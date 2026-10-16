@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub 四大顶级设计风格全景对比工作台 (Style Comparison)</title>
+  <style>
+    /* ========================================================
+       THEME DEFINITIONS: 4 DISTINCT DESIGN SYSTEMS
+       ======================================================== */
+    
+    /* 1. ANTHROPIC HUMANIST (典雅人文与智力感) */
+    .theme-anthropic {
+      --bg: #FAF7F2;
+      --card-bg: #FFFFFF;
+      --surface-subtle: #F3ECE2;
+      --border: #E5DFD5;
+      --border-dark: #D4CCC0;
+      --ink: #1F1E1D;
+      --body: #3C3A36;
+      --muted: #706D66;
+      --primary: #D97757;
+      --primary-hover: #C15F3C;
+      --accent-badge: #EBF2EE;
+      --accent-badge-text: #4E7060;
+      --font-display: "Songti SC", "Noto Serif SC", "Newsreader", Georgia, serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --radius-card: 6px;
+      --radius-btn: 4px;
+      --shadow-subtle: 0 4px 16px rgba(0, 0, 0, 0.03);
+      --calc-gradient: #FFFFFF;
+      --calc-border: 1px solid var(--border);
+    }
+
+    /* 2. LINEAR DARK GEEK (极客工程与极致效率暗黑) */
+    .theme-linear {
+      --bg: #08090A;
+      --card-bg: #101114;
+      --surface-subtle: #18191D;
+      --border: #23252A;
+      --border-dark: #32353D;
+      --ink: #F7F8F8;
+      --body: #D0D3D9;
+      --muted: #8A8F98;
+      --primary: #5E6AD2;
+      --primary-hover: #4F5BD5;
+      --accent-badge: rgba(94, 106, 210, 0.15);
+      --accent-badge-text: #828FFF;
+      --font-display: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", sans-serif;
+      --radius-card: 8px;
+      --radius-btn: 6px;
+      --shadow-subtle: 0 8px 32px rgba(0, 0, 0, 0.5);
+      --calc-gradient: linear-gradient(135deg, #15171C 0%, #0D0E12 100%);
+      --calc-border: 1px solid #2B2D35;
+    }
+
+    /* 3. VERCEL / SWISS GRID (瑞士国际主义黑白极简) */
+    .theme-vercel {
+      --bg: #000000;
+      --card-bg: #0A0A0A;
+      --surface-subtle: #1A1A1A;
+      --border: #333333;
+      --border-dark: #555555;
+      --ink: #FFFFFF;
+      --body: #EAEAEA;
+      --muted: #888888;
+      --primary: #FFFFFF;
+      --primary-hover: #CCCCCC;
+      --accent-badge: #1A1A1A;
+      --accent-badge-text: #FFFFFF;
+      --font-display: -apple-system, BlinkMacSystemFont, "Geist", "Helvetica Neue", sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Geist", "Helvetica Neue", sans-serif;
+      --radius-card: 0px;
+      --radius-btn: 0px;
+      --shadow-subtle: none;
+      --calc-gradient: #0A0A0A;
+      --calc-border: 1px solid #333333;
+    }
+
+    /* 4. RAYCAST / UNEED DIRECTORY (现代轻快与活力卡片目录) */
+    .theme-raycast {
+      --bg: #F8FAFC;
+      --card-bg: #FFFFFF;
+      --surface-subtle: #F1F5F9;
+      --border: #E2E8F0;
+      --border-dark: #CBD5E1;
+      --ink: #0F172A;
+      --body: #334155;
+      --muted: #64748B;
+      --primary: #7C3AED;
+      --primary-hover: #6D28D9;
+      --accent-badge: #EDE9FE;
+      --accent-badge-text: #6D28D9;
+      --font-display: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Segoe UI", sans-serif;
+      --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --radius-card: 12px;
+      --radius-btn: 8px;
+      --shadow-subtle: 0 10px 25px -5px rgba(15, 23, 42, 0.05);
+      --calc-gradient: linear-gradient(135deg, #4C1D95 0%, #1E1B4B 100%);
+      --calc-border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #090A0C;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      margin: 0;
+      padding: 0;
+      color: #FFF;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Comparison Control Header */
+    .comparison-controller {
+      position: sticky;
+      top: 0;
+      z-index: 9000;
+      background: #111216;
+      border-bottom: 1px solid #23252B;
+      padding: 0.75rem 1.75rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .controller-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: #F3F4F6;
+    }
+
+    .theme-selector {
+      display: flex;
+      background: #1A1C22;
+      border: 1px solid #2B2E37;
+      padding: 0.25rem;
+      border-radius: 8px;
+      gap: 0.25rem;
+    }
+
+    .theme-toggle-btn {
+      background: transparent;
+      border: none;
+      color: #9CA3AF;
+      padding: 0.45rem 0.9rem;
+      border-radius: 6px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .theme-toggle-btn:hover { color: #FFF; background: #262933; }
+    .theme-toggle-btn.active {
+      background: #3B82F6;
+      color: #FFF;
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.4);
+    }
+
+    /* Canvas Wrapper */
+    .canvas-wrap {
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1.5rem 5rem 1.5rem;
+      min-height: calc(100vh - 60px);
+    }
+
+    .app-canvas {
+      width: 100%;
+      max-width: 1240px;
+      background: var(--bg);
+      color: var(--body);
+      border-radius: var(--radius-card);
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7);
+      border: 1px solid var(--border);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* App Nav */
+    .canvas-header {
+      background: var(--bg);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 68px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand-box {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo-badge {
+      width: 32px;
+      height: 32px;
+      background: var(--primary);
+      color: #FFF;
+      border-radius: var(--radius-btn);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 900;
+      font-size: 1.1rem;
+    }
+    .brand-name {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+    .brand-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0.1rem 0.4rem;
+      border-radius: var(--radius-btn);
+      margin-left: 0.4rem;
+    }
+
+    .nav-links { display: flex; gap: 0.5rem; }
+    .nav-link {
+      font-size: 0.875rem;
+      color: var(--muted);
+      padding: 0.4rem 0.8rem;
+      border-radius: var(--radius-btn);
+      cursor: pointer;
+      font-weight: 500;
+      transition: all 0.12s;
+    }
+    .nav-link:hover { color: var(--ink); background: var(--surface-subtle); }
+    .nav-link.active { color: var(--ink); font-weight: 700; background: var(--surface-subtle); }
+
+    .header-cta-btn {
+      background: var(--primary);
+      color: #FFF;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-btn);
+      font-size: 0.825rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .header-cta-btn:hover { opacity: 0.9; }
+
+    /* Canvas Main Body */
+    .canvas-body {
+      padding: 2.5rem 2rem;
+      flex: 1;
+    }
+
+    /* Style Characteristic Badge */
+    .style-spec-banner {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      padding: 0.75rem 1.25rem;
+      border-radius: var(--radius-card);
+      margin-bottom: 2rem;
+      font-size: 0.825rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--ink);
+    }
+
+    /* Hero Headline */
+    .hero-h1 {
+      font-family: var(--font-display);
+      font-size: 2.25rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.25;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+    .hero-p {
+      font-size: 1rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+      max-width: 700px;
+      line-height: 1.6;
+    }
+
+    /* Subsidies Calculator Widget */
+    .calc-box {
+      background: var(--calc-gradient);
+      border: var(--calc-border);
+      border-radius: var(--radius-card);
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 2.5rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.25rem;
+      box-shadow: var(--shadow-subtle);
+    }
+    .calc-title {
+      font-family: var(--font-display);
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.25rem;
+    }
+    .calc-desc { font-size: 0.825rem; color: var(--muted); }
+
+    .calc-inputs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .calc-sel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.5rem 0.85rem;
+      border-radius: var(--radius-btn);
+      font-size: 0.825rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* 2 Column Main Section */
+    .two-cols {
+      display: grid;
+      grid-template-columns: 1.8fr 1.2fr;
+      gap: 2rem;
+    }
+
+    .block-h2 {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    /* Cards */
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+      transition: all 0.15s ease;
+      box-shadow: var(--shadow-subtle);
+      position: relative;
+    }
+    .info-card:hover {
+      border-color: var(--primary);
+    }
+
+    .info-card-title {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.4rem;
+      line-height: 1.4;
+    }
+    .info-card-meta {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.775rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+    }
+    .info-card-quote {
+      background: var(--surface-subtle);
+      border-left: 3px solid var(--primary);
+      padding: 0.6rem 0.85rem;
+      font-size: 0.825rem;
+      color: var(--body);
+      line-height: 1.55;
+      margin-bottom: 0.85rem;
+      border-radius: 0 var(--radius-btn) var(--radius-btn) 0;
+    }
+    .info-card-foot {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.75rem;
+    }
+
+    .card-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: var(--radius-btn);
+      font-size: 0.725rem;
+      font-weight: 700;
+      background: var(--accent-badge);
+      color: var(--accent-badge-text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-action {
+      background: var(--primary);
+      color: #FFF;
+      border: none;
+      padding: 0.4rem 0.85rem;
+      border-radius: var(--radius-btn);
+      font-size: 0.775rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn-action:hover { opacity: 0.9; }
+
+    /* Product Item */
+    .product-row {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-card);
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow-subtle);
+    }
+    .product-left { display: flex; align-items: center; gap: 0.85rem; }
+    .product-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--surface-subtle);
+      border-radius: var(--radius-btn);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      border: 1px solid var(--border);
+    }
+    .product-name {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.2rem;
+    }
+    .product-desc { font-size: 0.775rem; color: var(--muted); }
+
+    .upvote-box {
+      border: 1px solid var(--border);
+      background: var(--card-bg);
+      padding: 0.4rem 0.75rem;
+      border-radius: var(--radius-btn);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .upvote-box:hover, .upvote-box.upvoted {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--surface-subtle);
+    }
+
+    /* Toast */
+    .toast-popup {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: #111216;
+      color: #FFF;
+      padding: 0.85rem 1.4rem;
+      border-radius: 8px;
+      font-size: 0.875rem;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+      display: none;
+      z-index: 99999;
+      border: 1px solid #2B2E37;
+    }
+
+    @media (max-width: 900px) {
+      .two-cols { grid-template-columns: 1fr; }
+      .canvas-header { padding: 0 1rem; }
+      .canvas-body { padding: 1.5rem 1rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Top Fixed Style Switcher -->
+<div class="comparison-controller">
+  <div class="controller-title">
+    <span>🎨 OpcHub 四大设计风格实时对比系统：</span>
+  </div>
+  <div class="theme-selector">
+    <button class="theme-toggle-btn active" onclick="applyTheme('anthropic')">
+      <span>✨ 1. Anthropic 人文典雅</span>
+    </button>
+    <button class="theme-toggle-btn" onclick="applyTheme('linear')">
+      <span>⚡ 2. Linear 极客暗黑</span>
+    </button>
+    <button class="theme-toggle-btn" onclick="applyTheme('vercel')">
+      <span>📐 3. Vercel 瑞士黑白</span>
+    </button>
+    <button class="theme-toggle-btn" onclick="applyTheme('raycast')">
+      <span>🚀 4. Raycast 活力目录</span>
+    </button>
+  </div>
+</div>
+
+<!-- Main Canvas Viewport -->
+<div class="canvas-wrap">
+  <div class="app-canvas theme-anthropic" id="targetCanvas">
+
+    <!-- App Header -->
+    <header class="canvas-header">
+      <div class="brand-box">
+        <div class="brand-logo-badge">O</div>
+        <div class="brand-name">OpcHub</div>
+        <div class="brand-sub">一人公司生态</div>
+      </div>
+
+      <nav class="nav-links">
+        <div class="nav-link active">首页概览</div>
+        <div class="nav-link" onclick="triggerToast('🧭 切换至 SOP 全流程向导')">流程向导</div>
+        <div class="nav-link" onclick="triggerToast('📜 切换至 政策雷达智库')">政策雷达</div>
+        <div class="nav-link" onclick="triggerToast('🎁 切换至 算力与服务装备包')">装备包</div>
+        <div class="nav-link" onclick="triggerToast('🚀 切换至 创客产品展示橱窗')">产品橱窗</div>
+      </nav>
+
+      <button class="header-cta-btn" onclick="triggerToast('🚀 呼起低代码产品发布申请 Modal')">+ 发布我的产品</button>
+    </header>
+
+    <!-- App Body -->
+    <main class="canvas-body">
+
+      <!-- Current Style Spec Badge -->
+      <div class="style-spec-banner" id="styleDescriptionBar">
+        <div><strong>当前风格：</strong><span id="themeTitle">Anthropic 人文典雅风 (Claude.ai 风格)</span></div>
+        <div id="themeTraits">象牙暖沙底 · 衬线标题 · 标志性赤陶珊瑚红 · 高信噪比纸质感</div>
+      </div>
+
+      <!-- Hero Header -->
+      <h1 class="hero-h1">为每一个自成军团的超级个体提供后盾。</h1>
+      <p class="hero-p">连接政府真实政策补贴、聚合主流 Token 与云厂商折扣、提供全生命周期合规避坑向导与首发获客展厅。</p>
+
+      <!-- Subsidies Calculator Bar -->
+      <div class="calc-box">
+        <div>
+          <div class="calc-title">🎯 政策补贴 & 算力礼包一键测算</div>
+          <div class="calc-desc">基于 2026 最新官方目录秒级精准匹配增值税减免与无偿直补</div>
+        </div>
+        <div class="calc-inputs">
+          <select class="calc-sel" id="cityInput">
+            <option>📍 浙江 · 杭州市</option>
+            <option>📍 北京市</option>
+            <option>📍 广东省 · 深圳市</option>
+            <option>📍 上海市</option>
+          </select>
+          <select class="calc-sel" id="entityInput">
+            <option>个体工商户 (推荐极轻主体)</option>
+            <option>个人独资企业</option>
+            <option>科技型小微企业</option>
+          </select>
+          <button class="btn-action" onclick="runCalcAction()">⚡ 立即测算</button>
+        </div>
+      </div>
+
+      <!-- Core Content 2-Columns -->
+      <div class="two-cols">
+        <!-- Left: Policy Highlights -->
+        <div>
+          <div class="block-h2">
+            <span>📜 政策雷达 (高信噪比白话)</span>
+            <span class="card-badge">🟢 免费白话解读</span>
+          </div>
+
+          <div class="info-card">
+            <div class="info-card-title">小规模纳税人季度销售额 30 万元以下免征增值税</div>
+            <div class="info-card-meta">
+              <span>🏛️ 财政部 / 国家税务总局</span>
+              <span>📍 全国通用</span>
+              <span>🏷️ 税收减免</span>
+            </div>
+            <div class="info-card-quote">
+              💡 <strong>白话精要：</strong>只要单季度开具普通发票不超过 30 万元，全额免征增值税与城市建设附加税，极大减轻一人公司早期运营摩擦。
+            </div>
+            <div class="info-card-foot">
+              <span style="font-weight:600;">✓ 门槛硬指标：小规模纳税人主体</span>
+              <button class="btn-action" onclick="triggerToast('📄 正在呼出《增值税申报指引》官方解读抽屉...')">申报细则与原文 →</button>
+            </div>
+          </div>
+
+          <div class="info-card">
+            <div class="info-card-title">高校毕业生一次性创业无偿直补 ¥10,000</div>
+            <div class="info-card-meta">
+              <span>🏛️ 杭州市人力资源和社会保障局</span>
+              <span>📍 杭州市</span>
+              <span style="color:#D97757; font-weight:700;">⏳ 剩 18 天截止</span>
+            </div>
+            <div class="info-card-quote">
+              💡 <strong>白话精要：</strong>毕业 5 年内在杭设立个体户或企业，连续正常经营纳税满 6 个月，财政资金直接打入对公账户。
+            </div>
+            <div class="info-card-foot">
+              <span style="font-weight:600;">✓ 门槛：毕业 5 年内</span>
+              <button class="btn-action" onclick="triggerToast('🏛️ 前往浙江政务服务网官方申领通道...')">政务申报直达 →</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Perks & Showcase -->
+        <div>
+          <div class="block-h2">
+            <span>🎁 开发者装备包 (Perks)</span>
+            <span class="card-badge">🟠 厂商渠道返佣</span>
+          </div>
+
+          <div class="info-card">
+            <div style="font-size:0.75rem; font-weight:700; color:var(--muted); text-transform:uppercase;">SiliconFlow · 硅基流动</div>
+            <div class="info-card-title">2000 万 Token 专属免费额度 + 充值 8 折返佣</div>
+            <div style="font-size:0.825rem; color:var(--muted); margin-bottom:0.75rem;">极速调用 DeepSeek-V3 / Qwen 2.5 满血模型，专属渠道码即时生效。</div>
+            <div class="info-card-foot">
+              <span class="card-badge">🟠 渠道流水返佣</span>
+              <button class="btn-action" onclick="claimCoupon('SiliconFlow', 'OPCHUB2026')">复制优惠码 ↗</button>
+            </div>
+          </div>
+
+          <!-- Product Showcase -->
+          <div class="block-h2" style="margin-top:2rem;">
+            <span>🚀 优质创客橱窗 (Gallery)</span>
+            <span class="card-badge">🟣 创客付费展示</span>
+          </div>
+
+          <div class="product-row">
+            <div class="product-left">
+              <div class="product-icon">⚡</div>
+              <div>
+                <div class="product-name">DevAgent</div>
+                <div class="product-desc">@alex · 一人营销智能体 · 获客 800+</div>
+              </div>
+            </div>
+            <button class="upvote-box" onclick="voteToggle(this, 184)">▲ 184</button>
+          </div>
+
+          <div class="product-row">
+            <div class="product-left">
+              <div class="product-icon">🎨</div>
+              <div>
+                <div class="product-name">IconCraft</div>
+                <div class="product-desc">@sarah · AI 矢量图标生成器</div>
+              </div>
+            </div>
+            <button class="upvote-box" onclick="voteToggle(this, 96)">▲ 96</button>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Toast Box -->
+<div class="toast-popup" id="toast">通知内容</div>
+
+<script>
+  const themeSpecs = {
+    anthropic: {
+      title: "Anthropic 人文典雅风 (Claude.ai 风格)",
+      traits: "象牙暖沙底 · 典雅衬线标题 · 标志性赤陶珊瑚红 · 高信噪比纸质感"
+    },
+    linear: {
+      title: "Linear 极客工程暗黑风 (linear.app 风格)",
+      traits: "极致高对比暗黑 · 1px 微发光细边框 · 极速快捷键交互 · 像素级高信息密度"
+    },
+    vercel: {
+      title: "Vercel / Swiss Grid 瑞士国际主义黑白极简",
+      traits: "纯粹黑白单色 · 0圆角锐利几何 · 严谨瑞士网格线条 · 极度工程理性质感"
+    },
+    raycast: {
+      title: "Raycast / Uneed 现代轻快卡片目录风",
+      traits: "清爽 Slate 蓝灰底 · 活力紫与翡翠绿 · 大圆角卡片 · 社区化 Upvote 与发现感"
+    }
+  };
+
+  function applyTheme(themeName) {
+    const canvas = document.getElementById('targetCanvas');
+    canvas.className = 'app-canvas theme-' + themeName;
+
+    // Update active button
+    document.querySelectorAll('.theme-toggle-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.onclick.toString().includes(themeName));
+    });
+
+    // Update description bar
+    const spec = themeSpecs[themeName];
+    document.getElementById('themeTitle').innerText = spec.title;
+    document.getElementById('themeTraits').innerText = spec.traits;
+
+    triggerToast('✨ 已即时切换至：' + spec.title);
+  }
+
+  function runCalcAction() {
+    const city = document.getElementById('cityInput').value;
+    triggerToast('⚡ 测算完成：精准匹配到 2 项直补补贴与 3 项免税红利！');
+  }
+
+  function claimCoupon(vendor, code) {
+    navigator.clipboard.writeText(code).catch(() => {});
+    triggerToast('✅ 已复制 ' + vendor + ' 优惠码 [' + code + ']！正在跳转官方通道...');
+  }
+
+  function voteToggle(el, base) {
+    if (el.classList.contains('upvoted')) {
+      el.classList.remove('upvoted');
+      el.innerHTML = '▲ ' + base;
+      triggerToast('已取消赞同');
+    } else {
+      el.classList.add('upvoted');
+      el.innerHTML = '▲ ' + (base + 1);
+      triggerToast('🎉 Upvote +1 成功！');
+    }
+  }
+
+  let toastTimer = null;
+  function triggerToast(msg) {
+    const t = document.getElementById('toast');
+    t.innerText = msg;
+    t.style.display = 'block';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { t.style.display = 'none'; }, 2600);
+  }
+</script>
+
+</body>
+</html>
