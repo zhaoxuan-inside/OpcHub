@@ -623,6 +623,73 @@
       position: relative;
     }
 
+    /* ---------------- DAG Graph Orchestrator Styles (Liquid Glass Aligned) ---------------- */
+    .dag-canvas-container {
+      position: relative;
+      height: 490px;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      background: var(--glass-surface-subtle);
+      background-image: radial-gradient(var(--glass-border-subtle) 1.2px, transparent 1.2px);
+      background-size: 24px 24px;
+      overflow: hidden;
+      box-shadow: inset 0 2px 12px rgba(0, 0, 0, 0.04);
+    }
+    .svg-connections {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 1;
+    }
+    .dag-node {
+      position: absolute;
+      width: 210px;
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 12px 14px;
+      cursor: grab;
+      user-select: none;
+      z-index: 10;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .dag-node:active { cursor: grabbing; }
+    .dag-node.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow), var(--glass-specular);
+    }
+    .dag-node.pulse-running {
+      animation: nodePulse 0.7s ease-in-out infinite alternate;
+    }
+    @keyframes nodePulse {
+      0% { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+      100% { border-color: #34C759; box-shadow: 0 0 26px rgba(52, 199, 89, 0.6); }
+    }
+    .node-port {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--glass-surface-solid);
+      border: 2px solid var(--accent);
+      cursor: pointer;
+      z-index: 20;
+      transition: transform 0.15s, background-color 0.15s;
+    }
+    .node-port:hover {
+      transform: translateY(-50%) scale(1.35);
+      background: var(--accent);
+    }
+    .node-port.port-in { left: -6px; }
+    .node-port.port-out { right: -6px; }
+
     /* Modal Sheet */
     .sheet-modal {
       position: fixed; inset: 0;
@@ -1266,85 +1333,200 @@
          ========================================== -->
     <div id="view-backend-orch" class="view-panel">
       <div class="glass-box">
+        <!-- Header & Version Control Toolbar -->
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
-          <h1 class="page-title" style="font-size: 26px;">后端微内核流程编排与 Python 业务上传</h1>
-          <span class="mono-tag" style="background: rgba(255, 59, 48, 0.1); color: #FF3B30;">ADMIN PRIVILEGE REQUIRED</span>
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">后端微内核流程图可视化编排 · DAG Orchestrator</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">
+              所有原子方法均为图节点，通过 DAG 有向无环图串联编排，生成配置并根据工作版本热载生效。
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 4px 12px; font-size: 12px; font-family: var(--font-mono); display: flex; align-items: center; gap: 6px;">
+              <span style="color: var(--text-tertiary);">工作版本:</span>
+              <select id="dagVersionSelect" class="glass-select" style="width: auto; padding: 2px 6px; font-size: 11.5px; margin: 0; background: transparent; border: none;" onchange="switchWorkingDagVersion(this.value)">
+                <option value="v1.0.4-draft" selected>v1.0.4-draft (当前编辑态)</option>
+                <option value="v1.0.3-prod">v1.0.3 (线上运行态 · LIVE)</option>
+                <option value="v1.0.2-archived">v1.0.2 (历史归档)</option>
+              </select>
+              <span style="color: #34C759; font-size: 11px;">● 就绪</span>
+            </div>
+            <button class="btn-liquid-outline" onclick="previewDagConfigJson()">查看生成配置 (JSON)</button>
+            <button class="btn-liquid" onclick="deployDagConfiguration()">提交并加载生效</button>
+          </div>
         </div>
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
-          充血模型 + 单入口网关 (`POST /api/v1/gateway`) 架构。管理员上传业务脚本，通过 AST 安全沙箱语法校验后热注册进编排微内核。
-        </p>
 
-        <div class="grid-2" style="align-items: start;">
-          <!-- Left: Python Code Upload & Editor -->
-          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-              <h3 style="font-size: 15px; font-weight: 600;">上传业务逻辑脚本 (Python AST 沙箱)</h3>
-              <span class="mono-tag">FILE: invoice_tax_calc.py</span>
+        <!-- 3-Column Visual Orchestration Studio -->
+        <div style="display: grid; grid-template-columns: 220px 1fr 280px; gap: 16px; margin-top: 18px; align-items: start;">
+          
+          <!-- Column 1: Atomic Method Palette -->
+          <div style="background: var(--glass-surface-subtle); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle); display: flex; flex-direction: column; gap: 10px;">
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary); letter-spacing: 0.08em;">ATOMIC NODE PALETTE</div>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+              原子方法签名严格一致，点击即可置入中间画布：
             </div>
-            <textarea id="pythonCodeEditor" class="glass-textarea" rows="12" style="font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;">
-# 统一方法签名规范: async def (ctx: PipelineContext) -> PipelineContext
-async def execute(ctx: PipelineContext) -> PipelineContext:
-    """自动测算小规模纳税人增值税免征额与超额税负"""
-    quarterly_income = ctx.payload.get("quarterly_income", 0)
-    
-    if quarterly_income <= 300000:
-        ctx.payload["vat_exempt"] = True
-        ctx.payload["vat_due"] = 0
-        ctx.payload["status"] = "ELIGIBLE_FOR_EXEMPTION"
-    else:
-        ctx.payload["vat_exempt"] = False
-        ctx.payload["vat_due"] = round(quarterly_income * 0.01, 2)
-        ctx.payload["status"] = "TAX_PAYABLE"
-        
-    return ctx
-            </textarea>
-            <div style="display: flex; gap: 10px; margin-top: 14px;">
-              <button class="btn-liquid" onclick="validatePythonAST()">AST 安全编译与语法检测</button>
-              <button class="btn-liquid-outline" onclick="registerPipelineMethod()">热载注册入编排池</button>
+
+            <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">1. 门禁与流控节点</div>
+            <div class="sitemap-card" style="padding: 10px 12px;" onclick="addDagNodeToCanvas('auth_guard', '门禁拦截: 402鉴权', 'GUARD')">
+              <div style="font-weight: 600; font-size: 12.5px;">auth_guard</div>
+              <div style="font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono);">校验 ENT_VIP 凭证</div>
             </div>
-            <div id="astOutput" style="margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: #34C759; display: none;">
-              ✔ AST 安全检查通过: 无危险模块导入 (os/sys/subprocess 禁止调用), 方法签名符合 PipelineContext 协议。
+
+            <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">2. 业务算子 (Python热载)</div>
+            <div class="sitemap-card" style="padding: 10px 12px;" onclick="addDagNodeToCanvas('invoice_tax_calc', '小微免税测算算子', 'BIZ')">
+              <div style="font-weight: 600; font-size: 12.5px;">invoice_tax_calc</div>
+              <div style="font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono);">AST 安全沙箱脚本</div>
+            </div>
+            <div class="sitemap-card" style="padding: 10px 12px;" onclick="addDagNodeToCanvas('policy_matcher', '政策画像匹配', 'BIZ')">
+              <div style="font-weight: 600; font-size: 12.5px;">policy_matcher</div>
+              <div style="font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono);">创客资格审查</div>
+            </div>
+
+            <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">3. 存储与检索节点</div>
+            <div class="sitemap-card" style="padding: 10px 12px;" onclick="addDagNodeToCanvas('postgres_save', 'PG 实体持久化', 'STORAGE')">
+              <div style="font-weight: 600; font-size: 12.5px;">postgres_save</div>
+              <div style="font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono);">PostgreSQL 16</div>
+            </div>
+            <div class="sitemap-card" style="padding: 10px 12px;" onclick="addDagNodeToCanvas('es_audit_sync', 'ES日志与审计', 'STORAGE')">
+              <div style="font-weight: 600; font-size: 12.5px;">es_audit_sync</div>
+              <div style="font-size: 10.5px; color: var(--text-tertiary); font-family: var(--font-mono);">Elasticsearch 8.x</div>
             </div>
           </div>
 
-          <!-- Right: Scenario Pipeline Flow Builder -->
-          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
-              <h3 style="font-size: 15px; font-weight: 600;">场景编排管线 · Scenario Pipeline</h3>
-              <span class="mono-tag">SCENARIO: "tax.calculate_exemption"</span>
+          <!-- Column 2: Interactive Liquid Glass DAG Canvas -->
+          <div>
+            <div class="dag-canvas-container" id="dagCanvasWrapper">
+              <svg class="svg-connections" id="dagSvgConnections"></svg>
+
+              <!-- Node 1: Ingress -->
+              <div class="dag-node" id="dnode-1" style="top: 60px; left: 40px;" onclick="selectDagNode('dnode-1')">
+                <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 4px;">
+                  <span>GATEWAY_INGRESS</span>
+                  <span>#01</span>
+                </div>
+                <div style="font-weight: 600; font-size: 13.5px;">gateway_ingress</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">统一网关入参协议解析</div>
+                <div class="node-port port-out" title="连接输出端口" onmousedown="startDagConnecting('dnode-1', event)"></div>
+              </div>
+
+              <!-- Node 2: Guard -->
+              <div class="dag-node" id="dnode-2" style="top: 60px; left: 300px;" onclick="selectDagNode('dnode-2')">
+                <div class="node-port port-in" title="输入端口" onmouseup="endDagConnecting('dnode-2', event)"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 4px;">
+                  <span>GUARD · 402</span>
+                  <span>#02</span>
+                </div>
+                <div style="font-weight: 600; font-size: 13.5px;">auth_guard</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">校验 ENT_VIP 收费凭据</div>
+                <div class="node-port port-out" title="连接输出端口" onmousedown="startDagConnecting('dnode-2', event)"></div>
+              </div>
+
+              <!-- Node 3: Python Script -->
+              <div class="dag-node" id="dnode-3" style="top: 60px; left: 560px;" onclick="selectDagNode('dnode-3')">
+                <div class="node-port port-in" title="输入端口" onmouseup="endDagConnecting('dnode-3', event)"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 4px;">
+                  <span>PYTHON SCRIPT</span>
+                  <span>#03</span>
+                </div>
+                <div style="font-weight: 600; font-size: 13.5px;">invoice_tax_calc</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">小微增值税免征计算</div>
+                <div class="node-port port-out" title="连接输出端口" onmousedown="startDagConnecting('dnode-3', event)"></div>
+              </div>
+
+              <!-- Node 4: Storage -->
+              <div class="dag-node" id="dnode-4" style="top: 240px; left: 560px;" onclick="selectDagNode('dnode-4')">
+                <div class="node-port port-in" title="输入端口" onmouseup="endDagConnecting('dnode-4', event)"></div>
+                <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 4px;">
+                  <span>STORAGE & ES</span>
+                  <span>#04</span>
+                </div>
+                <div style="font-weight: 600; font-size: 13.5px;">es_audit_sync</div>
+                <div style="font-size: 11px; color: var(--text-tertiary);">审计写入与检索索引</div>
+              </div>
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
-                <div>
-                  <div style="font-weight: 600; font-size: 13px;">步骤 1: 权限与凭证拦截核验</div>
-                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">builtin.auth_guard (校验 402)</div>
-                </div>
-                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
+            <!-- Simulation Controls Bar -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px 16px; background: var(--glass-surface-subtle); border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
+              <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: #34C759; box-shadow: 0 0 8px #34C759;"></span>
+                <span>微内核已加载 4 节点 · 3 边 | 支持按住鼠标任意拖拽节点及重绘连线</span>
               </div>
+              <button class="btn-liquid" style="font-size: 12.5px; padding: 6px 14px;" onclick="runDagPulseSimulation()">
+                ▶ 仿真调度运行 (POST /api/v1/gateway)
+              </button>
+            </div>
+          </div>
 
-              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
-                <div>
-                  <div style="font-weight: 600; font-size: 13px;">步骤 2: 动态注册的税费测算算法</div>
-                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">custom.invoice_tax_calc.execute</div>
-                </div>
-                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
-              </div>
-
-              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
-                <div>
-                  <div style="font-weight: 600; font-size: 13px;">步骤 3: 审计日志与 Elasticsearch 索引</div>
-                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">builtin.audit_logger</div>
-                </div>
-                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
-              </div>
+          <!-- Column 3: Property Inspector -->
+          <div style="background: var(--glass-surface-subtle); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle); display: flex; flex-direction: column; gap: 12px;">
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary); letter-spacing: 0.08em;">NODE INSPECTOR</div>
+            
+            <div style="background: var(--glass-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px 12px;">
+              <div style="font-size: 11px; color: var(--text-tertiary);">当前选中节点</div>
+              <div style="font-weight: 600; font-size: 14px; margin-top: 2px;" id="dagInsTitle">invoice_tax_calc</div>
+              <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--accent);" id="dagInsType">TYPE: DYNAMIC_PYTHON_ACTION</div>
             </div>
 
-            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 18px;" onclick="testPipelineExecution()">
-              模拟单入口网关调度测试 (POST /api/v1/gateway)
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">绑定场景 (Scenario Code)</label>
+              <input type="text" class="glass-input" id="dagInsScenario" value="tax.calculate_vat_exemption">
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">超时与重试策略</label>
+              <select class="glass-select">
+                <option selected>超时 5000ms · 重试 1 次</option>
+                <option>超时 3000ms · 无重试</option>
+                <option>超时 10000ms · 指数退避 3 次</option>
+              </select>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">断言条件表达式 (Python/Expression)</label>
+              <textarea class="glass-textarea" rows="2">ctx.payload.get("quarterly_income") is not None</textarea>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 0;">
+              <label class="form-label">门禁拦截配置 (402 鉴权)</label>
+              <input type="text" class="glass-input" value="ENT_POL_VIP (未持有时中断并弹出收银台)">
+            </div>
+
+            <button class="btn-liquid-outline" style="color: #FF3B30; margin-top: 8px; justify-content: center;" onclick="deleteSelectedDagNode()">
+              删除当前选中的节点
             </button>
-            <div id="pipelineTestResult" style="margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); background: var(--glass-surface-solid); padding: 12px; border-radius: 6px; display: none;">
-              HTTP 200 OK | Pipeline Execution: 14ms | Payload: {"vat_exempt": true, "vat_due": 0, "status": "ELIGIBLE_FOR_EXEMPTION"}
+          </div>
+        </div>
+
+        <!-- Collapsible AST Python Script Upload Panel -->
+        <div style="margin-top: 24px; border-top: 1px solid var(--glass-border-subtle); padding-top: 20px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div>
+              <span style="font-weight: 600; font-size: 15px;">Python 业务脚本热载上传与 AST 安全沙箱</span>
+              <span class="mono-tag" style="margin-left: 8px;">FILE: invoice_tax_calc.py</span>
+            </div>
+            <button class="btn-liquid-outline" style="font-size: 12px; padding: 4px 10px;" onclick="toggleScriptPanel()">收起/展开编辑器</button>
+          </div>
+
+          <div id="dagScriptContainer">
+            <textarea id="pythonCodeEditor" class="glass-textarea" rows="7" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6;">
+# 统一方法签名: async def (ctx: PipelineContext) -> PipelineContext
+async def execute(ctx: PipelineContext) -> PipelineContext:
+    """自动测算小规模纳税人增值税免征额"""
+    income = ctx.payload.get("quarterly_income", 0)
+    if income <= 300000:
+        ctx.payload["vat_exempt"] = True
+        ctx.payload["vat_due"] = 0
+    else:
+        ctx.payload["vat_exempt"] = False
+        ctx.payload["vat_due"] = round(income * 0.01, 2)
+    return ctx
+            </textarea>
+            <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
+              <button class="btn-liquid" onclick="validatePythonAST()">AST 静态语法检测与安全编译</button>
+              <button class="btn-liquid-outline" onclick="registerPipelineMethod()">热载注册至节点库</button>
+              <span id="astOutput" style="font-family: var(--font-mono); font-size: 12px; color: #34C759; display: none;">
+                ✔ AST 检查通过: 无危险系统模块，已注册进微内核字典。
+              </span>
             </div>
           </div>
         </div>
@@ -1484,7 +1666,13 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             b.classList.add('active');
           }
         });
+      if (viewName === 'backend-orch') {
+        setTimeout(() => {
+          initDagDraggables();
+          renderDagEdges();
+        }, 50);
       }
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -1497,6 +1685,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       document.documentElement.setAttribute('data-theme', target);
       localStorage.setItem('opchub_complete_theme', target);
       updateThemeLabel(target);
+      renderDagEdges();
     }
 
     function updateThemeLabel(theme) {
@@ -1664,16 +1853,231 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
     }
 
-    function claimPerk(perkName) {
-      alert(`已成功领用特权：${perkName}，兑换凭证已存入您的创客权益背包！`);
+    // -------------------------------------------------------------
+    // DAG Graph State & Dragging Controller (Liquid Glass Visual Orchestrator)
+    // -------------------------------------------------------------
+    const dagState = {
+      version: "v1.0.4-draft",
+      scenario: "tax.calculate_vat_exemption",
+      nodes: [
+        { id: "dnode-1", name: "gateway_ingress", type: "GATEWAY", x: 40, y: 60 },
+        { id: "dnode-2", name: "auth_guard", type: "GUARD", x: 300, y: 60 },
+        { id: "dnode-3", name: "invoice_tax_calc", type: "BIZ", x: 560, y: 60 },
+        { id: "dnode-4", name: "es_audit_sync", type: "STORAGE", x: 560, y: 240 }
+      ],
+      edges: [
+        { from: "dnode-1", to: "dnode-2" },
+        { from: "dnode-2", to: "dnode-3" },
+        { from: "dnode-3", to: "dnode-4" }
+      ],
+      selectedNodeId: "dnode-3"
+    };
+
+    let activeDagDrag = null;
+    let dagDragOffset = { x: 0, y: 0 };
+    let connectingPortSource = null;
+
+    function renderDagEdges() {
+      const svg = document.getElementById("dagSvgConnections");
+      const wrapper = document.getElementById("dagCanvasWrapper");
+      if (!svg || !wrapper) return;
+      svg.innerHTML = "";
+      const wrapperRect = wrapper.getBoundingClientRect();
+
+      dagState.edges.forEach(edge => {
+        const fromEl = document.getElementById(edge.from);
+        const toEl = document.getElementById(edge.to);
+        if (!fromEl || !toEl) return;
+
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+
+        const x1 = fromRect.right - wrapperRect.left;
+        const y1 = fromRect.top + fromRect.height / 2 - wrapperRect.top;
+
+        const x2 = toRect.left - wrapperRect.left;
+        const y2 = toRect.top + toRect.height / 2 - wrapperRect.top;
+
+        const dx = Math.max(Math.abs(x2 - x1) * 0.5, 30);
+        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+        path.setAttribute("stroke", isDark ? "#2997FF" : "#0071E3");
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("opacity", "0.75");
+        path.setAttribute("stroke-linecap", "round");
+        svg.appendChild(path);
+      });
     }
 
-    function openPostModal() {
-      const title = prompt("请输入您要发布的交流帖子标题：");
-      if (title) {
-        alert("帖子已发布至交流贴吧！");
+    function initDagDraggables() {
+      document.querySelectorAll(".dag-node").forEach(node => {
+        node.onmousedown = (e) => {
+          if (e.target.classList.contains("node-port")) return;
+          activeDagDrag = node;
+          const rect = node.getBoundingClientRect();
+          dagDragOffset.x = e.clientX - rect.left;
+          dagDragOffset.y = e.clientY - rect.top;
+        };
+      });
+    }
+
+    document.addEventListener("mousemove", (e) => {
+      if (!activeDagDrag) return;
+      const canvas = document.getElementById("dagCanvasWrapper");
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+
+      let x = e.clientX - rect.left - dagDragOffset.x;
+      let y = e.clientY - rect.top - dagDragOffset.y;
+
+      x = Math.max(10, Math.min(x, rect.width - 230));
+      y = Math.max(10, Math.min(y, rect.height - 120));
+
+      activeDagDrag.style.left = `${x}px`;
+      activeDagDrag.style.top = `${y}px`;
+      renderDagEdges();
+    });
+
+    document.addEventListener("mouseup", () => {
+      activeDagDrag = null;
+    });
+
+    function selectDagNode(id) {
+      document.querySelectorAll(".dag-node").forEach(n => n.classList.remove("selected"));
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add("selected");
+        dagState.selectedNodeId = id;
+        const nodeObj = dagState.nodes.find(n => n.id === id);
+        if (nodeObj) {
+          document.getElementById("dagInsTitle").textContent = nodeObj.name;
+          document.getElementById("dagInsType").textContent = "TYPE: " + nodeObj.type;
+        }
       }
     }
-  </script>
+
+    function addDagNodeToCanvas(actionName, subtitle, type) {
+      const id = "dnode-" + Date.now();
+      const node = document.createElement("div");
+      node.className = "dag-node";
+      node.id = id;
+      node.style.top = "150px";
+      node.style.left = "220px";
+      node.onclick = () => selectDagNode(id);
+
+      node.innerHTML = `
+        <div class="node-port port-in" title="输入端口" onmouseup="endDagConnecting('${id}', event)"></div>
+        <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--accent); margin-bottom: 4px;">
+          <span>${type}</span>
+          <span>#NEW</span>
+        </div>
+        <div style="font-weight: 600; font-size: 13.5px;">${actionName}</div>
+        <div style="font-size: 11px; color: var(--text-tertiary);">${subtitle}</div>
+        <div class="node-port port-out" title="连接输出端口" onmousedown="startDagConnecting('${id}', event)"></div>
+      `;
+
+      document.getElementById("dagCanvasWrapper").appendChild(node);
+      dagState.nodes.push({ id, name: actionName, type, x: 220, y: 150 });
+      initDagDraggables();
+      selectDagNode(id);
+      renderDagEdges();
+    }
+
+    function deleteSelectedDagNode() {
+      if (!dagState.selectedNodeId || dagState.selectedNodeId === "dnode-1") {
+        alert("网关入参协议解析节点不允许删除！");
+        return;
+      }
+      const el = document.getElementById(dagState.selectedNodeId);
+      if (el) el.remove();
+      dagState.edges = dagState.edges.filter(e => e.from !== dagState.selectedNodeId && e.to !== dagState.selectedNodeId);
+      dagState.nodes = dagState.nodes.filter(n => n.id !== dagState.selectedNodeId);
+      renderDagEdges();
+      selectDagNode("dnode-1");
+    }
+
+    function startDagConnecting(sourceId, e) {
+      e.stopPropagation();
+      connectingPortSource = sourceId;
+    }
+
+    function endDagConnecting(targetId, e) {
+      e.stopPropagation();
+      if (connectingPortSource && connectingPortSource !== targetId) {
+        const exists = dagState.edges.some(edge => edge.from === connectingPortSource && edge.to === targetId);
+        if (!exists) {
+          dagState.edges.push({ from: connectingPortSource, to: targetId });
+          renderDagEdges();
+        }
+      }
+      connectingPortSource = null;
+    }
+
+    function generateDagConfigJson() {
+      return JSON.stringify({
+        version: dagState.version,
+        scenario_code: document.getElementById("dagInsScenario").value,
+        timestamp: new Date().toISOString(),
+        execution_graph: {
+          topology: "DAG",
+          entry_node: "dnode-1",
+          nodes: dagState.nodes.map(n => ({
+            id: n.id,
+            action_handler: n.name,
+            type: n.type,
+            retry: 1,
+            timeout_ms: 5000
+          })),
+          edges: dagState.edges
+        }
+      }, null, 2);
+    }
+
+    function previewDagConfigJson() {
+      const json = generateDagConfigJson();
+      alert("【微内核 DAG 编排配置生成成功】\n\n" + json);
+    }
+
+    function deployDagConfiguration() {
+      alert(`已成功向后端框架提交 DAG 流程图配置！\n工作版本 [${dagState.version}] 已编译加载至微内核执行引擎中，即刻生效！`);
+    }
+
+    function switchWorkingDagVersion(ver) {
+      dagState.version = ver;
+      alert(`已切换微内核上下文为版本 [${ver}]，对应 DAG 图拓扑已同步重载！`);
+    }
+
+    async function runDagPulseSimulation() {
+      const order = ["dnode-1", "dnode-2", "dnode-3", "dnode-4"];
+      for (const id of order) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.add("pulse-running");
+          await new Promise(r => setTimeout(r, 600));
+          el.classList.remove("pulse-running");
+        }
+      }
+      alert("✔ 调度链路仿真成功！\n入参: {quarterly_income: 280000}\n结果: HTTP 200 OK | Pipeline: 12ms | 免税判定: TRUE (免征增值税)");
+    }
+
+    function toggleScriptPanel() {
+      const el = document.getElementById("dagScriptContainer");
+      if (el.style.display === "none") {
+        el.style.display = "block";
+      } else {
+        el.style.display = "none";
+      }
+    }
+
+    window.addEventListener("DOMContentLoaded", () => {
+      initDagDraggables();
+      selectDagNode("dnode-3");
+      setTimeout(renderDagEdges, 300);
+    });
+    window.addEventListener("resize", renderDagEdges);
 </body>
 </html>
