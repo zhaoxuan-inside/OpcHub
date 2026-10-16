@@ -1,0 +1,1095 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub — Liquid Glass Editorial OS</title>
+  <style>
+    /* -------------------------------------------------------------
+       Apple VisionOS & Liquid Glass (液态玻璃) Design System
+       - Multi-layer Frosted Refraction & Specular Highlights
+       - Floating Iridescent Ambient Mesh Underlay
+       - Apple SF Pro & iA Writer Monospace Craftsmanship
+       - Zero Cheap Icons, Zero Button Overload, Supreme Elegance
+    -------------------------------------------------------------- */
+
+    :root {
+      /* Light Mode: Iridescent Pearl & Liquid Glass */
+      --bg-canvas: #F8F9FD;
+      --glass-surface: rgba(255, 255, 255, 0.65);
+      --glass-surface-hover: rgba(255, 255, 255, 0.85);
+      --glass-surface-subtle: rgba(245, 247, 252, 0.5);
+      --glass-border: rgba(255, 255, 255, 0.8);
+      --glass-border-subtle: rgba(0, 0, 0, 0.06);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow-hover: 0 20px 48px 0 rgba(31, 38, 135, 0.12), 0 4px 12px 0 rgba(0, 0, 0, 0.04);
+
+      --text-primary: #121316;
+      --text-secondary: #4B4E56;
+      --text-tertiary: #7D828D;
+      --text-quaternary: #A0A5B1;
+
+      --accent: #0071E3;
+      --accent-glow: rgba(0, 113, 227, 0.25);
+      --accent-glass: rgba(0, 113, 227, 0.08);
+
+      --orb-1: rgba(142, 197, 252, 0.45);
+      --orb-2: rgba(224, 195, 252, 0.4);
+      --orb-3: rgba(186, 230, 253, 0.35);
+
+      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --font-mono: "SF Mono", "iA Writer Mono", "Menlo", monospace;
+
+      --blur-strength: blur(24px) saturate(190%);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+      --transition-liquid: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      /* Dark Mode: Cosmic Obsidian & Luminous Liquid Glass */
+      --bg-canvas: #090A0F;
+      --glass-surface: rgba(18, 20, 29, 0.6);
+      --glass-surface-hover: rgba(28, 31, 44, 0.75);
+      --glass-surface-subtle: rgba(15, 17, 24, 0.45);
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-border-subtle: rgba(255, 255, 255, 0.06);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.04);
+      --glass-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.55), 0 4px 12px 0 rgba(0, 0, 0, 0.35);
+      --glass-shadow-hover: 0 24px 60px 0 rgba(0, 0, 0, 0.75), 0 8px 24px 0 rgba(41, 151, 255, 0.15);
+
+      --text-primary: #F5F7FA;
+      --text-secondary: #A6ACBA;
+      --text-tertiary: #757C8A;
+      --text-quaternary: #4D5360;
+
+      --accent: #2997FF;
+      --accent-glow: rgba(41, 151, 255, 0.35);
+      --accent-glass: rgba(41, 151, 255, 0.14);
+
+      --orb-1: rgba(56, 75, 140, 0.4);
+      --orb-2: rgba(99, 44, 133, 0.3);
+      --orb-3: rgba(28, 100, 148, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 15px;
+      line-height: 1.6;
+      letter-spacing: -0.012em;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    /* ---------------- Fluid Liquid Ambient Orbs (液态漫射光晕) ---------------- */
+    .ambient-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .ambient-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.85;
+      animation: floatMotion 22s infinite alternate ease-in-out;
+    }
+
+    .orb-1 {
+      width: 650px;
+      height: 650px;
+      background: radial-gradient(circle, var(--orb-1) 0%, transparent 70%);
+      top: -120px;
+      left: -100px;
+    }
+
+    .orb-2 {
+      width: 750px;
+      height: 750px;
+      background: radial-gradient(circle, var(--orb-2) 0%, transparent 70%);
+      top: 25%;
+      right: -150px;
+      animation-duration: 26s;
+      animation-delay: -6s;
+    }
+
+    .orb-3 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--orb-3) 0%, transparent 70%);
+      bottom: -150px;
+      left: 20%;
+      animation-duration: 28s;
+      animation-delay: -11s;
+    }
+
+    @keyframes floatMotion {
+      0% {
+        transform: translate(0px, 0px) scale(1);
+      }
+      50% {
+        transform: translate(60px, 45px) scale(1.08);
+      }
+      100% {
+        transform: translate(-45px, 70px) scale(0.94);
+      }
+    }
+
+    /* ---------------- Floating Liquid Glass Header ---------------- */
+    header {
+      position: sticky;
+      top: 16px;
+      z-index: 100;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .nav-glass-bar {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 0 24px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: var(--transition-liquid);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .brand-prism-mark {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-subtitle {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      font-weight: 400;
+      margin-left: 2px;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 26px;
+    }
+
+    .nav-link {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 500;
+      position: relative;
+      transition: var(--transition-liquid);
+    }
+
+    .nav-link:hover, .nav-link.active {
+      color: var(--text-primary);
+    }
+
+    .nav-link.active::after {
+      content: "";
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      right: 0;
+      height: 2px;
+      border-radius: 1px;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* ---------------- Liquid Switcher ---------------- */
+    .theme-glass-btn {
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      border-radius: var(--radius-full);
+      padding: 5px 14px;
+      font-size: 12px;
+      font-weight: 500;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      box-shadow: var(--glass-specular);
+      transition: var(--transition-liquid);
+    }
+
+    .theme-glass-btn:hover {
+      background: var(--glass-surface-hover);
+      transform: scale(1.02);
+      border-color: var(--glass-border);
+    }
+
+    .theme-liquid-indicator {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      transition: var(--transition-liquid);
+    }
+
+    /* ---------------- Main Layout ---------------- */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 60px 24px 120px;
+    }
+
+    /* ---------------- Hero Section (Liquid Glass Aura) ---------------- */
+    .hero {
+      margin-bottom: 72px;
+      padding: 48px;
+      border-radius: var(--radius-lg);
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-liquid);
+    }
+
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-tertiary);
+      margin-bottom: 16px;
+      display: inline-block;
+      padding: 4px 10px;
+      background: var(--glass-surface-subtle);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border-subtle);
+    }
+
+    .hero-headline {
+      font-family: var(--font-display);
+      font-size: 46px;
+      line-height: 1.12;
+      font-weight: 600;
+      letter-spacing: -0.038em;
+      color: var(--text-primary);
+      margin-bottom: 18px;
+      max-width: 800px;
+    }
+
+    .hero-lead {
+      font-size: 16px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+      max-width: 660px;
+      font-weight: 400;
+      margin-bottom: 36px;
+    }
+
+    .hero-glass-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      padding-top: 28px;
+      border-top: 1px solid var(--glass-border-subtle);
+    }
+
+    .stat-card {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-number {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+    }
+
+    .stat-desc {
+      font-size: 12px;
+      color: var(--text-tertiary);
+      margin-top: 2px;
+    }
+
+    /* ---------------- Section Typography ---------------- */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 21px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .section-action {
+      font-size: 13px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      transition: var(--transition-liquid);
+    }
+
+    .section-action:hover {
+      opacity: 0.8;
+    }
+
+    /* ---------------- Liquid Glass Cards Grid ---------------- */
+    .glass-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-bottom: 72px;
+    }
+
+    @media (max-width: 880px) {
+      .glass-grid {
+        grid-template-columns: 1fr;
+      }
+      .hero-headline {
+        font-size: 32px;
+      }
+      .hero {
+        padding: 28px;
+      }
+      .hero-glass-stats {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    .glass-card {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 26px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-liquid);
+    }
+
+    /* Refractive Liquid Light Sheen */
+    .glass-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 45%;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, transparent 100%);
+      pointer-events: none;
+      border-top-left-radius: inherit;
+      border-top-right-radius: inherit;
+    }
+
+    .glass-card:hover {
+      background: var(--glass-surface-hover);
+      transform: translateY(-3px);
+      box-shadow: var(--glass-shadow-hover), var(--glass-specular);
+      border-color: rgba(255, 255, 255, 0.4);
+    }
+
+    [data-theme="dark"] .glass-card:hover {
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+
+    .card-top {
+      margin-bottom: 22px;
+    }
+
+    .card-meta-line {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .mono-index {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-tertiary);
+      letter-spacing: 0.05em;
+    }
+
+    .mono-pill {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: var(--radius-full);
+      background: var(--glass-surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--glass-border-subtle);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.015em;
+      color: var(--text-primary);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .card-description {
+      font-size: 13px;
+      line-height: 1.6;
+      color: var(--text-secondary);
+    }
+
+    .card-footer {
+      border-top: 1px solid var(--glass-border-subtle);
+      padding-top: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 18px;
+    }
+
+    .card-status-text {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .glass-text-action {
+      font-size: 13px;
+      color: var(--text-primary);
+      text-decoration: none;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: var(--transition-liquid);
+    }
+
+    .glass-text-action:hover {
+      color: var(--accent);
+    }
+
+    /* ---------------- SOP Liquid Roadmap ---------------- */
+    .sop-glass-container {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      overflow: hidden;
+      margin-bottom: 72px;
+    }
+
+    .sop-row {
+      display: grid;
+      grid-template-columns: 80px 240px 1fr 140px;
+      align-items: center;
+      padding: 20px 28px;
+      border-bottom: 1px solid var(--glass-border-subtle);
+      transition: var(--transition-liquid);
+    }
+
+    .sop-row:last-child {
+      border-bottom: none;
+    }
+
+    .sop-row:hover {
+      background: var(--glass-surface-subtle);
+    }
+
+    .sop-num {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .sop-name {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .sop-summary {
+      font-size: 13px;
+      color: var(--text-secondary);
+      padding-right: 24px;
+    }
+
+    .sop-badge {
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .sop-badge.active-glow {
+      color: var(--accent);
+      font-weight: 500;
+    }
+
+    /* ---------------- Microkernel Console ---------------- */
+    .kernel-glass-box {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 32px;
+      margin-bottom: 72px;
+    }
+
+    .kernel-code-window {
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 22px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--text-primary);
+      overflow-x: auto;
+      box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .kernel-code-window .kw {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .kernel-code-window .comm {
+      color: var(--text-tertiary);
+    }
+
+    /* ---------------- Liquid Frosted Modal (visionOS style) ---------------- */
+    .modal-backdrop {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.24s ease;
+    }
+
+    .modal-backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .liquid-modal-panel {
+      background: var(--glass-surface);
+      backdrop-filter: blur(40px) saturate(210%);
+      -webkit-backdrop-filter: blur(40px) saturate(210%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-shadow-hover), var(--glass-specular);
+      padding: 36px;
+      width: 100%;
+      max-width: 440px;
+      transform: translateY(16px) scale(0.97);
+      transition: var(--transition-liquid);
+    }
+
+    .modal-backdrop.active .liquid-modal-panel {
+      transform: translateY(0) scale(1);
+    }
+
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 8px;
+    }
+
+    .modal-text {
+      font-size: 13px;
+      color: var(--text-secondary);
+      margin-bottom: 24px;
+      line-height: 1.55;
+    }
+
+    .modal-price-card {
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      margin-bottom: 24px;
+      background: var(--glass-surface-subtle);
+    }
+
+    .price-num {
+      font-family: var(--font-display);
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .price-caption {
+      font-size: 12px;
+      color: var(--text-tertiary);
+    }
+
+    .modal-btn-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .btn-liquid-primary {
+      flex: 1;
+      background: var(--text-primary);
+      color: var(--bg-canvas);
+      border: none;
+      padding: 10px 18px;
+      border-radius: var(--radius-full);
+      font-size: 14px;
+      font-weight: 500;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+      transition: var(--transition-liquid);
+    }
+
+    .btn-liquid-primary:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-liquid-dismiss {
+      background: var(--glass-surface-subtle);
+      color: var(--text-secondary);
+      border: 1px solid var(--glass-border-subtle);
+      padding: 10px 18px;
+      border-radius: var(--radius-full);
+      font-size: 14px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+
+    .btn-liquid-dismiss:hover {
+      color: var(--text-primary);
+      border-color: var(--glass-border);
+    }
+
+    /* ---------------- Footer ---------------- */
+    footer {
+      border-top: 1px solid var(--glass-border-subtle);
+      padding: 40px 0;
+      color: var(--text-tertiary);
+      font-size: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-left {
+      font-family: var(--font-mono);
+    }
+
+    .footer-nav a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      margin-left: 20px;
+      transition: var(--transition-liquid);
+    }
+
+    .footer-nav a:hover {
+      color: var(--text-primary);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Background Fluid Ambient Mesh Lights (液态弥散光晕，赋予界面呼吸与折射感) -->
+  <div class="ambient-container">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+  </div>
+
+  <!-- Floating Liquid Glass Navigation Bar -->
+  <header>
+    <div class="nav-glass-bar">
+      <div class="brand-group">
+        <div class="brand-prism-mark"></div>
+        <span class="brand-title">OpcHub</span>
+        <span class="brand-subtitle">Liquid OS</span>
+      </div>
+
+      <nav class="nav-links">
+        <a href="#sop" class="nav-link active">向导路径</a>
+        <a href="#policy" class="nav-link">政策内参</a>
+        <a href="#perks" class="nav-link">基础设施</a>
+        <a href="#kernel" class="nav-link">编排内核</a>
+      </nav>
+
+      <div class="nav-actions">
+        <!-- Liquid Glass Mode Switcher -->
+        <button class="theme-glass-btn" id="themeBtn" onclick="toggleTheme()">
+          <span class="theme-liquid-indicator"></span>
+          <span id="themeText">深色模式</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero Section (Frosted Liquid Glass Surface) -->
+    <section class="hero">
+      <div class="hero-eyebrow">LIQUID CRYSTAL EDITION 2026.10</div>
+      <h1 class="hero-headline">让超级个体，在晶莹呼吸的液态工作台优雅运行。</h1>
+      <p class="hero-lead">
+        融合 Apple VisionOS 与流体折射玻璃质感。以剔除冗余的出版物排版与灵动的液态弥散光泽，呈现一人公司全流程合规 SOP、政策雷达与基建算力特权。
+      </p>
+
+      <div class="hero-glass-stats">
+        <div class="stat-card">
+          <span class="stat-number">6 个阶段</span>
+          <span class="stat-desc">全闭环合规 SOP 流程</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">124 项</span>
+          <span class="stat-desc">政策雷达与白话提炼</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-number">¥86,000+</span>
+          <span class="stat-desc">平均算力与基建优惠</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 1: SOP Roadmap -->
+    <section id="sop" style="margin-bottom: 72px;">
+      <div class="section-header">
+        <h2 class="section-title">创客合规 SOP 向导</h2>
+        <a href="javascript:void(0)" class="section-action">导出清单 ›</a>
+      </div>
+
+      <div class="sop-glass-container">
+        <div class="sop-row">
+          <span class="sop-num">01</span>
+          <span class="sop-name">主体设立与税务定种</span>
+          <span class="sop-summary">个体工商户与小规模纳税人选型，开通电子税务局与银行对公基本户。</span>
+          <span class="sop-badge active-glow">已达成</span>
+        </div>
+        <div class="sop-row">
+          <span class="sop-num">02</span>
+          <span class="sop-name">数电发票与离岸资金流</span>
+          <span class="sop-summary">配置税务数电开票授信额度，绑定 Stripe / 派安盈合规结汇通道。</span>
+          <span class="sop-badge active-glow">已达成</span>
+        </div>
+        <div class="sop-row">
+          <span class="sop-num">03</span>
+          <span class="sop-name">知识产权与高新入库</span>
+          <span class="sop-summary">软件著作权申请，申报科技型中小企业入库登记以获取研发税收抵扣。</span>
+          <span class="sop-badge">进行中 65%</span>
+        </div>
+        <div class="sop-row">
+          <span class="sop-num">04</span>
+          <span class="sop-name">政府算力券与房租补贴</span>
+          <span class="sop-summary">匹配地方孵化器政策，申领年审算力券与首年度入驻减免。</span>
+          <span class="sop-badge">前置项核对</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Policy Radar -->
+    <section id="policy" style="margin-bottom: 72px;">
+      <div class="section-header">
+        <h2 class="section-title">政策雷达与白话提炼</h2>
+        <a href="javascript:void(0)" class="section-action">全部 124 份条目 ›</a>
+      </div>
+
+      <div class="glass-grid">
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">POL-2026-081</span>
+              <span class="mono-pill">财税减免</span>
+            </div>
+            <h3 class="card-title">小微企业增值税月销售额 10 万以下免征延续</h3>
+            <p class="card-description">按季申报纳税人季销售额 30 万元以内的免征增值税政策平稳接续，适用于未达到一般纳税人标准的个体经营者。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">截止 2027 年 12 月</span>
+            <a href="javascript:void(0)" class="glass-text-action">阅读细则 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">POL-2026-094</span>
+              <span class="mono-pill">算力赋能</span>
+            </div>
+            <h3 class="card-title">智能算力补贴券申领指引 (第 3 批)</h3>
+            <p class="card-description">针对自研大模型微调与 Agent 应用部署的企业，提供最高 30% 算力租赁费用返还，按季兑付直达银行账户。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">申报中 · 剩余 12 天</span>
+            <a href="javascript:void(0)" class="glass-text-action">匹配条件 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">POL-2026-102</span>
+              <span class="mono-pill">创客权益</span>
+            </div>
+            <h3 class="card-title">超级个体年度高价值商业线索内参</h3>
+            <p class="card-description">包含长三角与大湾区政府采购意向清单、前沿 AI 原生应用外包寻源需求，需持有高级创客权益方可查看具体联系方式。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">专享凭证解锁</span>
+            <a href="javascript:void(0)" class="glass-text-action" onclick="openPayment('超级个体年度商业线索凭证', 499)">解锁详情 ›</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: Perks & Infrastructure -->
+    <section id="perks" style="margin-bottom: 72px;">
+      <div class="section-header">
+        <h2 class="section-title">开发者基础设施权益</h2>
+        <a href="javascript:void(0)" class="section-action">管理所有凭据 ›</a>
+      </div>
+
+      <div class="glass-grid">
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">PERK-AWS-01</span>
+              <span class="mono-pill">云基础设施</span>
+            </div>
+            <h3 class="card-title">AWS Activate 创客计划</h3>
+            <p class="card-description">为认证超级个体提供 $5,000 云服务积分与全球技术支持额度，覆盖 EC2、Bedrock 及 S3 存储。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">认证用户免费</span>
+            <a href="javascript:void(0)" class="glass-text-action">领取兑换码 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">PERK-OPENAI-04</span>
+              <span class="mono-pill">AI 算力</span>
+            </div>
+            <h3 class="card-title">OpenAI Tier-4 专属并发加速</h3>
+            <p class="card-description">解除 TPM 与 RPM 频率限制，享有全球边缘节点低延迟路由特权，适合轻量级 Agent 商业化运行。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">已连接通道</span>
+            <a href="javascript:void(0)" class="glass-text-action">配置网关 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div class="card-top">
+            <div class="card-meta-line">
+              <span class="mono-index">PERK-PRO-FEATURE</span>
+              <span class="mono-pill">付费尊享</span>
+            </div>
+            <h3 class="card-title">出海独立站 Stripe 费率专属折扣</h3>
+            <p class="card-description">年结算手续费降低 0.4%，支持多币种自动本地结算，需绑定商业高级席位凭据。</p>
+          </div>
+          <div class="card-footer">
+            <span class="card-status-text">年费凭证</span>
+            <a href="javascript:void(0)" class="glass-text-action" onclick="openPayment('Stripe 出海专属费率凭据', 1200)">立即激活 ›</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 4: Microkernel Architecture -->
+    <section id="kernel">
+      <div class="section-header">
+        <h2 class="section-title">微内核与充血模型编排</h2>
+        <span class="mono-index">KERNEL SPEC v2.4</span>
+      </div>
+
+      <div class="kernel-glass-box">
+        <div style="margin-bottom: 18px;">
+          <div style="font-weight: 600; font-size: 15px; margin-bottom: 4px;">统一网关管线调度 · Single Ingress Architecture</div>
+          <div style="font-size: 13px; color: var(--text-secondary);">所有业务请求汇聚于单一接口，按 scenario 动态编排已安全沙箱化注册的方法链。</div>
+        </div>
+
+        <div class="kernel-code-window">
+<span class="comm"># 微内核执行引擎签名规范 (Strict Rich Domain Method Protocol)</span>
+<span class="kw">async def</span> execute_pipeline(ctx: <span class="kw">PipelineContext</span>) -&gt; <span class="kw">PipelineContext</span>:
+    <span class="comm"># 1. 统一鉴权与收费权益验证 (HTTP 402 Payment Required 拦截器)</span>
+    <span class="kw">if</span> ctx.entitlement_required <span class="kw">and not</span> ctx.user.has_entitlement(ctx.entitlement_required):
+        <span class="kw">raise</span> EntitlementRequiredException(status_code=402, entitlement_id=ctx.entitlement_required)
+
+    <span class="comm"># 2. 串联执行编排方法链 (每个步骤输入输出均受不可变 Context 约束)</span>
+    <span class="kw">for</span> step <span class="kw">in</span> ctx.pipeline.steps:
+        ctx = <span class="kw">await</span> step.invoke(ctx)
+
+    <span class="kw">return</span> ctx
+        </div>
+      </div>
+    </section>
+
+    <!-- Clean Glass Footer -->
+    <footer>
+      <div class="footer-left">
+        OPCHUB SYSTEM — LIQUID GLASS &amp; EDITORIAL DESIGN 2026
+      </div>
+      <div class="footer-nav">
+        <a href="javascript:void(0)">隐私承诺</a>
+        <a href="javascript:void(0)">合规服务协议</a>
+        <a href="javascript:void(0)">开放 API</a>
+      </div>
+    </footer>
+  </main>
+
+  <!-- Liquid Frosted Sheet Modal (visionOS Style) -->
+  <div class="modal-backdrop" id="modalBackdrop">
+    <div class="liquid-modal-panel">
+      <h3 class="modal-title" id="modalTitle">开通创客专享权益</h3>
+      <p class="modal-text" id="modalDesc">
+        该操作需要通过权益 ID 与您的用户账号完成强绑定，完成后即可即时解锁全量内参与专属 API。
+      </p>
+
+      <div class="modal-price-card">
+        <div class="price-num" id="modalPrice">¥ 499.00</div>
+        <div class="price-caption">一次性永久解锁或年度授权凭证</div>
+      </div>
+
+      <div class="modal-btn-row">
+        <button class="btn-liquid-dismiss" onclick="closePayment()">取消</button>
+        <button class="btn-liquid-primary" onclick="confirmPayment()">确认绑定并解锁</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // Liquid Glass Theme Controller (Dual Mode)
+    // -------------------------------------------------------------
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('opchub_liquid_theme', target);
+      updateLabel(target);
+    }
+
+    function updateLabel(theme) {
+      const text = document.getElementById('themeText');
+      if (theme === 'dark') {
+        text.textContent = '浅色模式';
+      } else {
+        text.textContent = '深色模式';
+      }
+    }
+
+    // Initialize Theme
+    (function init() {
+      const saved = localStorage.getItem('opchub_liquid_theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        updateLabel(saved);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        updateLabel('dark');
+      } else {
+        document.documentElement.setAttribute('data-theme', 'light');
+        updateLabel('light');
+      }
+    })();
+
+    // -------------------------------------------------------------
+    // Entitlement Modal Controller
+    // -------------------------------------------------------------
+    function openPayment(name, price) {
+      document.getElementById('modalTitle').textContent = name;
+      document.getElementById('modalPrice').textContent = '¥ ' + Number(price).toFixed(2);
+      document.getElementById('modalBackdrop').classList.add('active');
+    }
+
+    function closePayment() {
+      document.getElementById('modalBackdrop').classList.remove('active');
+    }
+
+    function confirmPayment() {
+      alert('已成功绑定权益 ID，网关鉴权状态已更新为 ACTIVE。');
+      closePayment();
+    }
+  </script>
+</body>
+</html>
