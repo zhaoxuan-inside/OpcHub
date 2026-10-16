@@ -7,6 +7,7 @@ from .models import (
     DAGConfig, ExecutionResult, ExecutionStatus, NodeExecutionTrace, NodeType
 )
 from .registry import registry
+from src.core.telemetry import get_current_trace_id
 
 
 class MicrokernelEngine:
@@ -44,13 +45,23 @@ class MicrokernelEngine:
 
         return sorted_nodes
 
-    async def execute_dag(self, config: DAGConfig, initial_inputs: dict[str, Any] | None = None) -> ExecutionResult:
+    async def execute_dag(
+        self,
+        config: DAGConfig,
+        initial_inputs: dict[str, Any] | None = None,
+        trace_id: str | None = None,
+    ) -> ExecutionResult:
         start_time = time.perf_counter()
+        tid = trace_id or get_current_trace_id()
         pipeline_id = f"pipe_{uuid.uuid4().hex[:12]}"
         inputs = dict(initial_inputs or {})
         traces: list[NodeExecutionTrace] = []
         node_map = {n.id: n for n in config.execution_graph.nodes}
-        context: dict[str, Any] = {"pipeline_id": pipeline_id, "version": config.version}
+        context: dict[str, Any] = {
+            "pipeline_id": pipeline_id,
+            "version": config.version,
+            "trace_id": tid,
+        }
 
         try:
             order = self.topological_sort(config)
@@ -58,6 +69,7 @@ class MicrokernelEngine:
             total_dur = (time.perf_counter() - start_time) * 1000
             return ExecutionResult(
                 pipeline_id=pipeline_id,
+                trace_id=tid,
                 version=config.version,
                 scenario_code=config.scenario_code,
                 status=ExecutionStatus.CYCLE_DETECTED,
@@ -83,11 +95,13 @@ class MicrokernelEngine:
                     type=node_def.type,
                     status=ExecutionStatus.FAILED,
                     duration_ms=round(dur, 2),
+                    trace_id=tid,
                     error=err_msg
                 ))
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
+                    trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
                     status=ExecutionStatus.FAILED,
@@ -109,6 +123,7 @@ class MicrokernelEngine:
                     type=node_def.type,
                     status=ExecutionStatus.SUCCESS,
                     duration_ms=round(dur, 2),
+                    trace_id=tid,
                     output=out
                 ))
                 if isinstance(out, dict):
@@ -123,11 +138,13 @@ class MicrokernelEngine:
                     type=node_def.type,
                     status=ExecutionStatus.GUARD_REJECTED,
                     duration_ms=round(dur, 2),
+                    trace_id=tid,
                     error=str(e)
                 ))
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
+                    trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
                     status=ExecutionStatus.GUARD_REJECTED,
@@ -145,11 +162,13 @@ class MicrokernelEngine:
                     type=node_def.type,
                     status=ExecutionStatus.FAILED,
                     duration_ms=round(dur, 2),
+                    trace_id=tid,
                     error=str(e)
                 ))
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
+                    trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
                     status=ExecutionStatus.FAILED,
@@ -163,6 +182,7 @@ class MicrokernelEngine:
         total_dur = (time.perf_counter() - start_time) * 1000
         return ExecutionResult(
             pipeline_id=pipeline_id,
+            trace_id=tid,
             version=config.version,
             scenario_code=config.scenario_code,
             status=ExecutionStatus.SUCCESS,

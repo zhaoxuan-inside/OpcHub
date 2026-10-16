@@ -58,12 +58,14 @@ class NodeExecutionTrace(BaseModel):
     type: NodeType
     status: ExecutionStatus
     duration_ms: float
+    trace_id: str | None = None
     output: Any = None
     error: str | None = None
 
 
 class ExecutionResult(BaseModel):
     pipeline_id: str
+    trace_id: str | None = None
     version: str
     scenario_code: str
     status: ExecutionStatus
