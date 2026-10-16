@@ -744,6 +744,188 @@
     }
     .sheet-modal.active .sheet-body { transform: translateY(0) scale(1); }
 
+    /* 11. Operational Analytics & Cross-Platform Showcase */
+    .kpi-grid-6 {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 1200px) {
+      .kpi-grid-6 { grid-template-columns: repeat(3, 1fr); }
+    }
+    @media (max-width: 768px) {
+      .kpi-grid-6 { grid-template-columns: repeat(2, 1fr); }
+    }
+    .kpi-card {
+      background: var(--glass-surface-solid);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 16px 14px;
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition-liquid);
+    }
+    .kpi-card:hover {
+      border-color: var(--glass-border-strong);
+      transform: translateY(-2px);
+      box-shadow: 0 16px 36px rgba(0,0,0,0.18), var(--glass-specular);
+    }
+    .kpi-label {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-tertiary);
+      letter-spacing: 0.05em;
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .kpi-value {
+      font-size: clamp(20px, 1.8vw, 25px);
+      font-weight: 700;
+      font-family: var(--font-display);
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+    .kpi-delta {
+      font-size: 11.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-weight: 500;
+    }
+    .kpi-delta.up { color: #34C759; }
+    .kpi-delta.down { color: #FF3B30; }
+
+    /* Telemetry Chart Pod */
+    .chart-dual-grid {
+      display: grid;
+      grid-template-columns: 1.55fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 992px) {
+      .chart-dual-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Mobile Device Frame Simulators */
+    .device-showcase-container {
+      display: flex;
+      gap: 28px;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      margin-top: 18px;
+    }
+    .device-frame-ios {
+      width: 350px;
+      height: 700px;
+      background: var(--bg-canvas);
+      border: 6px solid var(--glass-border-strong);
+      border-radius: 46px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), var(--glass-specular), inset 0 0 0 2px rgba(255,255,255,0.12);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: transform 0.28s ease, box-shadow 0.28s ease;
+    }
+    .device-frame-android {
+      width: 350px;
+      height: 700px;
+      background: var(--bg-canvas);
+      border: 5px solid var(--glass-border-strong);
+      border-radius: 38px;
+      box-shadow: 0 30px 80px rgba(0, 0, 0, 0.45), var(--glass-specular), inset 0 0 0 2px rgba(255,255,255,0.12);
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      transition: transform 0.28s ease, box-shadow 0.28s ease;
+    }
+    .device-status-bar {
+      height: 38px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 18px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--text-secondary);
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .dynamic-island {
+      width: 106px;
+      height: 24px;
+      background: #000;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 9px;
+      color: #fff;
+      font-size: 9px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .android-camera-hole {
+      width: 11px;
+      height: 11px;
+      background: #000;
+      border-radius: 50%;
+      border: 1.5px solid rgba(255,255,255,0.25);
+    }
+    .mobile-content-stream {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 12px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scrollbar-width: thin;
+    }
+    .mobile-card-liquid {
+      background: var(--glass-surface-solid);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      box-shadow: 0 6px 16px rgba(0,0,0,0.08), var(--glass-specular);
+      transition: transform 0.18s ease;
+    }
+    .mobile-tabbar-liquid {
+      height: 52px;
+      background: var(--glass-surface-solid);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border-top: 1px solid var(--glass-border);
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      padding: 0 8px 4px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .mobile-tab-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      font-size: 9.5px;
+      color: var(--text-tertiary);
+      cursor: pointer;
+      user-select: none;
+      transition: color 0.16s ease;
+    }
+    .mobile-tab-item.active {
+      color: var(--accent);
+      font-weight: 600;
+    }
+
     /* Floating Liquid Glass Tooltip */
     #liquidTooltip {
       position: fixed;
@@ -800,6 +982,7 @@
         <button class="nav-tab-btn" onclick="switchView('user', this)" data-tooltip="创客档案管理与VIP收费权益中心">用户权益</button>
         <button class="nav-tab-btn" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台">后端编排</button>
         <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器">前端编排</button>
+        <button class="nav-tab-btn" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示">运营大盘</button>
       </nav>
 
       <div class="nav-right-actions">
@@ -881,6 +1064,11 @@
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">09 · LOW-CODE</div>
               <h3 style="font-size: 16px; margin: 8px 0 6px;">前端页面构建编排</h3>
               <p style="font-size: 13px; color: var(--text-secondary);">24 栅格低代码拖拽画布、组件参数绑定与前后端原子发布管理。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('ops')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent);">10 · TELEMETRY</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">运营数据大盘</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">实时监测 DAU、UV、PV 与留存转化，支持 Web、Android、iOS 三端一致性展示。</p>
             </div>
           </div>
         </div>
@@ -1687,6 +1875,543 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         </div>
       </div>
     </div>
+
+    <!-- ==========================================
+         VIEW 11: 运营数据大盘与三端客户端展示 (Ops Intelligence & Multi-Terminal)
+         ========================================== -->
+    <div id="view-ops" class="view-panel">
+      <!-- Top Title & Global Controls -->
+      <div class="glass-box" style="padding: 24px 32px 18px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ADMIN TELEMETRY & MULTI-DEVICE PORTAL</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">● 实时流式指标监听中</span>
+            </div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">全域运营监控大盘与三端视口</h1>
+            <p style="font-size: 13px; color: var(--text-secondary); max-width: 780px;">
+              面向平台管理员实时跟踪 DAU、UV、PV、用户留存与付费转化；支持 Web 宽屏、Android、iOS 三端完全统一的 Apple VisionOS 液态毛玻璃设计语言展示（移动端为纯信息展示页面）。
+            </p>
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+            <!-- Mode Segmented Buttons -->
+            <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 3px; display: flex; gap: 4px;">
+              <button class="nav-tab-btn active" id="btnOpsModeAll" style="padding: 4px 12px; font-size: 12px;" onclick="switchOpsViewMode('all')" data-tooltip="同屏三端并排展示 Web、iOS 与 Android 客户端">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>三端并排
+              </button>
+              <button class="nav-tab-btn" id="btnOpsModeWeb" style="padding: 4px 12px; font-size: 12px;" onclick="switchOpsViewMode('web')" data-tooltip="聚焦展示 Web 桌面端宽屏高密运营看板">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>桌面大盘
+              </button>
+              <button class="nav-tab-btn" id="btnOpsModeIos" style="padding: 4px 12px; font-size: 12px;" onclick="switchOpsViewMode('ios')" data-tooltip="聚焦展示 iPhone 16 Pro 灵动岛纯信息展示客户端">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>苹果端
+              </button>
+              <button class="nav-tab-btn" id="btnOpsModeAndroid" style="padding: 4px 12px; font-size: 12px;" onclick="switchOpsViewMode('android')" data-tooltip="聚焦展示 Android Pixel 纯信息展示客户端">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="2" width="14" height="20" rx="3" ry="3"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>安卓端
+              </button>
+            </div>
+            <!-- Actions -->
+            <button class="btn-liquid-outline" onclick="exportOpsReport()" data-tooltip="导出本期运营审计分析报表 (CSV/PDF)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出报表</button>
+            <button class="btn-liquid" onclick="refreshOpsData()" data-tooltip="从微内核网关与ClickHouse重载最新实时指标"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>刷新数据</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section A: Web Desktop Rich Analytics Matrix -->
+      <div id="opsWebSection">
+        <!-- 6 Core KPI Pods -->
+        <div class="kpi-grid-6">
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>DAU 日活跃创客</span>
+              <span class="kpi-delta up">↑ 12.4%</span>
+            </div>
+            <div class="kpi-value" id="kpiDau">14,820</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">昨日 13,180 · 峰值 16.9k</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>UV 今日独立访客</span>
+              <span class="kpi-delta up">↑ 18.6%</span>
+            </div>
+            <div class="kpi-value" id="kpiUv">89,540</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">移动端 68.4% · 网页 31.6%</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>PV 页面总浏览量</span>
+              <span class="kpi-delta up">↑ 24.1%</span>
+            </div>
+            <div class="kpi-value" id="kpiPv">628,300</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">人均 7.01 页 · 停留 9.4m</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>MAU 月活创客数</span>
+              <span class="kpi-delta up">↑ 8.2%</span>
+            </div>
+            <div class="kpi-value">182,450</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">长三角独立创客渗透 41%</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>付费转化 / 留存</span>
+              <span class="kpi-delta up">↑ 4.82%</span>
+            </div>
+            <div class="kpi-value">64.2%</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">黑钻会员 4,316 人 (¥32.8万)</div>
+          </div>
+
+          <div class="kpi-card">
+            <div class="kpi-label">
+              <span>微内核 API 吞吐</span>
+              <span style="color: #34C759; font-size: 11.5px; font-weight: 500;">P99: 28ms</span>
+            </div>
+            <div class="kpi-value">12.8M</div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary);">48 条活跃热载 DAG 链路</div>
+          </div>
+        </div>
+
+        <!-- 2 Visual Analytics Charts -->
+        <div class="chart-dual-grid">
+          <!-- Left: 7-Day Trend Chart -->
+          <div class="glass-box" style="padding: 20px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px;">
+              <div>
+                <h3 style="font-size: 16px; font-weight: 600;">近 7 日流量与留存波动曲线 (PV / UV / DAU)</h3>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">基于 ClickHouse 列式流聚合计量，支持鼠标悬浮探针查看精确数值</div>
+              </div>
+              <div style="display: flex; gap: 14px; font-size: 11.5px; font-family: var(--font-mono);">
+                <span style="color: var(--accent); display: flex; align-items: center; gap: 4px;">● PV 浏览</span>
+                <span style="color: #34C759; display: flex; align-items: center; gap: 4px;">● UV 访客</span>
+                <span style="color: #FF9500; display: flex; align-items: center; gap: 4px;">● DAU 日活</span>
+              </div>
+            </div>
+
+            <!-- SVG Specular Multi-Curve Trend Chart -->
+            <div style="position: relative; width: 100%; height: 210px; background: var(--glass-surface-subtle); border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle); padding: 12px; overflow: hidden;">
+              <svg width="100%" height="100%" viewBox="0 0 650 180" preserveAspectRatio="none" style="overflow: visible;">
+                <defs>
+                  <linearGradient id="pvGlowGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="var(--accent)" stop-opacity="0.38"/>
+                    <stop offset="100%" stop-color="var(--accent)" stop-opacity="0.0"/>
+                  </linearGradient>
+                  <linearGradient id="uvBarGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#34C759" stop-opacity="0.65"/>
+                    <stop offset="100%" stop-color="#34C759" stop-opacity="0.15"/>
+                  </linearGradient>
+                </defs>
+                <!-- Grid guide lines -->
+                <line x1="0" y1="35" x2="650" y2="35" stroke="var(--glass-border-subtle)" stroke-dasharray="4 4"/>
+                <line x1="0" y1="80" x2="650" y2="80" stroke="var(--glass-border-subtle)" stroke-dasharray="4 4"/>
+                <line x1="0" y1="125" x2="650" y2="125" stroke="var(--glass-border-subtle)" stroke-dasharray="4 4"/>
+
+                <!-- Background Bars (UV Volume) -->
+                <rect x="35" y="105" width="22" height="55" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/10 · UV: 62k (PV: 420k)"/>
+                <rect x="125" y="95" width="22" height="65" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/11 · UV: 68k (PV: 460k)"/>
+                <rect x="215" y="80" width="22" height="80" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/12 · UV: 74k (PV: 510k)"/>
+                <rect x="305" y="70" width="22" height="90" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/13 · UV: 79k (PV: 550k)"/>
+                <rect x="395" y="60" width="22" height="100" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/14 · UV: 83k (PV: 580k)"/>
+                <rect x="485" y="50" width="22" height="110" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/15 · UV: 86k (PV: 610k)"/>
+                <rect x="575" y="40" width="22" height="120" rx="3" fill="url(#uvBarGrad)" data-tooltip="10/16 · 今日 UV: 89.5k (PV: 628k)"/>
+
+                <!-- PV Area Fill & Curved Path -->
+                <path d="M 46 120 Q 136 100, 226 80 T 406 50 T 586 28 L 586 160 L 46 160 Z" fill="url(#pvGlowGrad)"/>
+                <path d="M 46 120 Q 136 100, 226 80 T 406 50 T 586 28" fill="none" stroke="var(--accent)" stroke-width="3" stroke-linecap="round"/>
+
+                <!-- DAU Line -->
+                <path d="M 46 145 L 136 140 L 226 130 L 316 122 L 406 115 L 496 110 L 586 105" fill="none" stroke="#FF9500" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="3 3"/>
+
+                <!-- Interactive Data Dots -->
+                <circle cx="46" cy="120" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/10 PV: 420,000"/>
+                <circle cx="136" cy="100" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/11 PV: 460,000"/>
+                <circle cx="226" cy="80" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/12 PV: 510,000"/>
+                <circle cx="316" cy="65" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/13 PV: 550,000"/>
+                <circle cx="406" cy="50" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/14 PV: 580,000"/>
+                <circle cx="496" cy="38" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5" data-tooltip="10/15 PV: 610,000"/>
+                <circle cx="586" cy="28" r="5" fill="#34C759" stroke="#fff" stroke-width="2" data-tooltip="10/16 今日峰值 PV: 628,300"/>
+              </svg>
+
+              <!-- X-Axis Labels -->
+              <div style="display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); padding: 0 16px; margin-top: 4px;">
+                <span>10-10</span>
+                <span>10-11</span>
+                <span>10-12</span>
+                <span>10-13</span>
+                <span>10-14</span>
+                <span>10-15</span>
+                <span style="color: var(--accent); font-weight: 600;">今日 (10-16)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Module Breakdown & Device Distribution -->
+          <div class="glass-box" style="padding: 20px 24px;">
+            <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 12px;">全域模块热度与三端流量渗透</h3>
+
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">各核心业务功能 PV 访问占比</div>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
+                  <span>政策雷达 (白话速查)</span>
+                  <span style="font-family: var(--font-mono); color: var(--accent);">32.0% (20.1万)</span>
+                </div>
+                <div style="height: 6px; background: var(--glass-surface-subtle); border-radius: 3px; overflow: hidden;">
+                  <div style="width: 32%; height: 100%; background: var(--accent); border-radius: 3px;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
+                  <span>流程文书 SOP (材料导出)</span>
+                  <span style="font-family: var(--font-mono); color: #34C759;">26.0% (16.3万)</span>
+                </div>
+                <div style="height: 6px; background: var(--glass-surface-subtle); border-radius: 3px; overflow: hidden;">
+                  <div style="width: 26%; height: 100%; background: #34C759; border-radius: 3px;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
+                  <span>创客交流贴吧 (经验沉淀)</span>
+                  <span style="font-family: var(--font-mono); color: #FF9500;">18.0% (11.3万)</span>
+                </div>
+                <div style="height: 6px; background: var(--glass-surface-subtle); border-radius: 3px; overflow: hidden;">
+                  <div style="width: 18%; height: 100%; background: #FF9500; border-radius: 3px;"></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
+                  <span>需求外包集市 (委托竞标)</span>
+                  <span style="font-family: var(--font-mono); color: #AF52DE;">14.0% (8.8万)</span>
+                </div>
+                <div style="height: 6px; background: var(--glass-surface-subtle); border-radius: 3px; overflow: hidden;">
+                  <div style="width: 14%; height: 100%; background: #AF52DE; border-radius: 3px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Terminal Source Pods -->
+            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 12px;">
+              <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">客户端终端来源分布 (三端协同)</div>
+              <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; text-align: center;">
+                <div style="background: var(--glass-surface-subtle); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
+                  <div style="font-size: 10.5px; color: var(--text-tertiary);">iOS 客户端</div>
+                  <div style="font-size: 15px; font-weight: 700; color: var(--accent); margin-top: 2px;">46.2%</div>
+                </div>
+                <div style="background: var(--glass-surface-subtle); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
+                  <div style="font-size: 10.5px; color: var(--text-tertiary);">Android 客户端</div>
+                  <div style="font-size: 15px; font-weight: 700; color: #34C759; margin-top: 2px;">35.8%</div>
+                </div>
+                <div style="background: var(--glass-surface-subtle); padding: 8px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
+                  <div style="font-size: 10.5px; color: var(--text-tertiary);">Desktop 网页</div>
+                  <div style="font-size: 15px; font-weight: 700; color: #FF9500; margin-top: 2px;">18.0%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Realtime Gateway Telemetry Table -->
+        <div class="glass-box" style="padding: 18px 24px; margin-bottom: 24px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">GATEWAY STREAM</span>
+              <h3 style="font-size: 15px; font-weight: 600;">微内核 API 路由实时请求监控流水</h3>
+            </div>
+            <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">AUTO-SYNCING · 200 OK</span>
+          </div>
+          <div style="overflow-x: auto;">
+            <table class="glass-table" style="font-size: 12px; width: 100%;">
+              <thead>
+                <tr>
+                  <th>终端客户端</th>
+                  <th>路由接口 (Scenario Route)</th>
+                  <th>协议与方法</th>
+                  <th>网络延时</th>
+                  <th>来源属地</th>
+                  <th>执行状态</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent);">iOS Client</span></td>
+                  <td style="font-family: var(--font-mono); font-weight: 500;">/api/v1/policy/recommend.match</td>
+                  <td><span class="mono-tag">HTTP/3 GET</span></td>
+                  <td style="font-family: var(--font-mono); color: #34C759;">14ms</td>
+                  <td>浙江省杭州市 (高新节点)</td>
+                  <td><span style="color: #34C759;">● 200 SUCCESS</span></td>
+                </tr>
+                <tr>
+                  <td><span class="mono-tag" style="background: rgba(52,199,89,0.15); color: #34C759;">Android Client</span></td>
+                  <td style="font-family: var(--font-mono); font-weight: 500;">/api/v1/forum/threads/hot_digest</td>
+                  <td><span class="mono-tag">HTTP/2 GET</span></td>
+                  <td style="font-family: var(--font-mono); color: #34C759;">9ms</td>
+                  <td>上海市浦东新区</td>
+                  <td><span style="color: #34C759;">● 200 SUCCESS</span></td>
+                </tr>
+                <tr>
+                  <td><span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500;">Desktop Web</span></td>
+                  <td style="font-family: var(--font-mono); font-weight: 500;">/api/v1/kernel/dag/execute.tax</td>
+                  <td><span class="mono-tag">HTTP/2 POST</span></td>
+                  <td style="font-family: var(--font-mono); color: #34C759;">28ms</td>
+                  <td>江苏省苏州市工业园区</td>
+                  <td><span style="color: #34C759;">● 200 SUCCESS</span></td>
+                </tr>
+                <tr>
+                  <td><span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent);">iOS Client</span></td>
+                  <td style="font-family: var(--font-mono); font-weight: 500;">/api/v1/demands/leads.subscribe</td>
+                  <td><span class="mono-tag">HTTP/3 GET</span></td>
+                  <td style="font-family: var(--font-mono); color: #34C759;">12ms</td>
+                  <td>广东省深圳市南山区</td>
+                  <td><span style="color: #34C759;">● 200 SUCCESS</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section B: Cross-Platform Client Simulators (iOS & Android Pure Information Display) -->
+      <div id="opsDeviceSection">
+        <div class="glass-box" style="padding: 18px 24px 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div>
+              <h2 style="font-size: 18px; font-weight: 600;">移动端纯信息展示页面 (iOS & Android)</h2>
+              <p style="font-size: 12.5px; color: var(--text-secondary); margin-top: 2px;">
+                三端视觉风格严格保持 Apple VisionOS 液态毛玻璃一致性；移动双端专为创客设计为轻量高密度的「只读信息流与运营播报」，绝不堆砌复杂编辑工具。
+              </p>
+            </div>
+            <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">STYLE: VISIONOS SPECULAR IDENTICAL</span>
+          </div>
+        </div>
+
+        <div class="device-showcase-container">
+          <!-- 1. iOS Client Simulator (iPhone 16 Pro Dynamic Island) -->
+          <div class="device-frame-ios" id="deviceIosWrapper">
+            <!-- iOS Status Bar & Dynamic Island -->
+            <div class="device-status-bar">
+              <span>9:41</span>
+              <div class="dynamic-island">
+                <span style="color: #34C759;">● 运营中</span>
+                <span style="color: #aaa;">DAU 14.8k</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span>5G</span>
+                <span style="color: #34C759;">100%</span>
+              </div>
+            </div>
+
+            <!-- iOS App Header -->
+            <div style="padding: 8px 16px 10px; border-bottom: 1px solid var(--glass-border-subtle); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 10px; font-family: var(--font-mono); color: var(--accent);">OPCHUB · IOS CLIENT</div>
+                <div style="font-size: 16px; font-weight: 700; letter-spacing: -0.01em;">创客头条速递</div>
+              </div>
+              <span class="mono-tag" style="font-size: 10px; padding: 2px 6px;">纯信息展示</span>
+            </div>
+
+            <!-- iOS Content Stream (Read-only) -->
+            <div class="mobile-content-stream">
+              <!-- Summary KPI Card -->
+              <div class="mobile-card-liquid" style="background: linear-gradient(135deg, rgba(0, 113, 227, 0.12), rgba(52, 199, 89, 0.08));">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px;">
+                  <span style="font-weight: 600; color: var(--text-primary);">今日运营大盘简报</span>
+                  <span style="color: #34C759; font-family: var(--font-mono);">LIVE</span>
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; gap: 6px;">
+                  <div>
+                    <div style="font-size: 9.5px; color: var(--text-tertiary);">DAU 日活</div>
+                    <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">14,820</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 9.5px; color: var(--text-tertiary);">UV 独立访客</div>
+                    <div style="font-size: 14px; font-weight: 700; color: var(--text-primary);">89,540</div>
+                  </div>
+                  <div>
+                    <div style="font-size: 9.5px; color: var(--text-tertiary);">7日留存</div>
+                    <div style="font-size: 14px; font-weight: 700; color: #34C759;">48.5%</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- News 1: Policy Headline -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent); padding: 1px 5px;">政策快讯</span>
+                  <span style="color: var(--text-tertiary);">10 分钟前</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  2026 一人公司工商年报与增值税免征额度最新细则出台
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  针对季度营收 30 万元以下免税政策的电子税务局申报实录，附常见报错与退税处理指引。
+                </p>
+              </div>
+
+              <!-- News 2: Forum Hot Post -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500; padding: 1px 5px;">贴吧精选</span>
+                  <span style="color: var(--text-tertiary);">32 分钟前</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  独立站出海 Stripe 0.4% 超级结汇费率实测踩坑指南
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  一人公司出海绿色通道，协助开立香港与新加坡虚拟对公子账户，资金阳光结汇直达境内。
+                </p>
+                <div style="display: flex; gap: 12px; font-size: 10.5px; color: var(--text-tertiary); margin-top: 6px;">
+                  <span>作者: 赵玄</span>
+                  <span>互动: 142</span>
+                </div>
+              </div>
+
+              <!-- News 3: Demand Lead -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(52,199,89,0.15); color: #34C759; padding: 1px 5px;">外包商机</span>
+                  <span style="color: #34C759; font-weight: 600;">预算 ¥25,000</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  跨境电商独立站 AI 客服系统定制开发
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  需对接 Shopify 与 WhatsApp API，要求独立创客团队驻场或远程交付，工期 3 周。
+                </p>
+              </div>
+            </div>
+
+            <!-- iOS Liquid TabBar -->
+            <div class="mobile-tabbar-liquid">
+              <div class="mobile-tab-item active">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                <span>首页</span>
+              </div>
+              <div class="mobile-tab-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+                <span>政策</span>
+              </div>
+              <div class="mobile-tab-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>贴吧</span>
+              </div>
+              <div class="mobile-tab-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span>我的</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Android Client Simulator (Pixel 9 Pro Material Liquid) -->
+          <div class="device-frame-android" id="deviceAndroidWrapper">
+            <!-- Android Status Bar & Punch Hole Camera -->
+            <div class="device-status-bar">
+              <span>10:08</span>
+              <div class="android-camera-hole"></div>
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <span>WiFi</span>
+                <span style="color: #34C759;">98%</span>
+              </div>
+            </div>
+
+            <!-- Android App Header -->
+            <div style="padding: 8px 16px 10px; border-bottom: 1px solid var(--glass-border-subtle); display: flex; justify-content: space-between; align-items: center;">
+              <div>
+                <div style="font-size: 10px; font-family: var(--font-mono); color: #34C759;">OPCHUB · ANDROID APP</div>
+                <div style="font-size: 16px; font-weight: 700; letter-spacing: -0.01em;">创客资讯视窗</div>
+              </div>
+              <span class="mono-tag" style="font-size: 10px; padding: 2px 6px;">纯信息展示</span>
+            </div>
+
+            <!-- Android Content Stream (Read-only) -->
+            <div class="mobile-content-stream">
+              <!-- Service Pulse Card -->
+              <div class="mobile-card-liquid" style="background: linear-gradient(135deg, rgba(52, 199, 89, 0.12), rgba(0, 113, 227, 0.08));">
+                <div style="display: flex; justify-content: space-between; font-size: 11px; margin-bottom: 6px;">
+                  <span style="font-weight: 600; color: var(--text-primary);">平台服务与算力晴雨表</span>
+                  <span style="color: #34C759; font-family: var(--font-mono);">ONLINE</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: baseline; margin-top: 4px;">
+                  <div>
+                    <div style="font-size: 9.5px; color: var(--text-tertiary);">全网今日 PV</div>
+                    <div style="font-size: 17px; font-weight: 700; color: var(--text-primary);">62.8 万</div>
+                  </div>
+                  <div style="text-align: right;">
+                    <div style="font-size: 9.5px; color: var(--text-tertiary);">网关平均延迟</div>
+                    <div style="font-size: 14px; font-weight: 600; color: #34C759;">14ms (正常)</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Android Feature 1: Perks Digest -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(52,199,89,0.15); color: #34C759; padding: 1px 5px;">算力特权</span>
+                  <span style="color: #34C759;">价值 $5,000</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  AWS Activate 创客计划新一批额度开放
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  为平台认证超级个体提供 2 年期 $5,000 云服务积分与高级企业架构师一对一技术支持。
+                </p>
+                <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 4px;">剩余配额: 38/50 · 认证创客专享</div>
+              </div>
+
+              <!-- Android Feature 2: Product Showcase Top 1 -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent); padding: 1px 5px;">产品橱窗</span>
+                  <span style="color: var(--accent); font-weight: 600;">TOP 1 打榜</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  InkFlow AI · 超级个体沉浸写作引擎
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  集成分镜排版、多语言出海分发与本地 Markdown 导出，本周创客点赞数 428 次。
+                </p>
+                <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 4px;">开发者: 赵玄 · 极客视界工作室</div>
+              </div>
+
+              <!-- Android Feature 3: Official Notice -->
+              <div class="mobile-card-liquid">
+                <div style="display: flex; justify-content: space-between; font-size: 10.5px; margin-bottom: 4px;">
+                  <span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500; padding: 1px 5px;">官方通知</span>
+                  <span style="color: var(--text-tertiary);">今天 08:30</span>
+                </div>
+                <div style="font-size: 13px; font-weight: 600; line-height: 1.4; margin-bottom: 4px;">
+                  长三角智能算力补贴 12 万元申报辅导开启
+                </div>
+                <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+                  个体工商户与小微软件企业均可申报，流程文书中心已提供标准化申报材料模板。
+                </p>
+              </div>
+            </div>
+
+            <!-- Android Material Liquid Capsule TabBar -->
+            <div class="mobile-tabbar-liquid">
+              <div class="mobile-tab-item active">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                <span>看板</span>
+              </div>
+              <div class="mobile-tab-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                <span>资讯</span>
+              </div>
+              <div class="mobile-tab-item">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>商机</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- Reusable Entitlement & Payment Modal Sheet -->
@@ -1988,6 +2713,62 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n生效状态: 已激活\n说明: 凭据已同步至创客控制台，可直接在服务商控制台兑换抵扣。`,
         'SUCCESS'
       );
+    }
+
+    // -------------------------------------------------------------
+    // Operational Analytics & Multi-Terminal Controller
+    // -------------------------------------------------------------
+    function switchOpsViewMode(mode) {
+      const webSec = document.getElementById('opsWebSection');
+      const devSec = document.getElementById('opsDeviceSection');
+      const iosWrap = document.getElementById('deviceIosWrapper');
+      const androidWrap = document.getElementById('deviceAndroidWrapper');
+
+      const btnAll = document.getElementById('btnOpsModeAll');
+      const btnWeb = document.getElementById('btnOpsModeWeb');
+      const btnIos = document.getElementById('btnOpsModeIos');
+      const btnAndroid = document.getElementById('btnOpsModeAndroid');
+
+      [btnAll, btnWeb, btnIos, btnAndroid].forEach(btn => btn && btn.classList.remove('active'));
+
+      if (mode === 'web') {
+        if (btnWeb) btnWeb.classList.add('active');
+        if (webSec) webSec.style.display = 'block';
+        if (devSec) devSec.style.display = 'none';
+      } else if (mode === 'ios') {
+        if (btnIos) btnIos.classList.add('active');
+        if (webSec) webSec.style.display = 'none';
+        if (devSec) devSec.style.display = 'block';
+        if (iosWrap) iosWrap.style.display = 'flex';
+        if (androidWrap) androidWrap.style.display = 'none';
+      } else if (mode === 'android') {
+        if (btnAndroid) btnAndroid.classList.add('active');
+        if (webSec) webSec.style.display = 'none';
+        if (devSec) devSec.style.display = 'block';
+        if (iosWrap) iosWrap.style.display = 'none';
+        if (androidWrap) androidWrap.style.display = 'flex';
+      } else { // 'all'
+        if (btnAll) btnAll.classList.add('active');
+        if (webSec) webSec.style.display = 'block';
+        if (devSec) devSec.style.display = 'block';
+        if (iosWrap) iosWrap.style.display = 'flex';
+        if (androidWrap) androidWrap.style.display = 'flex';
+      }
+    }
+
+    function refreshOpsData() {
+      const dauEl = document.getElementById('kpiDau');
+      const uvEl = document.getElementById('kpiUv');
+      const pvEl = document.getElementById('kpiPv');
+      if (dauEl) dauEl.textContent = '14,' + Math.floor(820 + Math.random() * 80);
+      if (uvEl) uvEl.textContent = '89,' + Math.floor(540 + Math.random() * 90);
+      if (pvEl) pvEl.textContent = '628,' + Math.floor(300 + Math.random() * 200);
+
+      showLiquidNotice('运营指标已刷新', '已从 ClickHouse 列式库与微内核网关重新聚合最新实时指标！\n\nDAU: 14,890 (+12.6%)\nUV: 89,610 (+18.8%)\nPV: 628,480 (+24.3%)\n微内核网关延时: 12ms (P99: 28ms)', 'SUCCESS');
+    }
+
+    function exportOpsReport() {
+      showLiquidNotice('运营审计报表', '全平台 2026 年 10 月度核心运营报告（包含 DAU/UV/PV、用户三端留存曲线与业务转化漏斗）已打包导出为 CSV 与 PDF 格式！', 'SUCCESS');
     }
 
     // Backdrop click listener to close modals
