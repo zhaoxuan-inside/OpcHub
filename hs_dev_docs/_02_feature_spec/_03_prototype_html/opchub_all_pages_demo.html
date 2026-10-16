@@ -1,0 +1,1679 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub — One Person Company Complete System Demo</title>
+  <style>
+    /* -------------------------------------------------------------
+       OpcHub Complete System — Apple VisionOS Liquid Glass Design
+       - Fluid Ambient Mesh Orbs & Refraction Depth
+       - Interactive Mouse Spotlight & Specular Edge Bloom
+       - Apple SF Pro & iA Writer Monospace Typography
+       - 10 Complete Pages / Modular Views in Single Cohesive Console
+    -------------------------------------------------------------- */
+
+    :root {
+      --bg-canvas: #F8F9FD;
+      --glass-surface: rgba(255, 255, 255, 0.65);
+      --glass-surface-hover: rgba(255, 255, 255, 0.88);
+      --glass-surface-subtle: rgba(245, 247, 252, 0.5);
+      --glass-surface-solid: #FFFFFF;
+      --glass-border: rgba(255, 255, 255, 0.85);
+      --glass-border-subtle: rgba(0, 0, 0, 0.06);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow-hover: 0 20px 48px 0 rgba(31, 38, 135, 0.12), 0 4px 12px 0 rgba(0, 0, 0, 0.04);
+
+      --glass-glow-spotlight: rgba(255, 255, 255, 0.75);
+      --glass-border-hover: rgba(255, 255, 255, 0.98);
+      --glass-glow-halo: 0 0 24px rgba(255, 255, 255, 0.85), 0 0 48px rgba(0, 113, 227, 0.12);
+
+      --text-primary: #121316;
+      --text-secondary: #4B4E56;
+      --text-tertiary: #7D828D;
+      --text-quaternary: #A0A5B1;
+
+      --accent: #0071E3;
+      --accent-glow: rgba(0, 113, 227, 0.25);
+      --accent-glass: rgba(0, 113, 227, 0.08);
+
+      --orb-1: rgba(142, 197, 252, 0.45);
+      --orb-2: rgba(224, 195, 252, 0.4);
+      --orb-3: rgba(186, 230, 253, 0.35);
+
+      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --font-mono: "SF Mono", "iA Writer Mono", "Menlo", monospace;
+
+      --blur-strength: blur(24px) saturate(190%);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+      --transition-liquid: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090A0F;
+      --glass-surface: rgba(18, 20, 29, 0.6);
+      --glass-surface-hover: rgba(28, 31, 44, 0.8);
+      --glass-surface-subtle: rgba(15, 17, 24, 0.5);
+      --glass-surface-solid: #151720;
+      --glass-border: rgba(255, 255, 255, 0.14);
+      --glass-border-subtle: rgba(255, 255, 255, 0.06);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.04);
+      --glass-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.55), 0 4px 12px 0 rgba(0, 0, 0, 0.35);
+      --glass-shadow-hover: 0 24px 60px 0 rgba(0, 0, 0, 0.75), 0 8px 24px 0 rgba(41, 151, 255, 0.15);
+
+      --glass-glow-spotlight: rgba(65, 150, 255, 0.28);
+      --glass-border-hover: rgba(255, 255, 255, 0.45);
+      --glass-glow-halo: 0 0 30px rgba(41, 151, 255, 0.38), 0 0 60px rgba(41, 151, 255, 0.18);
+
+      --text-primary: #F5F7FA;
+      --text-secondary: #A6ACBA;
+      --text-tertiary: #757C8A;
+      --text-quaternary: #4D5360;
+
+      --accent: #2997FF;
+      --accent-glow: rgba(41, 151, 255, 0.35);
+      --accent-glass: rgba(41, 151, 255, 0.14);
+
+      --orb-1: rgba(56, 75, 140, 0.4);
+      --orb-2: rgba(99, 44, 133, 0.3);
+      --orb-3: rgba(28, 100, 148, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14.5px;
+      line-height: 1.6;
+      letter-spacing: -0.012em;
+      min-height: 100vh;
+      overflow-x: hidden;
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    /* ---------------- Fluid Ambient Background ---------------- */
+    .ambient-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .ambient-orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(90px);
+      opacity: 0.85;
+      animation: floatMotion 24s infinite alternate ease-in-out;
+    }
+
+    .orb-1 {
+      width: 650px;
+      height: 650px;
+      background: radial-gradient(circle, var(--orb-1) 0%, transparent 70%);
+      top: -100px;
+      left: -80px;
+    }
+
+    .orb-2 {
+      width: 750px;
+      height: 750px;
+      background: radial-gradient(circle, var(--orb-2) 0%, transparent 70%);
+      top: 30%;
+      right: -120px;
+      animation-duration: 28s;
+      animation-delay: -5s;
+    }
+
+    .orb-3 {
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--orb-3) 0%, transparent 70%);
+      bottom: -120px;
+      left: 25%;
+      animation-duration: 30s;
+      animation-delay: -10s;
+    }
+
+    @keyframes floatMotion {
+      0% { transform: translate(0px, 0px) scale(1); }
+      50% { transform: translate(50px, 40px) scale(1.06); }
+      100% { transform: translate(-40px, 60px) scale(0.95); }
+    }
+
+    /* ---------------- Navigation Bar & Sub-Bar ---------------- */
+    header {
+      position: sticky;
+      top: 12px;
+      z-index: 100;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 0 16px;
+    }
+
+    .nav-glass-bar {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 0 20px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: var(--transition-liquid);
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+
+    .brand-mark {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
+      box-shadow: 0 0 12px var(--accent-glow);
+    }
+
+    .brand-name {
+      font-family: var(--font-display);
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-tag {
+      font-size: 11px;
+      color: var(--text-tertiary);
+      font-family: var(--font-mono);
+      letter-spacing: 0.05em;
+    }
+
+    .nav-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .nav-tabs::-webkit-scrollbar { display: none; }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-size: 13px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: var(--radius-full);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition-liquid);
+      font-family: var(--font-sans);
+    }
+
+    .nav-tab-btn:hover {
+      color: var(--text-primary);
+      background: var(--glass-surface-subtle);
+    }
+
+    .nav-tab-btn.active {
+      color: var(--text-primary);
+      background: var(--glass-surface-hover);
+      box-shadow: var(--glass-specular);
+    }
+
+    .nav-right-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .theme-btn {
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      border-radius: var(--radius-full);
+      padding: 4px 12px;
+      font-size: 12px;
+      font-family: var(--font-sans);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      backdrop-filter: var(--blur-strength);
+      transition: var(--transition-liquid);
+    }
+
+    .theme-btn:hover {
+      transform: scale(1.03);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-glow-halo);
+    }
+
+    .theme-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+    }
+
+    /* ---------------- Main View Container ---------------- */
+    main {
+      position: relative;
+      z-index: 1;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 32px 16px 100px;
+    }
+
+    .view-panel {
+      display: none;
+      animation: fadeInView 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .view-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeInView {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ---------------- Common Liquid Glass Containers ---------------- */
+    .glass-box {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 32px;
+      position: relative;
+      overflow: hidden;
+      margin-bottom: 32px;
+      transition: var(--transition-liquid);
+    }
+
+    .glass-box:hover {
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-shadow-hover), var(--glass-specular), var(--glass-glow-halo);
+    }
+
+    .glass-card {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+      overflow: hidden;
+      cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+
+    /* Interactive Cursor Spotlight Glow (鼠标跟随变亮) */
+    .glass-card::after {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border-radius: inherit;
+      background: radial-gradient(
+        360px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+        var(--glass-glow-spotlight),
+        transparent 65%
+      );
+      opacity: 0;
+      pointer-events: none;
+      mix-blend-mode: overlay;
+      transition: opacity 0.3s ease;
+    }
+
+    .glass-card:hover {
+      background: var(--glass-surface-hover);
+      transform: translateY(-4px) scale(1.008);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-shadow-hover), var(--glass-specular), var(--glass-glow-halo);
+    }
+
+    .glass-card:hover::after {
+      opacity: 1;
+    }
+
+    /* Typography & Hierarchy */
+    .page-title {
+      font-family: var(--font-display);
+      font-size: 36px;
+      font-weight: 600;
+      letter-spacing: -0.035em;
+      margin-bottom: 10px;
+    }
+
+    .page-desc {
+      font-size: 15px;
+      color: var(--text-secondary);
+      max-width: 720px;
+      line-height: 1.6;
+      margin-bottom: 28px;
+    }
+
+    .mono-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: 0.05em;
+      padding: 3px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .grid-3, .grid-4, .grid-2 { grid-template-columns: 1fr; }
+    }
+
+    .btn-liquid {
+      background: var(--text-primary);
+      color: var(--bg-canvas);
+      border: none;
+      padding: 9px 18px;
+      border-radius: var(--radius-full);
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-liquid);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-liquid:hover {
+      opacity: 0.9;
+      transform: translateY(-1px);
+    }
+
+    .btn-liquid-outline {
+      background: var(--glass-surface-subtle);
+      color: var(--text-primary);
+      border: 1px solid var(--glass-border);
+      padding: 9px 18px;
+      border-radius: var(--radius-full);
+      font-size: 13.5px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+
+    .btn-liquid-outline:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-glow-halo);
+    }
+
+    /* ---------------- Inputs & Form Controls ---------------- */
+    .glass-input, .glass-select, .glass-textarea {
+      width: 100%;
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px 14px;
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      outline: none;
+      transition: var(--transition-liquid);
+    }
+
+    .glass-input:focus, .glass-select:focus, .glass-textarea:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
+      background: var(--glass-surface-hover);
+    }
+
+    .form-group {
+      margin-bottom: 18px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    /* ---------------- Specific View Styling ---------------- */
+
+    /* 1. Home Sitemap Grid */
+    .sitemap-card {
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      background: var(--glass-surface);
+      cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+    .sitemap-card:hover {
+      transform: translateY(-3px);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-glow-halo);
+    }
+
+    /* 2. Forum (Tieba Style) */
+    .forum-container {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 24px;
+    }
+    .bar-list-item {
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      color: var(--text-secondary);
+      transition: var(--transition-liquid);
+      font-size: 13.5px;
+    }
+    .bar-list-item.active, .bar-list-item:hover {
+      background: var(--glass-surface-hover);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+    .post-card {
+      border-bottom: 1px solid var(--glass-border-subtle);
+      padding: 18px 0;
+      transition: var(--transition-liquid);
+      cursor: pointer;
+    }
+    .post-card:last-child { border-bottom: none; }
+    .post-card:hover {
+      transform: translateX(4px);
+    }
+    .post-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .post-pinned {
+      font-size: 11px;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: var(--accent-glass);
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    /* 6. SOP Stepper & Generator */
+    .sop-stepper {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+    .sop-step-node {
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      background: var(--glass-surface-subtle);
+      cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+    .sop-step-node.active {
+      border-color: var(--accent);
+      background: var(--glass-surface-hover);
+      box-shadow: 0 0 16px var(--accent-glow);
+    }
+
+    /* 8. User Management */
+    .switch-toggle {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+    .switch-toggle input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border);
+      transition: .3s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 18px; width: 18px; left: 2px; bottom: 2px;
+      background-color: var(--text-primary);
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider { background-color: var(--accent); border-color: var(--accent); }
+    input:checked + .slider:before { transform: translateX(20px); background-color: #FFF; }
+
+    /* 9 & 10. Low-Code Canvas & Orchestration */
+    .drag-canvas {
+      min-height: 440px;
+      border: 1.5px dashed var(--glass-border);
+      border-radius: var(--radius-md);
+      padding: 24px;
+      background: var(--glass-surface-subtle);
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 16px;
+    }
+    .canvas-widget {
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      padding: 18px;
+      box-shadow: var(--glass-shadow);
+      position: relative;
+    }
+
+    /* Modal Sheet */
+    .sheet-modal {
+      position: fixed; inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(16px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 1000;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    .sheet-modal.active { opacity: 1; pointer-events: auto; }
+    .sheet-body {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 32px;
+      max-width: 500px;
+      width: 100%;
+      box-shadow: var(--glass-shadow-hover), var(--glass-specular);
+      transform: translateY(16px) scale(0.97);
+      transition: var(--transition-liquid);
+    }
+    .sheet-modal.active .sheet-body { transform: translateY(0) scale(1); }
+  </style>
+</head>
+<body>
+
+  <!-- Ambient Fluid Orbs -->
+  <div class="ambient-container">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+  </div>
+
+  <!-- Sticky Liquid Navigation -->
+  <header>
+    <div class="nav-glass-bar">
+      <div class="brand-group" onclick="switchView('home')">
+        <div class="brand-mark"></div>
+        <span class="brand-name">OpcHub</span>
+        <span class="brand-tag">OS 2.0</span>
+      </div>
+
+      <nav class="nav-tabs">
+        <button class="nav-tab-btn active" onclick="switchView('home', this)">首页地图</button>
+        <button class="nav-tab-btn" onclick="switchView('forum', this)">创客贴吧</button>
+        <button class="nav-tab-btn" onclick="switchView('product', this)">产品橱窗</button>
+        <button class="nav-tab-btn" onclick="switchView('policy', this)">政策雷达</button>
+        <button class="nav-tab-btn" onclick="switchView('demand', this)">需求外包池</button>
+        <button class="nav-tab-btn" onclick="switchView('sop', this)">流程SOP文书</button>
+        <button class="nav-tab-btn" onclick="switchView('perks', this)">支持算力券</button>
+        <button class="nav-tab-btn" onclick="switchView('user', this)">用户权益</button>
+        <button class="nav-tab-btn" onclick="switchView('backend-orch', this)">后端编排</button>
+        <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)">前端低代码</button>
+      </nav>
+
+      <div class="nav-right-actions">
+        <button class="theme-btn" onclick="toggleTheme()">
+          <span class="theme-dot"></span>
+          <span id="themeLabel">深色模式</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- ==========================================
+         VIEW 1: 首页功能地图 (Home / Capability Map)
+         ========================================== -->
+    <div id="view-home" class="view-panel active">
+      <div class="glass-box">
+        <span class="mono-tag">SYSTEM PLATFORM OVERVIEW</span>
+        <h1 class="page-title" style="margin-top: 12px;">超级个体一站式赋能服务平台</h1>
+        <p class="page-desc">
+          为一人公司（One-Person Company）构建全生命周期操作系统。以微内核流程编排与充血领域模型为基石，打通合规SOP、政策申报、算力折扣、产品打榜与商机外包。
+        </p>
+
+        <div style="display: flex; gap: 12px; margin-bottom: 36px;">
+          <button class="btn-liquid" onclick="switchView('sop')">开启创客合规 SOP</button>
+          <button class="btn-liquid-outline" onclick="switchView('policy')">查阅最新政策雷达</button>
+        </div>
+
+        <div class="section-divider" style="border-top: 1px solid var(--glass-border-subtle); padding-top: 24px;">
+          <h2 style="font-size: 19px; font-weight: 600; margin-bottom: 16px;">功能全景地图 (Capability Matrix)</h2>
+          <div class="grid-3">
+            <div class="sitemap-card" onclick="switchView('forum')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">01 · COMMUNITY</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">创客实战论坛</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">贴吧式主题交流、出海实战答疑、经验置顶与干货讨论区。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('product')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">02 · SHOWCASE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">产品展示橱窗</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">独立创客产品画廊，支持点赞打榜、产品收录与出海获客。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('policy')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">03 · INTELLIGENCE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">政策雷达内参</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">全网政策白话提炼，税收减免、算力返还与地方补贴精准匹配。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('demand')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">04 · MARKETPLACE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">需求外包池</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">真实企业寻源商机、AI Agent 外包撮合与资金托管担保。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('sop')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">05 · WORKFLOW</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">流程 SOP 与材料生成</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">工商设立到离岸资金流全阶段表单收集，一键导出标准申报材料。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('perks')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">06 · INFRASTRUCTURE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">支持与基础设施</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">云厂商激活特权、Token 优惠券、Stripe 结汇通道及工具折扣。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('user')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">07 · ENTITLEMENT</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">用户管理与权益开通</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">多级会员凭证强绑定、按量功能开关与支付鉴权控制中心。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('backend-orch')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">08 · MICROKERNEL</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">后端编排与业务上传</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">Python 脚本热上传、AST 安全沙箱验证与微内核 Scenario 路由编排。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('frontend-orch')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">09 · LOW-CODE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">前端页面构建编排</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">24 栅格低代码拖拽画布、组件参数绑定与前后端原子发布管理。</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 2: 交流论坛 (Forum / Tieba Style)
+         ========================================== -->
+    <div id="view-forum" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客交流贴吧</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">超级个体经验沉淀 · 独立出海问答 · 踩坑互助交流</p>
+          </div>
+          <button class="btn-liquid" onclick="openPostModal()">+ 发布新帖</button>
+        </div>
+      </div>
+
+      <div class="forum-container">
+        <!-- Left: Tieba Categories -->
+        <div class="glass-box" style="padding: 20px;">
+          <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">THEMATIC BARS</div>
+          <div class="bar-list-item active">全部讨论区 <span>1,280</span></div>
+          <div class="bar-list-item">工商财税吧 <span>420</span></div>
+          <div class="bar-list-item">独立出海吧 <span>365</span></div>
+          <div class="bar-list-item">AI Agent吧 <span>290</span></div>
+          <div class="bar-list-item">政策申报吧 <span>114</span></div>
+          <div class="bar-list-item">技术踩坑吧 <span>91</span></div>
+        </div>
+
+        <!-- Right: Tieba Posts List -->
+        <div class="glass-box" style="padding: 20px 28px;">
+          <div class="post-card">
+            <div class="post-title">
+              <span class="post-pinned">置顶</span>
+              <span>【必读】2026 一人公司工商年报与增值税免征额度最新操作细则</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+              针对季度营收 30 万以下免税政策的电子税务局申报实录，附常见报错与退税处理流程...
+            </p>
+            <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>作者: 平台管家</span>
+              <span>回复: 89</span>
+              <span>最后更新: 10 分钟前</span>
+            </div>
+          </div>
+
+          <div class="post-card">
+            <div class="post-title">
+              <span class="post-pinned">精选</span>
+              <span>从 0 到 1 拿到长三角智能算力补贴 12 万元的全周期复盘 (附审批材料格式)</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+              很多朋友以为个体户申报不了算力券，其实只要软著+科技型中小企业入库登记即可破局...
+            </p>
+            <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>作者: CodeNomad</span>
+              <span>回复: 42</span>
+              <span>最后更新: 35 分钟前</span>
+            </div>
+          </div>
+
+          <div class="post-card">
+            <div class="post-title">
+              <span>独立开发者 Stripe 绑定万里汇香港对公户结汇流程避坑指南</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+              最近很多人遇到银行合规风控抽检要求提供发票与服务履约截图，这里分享一份标准回复模版...
+            </p>
+            <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>作者: SoloDev_Z</span>
+              <span>回复: 19</span>
+              <span>最后更新: 2 小时前</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 3: 产品 Gallery (Product Showcase)
+         ========================================== -->
+    <div id="view-product" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">超级个体产品橱窗</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
+          </div>
+          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)">+ 提交我的产品</button>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">AI 原生写作</span>
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ 342 赞</span>
+            </div>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">InkFlow AI 专注编辑器</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              结合本地知识库与大模型的无干扰写作工作台，专为长文研究员与独立小说创作者打造。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">作者: @Alex_Writer</span>
+            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">开发者基础设施</span>
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ 288 赞</span>
+            </div>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">FastSchema DB 自动生成引擎</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              通过自然语言定义实体关系，1秒生成高质量 PostgreSQL 物理 DDL 与具备充血模型的 FastAPI 代码。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">作者: @ZeroDev</span>
+            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">跨境出海</span>
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ 195 赞</span>
+            </div>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">ShipGlobal 独立站支付聚合网关</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              为国内独立开发者提供合规无损的全球收单路由，支持 Apple Pay、Google Pay 与主流海外信用卡。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">作者: @GlobalPayMaster</span>
+            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 4: 政策 Gallery (Policy Radar)
+         ========================================== -->
+    <div id="view-policy" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 16px;">
+        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">政策雷达与白话提炼库</h1>
+        <p style="font-size: 13px; color: var(--text-secondary);">汇集长三角、大湾区及全国针对超级个体与初创团队的扶持红利，拒绝官话套话，直达关键要求。</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">POL-2026-081</span>
+              <span style="font-size: 11.5px; color: var(--text-tertiary);">全国统一</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">小微企业月销售额 10 万以下免征增值税</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】按季申报纳税人，季度开票未超 30 万元免交增值税；若开具专票需按 1% 征收率纳税。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">截止 2027-12-31</span>
+            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">匹配资格 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">POL-2026-094</span>
+              <span style="font-size: 11.5px; color: var(--text-tertiary);">大湾区</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">智能算力券补贴申领 (第 3 批)</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】租赁云厂商 GPU 算力卡训练微调大模型，由财政直补 30% 租赁费用，每家主体上限 20 万元。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">剩余 12 天</span>
+            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">申报材料 ›</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">POL-2026-105</span>
+              <span style="font-size: 11.5px; color: var(--text-tertiary);">长三角</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">科技型中小企业研发费用加计扣除</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】研发活动发生的人工与设备折旧费用，在税前按 100% 比例加计扣除，有效抵冲经营利润税负。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">常年开放申报</span>
+            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">入库测评 ›</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 5: 需求池 Gallery (Marketplace)
+         ========================================== -->
+    <div id="view-demand" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 16px;">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
+          </div>
+          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)">+ 发布寻源需求</button>
+        </div>
+      </div>
+
+      <div class="grid-3">
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">预算 ¥35,000</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">外贸 CRM 系统的垂直行业 Agent 工作流搭建</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              需要基于 FastAPI + PostgreSQL + pgvector 打造私有知识库问答与自动邮件生成插件，周期 3 周。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">3 人已竞标</span>
+            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">预算 ¥18,000</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">跨端桌面工具 (Electron / Tauri) 界面重构与性能调优</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              将老旧代码升级为 Vue3 组合式 API 并适配深色/浅色液态毛玻璃界面，具备良好现代美感。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">1 人已竞标</span>
+            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">年费项目 ¥60,000</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">出海 SaaS 平台长期兼职 DevOps 与合规架构顾问</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              负责 AWS Terraform 编排、Stripe Webhook 支付链路稳定性监控与自动化数据库备份保障。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">5 人已竞标</span>
+            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 6: 流程 SOP 与文档生成 (Workflow Doc Generator)
+         ========================================== -->
+    <div id="view-sop" class="view-panel">
+      <div class="glass-box">
+        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客合规 SOP 与标准化材料生成器</h1>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
+          串联创业从 0 到 1 的全流程填写流图。通过信息录入，系统自动生成符合政务与银行规范的标准申报材料，支持即时预览与一键下载。
+        </p>
+
+        <!-- Stepper Map -->
+        <div class="sop-stepper">
+          <div class="sop-step-node active" onclick="setSopStep(1)">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent);">阶段 01</div>
+            <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">主体定名与税种选型</div>
+          </div>
+          <div class="sop-step-node" onclick="setSopStep(2)">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">阶段 02</div>
+            <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">银行基本户与发票授信</div>
+          </div>
+          <div class="sop-step-node" onclick="setSopStep(3)">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">阶段 03</div>
+            <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">软著申报与技术入库</div>
+          </div>
+          <div class="sop-step-node" onclick="setSopStep(4)">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">阶段 04</div>
+            <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">跨境结汇通道配置</div>
+          </div>
+        </div>
+
+        <!-- Form and Document Preview -->
+        <div class="grid-2" style="align-items: start;">
+          <!-- Left: Input Form -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <h3 style="font-size: 16px; margin-bottom: 16px;">填写申报实体关键信息</h3>
+            <div class="form-group">
+              <label class="form-label">拟定经营主体字号 / 公司全称</label>
+              <input type="text" id="sopCompanyName" class="glass-input" value="极客视界（杭州）信息技术工作室" oninput="updateDocPreview()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">法定代表创客姓名 / 身份证号</label>
+              <input type="text" id="sopFounderName" class="glass-input" value="赵玄 (33010619920101XXXX)" oninput="updateDocPreview()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">主营经营范围代码</label>
+              <input type="text" id="sopBizScope" class="glass-input" value="软件开发；信息技术咨询服务；人工智能应用软件开发" oninput="updateDocPreview()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">注册资本 / 注册地址类型</label>
+              <select class="glass-select" id="sopAddressType" onchange="updateDocPreview()">
+                <option value="自有或集群租赁商务秘书地址 (免实际租赁)">集群租赁商务秘书地址 (免实际租赁)</option>
+                <option value="实际办公场地租赁合同">实际办公场地租赁合同</option>
+              </select>
+            </div>
+            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 12px;" onclick="downloadGeneratedDoc()">
+              生成并下载《个体工商户设立登记标准申请书.docx》
+            </button>
+          </div>
+
+          <!-- Right: Realtime Document Preview -->
+          <div style="background: var(--glass-surface-solid); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border); min-height: 380px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 12px; margin-bottom: 16px;">
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">DOC-PREVIEW-RENDER</span>
+              <span style="font-size: 12px; color: #34C759;">● 实时合规校验已通过</span>
+            </div>
+            <div id="sopDocOutput" style="font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap;">
+个体工商户设立登记申请书
+---------------------------------------------
+登记机关：杭州市市场监督管理局
+主体全称：极客视界（杭州）信息技术工作室
+经营者：赵玄 (33010619920101XXXX)
+资金数额：人民币 100,000 元整
+经营场所：杭州市高新技术产业园区集群登记地址
+主营范围：软件开发；信息技术咨询服务；人工智能应用软件开发
+
+承诺签署：
+本人保证所提交的文件、证件及有关材料真实、有效，
+且符合一人公司税收征管及合规要求。
+---------------------------------------------
+[电子签名待核验] 状态: READY FOR SUBMISSION
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 7: 支持与算力基础设施 (Perks & Infrastructure)
+         ========================================== -->
+    <div id="view-perks" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 16px;">
+        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">算力与开发者基础设施支持</h1>
+        <p style="font-size: 13px; color: var(--text-secondary);">已为超级个体接入全球顶尖算力与基础设施专属补贴通道，大幅削减一人公司的启动成本。</p>
+      </div>
+
+      <div class="grid-3">
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">云端抵扣券</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">价值 $5,000</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">AWS Activate 创客计划</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              为平台认证超级个体提供 2 年期 $5,000 云服务积分与高级企业架构师一对一技术支持。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">剩余额度: 38/50</span>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('AWS Activate 兑换码')">领取专属码</button>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">AI 算力通道</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">Tier-4 并发</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">OpenAI & Claude 高并发代理路由</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              免梯子直连全球边缘节点，享有独享 TPM 频率保障，月度结算提供正规增值税专用发票。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">已接入通道</span>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('API 路由 Key')">配置密钥</button>
+          </div>
+        </div>
+
+        <div class="glass-card">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">离岸资金流</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">费率 0.4%</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">Stripe & 派安盈专属出海结汇</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              出海收款绿色通道，协助开立香港/新加坡虚拟对公子账户，资金阳光结汇直达境内个人卡。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">认证专属通道</span>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('出海开户绿色通道')">提交申请</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 8: 用户管理与收费权益体系 (User & Entitlements)
+         ========================================== -->
+    <div id="view-user" class="view-panel">
+      <div class="glass-box">
+        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客用户体系与收费权益中心</h1>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
+          基于 user_id 与 entitlement_id 强绑定架构。涵盖三级用户体系（管理员、创客、游客）与功能权限开关控制。
+        </p>
+
+        <div class="grid-2" style="align-items: start;">
+          <!-- Left: User Profile -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
+              <h3 style="font-size: 16px;">创客基本信息档案</h3>
+              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: USER (普通创客)</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">用户绑定 UID</label>
+              <input type="text" class="glass-input" value="usr_2026_opc_9981" disabled style="opacity: 0.7;">
+            </div>
+            <div class="form-group">
+              <label class="form-label">创客昵称 / 电子邮箱</label>
+              <input type="text" class="glass-input" value="zhaoxuan@opchub.com">
+            </div>
+            <div class="form-group">
+              <label class="form-label">绑定企业统一社会信用代码</label>
+              <input type="text" class="glass-input" value="92330106MA2XXXXXX">
+            </div>
+            <button class="btn-liquid" style="margin-top: 8px;">保存档案修改</button>
+          </div>
+
+          <!-- Right: Entitlements Switcher & Monetization -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <h3 style="font-size: 16px; margin-bottom: 16px;">收费权益与专属功能开关</h3>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+              <div>
+                <div style="font-weight: 600; font-size: 14px;">政策雷达全量深度内参 (ENT_POL_VIP)</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">包含政策原文对照、长三角直通车辅导</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" checked onchange="toggleFeature(this, 'ENT_POL_VIP')">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+              <div>
+                <div style="font-weight: 600; font-size: 14px;">高级商机线索与需求竞标 (ENT_BIZ_LEADS)</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">解锁外包集市客户直连电话与资金托管通道</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" onchange="toggleFeature(this, 'ENT_BIZ_LEADS')">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+              <div>
+                <div style="font-weight: 600; font-size: 14px;">出海 Stripe 0.4% 超级费率特权 (ENT_STRIPE_PERK)</div>
+                <div style="font-size: 12px; color: var(--text-secondary);">每年节省超 1.2 万元跨境结汇手续费</div>
+              </div>
+              <label class="switch-toggle">
+                <input type="checkbox" onchange="toggleFeature(this, 'ENT_STRIPE_PERK')">
+                <span class="slider"></span>
+              </label>
+            </div>
+
+            <div style="margin-top: 20px; text-align: right;">
+              <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)">
+                + 升级年度黑钻创客 (¥999/年)
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 9: 后端微内核编排与业务上传 (Backend Orchestration)
+         ========================================== -->
+    <div id="view-backend-orch" class="view-panel">
+      <div class="glass-box">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+          <h1 class="page-title" style="font-size: 26px;">后端微内核流程编排与 Python 业务上传</h1>
+          <span class="mono-tag" style="background: rgba(255, 59, 48, 0.1); color: #FF3B30;">ADMIN PRIVILEGE REQUIRED</span>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
+          充血模型 + 单入口网关 (`POST /api/v1/gateway`) 架构。管理员上传业务脚本，通过 AST 安全沙箱语法校验后热注册进编排微内核。
+        </p>
+
+        <div class="grid-2" style="align-items: start;">
+          <!-- Left: Python Code Upload & Editor -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+              <h3 style="font-size: 15px; font-weight: 600;">上传业务逻辑脚本 (Python AST 沙箱)</h3>
+              <span class="mono-tag">FILE: invoice_tax_calc.py</span>
+            </div>
+            <textarea id="pythonCodeEditor" class="glass-textarea" rows="12" style="font-family: var(--font-mono); font-size: 12.5px; line-height: 1.6;">
+# 统一方法签名规范: async def (ctx: PipelineContext) -> PipelineContext
+async def execute(ctx: PipelineContext) -> PipelineContext:
+    """自动测算小规模纳税人增值税免征额与超额税负"""
+    quarterly_income = ctx.payload.get("quarterly_income", 0)
+    
+    if quarterly_income <= 300000:
+        ctx.payload["vat_exempt"] = True
+        ctx.payload["vat_due"] = 0
+        ctx.payload["status"] = "ELIGIBLE_FOR_EXEMPTION"
+    else:
+        ctx.payload["vat_exempt"] = False
+        ctx.payload["vat_due"] = round(quarterly_income * 0.01, 2)
+        ctx.payload["status"] = "TAX_PAYABLE"
+        
+    return ctx
+            </textarea>
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button class="btn-liquid" onclick="validatePythonAST()">AST 安全编译与语法检测</button>
+              <button class="btn-liquid-outline" onclick="registerPipelineMethod()">热载注册入编排池</button>
+            </div>
+            <div id="astOutput" style="margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: #34C759; display: none;">
+              ✔ AST 安全检查通过: 无危险模块导入 (os/sys/subprocess 禁止调用), 方法签名符合 PipelineContext 协议。
+            </div>
+          </div>
+
+          <!-- Right: Scenario Pipeline Flow Builder -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <h3 style="font-size: 15px; font-weight: 600;">场景编排管线 · Scenario Pipeline</h3>
+              <span class="mono-tag">SCENARIO: "tax.calculate_exemption"</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">步骤 1: 权限与凭证拦截核验</div>
+                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">builtin.auth_guard (校验 402)</div>
+                </div>
+                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
+              </div>
+
+              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">步骤 2: 动态注册的税费测算算法</div>
+                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">custom.invoice_tax_calc.execute</div>
+                </div>
+                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
+              </div>
+
+              <div style="border: 1px solid var(--glass-border); padding: 12px 16px; border-radius: var(--radius-sm); background: var(--glass-surface); display: flex; justify-content: space-between;">
+                <div>
+                  <div style="font-weight: 600; font-size: 13px;">步骤 3: 审计日志与 Elasticsearch 索引</div>
+                  <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">builtin.audit_logger</div>
+                </div>
+                <span class="mono-tag" style="color: #34C759;">ACTIVE</span>
+              </div>
+            </div>
+
+            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 18px;" onclick="testPipelineExecution()">
+              模拟单入口网关调度测试 (POST /api/v1/gateway)
+            </button>
+            <div id="pipelineTestResult" style="margin-top: 12px; font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); background: var(--glass-surface-solid); padding: 12px; border-radius: 6px; display: none;">
+              HTTP 200 OK | Pipeline Execution: 14ms | Payload: {"vat_exempt": true, "vat_due": 0, "status": "ELIGIBLE_FOR_EXEMPTION"}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==========================================
+         VIEW 10: 前端页面构建编排 (Frontend Low-Code Canvas)
+         ========================================== -->
+    <div id="view-frontend-orch" class="view-panel">
+      <div class="glass-box">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
+          <h1 class="page-title" style="font-size: 26px;">前端页面可视化低代码构建器</h1>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn-liquid-outline" onclick="rollbackRelease()">回滚上个版本</button>
+            <button class="btn-liquid" onclick="publishReleaseBundle()">原子联合发布 v1.0.4</button>
+          </div>
+        </div>
+        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
+          将页面完全网格化，支持从左侧组件库拖入或点击添加组件，右侧直观绑定后端接口 Scenario 与参数。
+        </p>
+
+        <div style="display: grid; grid-template-columns: 200px 1fr 280px; gap: 16px; align-items: start;">
+          <!-- Left: Component Palette -->
+          <div style="background: var(--glass-surface-subtle); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">COMPONENT PALETTE</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('stat')">+ 统计指标卡</button>
+              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('table')">+ 数据表格列表</button>
+              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('form')">+ 提交表单组件</button>
+              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('chart')">+ 折射趋势图表</button>
+            </div>
+          </div>
+
+          <!-- Center: 24-Grid Drag & Drop Canvas -->
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>CANVAS: 24-COLUMN GRID RESPONSIVE</span>
+              <span>STATE: EDITING (DRAFT)</span>
+            </div>
+            <div class="drag-canvas" id="mainCanvas">
+              <div class="canvas-widget" style="grid-column: span 6;">
+                <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">WIDGET #01 · STAT_CARD</div>
+                <div style="font-size: 22px; font-weight: 600; margin: 4px 0;">¥ 248,000</div>
+                <div style="font-size: 12px; color: var(--text-tertiary);">季度免税开票累计</div>
+              </div>
+              <div class="canvas-widget" style="grid-column: span 6;">
+                <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">WIDGET #02 · PERK_STATUS</div>
+                <div style="font-size: 22px; font-weight: 600; margin: 4px 0;">3 个可用</div>
+                <div style="font-size: 12px; color: var(--text-tertiary);">云厂商算力特权礼包</div>
+              </div>
+              <div class="canvas-widget" style="grid-column: span 12;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">WIDGET #03 · POLICY_TABLE</span>
+                  <span class="mono-tag">BOUND: scenario.get_radar_list</span>
+                </div>
+                <div style="font-size: 13.5px; color: var(--text-secondary);">
+                  已绑定后端统一网关查询场景，前台自动拉取长三角最新财税与补贴条目列表并分页渲染。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Inspector & Backend Binding -->
+          <div style="background: var(--glass-surface-subtle); padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
+            <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">PROPERTY INSPECTOR</div>
+            <div class="form-group">
+              <label class="form-label">组件宽度 (栅格跨度)</label>
+              <select class="glass-select">
+                <option>跨 6 列 (Quarter)</option>
+                <option selected>跨 12 列 (Half / Full)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">绑定后端调用场景 (Scenario)</label>
+              <input type="text" class="glass-input" value="policy.query_radar_v2">
+            </div>
+            <div class="form-group">
+              <label class="form-label">入参映射 (JSON Payload)</label>
+              <textarea class="glass-textarea" rows="4" style="font-family: var(--font-mono); font-size: 11.5px;">{"region": "CN_YANGTZE", "limit": 10}</textarea>
+            </div>
+            <div class="form-group">
+              <label class="form-label">权限门禁 (Entitlement Required)</label>
+              <select class="glass-select">
+                <option value="NONE">公开无需门禁 (GUEST)</option>
+                <option value="ENT_POL_VIP" selected>ENT_POL_VIP (需高级内参凭据)</option>
+              </select>
+            </div>
+            <button class="btn-liquid" style="width: 100%; justify-content: center; font-size: 13px;">保存属性配置</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Reusable Entitlement & Payment Modal Sheet -->
+  <div class="sheet-modal" id="modalSheet">
+    <div class="sheet-body">
+      <h3 style="font-size: 19px; font-weight: 600; margin-bottom: 8px;" id="sheetModalTitle">开通创客专享权益</h3>
+      <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;" id="sheetModalDesc">
+        该操作将为您的用户账号强绑定权益 ID，开通后即刻解锁对应功能模块。
+      </p>
+
+      <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+        <div style="font-size: 28px; font-weight: 600; font-family: var(--font-display);" id="sheetModalPrice">¥ 499.00</div>
+        <div style="font-size: 12px; color: var(--text-tertiary);">一次性永久或年度授权凭据</div>
+      </div>
+
+      <div style="display: flex; gap: 10px;">
+        <button class="btn-liquid-outline" style="flex: 1;" onclick="closeEntitlementModal()">取消</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="confirmEntitlementPayment()">确认绑定并激活</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // View Switcher (Router)
+    // -------------------------------------------------------------
+    function switchView(viewName, btnElement) {
+      document.querySelectorAll('.view-panel').forEach(panel => {
+        panel.classList.remove('active');
+      });
+      const target = document.getElementById(`view-${viewName}`);
+      if (target) {
+        target.classList.add('active');
+      }
+
+      if (btnElement) {
+        document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
+        btnElement.classList.add('active');
+      } else {
+        // Find corresponding button
+        document.querySelectorAll('.nav-tab-btn').forEach(b => {
+          if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${viewName}'`)) {
+            document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+            b.classList.add('active');
+          }
+        });
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    // -------------------------------------------------------------
+    // Liquid Glass Theme Controller (Light / Dark)
+    // -------------------------------------------------------------
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme');
+      const target = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', target);
+      localStorage.setItem('opchub_complete_theme', target);
+      updateThemeLabel(target);
+    }
+
+    function updateThemeLabel(theme) {
+      const label = document.getElementById('themeLabel');
+      if (theme === 'dark') {
+        label.textContent = '浅色模式';
+      } else {
+        label.textContent = '深色模式';
+      }
+    }
+
+    (function initTheme() {
+      const saved = localStorage.getItem('opchub_complete_theme');
+      if (saved) {
+        document.documentElement.setAttribute('data-theme', saved);
+        updateThemeLabel(saved);
+      } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        updateThemeLabel('dark');
+      }
+    })();
+
+    // -------------------------------------------------------------
+    // Dynamic Mouse Spotlight Lighting (悬停变亮跟随光效)
+    // -------------------------------------------------------------
+    function initMouseLighting() {
+      const items = document.querySelectorAll('.glass-card, .sitemap-card, .glass-box, .canvas-widget');
+      items.forEach(el => {
+        el.addEventListener('mousemove', (e) => {
+          const rect = el.getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          el.style.setProperty('--mouse-x', `${x}px`);
+          el.style.setProperty('--mouse-y', `${y}px`);
+        });
+      });
+    }
+    initMouseLighting();
+
+    // -------------------------------------------------------------
+    // SOP Document Generator
+    // -------------------------------------------------------------
+    function updateDocPreview() {
+      const company = document.getElementById('sopCompanyName').value || '拟定企业全称';
+      const founder = document.getElementById('sopFounderName').value || '创客姓名';
+      const scope = document.getElementById('sopBizScope').value || '经营范围描述';
+      const addr = document.getElementById('sopAddressType').value;
+
+      const template = `个体工商户设立登记申请书
+---------------------------------------------
+登记机关：市场监督管理局
+主体全称：${company}
+经营者：${founder}
+资金数额：人民币 100,000 元整
+经营场所：${addr}
+主营范围：${scope}
+
+承诺签署：
+本人保证所提交的文件、证件及有关材料真实、有效，
+且符合一人公司税收征管及合规要求。
+---------------------------------------------
+[电子签名待核验] 状态: READY FOR SUBMISSION`;
+
+      document.getElementById('sopDocOutput').textContent = template;
+    }
+
+    function downloadGeneratedDoc() {
+      const content = document.getElementById('sopDocOutput').textContent;
+      const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "个体工商户设立登记标准申请书.txt";
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function setSopStep(stepNum) {
+      document.querySelectorAll('.sop-step-node').forEach((node, idx) => {
+        if (idx + 1 === stepNum) {
+          node.classList.add('active');
+        } else {
+          node.classList.remove('active');
+        }
+      });
+    }
+
+    // -------------------------------------------------------------
+    // Backend AST and Pipeline Simulation
+    // -------------------------------------------------------------
+    function validatePythonAST() {
+      const code = document.getElementById('pythonCodeEditor').value;
+      const out = document.getElementById('astOutput');
+      out.style.display = 'block';
+      out.style.color = '#34C759';
+      out.textContent = '✔ AST 安全检测通过: 语法解析正确，未检测到 os/sys/subprocess 等非法外部命令导入，已生成合法字节码签名。';
+    }
+
+    function registerPipelineMethod() {
+      alert('已成功将方法 custom.invoice_tax_calc.execute 热载并注册入微内核编排方法池！');
+    }
+
+    function testPipelineExecution() {
+      const res = document.getElementById('pipelineTestResult');
+      res.style.display = 'block';
+    }
+
+    // -------------------------------------------------------------
+    // Frontend Low-Code Builder Actions
+    // -------------------------------------------------------------
+    function addWidgetToCanvas(type) {
+      const canvas = document.getElementById('mainCanvas');
+      const widget = document.createElement('div');
+      widget.className = 'canvas-widget';
+      widget.style.gridColumn = 'span 6';
+
+      let inner = '';
+      if (type === 'stat') {
+        inner = `<div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">NEW · STAT_CARD</div>
+                 <div style="font-size: 20px; font-weight: 600; margin: 4px 0;">¥ 58,400</div>
+                 <div style="font-size: 12px; color: var(--text-tertiary);">新增指标项</div>`;
+      } else if (type === 'form') {
+        inner = `<div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">NEW · FORM_INPUT</div>
+                 <div style="margin-top: 6px;"><input type="text" class="glass-input" placeholder="请输入申报内容..."></div>`;
+      } else {
+        inner = `<div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">NEW · WIDGET_${type.toUpperCase()}</div>
+                 <div style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">已载入低代码容器</div>`;
+      }
+      widget.innerHTML = inner;
+      canvas.appendChild(widget);
+      initMouseLighting();
+    }
+
+    function publishReleaseBundle() {
+      alert('已打包生成前后端原子发布包 (Release Bundle v1.0.4)，状态已流转为 PUBLISHED！');
+    }
+
+    function rollbackRelease() {
+      alert('已触发零停机安全回滚，系统已恢复至版本 v1.0.3！');
+    }
+
+    // -------------------------------------------------------------
+    // Entitlements & Monetization Modal Controller
+    // -------------------------------------------------------------
+    function openEntitlementModal(name, price) {
+      document.getElementById('sheetModalTitle').textContent = name;
+      document.getElementById('sheetModalPrice').textContent = '¥ ' + Number(price).toFixed(2);
+      document.getElementById('modalSheet').classList.add('active');
+    }
+
+    function closeEntitlementModal() {
+      document.getElementById('modalSheet').classList.remove('active');
+    }
+
+    function confirmEntitlementPayment() {
+      alert('已成功绑定权益凭据并完成支付鉴权，对应功能模块已开启！');
+      closeEntitlementModal();
+    }
+
+    function toggleFeature(checkbox, entitlementId) {
+      if (checkbox.checked) {
+        alert(`已开启功能 [${entitlementId}]，已通过网关鉴权。`);
+      } else {
+        alert(`已关闭功能 [${entitlementId}]。`);
+      }
+    }
+
+    function claimPerk(perkName) {
+      alert(`已成功领用特权：${perkName}，兑换凭证已存入您的创客权益背包！`);
+    }
+
+    function openPostModal() {
+      const title = prompt("请输入您要发布的交流帖子标题：");
+      if (title) {
+        alert("帖子已发布至交流贴吧！");
+      }
+    }
+  </script>
+</body>
+</html>
