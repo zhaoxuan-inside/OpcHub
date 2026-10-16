@@ -1,0 +1,59 @@
+# OpcHub 全局统一定义词典与防歧义词典 (_02_project_word.dict.yaml)
+# Version: 1.0.0
+# Complies with hs-dev-skill verify_consistency schema
+
+terms:
+  - term: "创客"
+    en_name: "Maker"
+    description: "平台的核心服务主体，一人公司（One-Person Company）创办者或独立开发者"
+    forbidden_alias: ["end_user", "consumer", "client_person"]
+
+  - term: "收费权益"
+    en_name: "Entitlement"
+    description: "用户账户强绑定的功能与服务调用权限凭据，用于门禁鉴权与按量计费"
+    forbidden_alias: ["vip_flag", "permission_ticket", "reward_point"]
+
+  - term: "扶持政策"
+    en_name: "Policy"
+    description: "政府公开的免税、算力券、研发费用加计扣除等扶持补贴条目"
+    forbidden_alias: ["government_order", "subsidy_doc"]
+
+  - term: "生态特权"
+    en_name: "Perk"
+    description: "云厂商、大模型平台、离岸支付工具提供给创客的专属额度与折扣"
+    forbidden_alias: ["welfare_pack", "coupon_gift"]
+
+  - term: "需求委托"
+    en_name: "Demand"
+    description: "企业客户发布的技术外包、合规辅导或定制开发需求"
+    forbidden_alias: ["work_order", "gig_item"]
+
+  - term: "微内核编排链路"
+    en_name: "DAGPipeline"
+    description: "后端通过有向无环图串联门禁、算子与存储的执行拓扑流程"
+    forbidden_alias: ["script_chain", "raw_workflow"]
+
+lifecycle_terms:
+  - concept: "DAG Pipeline Lifecycle"
+    command: "execute_pipeline"
+    event: "pipeline.executed"
+    status: "SUCCESS"
+    forbidden_alias: ["run_pipe", "pipeline_ran"]
+
+  - concept: "Entitlement Lifecycle"
+    command: "grant_entitlement"
+    event: "entitlement.activated"
+    status: "ACTIVE"
+    forbidden_alias: ["open_vip", "vip_opened"]
+
+  - concept: "Document Generation Lifecycle"
+    command: "generate_document"
+    event: "document.generated"
+    status: "READY"
+    forbidden_alias: ["create_doc", "doc_created"]
+
+  - concept: "Forum Post Lifecycle"
+    command: "publish_post"
+    event: "post.published"
+    status: "PUBLISHED"
+    forbidden_alias: ["send_msg", "msg_sent"]
