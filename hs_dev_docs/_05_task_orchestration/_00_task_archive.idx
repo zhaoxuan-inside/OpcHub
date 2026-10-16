@@ -1,2 +1,3 @@
 {"version": "1.0", "category": "task_archive", "root": "_05_task_orchestration"}
 {"id": "TASK-001", "title": "微内核DAG编排执行引擎与全域运营大盘", "path": "_02_task_detail/_01_TASK-001/_00_task_detail.md", "status": "COMPLETED", "digest": "da35a671", "updated_at": "2026-10-16T14:10:12Z", "last_note": "自动化测试11/11全通过，质量门禁零告警零错误，交付完成"}
+{"id": "TASK-002", "title": "论坛多级嵌套问答树与点赞收藏持久化引擎", "path": "_02_task_detail/_01_TASK-002/_00_task_detail.md", "status": "COMPLETED", "digest": "88f3eecd", "updated_at": "2026-10-16T15:10:41Z", "last_note": "Forum nested comments tree and upvotes/bookmarks fully implemented and verified"}

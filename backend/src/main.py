@@ -11,6 +11,18 @@ from src.core.microkernel.sandbox import validate_python_code
 from src.core.microkernel.registry import registry
 from src.domains.telemetry.service import telemetry_service
 from src.domains.telemetry.models import OpsDashboardResponse
+from src.domains.forum.service import forum_service
+from src.domains.forum.models import (
+    ForumThreadCreate,
+    ForumThreadResponse,
+    ForumCommentCreate,
+    ForumCommentResponse,
+    ThreadDetailResponse,
+    UpvoteRequest,
+    UpvoteResponse,
+    BookmarkRequest,
+    BookmarkResponse,
+)
 
 
 app = FastAPI(
@@ -94,3 +106,85 @@ async def validate_script_sandbox(payload: ScriptValidationRequest):
         "parsed_functions": validation.parsed_functions,
         "signature_hash": validation.signature_hash
     }
+
+
+# ==========================================
+# Forum Domain Endpoints (Threads, Nested Tree, Upvotes & Bookmarks)
+# ==========================================
+@app.post(
+    f"{settings.api_prefix}/forum/threads",
+    response_model=ForumThreadResponse,
+    status_code=201,
+    tags=["Forum"]
+)
+async def create_forum_thread(payload: ForumThreadCreate):
+    """Publish a new maker discussion thread."""
+    return forum_service.create_thread(payload)
+
+
+@app.get(
+    f"{settings.api_prefix}/forum/threads",
+    response_model=list[ForumThreadResponse],
+    tags=["Forum"]
+)
+async def list_forum_threads(category_code: str | None = None):
+    """List forum discussion threads, optionally filtered by category."""
+    return forum_service.list_threads(category_code=category_code)
+
+
+@app.get(
+    f"{settings.api_prefix}/forum/threads/{{thread_id}}",
+    response_model=ThreadDetailResponse,
+    tags=["Forum"]
+)
+async def get_forum_thread_detail(thread_id: str):
+    """Get discussion thread detail including full recursive comment tree."""
+    try:
+        return forum_service.get_thread_detail(thread_id)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Forum thread not found")
+
+
+@app.post(
+    f"{settings.api_prefix}/forum/threads/{{thread_id}}/comments",
+    response_model=ForumCommentResponse,
+    status_code=201,
+    tags=["Forum"]
+)
+async def create_forum_comment(thread_id: str, payload: ForumCommentCreate):
+    """Post a top-level answer or nested sub-reply with materialized path computation."""
+    try:
+        return forum_service.create_comment(thread_id, payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post(
+    f"{settings.api_prefix}/forum/upvote",
+    response_model=UpvoteResponse,
+    tags=["Forum"]
+)
+async def toggle_forum_upvote(payload: UpvoteRequest):
+    """Atomically toggle upvote on a thread or comment."""
+    try:
+        return forum_service.toggle_upvote(payload.user_id, payload.target_type, payload.target_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post(
+    f"{settings.api_prefix}/forum/bookmark",
+    response_model=BookmarkResponse,
+    tags=["Forum"]
+)
+async def toggle_forum_bookmark(payload: BookmarkRequest):
+    """Atomically toggle bookmark on a thread."""
+    try:
+        return forum_service.toggle_bookmark(payload.user_id, payload.thread_id, payload.folder_name)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+

@@ -1,5 +1,5 @@
 # OpcHub 全局统一定义词典与防歧义词典 (_02_project_word.dict.yaml)
-# Version: 1.0.0
+# Version: 1.1.0
 # Complies with hs-dev-skill verify_consistency schema
 
 terms:
@@ -33,6 +33,26 @@ terms:
     description: "后端通过有向无环图串联门禁、算子与存储的执行拓扑流程"
     forbidden_alias: ["script_chain", "raw_workflow"]
 
+  - term: "论坛讨论帖"
+    en_name: "ForumThread"
+    description: "创客交流贴吧中发布的实战经验、踩坑记录或出海商业主题帖"
+    forbidden_alias: ["main_post", "topic_entity", "article_item"]
+
+  - term: "多级问答回复"
+    en_name: "ForumComment"
+    description: "对讨论帖的回答或对回答的楼中楼二级/多级嵌套回复（基于物化路径模型）"
+    forbidden_alias: ["reply_entity", "sub_talk", "talk_item"]
+
+  - term: "认同点赞"
+    en_name: "Upvote"
+    description: "对帖子或问答回复的投票认同机制，一人一票防重"
+    forbidden_alias: ["like_action", "thumb_up", "agree_vote"]
+
+  - term: "收藏归档"
+    en_name: "Bookmark"
+    description: "创客将优质实战经验或出海指南加入个人收藏夹"
+    forbidden_alias: ["favorite_mark", "star_item"]
+
 lifecycle_terms:
   - concept: "DAG Pipeline Lifecycle"
     command: "execute_pipeline"
@@ -57,3 +77,21 @@ lifecycle_terms:
     event: "post.published"
     status: "PUBLISHED"
     forbidden_alias: ["send_msg", "msg_sent"]
+
+  - concept: "Forum Comment Lifecycle"
+    command: "reply_comment"
+    event: "comment.created"
+    status: "ACTIVE"
+    forbidden_alias: ["post_reply", "reply_posted"]
+
+  - concept: "Upvote Lifecycle"
+    command: "toggle_upvote"
+    event: "target.upvoted"
+    status: "UPVOTED"
+    forbidden_alias: ["give_like", "like_given"]
+
+  - concept: "Bookmark Lifecycle"
+    command: "toggle_bookmark"
+    event: "thread.bookmarked"
+    status: "BOOKMARKED"
+    forbidden_alias: ["do_favorite", "fav_done"]

@@ -37,6 +37,14 @@ schema_contract:
       primary_key: "id (VARCHAR(64))"
     - name: "dag_pipeline_configs"
       primary_key: "id (UUID)"
+    - name: "forum_threads"
+      primary_key: "id (UUID)"
+    - name: "forum_comments"
+      primary_key: "id (UUID)"
+    - name: "forum_upvotes"
+      primary_key: "id (UUID)"
+    - name: "forum_bookmarks"
+      primary_key: "id (UUID)"
 ```
 
 ---
@@ -159,3 +167,83 @@ CREATE TABLE IF NOT EXISTS dag_pipeline_configs (
 
 CREATE INDEX idx_dag_configs_lookup ON dag_pipeline_configs(scenario_code, status);
 ```
+
+### 1.7 创客论坛讨论帖表 (`forum_threads`)
+```sql
+CREATE TABLE IF NOT EXISTS forum_threads (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    category_code VARCHAR(64) NOT NULL DEFAULT 'DEV', -- 'DEV', 'BIZ', 'TAX', 'AGENTS'
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    view_count INT NOT NULL DEFAULT 0,
+    upvote_count INT NOT NULL DEFAULT 0,
+    comment_count INT NOT NULL DEFAULT 0,
+    bookmark_count INT NOT NULL DEFAULT 0,
+    is_pinned BOOLEAN NOT NULL DEFAULT FALSE,
+    status VARCHAR(32) NOT NULL DEFAULT 'PUBLISHED', -- 'PUBLISHED', 'ARCHIVED', 'DELETED'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_forum_threads_cat_created ON forum_threads(category_code, created_at DESC);
+CREATE INDEX idx_forum_threads_author ON forum_threads(author_id);
+```
+
+### 1.8 论坛多级问答回复表 (`forum_comments` · 物化路径模型)
+```sql
+CREATE TABLE IF NOT EXISTS forum_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    thread_id UUID NOT NULL REFERENCES forum_threads(id) ON DELETE CASCADE,
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    content TEXT NOT NULL,
+    -- 物化路径与层级结构: 支持无限层级“回答以及对回答的回答”
+    parent_id UUID REFERENCES forum_comments(id) ON DELETE CASCADE, -- NULL表示顶级回答
+    root_id UUID REFERENCES forum_comments(id) ON DELETE CASCADE,   -- 属于哪一个顶级回答（便于楼中楼二级聚合）
+    reply_to_user_id UUID REFERENCES users(id) ON DELETE SET NULL, -- 被回复的创客UID
+    materialized_path VARCHAR(1024) NOT NULL,                      -- 物化路径，如 "/root_id/parent_id/id"
+    depth INT NOT NULL DEFAULT 0,                                  -- 嵌套深度，0为顶级回答，1为回答的回答
+    upvote_count INT NOT NULL DEFAULT 0,
+    is_accepted BOOLEAN NOT NULL DEFAULT FALSE,                    -- 问答场景采纳标识
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 单表极速索引：通过物化路径或 thread_id+path 一次索引扫描召回整个评论树
+CREATE INDEX idx_forum_comments_thread_path ON forum_comments(thread_id, materialized_path);
+CREATE INDEX idx_forum_comments_root_created ON forum_comments(root_id, created_at ASC);
+CREATE INDEX idx_forum_comments_parent ON forum_comments(parent_id);
+```
+
+### 1.9 认同点赞表 (`forum_upvotes` · 防重唯一索引)
+```sql
+CREATE TABLE IF NOT EXISTS forum_upvotes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    target_type VARCHAR(32) NOT NULL, -- 'THREAD' 或 'COMMENT'
+    target_id UUID NOT NULL,          -- 对应的 thread_id 或 comment_id
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 严格防重：同一创客对同一帖子或评论只允许点赞一次
+    CONSTRAINT uq_forum_upvote_target UNIQUE (user_id, target_type, target_id)
+);
+
+CREATE INDEX idx_forum_upvotes_user ON forum_upvotes(user_id);
+CREATE INDEX idx_forum_upvotes_target ON forum_upvotes(target_type, target_id);
+```
+
+### 1.10 创客收藏归档表 (`forum_bookmarks` · 防重唯一索引)
+```sql
+CREATE TABLE IF NOT EXISTS forum_bookmarks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    thread_id UUID NOT NULL REFERENCES forum_threads(id) ON DELETE CASCADE,
+    folder_name VARCHAR(64) NOT NULL DEFAULT '默认收藏夹',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    -- 严格防重：同一创客对同一帖子只收藏一次
+    CONSTRAINT uq_forum_bookmark UNIQUE (user_id, thread_id)
+);
+
+CREATE INDEX idx_forum_bookmarks_user ON forum_bookmarks(user_id, created_at DESC);
+```
+

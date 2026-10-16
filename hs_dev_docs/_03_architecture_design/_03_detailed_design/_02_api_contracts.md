@@ -48,6 +48,37 @@ api_contract:
       method: "POST"
       auth: "AUTHENTICATED"
       summary: "根据创客填报字段生成标准个体户申请书"
+
+    # 5. 创客论坛讨论帖与多级问答树 (Forum Engine)
+    - path: "/forum/threads"
+      method: "POST"
+      auth: "AUTHENTICATED"
+      summary: "发布创客讨论帖 (publish_post)"
+
+    - path: "/forum/threads"
+      method: "GET"
+      auth: "OPTIONAL"
+      summary: "分页检索论坛讨论帖列表"
+
+    - path: "/forum/threads/{thread_id}"
+      method: "GET"
+      auth: "OPTIONAL"
+      summary: "获取讨论帖详情及全量多级问答递归嵌套树"
+
+    - path: "/forum/threads/{thread_id}/comments"
+      method: "POST"
+      auth: "AUTHENTICATED"
+      summary: "发表顶级回答或多级楼中楼回复 (reply_comment)"
+
+    - path: "/forum/upvote"
+      method: "POST"
+      auth: "AUTHENTICATED"
+      summary: "帖子或回复认同点赞原子切换 (toggle_upvote)"
+
+    - path: "/forum/bookmark"
+      method: "POST"
+      auth: "AUTHENTICATED"
+      summary: "讨论帖收藏归档原子切换 (toggle_bookmark)"
 ```
 
 ---
@@ -131,3 +162,115 @@ api_contract:
   }
 }
 ```
+
+### 1.3 创客论坛讨论帖与多级问答树接口 (`GET/POST /api/v1/forum/...`)
+
+#### 1.3.1 发帖接口 (`POST /api/v1/forum/threads`)
+- **请求载荷**：
+```json
+{
+  "category_code": "DEV",
+  "author_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "title": "一人公司基于 Claude 3.5 Sonnet 与 AST 沙箱自动化重构实践",
+  "content": "详细复盘独立创客如何在 3 小时内实现自动化安全检测引擎..."
+}
+```
+- **响应 Schema**：返回 `ForumThreadResponse`，含自增 `view_count`, `upvote_count`, `comment_count`, `bookmark_count` 初始值 0 与状态 `PUBLISHED`。
+
+#### 1.3.2 发表回答与多级楼中楼回复 (`POST /api/v1/forum/threads/{thread_id}/comments`)
+- **请求载荷**：
+```json
+{
+  "author_id": "7ca85f64-5717-4562-b3fc-2c963f66afb7",
+  "content": "请问沙箱对于内置 `__builtins__` 的动态导入是否有深层拦截？",
+  "parent_id": "optional-uuid-of-parent-comment",
+  "reply_to_user_id": "optional-uuid-of-replied-maker"
+}
+```
+- **响应 Schema**：返回 `ForumCommentResponse`，由后端自动计算 `root_id`、`materialized_path`（如 `/root_id/parent_id/comment_id`）与 `depth`。
+
+#### 1.3.3 获取帖子详情与完整递归嵌套树 (`GET /api/v1/forum/threads/{thread_id}`)
+- **响应 Schema** (`ThreadDetailResponse`)：
+```json
+{
+  "thread": {
+    "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+    "category_code": "DEV",
+    "title": "一人公司基于 Claude 3.5 Sonnet 实践",
+    "content": "...",
+    "upvote_count": 42,
+    "comment_count": 18,
+    "bookmark_count": 15,
+    "created_at": "2026-10-16T15:00:00Z"
+  },
+  "comments": [
+    {
+      "id": "c-root-1",
+      "thread_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+      "author_id": "maker-1",
+      "content": "顶级回答：AST 静态分析是第一道防线...",
+      "parent_id": null,
+      "root_id": "c-root-1",
+      "materialized_path": "/c-root-1",
+      "depth": 0,
+      "upvote_count": 12,
+      "children": [
+        {
+          "id": "c-sub-1",
+          "thread_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+          "author_id": "maker-2",
+          "content": "二级楼中楼回复：同意，配合 ptrace 效果更好",
+          "parent_id": "c-root-1",
+          "root_id": "c-root-1",
+          "reply_to_user_id": "maker-1",
+          "materialized_path": "/c-root-1/c-sub-1",
+          "depth": 1,
+          "upvote_count": 3,
+          "children": []
+        }
+      ]
+    }
+  ]
+}
+```
+
+### 1.4 认同点赞与收藏归档原子操作接口
+
+#### 1.4.1 认同点赞切换 (`POST /api/v1/forum/upvote`)
+- **请求载荷**：
+```json
+{
+  "user_id": "user-uuid",
+  "target_type": "THREAD", // 或 "COMMENT"
+  "target_id": "target-uuid"
+}
+```
+- **响应 Schema** (`UpvoteResponse`)：
+```json
+{
+  "is_upvoted": true,
+  "upvote_count": 43,
+  "target_type": "THREAD",
+  "target_id": "target-uuid"
+}
+```
+
+#### 1.4.2 收藏归档切换 (`POST /api/v1/forum/bookmark`)
+- **请求载荷**：
+```json
+{
+  "user_id": "user-uuid",
+  "thread_id": "thread-uuid",
+  "folder_name": "默认收藏夹"
+}
+```
+- **响应 Schema** (`BookmarkResponse`)：
+```json
+{
+  "is_bookmarked": true,
+  "bookmark_count": 16,
+  "thread_id": "thread-uuid",
+  "folder_name": "默认收藏夹"
+}
+```
+
