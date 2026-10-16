@@ -426,38 +426,61 @@
       background: var(--text-primary);
       color: var(--bg-canvas);
       border: none;
-      padding: 9px 18px;
+      padding: 7px 14px;
       border-radius: var(--radius-full);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
       transition: var(--transition-liquid);
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
+      line-height: 1;
     }
 
     .btn-liquid:hover {
       opacity: 0.9;
       transform: translateY(-1px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
     }
 
     .btn-liquid-outline {
       background: var(--glass-surface-subtle);
       color: var(--text-primary);
       border: 1px solid var(--glass-border);
-      padding: 9px 18px;
+      padding: 7px 14px;
       border-radius: var(--radius-full);
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 500;
       cursor: pointer;
+      white-space: nowrap;
+      user-select: none;
       transition: var(--transition-liquid);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      line-height: 1;
     }
 
     .btn-liquid-outline:hover {
       background: var(--glass-surface-hover);
       border-color: var(--glass-border-hover);
       box-shadow: var(--glass-glow-halo);
+    }
+
+    .btn-liquid svg, .btn-liquid-outline svg {
+      width: 14px;
+      height: 14px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex-shrink: 0;
     }
 
     /* ---------------- Inputs & Form Controls ---------------- */
@@ -769,8 +792,14 @@
         </p>
 
         <div style="display: flex; gap: 12px; margin-bottom: 36px;">
-          <button class="btn-liquid" onclick="switchView('sop')">开启创客合规 SOP</button>
-          <button class="btn-liquid-outline" onclick="switchView('policy')">查阅最新政策雷达</button>
+          <button class="btn-liquid" onclick="switchView('sop')">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
+            <span>开启 SOP 向导</span>
+          </button>
+          <button class="btn-liquid-outline" onclick="switchView('policy')">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path><line x1="12" y1="12" x2="19" y2="5"></line></svg>
+            <span>政策雷达</span>
+          </button>
         </div>
 
         <div class="section-divider" style="border-top: 1px solid var(--glass-border-subtle); padding-top: 24px;">
@@ -836,7 +865,10 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客交流贴吧</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">超级个体经验沉淀 · 独立出海问答 · 踩坑互助交流</p>
           </div>
-          <button class="btn-liquid" onclick="openPostModal()">+ 发布新帖</button>
+          <button class="btn-liquid" onclick="openPostModal()">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>发帖</span>
+          </button>
         </div>
       </div>
 
@@ -911,7 +943,10 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">超级个体产品橱窗</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)">+ 提交我的产品</button>
+          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>提交产品</span>
+          </button>
         </div>
       </div>
 
@@ -990,9 +1025,9 @@
               【白话要点】按季申报纳税人，季度开票未超 30 万元免交增值税；若开具专票需按 1% 征收率纳税。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">截止 2027-12-31</span>
-            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">匹配资格 ›</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格</button>
           </div>
         </div>
 
@@ -1007,9 +1042,9 @@
               【白话要点】租赁云厂商 GPU 算力卡训练微调大模型，由财政直补 30% 租赁费用，每家主体上限 20 万元。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">剩余 12 天</span>
-            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">申报材料 ›</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>申报材料</button>
           </div>
         </div>
 
@@ -1024,9 +1059,9 @@
               【白话要点】研发活动发生的人工与设备折旧费用，在税前按 100% 比例加计扣除，有效抵冲经营利润税负。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">常年开放申报</span>
-            <a href="javascript:void(0)" style="color: var(--accent); text-decoration: none;">入库测评 ›</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>入库测评</button>
           </div>
         </div>
       </div>
@@ -1042,7 +1077,7 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)">+ 发布寻源需求</button>
+          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>发布需求</button>
         </div>
       </div>
 
@@ -1058,9 +1093,9 @@
               需要基于 FastAPI + PostgreSQL + pgvector 打造私有知识库问答与自动邮件生成插件，周期 3 周。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">3 人已竞标</span>
-            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
@@ -1075,9 +1110,9 @@
               将老旧代码升级为 Vue3 组合式 API 并适配深色/浅色液态毛玻璃界面，具备良好现代美感。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">1 人已竞标</span>
-            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
@@ -1092,9 +1127,9 @@
               负责 AWS Terraform 编排、Stripe Webhook 支付链路稳定性监控与自动化数据库备份保障。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">5 人已竞标</span>
-            <a href="javascript:void(0)" class="btn-liquid" style="padding: 4px 12px; font-size: 12px;">提交方案</a>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
       </div>
@@ -1155,7 +1190,7 @@
               </select>
             </div>
             <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 12px;" onclick="downloadGeneratedDoc()">
-              生成并下载《个体工商户设立登记标准申请书.docx》
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出登记文书 (.docx)
             </button>
           </div>
 
@@ -1207,9 +1242,9 @@
               为平台认证超级个体提供 2 年期 $5,000 云服务积分与高级企业架构师一对一技术支持。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">剩余额度: 38/50</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('AWS Activate 兑换码')">领取专属码</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('AWS Activate 兑换码')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取</button>
           </div>
         </div>
 
@@ -1224,9 +1259,9 @@
               免梯子直连全球边缘节点，享有独享 TPM 频率保障，月度结算提供正规增值税专用发票。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">已接入通道</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('API 路由 Key')">配置密钥</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('API 路由 Key')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>配置</button>
           </div>
         </div>
 
@@ -1241,9 +1276,9 @@
               出海收款绿色通道，协助开立香港/新加坡虚拟对公子账户，资金阳光结汇直达境内个人卡。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">认证专属通道</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('出海开户绿色通道')">提交申请</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('出海开户绿色通道')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>申请</button>
           </div>
         </div>
       </div>
@@ -1278,7 +1313,7 @@
               <label class="form-label">绑定企业统一社会信用代码</label>
               <input type="text" class="glass-input" value="92330106MA2XXXXXX">
             </div>
-            <button class="btn-liquid" style="margin-top: 8px;">保存档案修改</button>
+            <button class="btn-liquid" style="margin-top: 8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
           </div>
 
           <!-- Right: Entitlements Switcher & Monetization -->
@@ -1320,7 +1355,7 @@
 
             <div style="margin-top: 20px; text-align: right;">
               <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)">
-                + 升级年度黑钻创客 (¥999/年)
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>升级黑钻 (¥999)
               </button>
             </div>
           </div>
@@ -1351,8 +1386,8 @@
               </select>
               <span style="color: #34C759; font-size: 11px;">● 就绪</span>
             </div>
-            <button class="btn-liquid-outline" onclick="previewDagConfigJson()">查看生成配置 (JSON)</button>
-            <button class="btn-liquid" onclick="deployDagConfiguration()">提交并加载生效</button>
+            <button class="btn-liquid-outline" onclick="previewDagConfigJson()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>查看配置</button>
+            <button class="btn-liquid" onclick="deployDagConfiguration()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>部署生效</button>
           </div>
         </div>
 
@@ -1452,7 +1487,7 @@
                 <span>微内核已加载 4 节点 · 3 边 | 支持按住鼠标任意拖拽节点及重绘连线</span>
               </div>
               <button class="btn-liquid" style="font-size: 12.5px; padding: 6px 14px;" onclick="runDagPulseSimulation()">
-                ▶ 仿真调度运行 (POST /api/v1/gateway)
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>仿真运行
               </button>
             </div>
           </div>
@@ -1492,7 +1527,7 @@
             </div>
 
             <button class="btn-liquid-outline" style="color: #FF3B30; margin-top: 8px; justify-content: center;" onclick="deleteSelectedDagNode()">
-              删除当前选中的节点
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>移除节点
             </button>
           </div>
         </div>
@@ -1504,7 +1539,7 @@
               <span style="font-weight: 600; font-size: 15px;">Python 业务脚本热载上传与 AST 安全沙箱</span>
               <span class="mono-tag" style="margin-left: 8px;">FILE: invoice_tax_calc.py</span>
             </div>
-            <button class="btn-liquid-outline" style="font-size: 12px; padding: 4px 10px;" onclick="toggleScriptPanel()">收起/展开编辑器</button>
+            <button class="btn-liquid-outline" style="font-size: 12px; padding: 4px 10px;" onclick="toggleScriptPanel()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>源码沙箱</button>
           </div>
 
           <div id="dagScriptContainer">
@@ -1522,8 +1557,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     return ctx
             </textarea>
             <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
-              <button class="btn-liquid" onclick="validatePythonAST()">AST 静态语法检测与安全编译</button>
-              <button class="btn-liquid-outline" onclick="registerPipelineMethod()">热载注册至节点库</button>
+              <button class="btn-liquid" onclick="validatePythonAST()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>AST 校验</button>
+              <button class="btn-liquid-outline" onclick="registerPipelineMethod()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>热载注册</button>
               <span id="astOutput" style="font-family: var(--font-mono); font-size: 12px; color: #34C759; display: none;">
                 ✔ AST 检查通过: 无危险系统模块，已注册进微内核字典。
               </span>
@@ -1541,8 +1576,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
           <h1 class="page-title" style="font-size: 26px;">前端页面可视化低代码构建器</h1>
           <div style="display: flex; gap: 8px;">
-            <button class="btn-liquid-outline" onclick="rollbackRelease()">回滚上个版本</button>
-            <button class="btn-liquid" onclick="publishReleaseBundle()">原子联合发布 v1.0.4</button>
+            <button class="btn-liquid-outline" onclick="rollbackRelease()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>版本回滚</button>
+            <button class="btn-liquid" onclick="publishReleaseBundle()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>原子发布 v1.0.4</button>
           </div>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
@@ -1554,10 +1589,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <div style="background: var(--glass-surface-subtle); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
             <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">COMPONENT PALETTE</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('stat')">+ 统计指标卡</button>
-              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('table')">+ 数据表格列表</button>
-              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('form')">+ 提交表单组件</button>
-              <button class="btn-liquid-outline" style="text-align: left; font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('chart')">+ 折射趋势图表</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('stat')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>统计指标卡</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('table')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>数据表格列表</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('form')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>提交表单组件</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>折射趋势图表</button>
             </div>
           </div>
 
@@ -1615,7 +1650,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
                 <option value="ENT_POL_VIP" selected>ENT_POL_VIP (需高级内参凭据)</option>
               </select>
             </div>
-            <button class="btn-liquid" style="width: 100%; justify-content: center; font-size: 13px;">保存属性配置</button>
+            <button class="btn-liquid" style="width: 100%; justify-content: center; font-size: 13px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存配置</button>
           </div>
         </div>
       </div>
@@ -1636,8 +1671,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button class="btn-liquid-outline" style="flex: 1;" onclick="closeEntitlementModal()">取消</button>
-        <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="confirmEntitlementPayment()">确认绑定并激活</button>
+        <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeEntitlementModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="confirmEntitlementPayment()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>激活权益</button>
       </div>
     </div>
   </div>
