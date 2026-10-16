@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub（一人公司综合赋能平台）商业计划书</title>
+  <style>
+    :root {
+      --navy-950: #0a1128;
+      --navy-900: #101f42;
+      --navy-800: #1c2d5a;
+      --navy-700: #2b3e73;
+      --slate-900: #0f172a;
+      --slate-800: #1e293b;
+      --slate-700: #334155;
+      --slate-600: #475569;
+      --slate-500: #64748b;
+      --slate-200: #e2e8f0;
+      --slate-100: #f1f5f9;
+      --slate-50: #f8fafc;
+      --gold-600: #b45309;
+      --gold-500: #d97706;
+      --gold-100: #fef3c7;
+      --emerald-800: #065f46;
+      --emerald-100: #d1fae5;
+      --purple-800: #5b21b6;
+      --purple-100: #ede9fe;
+      --blue-800: #1e40af;
+      --blue-100: #dbeafe;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Georgia", serif;
+      background-color: #f1f5f9;
+      color: var(--slate-800);
+      line-height: 1.75;
+      padding: 3rem 1rem;
+      font-size: 15px;
+    }
+
+    .doc-container {
+      max-width: 980px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid var(--slate-200);
+      box-shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+    }
+
+    /* Top Institutional Header */
+    .doc-header {
+      border-bottom: 2px solid var(--navy-900);
+      padding: 3.5rem 4rem 2.5rem 4rem;
+      background: #ffffff;
+      position: relative;
+    }
+
+    .doc-confidential {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--slate-500);
+      font-weight: 700;
+      border-bottom: 1px solid var(--slate-200);
+      padding-bottom: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    .doc-title {
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--navy-950);
+      letter-spacing: -0.01em;
+      line-height: 1.25;
+      margin-bottom: 1rem;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+
+    .doc-subtitle {
+      font-size: 1.05rem;
+      color: var(--slate-600);
+      max-width: 820px;
+      line-height: 1.6;
+      margin-bottom: 2rem;
+    }
+
+    .doc-meta-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+    }
+
+    .doc-meta-table td {
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--slate-200);
+      color: var(--slate-700);
+    }
+
+    .doc-meta-table td.label {
+      background: #eaeff5;
+      font-weight: 700;
+      width: 18%;
+      color: var(--navy-900);
+    }
+
+    /* Content */
+    .doc-body {
+      padding: 3.5rem 4rem;
+    }
+
+    .section-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--navy-950);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      border-bottom: 1px solid var(--navy-900);
+      padding-bottom: 0.5rem;
+      margin: 2.5rem 0 1.25rem 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .section-title:first-of-type {
+      margin-top: 0;
+    }
+
+    .section-title .section-id {
+      color: var(--navy-700);
+      font-size: 1.1rem;
+      margin-right: 0.5rem;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--navy-900);
+      margin: 1.75rem 0 0.75rem 0;
+    }
+
+    p {
+      color: var(--slate-700);
+      margin-bottom: 1rem;
+      text-align: justify;
+    }
+
+    /* Institutional Badge System */
+    .badge-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      background: var(--slate-50);
+      border: 1px solid var(--slate-200);
+      padding: 0.85rem 1.25rem;
+      margin: 1.5rem 0 2rem 0;
+      align-items: center;
+      font-size: 0.825rem;
+    }
+
+    .badge-bar-label {
+      font-weight: 700;
+      color: var(--navy-950);
+      margin-right: 0.5rem;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.55rem;
+      font-size: 0.75rem;
+      font-weight: 700;
+      border-radius: 2px;
+      letter-spacing: 0.02em;
+    }
+
+    .badge-free {
+      background: var(--emerald-100);
+      color: var(--emerald-800);
+      border: 1px solid #a7f3d0;
+    }
+
+    .badge-creator {
+      background: var(--purple-100);
+      color: var(--purple-800);
+      border: 1px solid #ddd6fe;
+    }
+
+    .badge-vendor {
+      background: var(--gold-100);
+      color: var(--gold-600);
+      border: 1px solid #fde68a;
+    }
+
+    .badge-trade {
+      background: var(--blue-100);
+      color: var(--blue-800);
+      border: 1px solid #bfdbfe;
+    }
+
+    /* Structured Boxes & Tables */
+    .box-quote {
+      border-left: 3px solid var(--navy-800);
+      background: var(--slate-50);
+      padding: 1.25rem 1.5rem;
+      margin: 1.25rem 0;
+      font-size: 0.95rem;
+      color: var(--slate-700);
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+      margin: 1.25rem 0 2rem 0;
+      border: 1px solid var(--slate-200);
+    }
+
+    .data-table th {
+      background: var(--slate-100);
+      color: var(--navy-950);
+      font-weight: 700;
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--slate-200);
+      text-align: left;
+    }
+
+    .data-table td {
+      padding: 0.75rem 1rem;
+      border: 1px solid var(--slate-200);
+      color: var(--slate-700);
+      vertical-align: top;
+    }
+
+    .data-table tr:nth-child(even) td {
+      background: #fafbfc;
+    }
+
+    /* Matrix 2-Col */
+    .matrix-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin: 1.25rem 0;
+    }
+
+    .matrix-card {
+      border: 1px solid var(--slate-200);
+      background: #ffffff;
+      padding: 1.25rem 1.5rem;
+      border-radius: 4px;
+    }
+
+    .matrix-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.6rem;
+      border-bottom: 1px dashed var(--slate-200);
+      padding-bottom: 0.5rem;
+    }
+
+    .matrix-card-title {
+      font-weight: 700;
+      color: var(--navy-950);
+      font-size: 0.95rem;
+    }
+
+    .matrix-card-desc {
+      font-size: 0.85rem;
+      color: var(--slate-600);
+      line-height: 1.55;
+      margin-bottom: 0.6rem;
+    }
+
+    .matrix-card ul {
+      list-style-type: square;
+      padding-left: 1.2rem;
+      font-size: 0.8rem;
+      color: var(--slate-700);
+    }
+
+    .matrix-card ul li {
+      margin-bottom: 0.35rem;
+    }
+
+    /* Footer */
+    .doc-footer {
+      border-top: 1px solid var(--slate-200);
+      padding: 1.75rem 4rem;
+      background: var(--slate-50);
+      font-size: 0.8rem;
+      color: var(--slate-500);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    @media (max-width: 768px) {
+      .doc-header, .doc-body, .doc-footer { padding: 1.5rem; }
+      .doc-title { font-size: 1.65rem; }
+      .matrix-grid { grid-template-columns: 1fr; }
+      .doc-meta-table td.label { width: 30%; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="doc-container">
+
+  <!-- Header -->
+  <header class="doc-header">
+    <div class="doc-confidential">
+      <span>OpcHub 战略规划报告 · 商业计划书</span>
+      <span>严格内部保密 / 机密文档</span>
+    </div>
+    <h1 class="doc-title">OpcHub 一人公司综合赋能平台<br>商业计划书</h1>
+    <p class="doc-subtitle">
+      以新质生产力与先进大模型应用为驱动，构建服务于一人公司（OPC）、独立创客与超级个体的数字化基础设施，提供端到端政策导航、算力支持与商业协作枢纽。
+    </p>
+
+    <table class="doc-meta-table">
+      <tr>
+        <td class="label">项目代号</td>
+        <td>OpcHub</td>
+        <td class="label">所属赛道</td>
+        <td>企业服务 / 独立创客基础设施 / 数字经济</td>
+      </tr>
+      <tr>
+        <td class="label">技术架构</td>
+        <td>API-First 强后端 · 全端轻量适配</td>
+        <td class="label">变现模式</td>
+        <td>B端生态合作 + C端增值服务 + 交易撮合分润</td>
+      </tr>
+      <tr>
+        <td class="label">项目定位</td>
+        <td>一人公司全生命周期公共服务平台</td>
+        <td class="label">规划版本</td>
+        <td>2026 战略稳健版 (v2.1)</td>
+      </tr>
+    </table>
+  </header>
+
+  <!-- Body -->
+  <main class="doc-body">
+
+    <!-- 变现标记图例 -->
+    <div class="badge-bar">
+      <span class="badge-bar-label">商业变现标记规范：</span>
+      <span class="badge badge-free">🟢 免费基础项 (流量引流/生态留存)</span>
+      <span class="badge badge-creator">🟣 收费点 · 创客付费 (特权/审核/打榜)</span>
+      <span class="badge badge-vendor">🟠 收费点 · 厂商合作 (赞助/渠道返佣)</span>
+      <span class="badge badge-trade">🔵 收费点 · 撮合抽佣 (服务中介/担保交割)</span>
+    </div>
+
+    <!-- 1. 宏观环境与战略机遇 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">01.</span> 宏观环境与战略机遇</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">MACRO ENVIRONMENT & OPPORTUNITY</small>
+      </div>
+      <p>
+        近年来，随着新一代大语言模型（LLM）、自动化智能体（Agent）及低代码开发工具的爆发式普及，个人数字生产力实现了跨越式提升。单兵作战的技术人员、产品设计者、自媒体创作者已具备独立交付完整商业软件与数字服务的能力，<strong>“一人公司（One Person Company, OPC）”</strong>作为一种新型敏捷组织形式在全球及国内迅速兴起。
+      </p>
+      <div class="box-quote">
+        <strong>战略契合点：</strong>当前国家层面高度鼓励民营经济发展、促进新质生产力培育与高质量充分就业。多地政府相继出台了针对个体工商户、小微科技主体的阶段性免税、创新券、初创补贴等扶持政策。OpcHub 致力于消除政企信息鸿沟，帮助个体创客合规享受红利，具有坚实的政策导向契合度与社会价值。
+      </div>
+    </section>
+
+    <!-- 2. 核心痛点与行业分析 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">02.</span> 市场痛点与现存摩擦</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">MARKET PAIN POINTS</small>
+      </div>
+      <p>
+        尽管个人研发效能空前提升，但在实际商业化运作中，OPC 创客面临四大非技术性瓶颈，构成了严重的“试错成本与发展摩擦”：
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 20%;">痛点领域</th>
+            <th style="width: 40%;">行业现状与摩擦表现</th>
+            <th style="width: 40%;">OpcHub 解决方案</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>政策信息不对称</strong></td>
+            <td>各地小微科技扶持公文分散、法条晦涩、申报门槛不直观，个体创客无暇研读，造成大量政策红利错失。</td>
+            <td><strong>政策雷达：</strong>AI 结构化抓取与白话提炼，输入画像一键测算补贴与免税区间。</td>
+          </tr>
+          <tr>
+            <td><strong>基础设施刚性支出</strong></td>
+            <td>大模型 API Token、云服务器、域名、SaaS 是每日硬性现金流损耗，个体采购只能接受零售高价。</td>
+            <td><strong>算力装备包 (Perks)：</strong>聚合主流大厂开发者扶持计划与专属折扣，切实降低创业硬成本。</td>
+          </tr>
+          <tr>
+            <td><strong>商业合规与财税短板</strong></td>
+            <td>个体户/公司选型困惑、记账报税、合规开票、跨境收款难，外包给线下中介极易踩坑。</td>
+            <td><strong>SOP 向导 + 认证集市：</strong>结构化避坑 Checklist，严格准入机制撮合专业财税服务商。</td>
+          </tr>
+          <tr>
+            <td><strong>分发获客与资产变现</strong></td>
+            <td>产品研发完成后缺乏精准冷启动渠道；半成品项目或微利项目缺乏规范的转让退场机制。</td>
+            <td><strong>产品橱窗 + 流量互助微件 + 二手微型资产并购市场：</strong>多层次解决曝光与退出难题。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 3. 产品架构与功能矩阵 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">03.</span> 产品架构与业务矩阵 (含变现标记)</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">PRODUCT ARCHITECTURE & MATRIX</small>
+      </div>
+      <p>
+        平台遵循<strong>“强后端逻辑整合、轻前端全端适配”</strong>原则，首期以轻量 Web 接入，并为未来微信小程序、客户端扩展保留标准 API。功能分为“基础公共赋能”与“商业增值交易”两大板块：
+      </p>
+
+      <h3>板块一：基础公共服务与流量入口 (高信噪比赋能)</h3>
+      <div class="matrix-grid">
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">🧭 OPC 全生命周期向导 (SOP)</span>
+            <span class="badge badge-free">🟢 免费基础项</span>
+          </div>
+          <div class="matrix-card-desc">规范化引导创客从构思、工商注册、研发到推广的 6 阶段标准任务树。</div>
+          <ul>
+            <li>阶段性合规与任务看板（进度持久化保存）</li>
+            <li>行业典型合规风控及税务避坑知识库</li>
+            <li>关键选型节点原生推荐主流基础设施 <span class="badge badge-vendor">🟠 场景化返佣嵌入</span></li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">📜 政策雷达与补贴计算器</span>
+            <span class="badge badge-free">🟢 免费基础项</span>
+          </div>
+          <div class="matrix-card-desc">全网小微扶持政策标准化清洗与大白话核心要点呈现。</div>
+          <ul>
+            <li>主体类型、省市地域、支持形式组合筛选</li>
+            <li>100 字官方白话精要、申报门槛与官方直达链接</li>
+            <li>补贴计算器（画像匹配精准测算适配扶持）</li>
+            <li>复杂高阶政策一对一专家申报指导 <span class="badge badge-trade">🔵 咨询撮合抽佣</span></li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">🎁 算力与基础设施装备包 (Perks)</span>
+            <span class="badge badge-vendor">🟠 厂商合作项</span>
+          </div>
+          <div class="matrix-card-desc">汇聚 Token 厂商与云服务商扶持权益，助力早期降本。</div>
+          <ul>
+            <li>大模型 Token 厂商专享试用额度与折扣渠道</li>
+            <li>主流云厂商初创扶持机型一键直达</li>
+            <li>专属渠道注册带来充值流水返佣机制</li>
+            <li>品牌厂商季度特约推广合作位 <span class="badge badge-vendor">🟠 品牌展位赞助</span></li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">💡 创客论坛与实战复盘 (Forum)</span>
+            <span class="badge badge-free">🟢 免费基础项</span>
+          </div>
+          <div class="matrix-card-desc">建立高纯度、无灌水的超级个体实战经验沉淀社区。</div>
+          <ul>
+            <li>Markdown 格式实战复盘、技术选型与踩坑分享</li>
+            <li>产品尝鲜试用与早期反馈互助交流</li>
+            <li>平台违规内容与商业软文严格审核防范</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3>板块二：商业协作与交易网络 (造血闭环)</h3>
+      <div class="matrix-grid">
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">🚀 产品展示橱窗 (Product Gallery)</span>
+            <span class="badge badge-creator">🟣 创客付费项</span>
+          </div>
+          <div class="matrix-card-desc">为创客成熟产品提供权威展示大厅、信誉背书与冷启动流量。</div>
+          <ul>
+            <li>官方 Gallery 独立收录与高权重 SEO 专属主页 <span class="badge badge-creator">🟣 入驻审核费</span></li>
+            <li>周期性首页推荐与全站优先展示位 <span class="badge badge-creator">🟣 打榜置顶费</span></li>
+            <li>普通社区讨论帖免费，与官方权威橱窗分流保障质量</li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">🌐 创客流量互助网络 (Cross-Promo)</span>
+            <span class="badge badge-creator">🟣 创客特权项</span>
+          </div>
+          <div class="matrix-card-desc">利用去中心化互助组件盘活全网创客产品的闲置边缘流量。</div>
+          <ul>
+            <li>底部嵌入式微件：贡献流量换取全网同等流量曝光 <span class="badge badge-free">🟢 互助免付费</span></li>
+            <li>初创无流量产品可购买专属流量包加速曝光 <span class="badge badge-creator">🟣 流量加油包</span></li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">🤝 依赖服务集市 (Marketplace)</span>
+            <span class="badge badge-trade">🔵 撮合交易项</span>
+          </div>
+          <div class="matrix-card-desc">对接代理记账、个体户代办、专业设计、代码外包等专业能力。</div>
+          <ul>
+            <li>创客免费发布个性化代办与外包需求 <span class="badge badge-free">🟢 需求发布免费</span></li>
+            <li>财税所、合规法务、专业设计工作室入驻审核 <span class="badge badge-vendor">🟠 服务商资质认证费</span></li>
+            <li>按单精准线索撮合对接服务分成 <span class="badge badge-trade">🔵 线索费 / 撮合佣金</span></li>
+          </ul>
+        </div>
+
+        <div class="matrix-card">
+          <div class="matrix-card-header">
+            <span class="matrix-card-title">💰 微型项目资产流转市场 (Acquire)</span>
+            <span class="badge badge-trade">🔵 撮合交易项</span>
+          </div>
+          <div class="matrix-card-desc">盘活闲置半成品代码、域名及具备微利收入的成熟小项目。</div>
+          <ul>
+            <li>资产估值评估与标的挂牌 <span class="badge badge-free">🟢 挂牌测算免费</span></li>
+            <li>代码交接、域名过户与资金交割全程见证担保 <span class="badge badge-trade">🔵 技术交割担保服务费</span></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. 商业模式与可持续变现机制 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">04.</span> 商业模式与造血机制</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">BUSINESS MODEL & REVENUE MECHANISM</small>
+      </div>
+      <p>
+        OpcHub 不依赖向基础用户收取“入场门票”，而是坚持<strong>“以高价值免费服务沉淀高粘性精准创客群体，通过 B 端渠道分成、产品分发特权及专业服务撮合实现商业正循环”</strong>：
+      </p>
+
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>变现渠道</th>
+            <th>付费主体</th>
+            <th>收费逻辑与服务标的</th>
+            <th>平台变现性质</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>基础设施渠道分成</strong></td>
+            <td>Token 服务商 / 云计算厂商</td>
+            <td>创客通过装备包优惠直通车注册并持续充值消耗，厂商按渠道结算返佣。</td>
+            <td><span class="badge badge-vendor">🟠 渠道流水返佣</span></td>
+          </tr>
+          <tr>
+            <td><strong>品牌赞助与特约 Deals</strong></td>
+            <td>开发者工具 / SaaS 厂商</td>
+            <td>合作厂商按季度承包首页推荐位、专属权益置顶与联合活动曝光。</td>
+            <td><span class="badge badge-vendor">🟠 品牌广告赞助</span></td>
+          </tr>
+          <tr>
+            <td><strong>产品橱窗收录与推广</strong></td>
+            <td>有获客诉求的 OPC 创客</td>
+            <td>申请入驻官方 Product Gallery 的独立收录审核，以及周期性打榜置顶。</td>
+            <td><span class="badge badge-creator">🟣 增值分发服务</span></td>
+          </tr>
+          <tr>
+            <td><strong>服务商资质认证</strong></td>
+            <td>财税所 / 知识产权机构</td>
+            <td>第三方服务商申请平台官方认证背书、建立信誉档案的年度审核费。</td>
+            <td><span class="badge badge-vendor">🟠 认证信用费</span></td>
+          </tr>
+          <tr>
+            <td><strong>外包撮合与资产交割</strong></td>
+            <td>需求双方 / 资产交易双方</td>
+            <td>外包需求线索精准分发，或微型项目代码、域名过户的技术安全担保佣金。</td>
+            <td><span class="badge badge-trade">🔵 撮合与担保佣金</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 5. 运营防御性与风险管控 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">05.</span> 风险管控与防御性运营</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">RISK MANAGEMENT & DEFENSIVE OPERATIONS</small>
+      </div>
+      <p>
+        稳健性是一人公司平台长期立足的底线。针对外部法律合规、平台声誉及运营安全，制定如下稳健合规防线：
+      </p>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th style="width: 25%;">潜在风险</th>
+            <th style="width: 35%;">诱发场景</th>
+            <th style="width: 40%;">防御应对措施</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>政策准确性与时效风险</strong></td>
+            <td>地方性政策文件频繁修订、截止申报提前或解释口径变动。</td>
+            <td>所有政策页面显著标记官方发文原链与时效倒计时，免责声明明晰，并引入“社区纠错反馈机制”。</td>
+          </tr>
+          <tr>
+            <td><strong>资金二清与金融合规</strong></td>
+            <td>服务集市涉及大额外包资金直接沉淀在平台账户。</td>
+            <td>初期严格坚持“轻撮合”模式，平台不介入资金托管资金池，仅收取商机线索与认证费，杜绝金融合规风险。</td>
+          </tr>
+          <tr>
+            <td><strong>外部合作厂商权益波动</strong></td>
+            <td>Token 或云厂商优惠政策缩水，导致用户体验受损。</td>
+            <td>建立动态 Deals 有效性巡检机制，失效优惠即时下线，确保上架权益均为真实高价值福利。</td>
+          </tr>
+          <tr>
+            <td><strong>社区软文与黑灰产侵害</strong></td>
+            <td>虚假发票、诈骗、违规灰产利用论坛发布违法信息。</td>
+            <td>全站实施敏感词自动过滤、外链合规校验及人工举报通道，确保平台生态高信噪比与清朗合规。</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- 6. 稳健推进路线图 -->
+    <section>
+      <div class="section-title">
+        <span><span class="section-id">06.</span> 稳健分阶段实施路径</span>
+        <small style="font-size:0.75rem; color:var(--slate-500); font-weight:400;">IMPLEMENTATION ROADMAP</small>
+      </div>
+      <p>
+        遵循“小步快跑、逐级验证、保持正向现金流”的原则推进：
+      </p>
+      <div class="box-quote">
+        <strong>阶段一（立足工具与信噪比）：</strong>跑通核心后端 API 与高信噪比政策库，接入首批主流 Token/云服务装备包，上线基础 SOP 向导，完成首批核心创客留存。<br>
+        <strong>阶段二（拓展交易与分发网络）：</strong>上线付费 Product Gallery 与打榜机制，引入流量互助微件，开启首批认证财税所入驻与线索撮合。<br>
+        <strong>阶段三（深化资产与生态运营）：</strong>探索微型项目资产流转市场与集采议价体系，沉淀为超级个体创业的首选数字化入口。
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="doc-footer">
+    <div><strong>OpcHub 战略规划组</strong> · 一人公司赋能生态</div>
+    <div>商业计划书 (Business Plan) · 稳健发展版</div>
+  </footer>
+
+</div>
+
+</body>
+</html>
