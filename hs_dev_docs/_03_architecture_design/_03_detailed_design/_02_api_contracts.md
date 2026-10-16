@@ -274,3 +274,91 @@ api_contract:
 }
 ```
 
+### 1.5 流程文书模板库与申报材料生成接口 (`/api/v1/sop/...`)
+
+#### 1.5.1 获取 SOP 全阶段及预置标准模板 (`GET /api/v1/sop/templates`)
+- **响应 Schema**：
+```json
+{
+  "stages": [
+    { "stage": 1, "name": "阶段 01: 主体定名与税种选型", "code": "STAGE_TAX_ENTITY" },
+    { "stage": 2, "name": "阶段 02: 银行基本户与发票授信", "code": "STAGE_BANK_INVOICE" },
+    { "stage": 3, "name": "阶段 03: 软著申报与技术入库", "code": "STAGE_IP_COPYRIGHT" },
+    { "stage": 4, "name": "阶段 04: 跨境结汇通道配置", "code": "STAGE_CROSS_BORDER" }
+  ],
+  "templates": [
+    {
+      "id": "tpl_individual_biz_reg",
+      "stage": 1,
+      "code": "INDIVIDUAL_BIZ_REG",
+      "name": "个体工商户设立登记标准申请书",
+      "category": "TAX",
+      "description": "标准政务规范设立登记表，支持免实际租约商务秘书集群地址",
+      "required_fields": [
+        { "key": "company_name", "label": "拟定经营主体字号", "type": "string" },
+        { "key": "founder_name", "label": "法定代表创客姓名及身份证", "type": "string" },
+        { "key": "biz_scope", "label": "主营经营范围代码", "type": "string" },
+        { "key": "address_type", "label": "注册地址类型", "type": "select" }
+      ]
+    }
+  ]
+}
+```
+
+#### 1.5.2 提交申报表单并由后端渲染保存材料 (`POST /api/v1/sop/documents`)
+- **请求载荷**：
+```json
+{
+  "template_id": "tpl_individual_biz_reg",
+  "user_id": "usr_2026_opc_9981",
+  "form_data": {
+    "company_name": "极客视界（杭州）信息技术工作室",
+    "founder_name": "赵玄 (33010619920101XXXX)",
+    "biz_scope": "软件开发；信息技术咨询服务；人工智能应用软件开发",
+    "address_type": "集群租赁商务秘书地址 (免实际租赁)"
+  }
+}
+```
+- **响应 Schema**：
+```json
+{
+  "id": "doc_9f81a7bc-28b3-4611",
+  "template_id": "tpl_individual_biz_reg",
+  "document_title": "个体工商户设立登记申请书 - 极客视界（杭州）信息技术工作室",
+  "rendered_content": "个体工商户设立登记申请书\n---------------------------------------------\n登记机关：市场监督管理局\n...",
+  "compliance_passed": true,
+  "status": "READY",
+  "created_at": "2026-10-16T15:15:00Z"
+}
+```
+
+### 1.6 独立产品橱窗接口 (`GET/POST /api/v1/products`)
+- `GET /api/v1/products?category=AI`: 获取创客独立产品列表。
+- `POST /api/v1/products`: 提交产品橱窗展示。
+
+### 1.7 政策雷达与智能测算接口 (`GET/POST /api/v1/policies/...`)
+- `GET /api/v1/policies`: 获取全国及地方扶持补贴政策列表。
+- `POST /api/v1/policies/match`:
+  - **请求载荷**：`{ "quarterly_income": 280000, "maker_type": "INDIVIDUAL", "region": "杭州" }`
+  - **响应 Schema**：`{ "eligible": true, "applicable_tax_rate": 0.0, "estimated_tax_savings": 8400.0, "matched_policies": [...] }`
+
+### 1.8 需求集市与竞标接口 (`GET/POST /api/v1/demands/...`)
+- `GET /api/v1/demands`: 获取企业委托需求集市列表。
+- `POST /api/v1/demands`: 企业或创客发布委托需求。
+- `POST /api/v1/demands/{demand_id}/bids`: 创客提交竞标方案与报价。
+
+### 1.9 开发者生态特权接口 (`GET/POST /api/v1/perks/...`)
+- `GET /api/v1/perks`: 获取算力与基础设施特权权益清单。
+- `POST /api/v1/perks/claim`: 领取/兑换专属特权，返回核销凭据与卡密。
+
+### 1.10 用户档案与收费权益中心 (`GET/POST /api/v1/user/...`)
+- `GET /api/v1/user/profile`: 获取创客档案、当前 VIP 会员等级与特权状态。
+- `POST /api/v1/user/entitlements/activate`: 购买/激活高级门禁收费权益凭据。
+
+### 1.11 编排配置持久化接口 (`POST/GET /api/v1/microkernel/dag/configs`, `/frontend/layouts`)
+- `POST /api/v1/microkernel/dag/configs`: 保存 DAG 流程图版本配置并自动热载。
+- `GET /api/v1/microkernel/dag/configs`: 按工作版本获取已生效的微内核 DAG 拓扑图。
+- `POST /api/v1/frontend/layouts`: 保存前端 24 栅格低代码画布布局配置。
+- `GET /api/v1/frontend/layouts`: 加载最新发布的前端画布布局配置。
+
+

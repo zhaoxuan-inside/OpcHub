@@ -1409,9 +1409,14 @@
                 <option value="实际办公场地租赁合同">实际办公场地租赁合同</option>
               </select>
             </div>
-            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 12px;" onclick="downloadGeneratedDoc()" data-tooltip="生成并下载《个体工商户设立登记标准申请书.docx》">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出文书
-            </button>
+            <div style="display: flex; gap: 10px; margin-top: 12px;">
+              <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="renderAndSaveSopDoc(true)" data-tooltip="提交填报信息至后端完成合规渲染并持久化保存">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存文书
+              </button>
+              <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="downloadGeneratedDoc()" data-tooltip="下载已由后端校验并持久化保存的标准文书">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出文书
+              </button>
+            </div>
           </div>
 
           <!-- Right: Realtime Document Preview -->
@@ -2863,30 +2868,90 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     initMouseLighting();
 
     // -------------------------------------------------------------
-    // SOP Document Generator
+    // SOP Document Generator & Backend Persistence Engine
     // -------------------------------------------------------------
+    let currentSopTemplateId = "tpl_individual_biz_reg";
+    let currentSavedDocId = null;
+    let sopDebounceTimer = null;
+
+    const stepTemplateMap = {
+      1: "tpl_individual_biz_reg",
+      2: "tpl_opc_charter",
+      3: "tpl_soft_copyright",
+      4: "tpl_cross_border_fx"
+    };
+
     function updateDocPreview() {
+      clearTimeout(sopDebounceTimer);
+      sopDebounceTimer = setTimeout(async () => {
+        await renderAndSaveSopDoc(false);
+      }, 300);
+    }
+
+    async function renderAndSaveSopDoc(showNotice = true) {
       const company = document.getElementById('sopCompanyName').value || '拟定企业全称';
       const founder = document.getElementById('sopFounderName').value || '创客姓名';
       const scope = document.getElementById('sopBizScope').value || '经营范围描述';
       const addr = document.getElementById('sopAddressType').value;
 
-      const template = `个体工商户设立登记申请书
+      const payload = {
+        template_id: currentSopTemplateId,
+        user_id: "usr_2026_opc_9981",
+        form_data: {
+          company_name: company,
+          founder_name: founder,
+          biz_scope: scope,
+          address_type: addr,
+          capital_cny: "100,000",
+          registration_office: "杭州市市场监督管理局高新区分局",
+          software_name: company + " 智能调度系统",
+          software_short_name: "OPC-Kernel",
+          software_version: "V1.0.0",
+          complete_date: "2026-10-16",
+          feature_summary: scope,
+          settlement_channel: "Stripe / PingPong 跨境资金通道"
+        }
+      };
+
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/documents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          const data = await res.json();
+          currentSavedDocId = data.id;
+          document.getElementById('sopDocOutput').textContent = data.rendered_content;
+          if (showNotice) {
+            showLiquidNotice('文书生成入库', `申报材料已由后端微内核完成合规校验并持久化！\n\n文档编号: ${data.id}\n状态: READY FOR SUBMISSION\n合规判定: 通过`, 'SUCCESS');
+          }
+          return;
+        }
+      } catch (err) {
+        // Fallback for standalone demo when local API is not connected
+      }
+
+      // Standalone render fallback for offline HTML preview
+      const fallbackTemplate = `个体工商户设立登记申请书
 ---------------------------------------------
-登记机关：市场监督管理局
+登记机关：杭州市市场监督管理局高新区分局
 主体全称：${company}
 经营者：${founder}
 资金数额：人民币 100,000 元整
 经营场所：${addr}
 主营范围：${scope}
 
-承诺签署：
-本人保证所提交的文件、证件及有关材料真实、有效，
+申报承诺：
+本人保证所提交的文件材料真实、合法、有效，
 且符合一人公司税收征管及合规要求。
 ---------------------------------------------
-[电子签名待核验] 状态: READY FOR SUBMISSION`;
-
-      document.getElementById('sopDocOutput').textContent = template;
+[电子印签] 状态: READY FOR SUBMISSION
+核验流水号: VER-LOCAL-MOCK-2026`;
+      document.getElementById('sopDocOutput').textContent = fallbackTemplate;
+      if (showNotice) {
+        showLiquidNotice('文书已生成', '申报文书已根据填报关键字段完成合规排版！', 'SUCCESS');
+      }
     }
 
     function downloadGeneratedDoc() {
@@ -2895,9 +2960,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = "个体工商户设立登记标准申请书.txt";
+      a.download = `${currentSopTemplateId}_申报材料.txt`;
       a.click();
       URL.revokeObjectURL(url);
+      showLiquidNotice('文书导出成功', '已根据后端标准模板生成文书并启动下载！', 'SUCCESS');
     }
 
     function setSopStep(stepNum) {
@@ -2908,6 +2974,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           node.classList.remove('active');
         }
       });
+      currentSopTemplateId = stepTemplateMap[stepNum] || "tpl_individual_biz_reg";
+      renderAndSaveSopDoc(false);
     }
 
     // -------------------------------------------------------------

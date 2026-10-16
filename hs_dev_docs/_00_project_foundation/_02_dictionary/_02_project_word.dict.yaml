@@ -53,6 +53,26 @@ terms:
     description: "创客将优质实战经验或出海指南加入个人收藏夹"
     forbidden_alias: ["favorite_mark", "star_item"]
 
+  - term: "流程文书模板"
+    en_name: "SOPTemplate"
+    description: "预置的设立登记、章程、软著等标准申报模板，含变量占位符与必填字段定义"
+    forbidden_alias: ["doc_template", "raw_model"]
+
+  - term: "生成申报材料"
+    en_name: "SOPDocument"
+    description: "结合创客填报字段经后端微内核模板引擎渲染并持久化保存的合规申报文书实例"
+    forbidden_alias: ["filled_paper", "output_pdf"]
+
+  - term: "独立产品橱窗"
+    en_name: "ProductShowcase"
+    description: "超级个体创客独立研发的商业化应用、SaaS工具或智能体服务展示项"
+    forbidden_alias: ["tool_item", "show_box"]
+
+  - term: "需求竞标出价"
+    en_name: "DemandBid"
+    description: "创客对企业发布的委托需求提交的实施方案与报价条目"
+    forbidden_alias: ["bid_offer", "price_quote"]
+
 lifecycle_terms:
   - concept: "DAG Pipeline Lifecycle"
     command: "execute_pipeline"

@@ -1,0 +1,1 @@
+"""Product showcase domain package."""

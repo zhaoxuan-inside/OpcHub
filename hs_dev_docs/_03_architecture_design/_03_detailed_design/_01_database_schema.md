@@ -35,6 +35,14 @@ schema_contract:
       primary_key: "id (UUID)"
     - name: "sop_templates"
       primary_key: "id (VARCHAR(64))"
+    - name: "sop_documents"
+      primary_key: "id (UUID)"
+    - name: "product_showcases"
+      primary_key: "id (UUID)"
+    - name: "demand_bids"
+      primary_key: "id (UUID)"
+    - name: "perk_claims"
+      primary_key: "id (UUID)"
     - name: "dag_pipeline_configs"
       primary_key: "id (UUID)"
     - name: "forum_threads"
@@ -246,4 +254,98 @@ CREATE TABLE IF NOT EXISTS forum_bookmarks (
 
 CREATE INDEX idx_forum_bookmarks_user ON forum_bookmarks(user_id, created_at DESC);
 ```
+
+### 1.11 流程文书模板表 (`sop_templates`)
+```sql
+CREATE TABLE IF NOT EXISTS sop_templates (
+    id VARCHAR(64) PRIMARY KEY, -- 'tpl_individual_biz_reg', 'tpl_opc_charter', 'tpl_soft_copyright'
+    stage INT NOT NULL DEFAULT 1, -- 1: 主体定名与税种, 2: 银行与发票, 3: 软著申报, 4: 跨境结汇
+    code VARCHAR(64) NOT NULL UNIQUE,
+    name VARCHAR(255) NOT NULL,
+    category VARCHAR(64) NOT NULL, -- 'TAX', 'LEGAL', 'IP', 'FINANCE'
+    description TEXT NOT NULL,
+    template_content TEXT NOT NULL, -- 包含变量占位符的模板正文 (e.g. ${company_name})
+    required_fields JSONB NOT NULL DEFAULT '[]'::jsonb, -- 必填字段定义元数据
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_sop_templates_stage ON sop_templates(stage, is_active);
+```
+
+### 1.12 创客生成申报材料表 (`sop_documents`)
+```sql
+CREATE TABLE IF NOT EXISTS sop_documents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    template_id VARCHAR(64) NOT NULL REFERENCES sop_templates(id),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_title VARCHAR(255) NOT NULL,
+    form_data JSONB NOT NULL, -- 创客填报的关键业务字段 (company_name, founder_name, etc.)
+    rendered_content TEXT NOT NULL, -- 后端微内核模板引擎渲染并持久化的完整申报材料
+    status VARCHAR(32) NOT NULL DEFAULT 'READY', -- 'DRAFT', 'READY', 'SUBMITTED', 'ARCHIVED'
+    compliance_passed BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_sop_documents_user ON sop_documents(user_id, created_at DESC);
+CREATE INDEX idx_sop_documents_template ON sop_documents(template_id);
+```
+
+### 1.13 独立产品橱窗表 (`product_showcases`)
+```sql
+CREATE TABLE IF NOT EXISTS product_showcases (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    author_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    tagline VARCHAR(255) NOT NULL,
+    description TEXT NOT NULL,
+    category VARCHAR(64) NOT NULL DEFAULT 'AI', -- 'AI', 'SAAS', 'DEV', 'DEV_OPS'
+    pricing_model VARCHAR(32) NOT NULL DEFAULT 'SUBSCRIPTION', -- 'FREE', 'ONE_TIME', 'SUBSCRIPTION'
+    price_cny NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+    demo_url VARCHAR(512),
+    upvote_count INT NOT NULL DEFAULT 0,
+    status VARCHAR(32) NOT NULL DEFAULT 'PUBLISHED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_product_showcases_category ON product_showcases(category, created_at DESC);
+CREATE INDEX idx_product_showcases_author ON product_showcases(author_id);
+```
+
+### 1.14 需求竞标出价表 (`demand_bids`)
+```sql
+CREATE TABLE IF NOT EXISTS demand_bids (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    demand_id UUID NOT NULL REFERENCES demands(id) ON DELETE CASCADE,
+    bidder_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    bid_amount_cny NUMERIC(12, 2) NOT NULL,
+    delivery_days INT NOT NULL,
+    proposal_text TEXT NOT NULL,
+    status VARCHAR(32) NOT NULL DEFAULT 'SUBMITTED', -- 'SUBMITTED', 'ACCEPTED', 'REJECTED'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_demand_bid UNIQUE (demand_id, bidder_id)
+);
+
+CREATE INDEX idx_demand_bids_demand ON demand_bids(demand_id);
+CREATE INDEX idx_demand_bids_bidder ON demand_bids(bidder_id);
+```
+
+### 1.15 特权核销记录表 (`perk_claims`)
+```sql
+CREATE TABLE IF NOT EXISTS perk_claims (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    perk_id UUID NOT NULL REFERENCES perks(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    voucher_code VARCHAR(64) NOT NULL UNIQUE,
+    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVATED', -- 'ACTIVATED', 'REDEEMED', 'EXPIRED'
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_perk_user_claim UNIQUE (perk_id, user_id)
+);
+
+CREATE INDEX idx_perk_claims_user ON perk_claims(user_id);
+```
+
 

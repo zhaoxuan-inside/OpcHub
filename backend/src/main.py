@@ -23,6 +23,46 @@ from src.domains.forum.models import (
     BookmarkRequest,
     BookmarkResponse,
 )
+from src.domains.sop.service import sop_service
+from src.domains.sop.models import (
+    SOPTemplatesResponse,
+    SOPDocumentCreate,
+    SOPDocumentResponse,
+)
+from src.domains.products.service import product_service
+from src.domains.products.models import ProductCreate, ProductResponse
+from src.domains.policies.service import policy_service
+from src.domains.policies.models import (
+    PolicyResponse,
+    PolicyMatchRequest,
+    PolicyMatchResponse,
+)
+from src.domains.demands.service import demand_service
+from src.domains.demands.models import (
+    DemandCreate,
+    DemandResponse,
+    BidCreate,
+    BidResponse,
+)
+from src.domains.perks.service import perk_service
+from src.domains.perks.models import (
+    PerkResponse,
+    PerkClaimRequest,
+    PerkClaimResponse,
+)
+from src.domains.user.service import user_service
+from src.domains.user.models import (
+    MakerProfileResponse,
+    EntitlementActivateRequest,
+    EntitlementActivateResponse,
+)
+from src.domains.orchestration.service import orchestration_service
+from src.domains.orchestration.models import (
+    DAGConfigSaveRequest,
+    DAGConfigRecord,
+    FrontendLayoutSaveRequest,
+    FrontendLayoutRecord,
+)
 
 
 app = FastAPI(
@@ -187,4 +227,278 @@ async def toggle_forum_bookmark(payload: BookmarkRequest):
         return forum_service.toggle_bookmark(payload.user_id, payload.thread_id, payload.folder_name)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ==========================================
+# Home Platform Overview Endpoints
+# ==========================================
+@app.get(f"{settings.api_prefix}/home/overview", tags=["Home Overview"])
+async def get_home_overview():
+    """Retrieve platform aggregate overview statistics and navigation summary."""
+    return {
+        "active_makers_count": 14820,
+        "active_dags_count": 482,
+        "matched_policies_count": 128,
+        "demands_orders_count": 89,
+        "perks_saved_cny": 1820000.0,
+        "quick_links": [
+            {"name": "创客贴吧", "route": "forum", "count_desc": "1,240 篇实战经验"},
+            {"name": "流程文书", "route": "sop", "count_desc": "4 阶段合规材料"},
+            {"name": "政策雷达", "route": "policy", "count_desc": "30万增值税免征"},
+            {"name": "需求集市", "route": "demand", "count_desc": "89 笔进行中委托"},
+            {"name": "生态特权", "route": "perks", "count_desc": "最高 $5,000 算力券"},
+            {"name": "后端编排", "route": "backend-orch", "count_desc": "微内核 DAG 引擎"},
+        ],
+    }
+
+
+# ==========================================
+# SOP Document & Template Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/sop/templates",
+    response_model=SOPTemplatesResponse,
+    tags=["SOP Workflow"]
+)
+async def get_sop_stages_and_templates():
+    """Get all 4-stage business creation steps and standard document templates."""
+    return sop_service.get_stages_and_templates()
+
+
+@app.post(
+    f"{settings.api_prefix}/sop/documents",
+    response_model=SOPDocumentResponse,
+    status_code=201,
+    tags=["SOP Workflow"]
+)
+async def render_and_save_sop_document(payload: SOPDocumentCreate):
+    """Render document template with maker input data and persist instance to backend."""
+    try:
+        return sop_service.render_and_save_document(payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get(
+    f"{settings.api_prefix}/sop/documents/{{doc_id}}",
+    response_model=SOPDocumentResponse,
+    tags=["SOP Workflow"]
+)
+async def get_sop_document(doc_id: str):
+    """Retrieve saved document instance by ID."""
+    try:
+        return sop_service.get_document(doc_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get(
+    f"{settings.api_prefix}/sop/documents",
+    response_model=list[SOPDocumentResponse],
+    tags=["SOP Workflow"]
+)
+async def list_sop_documents(user_id: str | None = None):
+    """List saved documents, optionally filtered by maker user_id."""
+    return sop_service.list_documents(user_id=user_id)
+
+
+# ==========================================
+# Product Showcase Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/products",
+    response_model=list[ProductResponse],
+    tags=["Product Showcase"]
+)
+async def list_products(category: str | None = None):
+    """List maker independent products, optionally filtered by category."""
+    return product_service.list_products(category=category)
+
+
+@app.post(
+    f"{settings.api_prefix}/products",
+    response_model=ProductResponse,
+    status_code=201,
+    tags=["Product Showcase"]
+)
+async def create_product(payload: ProductCreate):
+    """Publish a new maker product showcase."""
+    return product_service.create_product(payload)
+
+
+@app.post(
+    f"{settings.api_prefix}/products/{{product_id}}/upvote",
+    response_model=ProductResponse,
+    tags=["Product Showcase"]
+)
+async def upvote_product(product_id: str):
+    """Upvote an independent maker product."""
+    try:
+        return product_service.upvote_product(product_id)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ==========================================
+# Policy Radar Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/policies",
+    response_model=list[PolicyResponse],
+    tags=["Policy Radar"]
+)
+async def list_policies(category: str | None = None):
+    """List government incentive and tax exemption policies."""
+    return policy_service.list_policies(category=category)
+
+
+@app.post(
+    f"{settings.api_prefix}/policies/match",
+    response_model=PolicyMatchResponse,
+    tags=["Policy Radar"]
+)
+async def match_policies(payload: PolicyMatchRequest):
+    """Evaluate maker financial data against policies and calculate tax savings."""
+    return policy_service.match_policies(payload)
+
+
+# ==========================================
+# Demand Market & Bidding Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/demands",
+    response_model=list[DemandResponse],
+    tags=["Demand Market"]
+)
+async def list_demands(category: str | None = None):
+    """List enterprise outsourcing and custom demands."""
+    return demand_service.list_demands(category=category)
+
+
+@app.post(
+    f"{settings.api_prefix}/demands",
+    response_model=DemandResponse,
+    status_code=201,
+    tags=["Demand Market"]
+)
+async def create_demand(payload: DemandCreate):
+    """Publish a new corporate outsourcing demand."""
+    return demand_service.create_demand(payload)
+
+
+@app.post(
+    f"{settings.api_prefix}/demands/{{demand_id}}/bids",
+    response_model=BidResponse,
+    status_code=201,
+    tags=["Demand Market"]
+)
+async def submit_demand_bid(demand_id: str, payload: BidCreate):
+    """Submit a maker bid for a demand."""
+    try:
+        return demand_service.submit_bid(demand_id, payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ==========================================
+# Perks & Infrastructure Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/perks",
+    response_model=list[PerkResponse],
+    tags=["Perks & Infra"]
+)
+async def list_perks():
+    """List available developer credits and platform discounts."""
+    return perk_service.list_perks()
+
+
+@app.post(
+    f"{settings.api_prefix}/perks/claim",
+    response_model=PerkClaimResponse,
+    tags=["Perks & Infra"]
+)
+async def claim_perk(payload: PerkClaimRequest):
+    """Claim and activate an exclusive maker infrastructure deal."""
+    try:
+        return perk_service.claim_perk(payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# User Profile & Entitlements Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/user/profile",
+    response_model=MakerProfileResponse,
+    tags=["User & Entitlements"]
+)
+async def get_user_profile():
+    """Get maker account profile and active feature entitlements."""
+    return user_service.get_profile()
+
+
+@app.post(
+    f"{settings.api_prefix}/user/entitlements/activate",
+    response_model=EntitlementActivateResponse,
+    tags=["User & Entitlements"]
+)
+async def activate_entitlement(payload: EntitlementActivateRequest):
+    """Purchase or activate a paid feature entitlement."""
+    try:
+        return user_service.activate_entitlement(payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+# ==========================================
+# Orchestration Config Persistence Endpoints
+# ==========================================
+@app.post(
+    f"{settings.api_prefix}/microkernel/dag/configs",
+    response_model=DAGConfigRecord,
+    status_code=201,
+    tags=["Orchestration Persistence"]
+)
+async def save_dag_config(payload: DAGConfigSaveRequest):
+    """Save and compile a versioned DAG pipeline configuration."""
+    return orchestration_service.save_dag_config(payload)
+
+
+@app.get(
+    f"{settings.api_prefix}/microkernel/dag/configs",
+    response_model=list[DAGConfigRecord],
+    tags=["Orchestration Persistence"]
+)
+async def list_dag_configs(scenario_code: str | None = None):
+    """List saved DAG configurations."""
+    return orchestration_service.list_dag_configs(scenario_code=scenario_code)
+
+
+@app.post(
+    f"{settings.api_prefix}/frontend/layouts",
+    response_model=FrontendLayoutRecord,
+    status_code=201,
+    tags=["Orchestration Persistence"]
+)
+async def save_frontend_layout(payload: FrontendLayoutSaveRequest):
+    """Save low-code canvas 24-grid responsive layout."""
+    return orchestration_service.save_frontend_layout(payload)
+
+
+@app.get(
+    f"{settings.api_prefix}/frontend/layouts",
+    response_model=FrontendLayoutRecord,
+    tags=["Orchestration Persistence"]
+)
+async def get_frontend_layout(layout_name: str = "main_console_layout"):
+    """Load latest published frontend layout schema."""
+    try:
+        return orchestration_service.get_frontend_layout(layout_name)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 
