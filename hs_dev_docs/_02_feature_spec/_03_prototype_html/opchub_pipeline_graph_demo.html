@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub — Backend Pipeline DAG Graph Orchestrator</title>
+  <style>
+    /* -------------------------------------------------------------
+       Apple VisionOS Liquid Glass Design System
+       Interactive DAG Node-Graph Canvas & Version Deployment Engine
+    -------------------------------------------------------------- */
+
+    :root {
+      --bg-canvas: #F8F9FD;
+      --glass-surface: rgba(255, 255, 255, 0.7);
+      --glass-surface-hover: rgba(255, 255, 255, 0.9);
+      --glass-surface-subtle: rgba(245, 247, 252, 0.6);
+      --glass-surface-solid: #FFFFFF;
+      --glass-border: rgba(255, 255, 255, 0.85);
+      --glass-border-subtle: rgba(0, 0, 0, 0.08);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 1px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow: 0 12px 32px 0 rgba(31, 38, 135, 0.06), 0 2px 6px 0 rgba(0, 0, 0, 0.02);
+      --glass-shadow-hover: 0 20px 48px 0 rgba(31, 38, 135, 0.14), 0 4px 12px 0 rgba(0, 0, 0, 0.04);
+
+      --glass-glow-spotlight: rgba(255, 255, 255, 0.8);
+      --glass-border-hover: rgba(255, 255, 255, 0.98);
+      --glass-glow-halo: 0 0 24px rgba(255, 255, 255, 0.85), 0 0 48px rgba(0, 113, 227, 0.15);
+
+      --text-primary: #121316;
+      --text-secondary: #4B4E56;
+      --text-tertiary: #7D828D;
+
+      --accent: #0071E3;
+      --accent-glow: rgba(0, 113, 227, 0.25);
+      --accent-glass: rgba(0, 113, 227, 0.08);
+
+      --orb-1: rgba(142, 197, 252, 0.45);
+      --orb-2: rgba(224, 195, 252, 0.4);
+      --orb-3: rgba(186, 230, 253, 0.35);
+
+      --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Helvetica Neue", sans-serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --font-mono: "SF Mono", "iA Writer Mono", "Menlo", monospace;
+
+      --blur-strength: blur(24px) saturate(190%);
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --radius-full: 9999px;
+      --transition-liquid: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    [data-theme="dark"] {
+      --bg-canvas: #090A0F;
+      --glass-surface: rgba(18, 20, 29, 0.65);
+      --glass-surface-hover: rgba(28, 31, 44, 0.85);
+      --glass-surface-subtle: rgba(15, 17, 24, 0.55);
+      --glass-surface-solid: #151720;
+      --glass-border: rgba(255, 255, 255, 0.16);
+      --glass-border-subtle: rgba(255, 255, 255, 0.08);
+      --glass-specular: inset 0 1px 1px 0 rgba(255, 255, 255, 0.35), inset 0 -1px 1px 0 rgba(255, 255, 255, 0.04);
+      --glass-shadow: 0 16px 40px 0 rgba(0, 0, 0, 0.55), 0 4px 12px 0 rgba(0, 0, 0, 0.35);
+      --glass-shadow-hover: 0 24px 60px 0 rgba(0, 0, 0, 0.75), 0 8px 24px 0 rgba(41, 151, 255, 0.2);
+
+      --glass-glow-spotlight: rgba(65, 150, 255, 0.32);
+      --glass-border-hover: rgba(255, 255, 255, 0.45);
+      --glass-glow-halo: 0 0 30px rgba(41, 151, 255, 0.38), 0 0 60px rgba(41, 151, 255, 0.18);
+
+      --text-primary: #F5F7FA;
+      --text-secondary: #A6ACBA;
+      --text-tertiary: #757C8A;
+
+      --accent: #2997FF;
+      --accent-glow: rgba(41, 151, 255, 0.35);
+      --accent-glass: rgba(41, 151, 255, 0.14);
+
+      --orb-1: rgba(56, 75, 140, 0.4);
+      --orb-2: rgba(99, 44, 133, 0.3);
+      --orb-3: rgba(28, 100, 148, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      transition: background-color 0.4s ease, color 0.4s ease;
+    }
+
+    /* Ambient Fluid Mesh */
+    .ambient-container {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .ambient-orb {
+      position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.8;
+      animation: floatMotion 25s infinite alternate ease-in-out;
+    }
+    .orb-1 { width: 600px; height: 600px; background: radial-gradient(circle, var(--orb-1) 0%, transparent 70%); top: -100px; left: -80px; }
+    .orb-2 { width: 700px; height: 700px; background: radial-gradient(circle, var(--orb-2) 0%, transparent 70%); top: 30%; right: -120px; animation-duration: 28s; }
+    .orb-3 { width: 550px; height: 550px; background: radial-gradient(circle, var(--orb-3) 0%, transparent 70%); bottom: -100px; left: 30%; animation-duration: 32s; }
+    @keyframes floatMotion {
+      0% { transform: translate(0px, 0px) scale(1); }
+      50% { transform: translate(40px, 30px) scale(1.05); }
+      100% { transform: translate(-30px, 50px) scale(0.96); }
+    }
+
+    /* ---------------- Header Toolbar ---------------- */
+    header {
+      position: relative; z-index: 50; padding: 12px 20px;
+      display: flex; justify-content: space-between; align-items: center;
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border-bottom: 1px solid var(--glass-border);
+      box-shadow: var(--glass-shadow);
+    }
+    .header-left { display: flex; align-items: center; gap: 14px; }
+    .header-title { font-family: var(--font-display); font-size: 16px; font-weight: 600; letter-spacing: -0.02em; }
+    .header-version-pill {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-full);
+      padding: 4px 12px; font-size: 12px; font-family: var(--font-mono);
+    }
+    .version-select {
+      background: transparent; border: none; color: var(--text-primary);
+      font-family: var(--font-mono); font-size: 12px; outline: none; cursor: pointer;
+    }
+    .header-right { display: flex; align-items: center; gap: 10px; }
+
+    /* Button Styles */
+    .btn-liquid {
+      background: var(--text-primary); color: var(--bg-canvas);
+      border: none; padding: 7px 16px; border-radius: var(--radius-full);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: var(--transition-liquid);
+    }
+    .btn-liquid:hover { opacity: 0.9; transform: translateY(-1px); }
+    .btn-liquid-outline {
+      background: var(--glass-surface-subtle); color: var(--text-primary);
+      border: 1px solid var(--glass-border); padding: 7px 14px; border-radius: var(--radius-full);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: var(--transition-liquid);
+    }
+    .btn-liquid-outline:hover {
+      background: var(--glass-surface-hover); border-color: var(--glass-border-hover); box-shadow: var(--glass-glow-halo);
+    }
+
+    /* ---------------- Main Three-Column Workspace ---------------- */
+    .workspace-layout {
+      position: relative; z-index: 10;
+      flex: 1; display: grid; grid-template-columns: 280px 1fr 340px;
+      overflow: hidden;
+    }
+
+    /* Left: Node Palette */
+    .sidebar-palette {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border-right: 1px solid var(--glass-border);
+      padding: 18px; display: flex; flex-direction: column; gap: 16px;
+      overflow-y: auto;
+    }
+    .section-label {
+      font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);
+      letter-spacing: 0.08em; text-transform: uppercase;
+    }
+    .palette-item {
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px; cursor: pointer;
+      transition: var(--transition-liquid);
+    }
+    .palette-item:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-hover);
+      transform: translateY(-2px);
+      box-shadow: var(--glass-shadow);
+    }
+    .palette-item-name { font-weight: 600; font-size: 13.5px; margin-bottom: 2px; }
+    .palette-item-sig { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+
+    /* Center: DAG Graph Canvas */
+    .dag-canvas-container {
+      position: relative; overflow: hidden;
+      background-image: radial-gradient(var(--glass-border-subtle) 1px, transparent 1px);
+      background-size: 24px 24px;
+      cursor: crosshair;
+    }
+    .svg-connections {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      pointer-events: none; z-index: 1;
+    }
+
+    /* Graph Nodes (Draggable Liquid Glass) */
+    .dag-node {
+      position: absolute; width: 220px;
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 14px;
+      cursor: grab;
+      user-select: none;
+      z-index: 10;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .dag-node:active { cursor: grabbing; }
+    .dag-node.selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 20px var(--accent-glow), var(--glass-specular);
+    }
+    .dag-node.pulse-running {
+      animation: nodePulse 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes nodePulse {
+      0% { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
+      100% { border-color: #34C759; box-shadow: 0 0 28px rgba(52, 199, 89, 0.6); }
+    }
+
+    .node-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
+    }
+    .node-type-tag {
+      font-family: var(--font-mono); font-size: 10px; padding: 2px 6px;
+      border-radius: 4px; background: var(--accent-glass); color: var(--accent);
+    }
+    .node-title { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .node-sig { font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary); }
+
+    /* Node Connection Ports (In / Out) */
+    .node-port {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 12px; height: 12px; border-radius: 50%;
+      background: var(--glass-surface-solid);
+      border: 2px solid var(--accent);
+      cursor: pointer; z-index: 20;
+      transition: transform 0.15s, background-color 0.15s;
+    }
+    .node-port:hover { transform: translateY(-50%) scale(1.35); background: var(--accent); }
+    .node-port.port-in { left: -7px; }
+    .node-port.port-out { right: -7px; }
+
+    /* Right: Inspector & Version Management */
+    .sidebar-inspector {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border-left: 1px solid var(--glass-border);
+      padding: 18px; display: flex; flex-direction: column; gap: 16px;
+      overflow-y: auto;
+    }
+    .config-box {
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 12px;
+    }
+    .glass-input, .glass-select, .glass-textarea {
+      width: 100%; background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border-subtle);
+      border-radius: var(--radius-sm); padding: 8px 10px;
+      color: var(--text-primary); font-family: var(--font-sans); font-size: 13px;
+      outline: none; margin-top: 4px;
+    }
+    .glass-textarea { font-family: var(--font-mono); font-size: 11.5px; line-height: 1.5; }
+
+    /* Bottom Pipeline Execution Console Drawer */
+    .bottom-runner-drawer {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      border-top: 1px solid var(--glass-border);
+      padding: 14px 24px; z-index: 30;
+      display: flex; justify-content: space-between; align-items: center;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.05);
+    }
+    .runner-status-text {
+      font-family: var(--font-mono); font-size: 12.5px; color: var(--text-secondary);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .status-bulb { width: 8px; height: 8px; border-radius: 50%; background: #34C759; box-shadow: 0 0 10px #34C759; }
+
+    /* JSON Config Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(14px); display: flex; align-items: center; justify-content: center;
+      z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.2s ease;
+    }
+    .modal-overlay.active { opacity: 1; pointer-events: auto; }
+    .modal-card {
+      background: var(--glass-surface); backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border); border-radius: var(--radius-lg);
+      padding: 28px; width: 620px; box-shadow: var(--glass-shadow-hover);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="ambient-container">
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+    <div class="ambient-orb orb-3"></div>
+  </div>
+
+  <!-- Top Toolbar -->
+  <header>
+    <div class="header-left">
+      <span class="header-title">OpcHub 流程图编排控制台 · DAG Orchestrator</span>
+      <div class="header-version-pill">
+        <span style="color: var(--text-tertiary);">工作版本:</span>
+        <select class="version-select" id="versionSelector" onchange="switchWorkingVersion(this.value)">
+          <option value="v1.0.4-draft" selected>v1.0.4-draft (当前编辑态)</option>
+          <option value="v1.0.3-prod">v1.0.3 (线上运行态 · LIVE)</option>
+          <option value="v1.0.2">v1.0.2 (历史存档)</option>
+        </select>
+        <span style="color: #34C759;">● 就绪</span>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="btn-liquid-outline" onclick="previewGeneratedConfig()">查看生成配置 (JSON)</button>
+      <button class="btn-liquid" onclick="deployWorkingVersion()">提交并加载生效</button>
+      <button class="btn-liquid-outline" onclick="toggleTheme()" style="padding: 7px 12px;">🌓 主题</button>
+    </div>
+  </header>
+
+  <!-- Workspace: Left (Nodes), Center (Canvas), Right (Inspector) -->
+  <div class="workspace-layout">
+
+    <!-- Left: Atomic Method Nodes Palette -->
+    <div class="sidebar-palette">
+      <div class="section-label">原子方法库 · Atomic Nodes</div>
+      <p style="font-size: 12px; color: var(--text-tertiary); margin-top: -8px;">
+        所有原子方法签名均为一致的统一上下文协议。点击或拖拽节点至画布中即可编排。
+      </p>
+
+      <div class="section-label" style="margin-top: 8px;">1. 权限与门禁节点</div>
+      <div class="palette-item" onclick="addNodeToCanvas('auth_guard', '门禁拦截: 402鉴权', 'GUARD')">
+        <div class="palette-item-name">auth_guard (权益检查)</div>
+        <div class="palette-item-sig">async def (ctx) -> ctx</div>
+      </div>
+
+      <div class="section-label" style="margin-top: 8px;">2. 业务测算节点 (Python热载)</div>
+      <div class="palette-item" onclick="addNodeToCanvas('invoice_tax_calc', '小微免税测算算子', 'BIZ')">
+        <div class="palette-item-name">invoice_tax_calc (Python脚本)</div>
+        <div class="palette-item-sig">async def (ctx) -> ctx</div>
+      </div>
+      <div class="palette-item" onclick="addNodeToCanvas('policy_matcher', '政策画像智能匹配', 'BIZ')">
+        <div class="palette-item-name">policy_matcher (资格筛查)</div>
+        <div class="palette-item-sig">async def (ctx) -> ctx</div>
+      </div>
+
+      <div class="section-label" style="margin-top: 8px;">3. 存储与多模态检索节点</div>
+      <div class="palette-item" onclick="addNodeToCanvas('postgres_save', 'PostgreSQL 状态归档', 'STORAGE')">
+        <div class="palette-item-name">postgres_save (实体落地)</div>
+        <div class="palette-item-sig">async def (ctx) -> ctx</div>
+      </div>
+      <div class="palette-item" onclick="addNodeToCanvas('es_audit_sync', 'ES日志与审计搜索', 'STORAGE')">
+        <div class="palette-item-name">es_audit_sync (ES索引)</div>
+        <div class="palette-item-sig">async def (ctx) -> ctx</div>
+      </div>
+    </div>
+
+    <!-- Center: Interactive DAG Canvas -->
+    <div class="dag-canvas-container" id="canvasContainer">
+      <svg class="svg-connections" id="svgCanvas"></svg>
+
+      <!-- Pre-rendered Interactive DAG Nodes -->
+      <div class="dag-node" id="node-1" style="top: 80px; left: 80px;" onclick="selectNode('node-1')">
+        <div class="node-header">
+          <span class="node-type-tag">INPUT / GATEWAY</span>
+          <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">#01</span>
+        </div>
+        <div class="node-title">gateway_ingress</div>
+        <div class="node-sig">统一网关入参解析校验</div>
+        <div class="node-port port-out" title="连接输出端口" onmousedown="startConnecting('node-1', event)"></div>
+      </div>
+
+      <div class="dag-node" id="node-2" style="top: 80px; left: 380px;" onclick="selectNode('node-2')">
+        <div class="node-port port-in" title="输入端口" onmouseup="endConnecting('node-2', event)"></div>
+        <div class="node-header">
+          <span class="node-type-tag">GUARD · 402</span>
+          <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">#02</span>
+        </div>
+        <div class="node-title">auth_entitlement_guard</div>
+        <div class="node-sig">检查 ENT_POL_VIP 凭证</div>
+        <div class="node-port port-out" title="连接输出端口" onmousedown="startConnecting('node-2', event)"></div>
+      </div>
+
+      <div class="dag-node" id="node-3" style="top: 80px; left: 680px;" onclick="selectNode('node-3')">
+        <div class="node-port port-in" title="输入端口" onmouseup="endConnecting('node-3', event)"></div>
+        <div class="node-header">
+          <span class="node-type-tag">PYTHON SCRIPT</span>
+          <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">#03</span>
+        </div>
+        <div class="node-title">invoice_tax_calc</div>
+        <div class="node-sig">AST安全沙箱动态算子</div>
+        <div class="node-port port-out" title="连接输出端口" onmousedown="startConnecting('node-3', event)"></div>
+      </div>
+
+      <div class="dag-node" id="node-4" style="top: 280px; left: 680px;" onclick="selectNode('node-4')">
+        <div class="node-port port-in" title="输入端口" onmouseup="endConnecting('node-4', event)"></div>
+        <div class="node-header">
+          <span class="node-type-tag">STORAGE & ES</span>
+          <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">#04</span>
+        </div>
+        <div class="node-title">es_audit_sync</div>
+        <div class="node-sig">写入审计与全网检索</div>
+      </div>
+
+      <!-- Bottom Realtime Simulation Drawer -->
+      <div class="bottom-runner-drawer">
+        <div class="runner-status-text">
+          <div class="status-bulb"></div>
+          <span>微内核执行状态: 已就绪 (工作版本: v1.0.4-draft) | 节点数: 4 | 连接数: 3</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn-liquid" onclick="runGraphExecutionSimulation()">▶ 仿真调度运行 (单入口测试)</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Property Inspector & Method Binding -->
+    <div class="sidebar-inspector">
+      <div class="section-label">节点属性配置 · Inspector</div>
+
+      <div class="config-box">
+        <div style="font-size: 12px; color: var(--text-tertiary);">当前选中节点</div>
+        <div style="font-weight: 600; font-size: 15px; margin-top: 4px;" id="insNodeName">invoice_tax_calc</div>
+        <div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent); margin-top: 2px;">
+          TYPE: DYNAMIC_PYTHON_ACTION
+        </div>
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">绑定业务场景 (Scenario Code)</label>
+        <input type="text" class="glass-input" id="insScenarioCode" value="tax.calculate_vat_exemption">
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">失败重试与超时控制</label>
+        <select class="glass-select">
+          <option>重试 0 次 · 超时 3000ms</option>
+          <option selected>重试 1 次 · 超时 5000ms</option>
+          <option>指数退避重试 3 次</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">前置条件断言 (Condition Expression)</label>
+        <textarea class="glass-textarea" rows="3">ctx.payload.get("quarterly_income") is not None</textarea>
+      </div>
+
+      <div>
+        <label style="font-size: 12px; color: var(--text-secondary); font-weight: 500;">收费门禁要求 (Required Entitlement)</label>
+        <input type="text" class="glass-input" value="ENT_POL_VIP (未购买直接抛 402)">
+      </div>
+
+      <div style="margin-top: auto; border-top: 1px solid var(--glass-border-subtle); padding-top: 16px;">
+        <button class="btn-liquid-outline" style="width: 100%; justify-content: center; color: #FF3B30;" onclick="deleteSelectedNode()">
+          删除当前节点
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Generated JSON Config Modal -->
+  <div class="modal-overlay" id="configModal">
+    <div class="modal-card">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 12px;">
+        <h3 style="font-size: 17px; font-weight: 600;">生成微内核管线配置 · Scenario Pipeline Spec</h3>
+        <span style="font-family: var(--font-mono); font-size: 11.5px; color: var(--accent);">VERSION: v1.0.4</span>
+      </div>
+      <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 14px;">
+        该 JSON 配置将被提交至后端框架，微内核根据工作版本加载生效，驱动网关调度执行。
+      </p>
+
+      <textarea id="jsonConfigText" class="glass-textarea" rows="14" readonly style="width: 100%; background: var(--glass-surface-subtle);"></textarea>
+
+      <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closeConfigModal()">关闭</button>
+        <button class="btn-liquid" onclick="copyAndDeployConfig()">确认提交配置至微内核</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // -------------------------------------------------------------
+    // DAG Graph State Management
+    // -------------------------------------------------------------
+    const graphState = {
+      version: "v1.0.4-draft",
+      scenario: "tax.calculate_vat_exemption",
+      nodes: [
+        { id: "node-1", name: "gateway_ingress", type: "GATEWAY", x: 80, y: 80 },
+        { id: "node-2", name: "auth_entitlement_guard", type: "GUARD", x: 380, y: 80 },
+        { id: "node-3", name: "invoice_tax_calc", type: "BIZ", x: 680, y: 80 },
+        { id: "node-4", name: "es_audit_sync", type: "STORAGE", x: 680, y: 280 }
+      ],
+      edges: [
+        { from: "node-1", to: "node-2" },
+        { from: "node-2", to: "node-3" },
+        { from: "node-3", to: "node-4" }
+      ],
+      selectedNodeId: "node-3"
+    };
+
+    let activeDragNode = null;
+    let dragOffset = { x: 0, y: 0 };
+    let connectingSourceId = null;
+
+    // -------------------------------------------------------------
+    // SVG Connection Curves Rendering
+    // -------------------------------------------------------------
+    function renderEdges() {
+      const svg = document.getElementById("svgCanvas");
+      svg.innerHTML = "";
+
+      graphState.edges.forEach(edge => {
+        const fromEl = document.getElementById(edge.from);
+        const toEl = document.getElementById(edge.to);
+        if (!fromEl || !toEl) return;
+
+        const fromRect = fromEl.getBoundingClientRect();
+        const toRect = toEl.getBoundingClientRect();
+        const canvasRect = document.getElementById("canvasContainer").getBoundingClientRect();
+
+        const x1 = fromRect.right - canvasRect.left;
+        const y1 = fromRect.top + fromRect.height / 2 - canvasRect.top;
+
+        const x2 = toRect.left - canvasRect.left;
+        const y2 = toRect.top + toRect.height / 2 - canvasRect.top;
+
+        const dx = Math.max(Math.abs(x2 - x1) * 0.5, 40);
+        const d = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", document.documentElement.getAttribute("data-theme") === "dark" ? "#2997FF" : "#0071E3");
+        path.setAttribute("stroke-width", "2.5");
+        path.setAttribute("stroke-dasharray", "none");
+        path.setAttribute("stroke-linecap", "round");
+        path.setAttribute("opacity", "0.75");
+        svg.appendChild(path);
+      });
+    }
+
+    // -------------------------------------------------------------
+    // Node Dragging Logic
+    // -------------------------------------------------------------
+    function initDraggables() {
+      document.querySelectorAll(".dag-node").forEach(node => {
+        node.addEventListener("mousedown", (e) => {
+          if (e.target.classList.contains("node-port")) return;
+          activeDragNode = node;
+          const rect = node.getBoundingClientRect();
+          dragOffset.x = e.clientX - rect.left;
+          dragOffset.y = e.clientY - rect.top;
+        });
+      });
+    }
+
+    document.addEventListener("mousemove", (e) => {
+      if (!activeDragNode) return;
+      const canvasRect = document.getElementById("canvasContainer").getBoundingClientRect();
+      let newX = e.clientX - canvasRect.left - dragOffset.x;
+      let newY = e.clientY - canvasRect.top - dragOffset.y;
+
+      newX = Math.max(10, Math.min(newX, canvasRect.width - 240));
+      newY = Math.max(10, Math.min(newY, canvasRect.height - 150));
+
+      activeDragNode.style.left = `${newX}px`;
+      activeDragNode.style.top = `${newY}px`;
+      renderEdges();
+    });
+
+    document.addEventListener("mouseup", () => {
+      activeDragNode = null;
+    });
+
+    // -------------------------------------------------------------
+    // Node Selection & Inspector
+    // -------------------------------------------------------------
+    function selectNode(id) {
+      document.querySelectorAll(".dag-node").forEach(n => n.classList.remove("selected"));
+      const nodeEl = document.getElementById(id);
+      if (nodeEl) {
+        nodeEl.classList.add("selected");
+        graphState.selectedNodeId = id;
+        const title = nodeEl.querySelector(".node-title").textContent;
+        document.getElementById("insNodeName").textContent = title;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Add Node to Canvas
+    // -------------------------------------------------------------
+    function addNodeToCanvas(actionName, title, type) {
+      const id = "node-" + Date.now();
+      const node = document.createElement("div");
+      node.className = "dag-node";
+      node.id = id;
+      node.style.top = "180px";
+      node.style.left = "280px";
+      node.onclick = () => selectNode(id);
+
+      node.innerHTML = `
+        <div class="node-port port-in" title="输入端口" onmouseup="endConnecting('${id}', event)"></div>
+        <div class="node-header">
+          <span class="node-type-tag">${type}</span>
+          <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">#NEW</span>
+        </div>
+        <div class="node-title">${actionName}</div>
+        <div class="node-sig">${title}</div>
+        <div class="node-port port-out" title="连接输出端口" onmousedown="startConnecting('${id}', event)"></div>
+      `;
+
+      document.getElementById("canvasContainer").appendChild(node);
+      graphState.nodes.push({ id, name: actionName, type, x: 280, y: 180 });
+
+      initDraggables();
+      selectNode(id);
+      renderEdges();
+    }
+
+    function deleteSelectedNode() {
+      if (!graphState.selectedNodeId || graphState.selectedNodeId === "node-1") {
+        alert("网关入口节点不允许删除！");
+        return;
+      }
+      const el = document.getElementById(graphState.selectedNodeId);
+      if (el) el.remove();
+      graphState.edges = graphState.edges.filter(e => e.from !== graphState.selectedNodeId && e.to !== graphState.selectedNodeId);
+      renderEdges();
+      selectNode("node-1");
+    }
+
+    // -------------------------------------------------------------
+    // Interactive Port Connecting
+    // -------------------------------------------------------------
+    function startConnecting(sourceId, e) {
+      e.stopPropagation();
+      connectingSourceId = sourceId;
+    }
+
+    function endConnecting(targetId, e) {
+      e.stopPropagation();
+      if (connectingSourceId && connectingSourceId !== targetId) {
+        // Prevent duplicate edge
+        const exists = graphState.edges.some(edge => edge.from === connectingSourceId && edge.to === targetId);
+        if (!exists) {
+          graphState.edges.push({ from: connectingSourceId, to: targetId });
+          renderEdges();
+        }
+      }
+      connectingSourceId = null;
+    }
+
+    // -------------------------------------------------------------
+    // Config Generation & Deployment
+    // -------------------------------------------------------------
+    function generateConfigJson() {
+      const config = {
+        version: graphState.version,
+        scenario_code: document.getElementById("insScenarioCode").value,
+        timestamp: new Date().toISOString(),
+        execution_graph: {
+          topology: "DAG",
+          entry_node: "node-1",
+          nodes: graphState.nodes.map(n => ({
+            id: n.id,
+            action_handler: n.name,
+            type: n.type,
+            retry: 1,
+            timeout_ms: 5000
+          })),
+          edges: graphState.edges
+        }
+      };
+      return JSON.stringify(config, null, 2);
+    }
+
+    function previewGeneratedConfig() {
+      document.getElementById("jsonConfigText").value = generateConfigJson();
+      document.getElementById("configModal").classList.add("active");
+    }
+
+    function closeConfigModal() {
+      document.getElementById("configModal").classList.remove("active");
+    }
+
+    function copyAndDeployConfig() {
+      alert(`已成功向后端框架提交 DAG 流程图配置！工作版本 [${graphState.version}] 已编译加载至内存编排微内核中，即刻生效！`);
+      closeConfigModal();
+    }
+
+    function deployWorkingVersion() {
+      previewGeneratedConfig();
+    }
+
+    function switchWorkingVersion(val) {
+      graphState.version = val;
+      alert(`已切换微内核上下文为版本 [${val}]，当前图结构已同步载入！`);
+    }
+
+    // -------------------------------------------------------------
+    // Step-by-Step Pulse Simulation
+    // -------------------------------------------------------------
+    async function runGraphExecutionSimulation() {
+      const order = ["node-1", "node-2", "node-3", "node-4"];
+      for (const id of order) {
+        const el = document.getElementById(id);
+        if (el) {
+          el.classList.add("pulse-running");
+          await new Promise(r => setTimeout(r, 600));
+          el.classList.remove("pulse-running");
+        }
+      }
+      alert("✔ 调度链路仿真成功！\n输入参数: {quarterly_income: 280000}\n执行结果: HTTP 200 OK | Pipeline: 12ms | 免税判定: TRUE (免征增值税)");
+    }
+
+    // -------------------------------------------------------------
+    // Theme Switcher
+    // -------------------------------------------------------------
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute("data-theme");
+      const target = current === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", target);
+      renderEdges();
+    }
+
+    window.onload = () => {
+      initDraggables();
+      selectNode("node-3");
+      renderEdges();
+    };
+    window.onresize = renderEdges;
+  </script>
+</body>
+</html>
