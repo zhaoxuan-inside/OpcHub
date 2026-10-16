@@ -1666,11 +1666,13 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             b.classList.add('active');
           }
         });
+      }
+
       if (viewName === 'backend-orch') {
         setTimeout(() => {
           initDagDraggables();
           renderDagEdges();
-        }, 50);
+        }, 60);
       }
 
       window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -2079,5 +2081,6 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       setTimeout(renderDagEdges, 300);
     });
     window.addEventListener("resize", renderDagEdges);
+  </script>
 </body>
 </html>
