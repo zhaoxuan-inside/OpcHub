@@ -232,9 +232,11 @@
       padding: 6px 12px;
       border-radius: var(--radius-full);
       cursor: pointer;
-      white-space: nowrap;
+      white-space: nowrap !important;
+      flex-shrink: 0;
       transition: var(--transition-liquid);
       font-family: var(--font-sans);
+      user-select: none;
     }
 
     .nav-tab-btn:hover {
@@ -431,7 +433,8 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      white-space: nowrap;
+      white-space: nowrap !important;
+      flex-shrink: 0;
       user-select: none;
       transition: var(--transition-liquid);
       display: inline-flex;
@@ -456,7 +459,8 @@
       font-size: 13px;
       font-weight: 500;
       cursor: pointer;
-      white-space: nowrap;
+      white-space: nowrap !important;
+      flex-shrink: 0;
       user-select: none;
       transition: var(--transition-liquid);
       display: inline-flex;
@@ -713,30 +717,58 @@
     .node-port.port-in { left: -6px; }
     .node-port.port-out { right: -6px; }
 
-    /* Modal Sheet */
+    /* Liquid Glass Modal Sheets & Dialogs (VisionOS Specular Pod) */
     .sheet-modal {
       position: fixed; inset: 0;
-      background: rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(16px);
+      background: rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(28px) saturate(160%);
+      -webkit-backdrop-filter: blur(28px) saturate(160%);
       display: flex; align-items: center; justify-content: center;
       z-index: 1000;
       opacity: 0; pointer-events: none;
-      transition: opacity 0.25s ease;
+      transition: opacity 0.26s cubic-bezier(0.16, 1, 0.3, 1);
     }
     .sheet-modal.active { opacity: 1; pointer-events: auto; }
     .sheet-body {
-      background: var(--glass-surface);
+      background: var(--glass-surface-solid);
       backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-lg);
-      padding: 32px;
+      padding: 30px;
       max-width: 500px;
-      width: 100%;
-      box-shadow: var(--glass-shadow-hover), var(--glass-specular);
-      transform: translateY(16px) scale(0.97);
-      transition: var(--transition-liquid);
+      width: 90%;
+      box-shadow: 0 28px 64px rgba(0, 0, 0, 0.35), var(--glass-specular), var(--glass-glow-halo);
+      transform: translateY(18px) scale(0.96);
+      transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.26s ease;
     }
     .sheet-modal.active .sheet-body { transform: translateY(0) scale(1); }
+
+    /* Floating Liquid Glass Tooltip */
+    #liquidTooltip {
+      position: fixed;
+      pointer-events: none;
+      z-index: 99999;
+      opacity: 0;
+      transform: translate(-50%, 4px) scale(0.96);
+      transition: opacity 0.16s cubic-bezier(0.16, 1, 0.3, 1), transform 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+      background: var(--glass-surface-solid);
+      backdrop-filter: blur(24px) saturate(180%);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.22), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      white-space: nowrap !important;
+      letter-spacing: 0.02em;
+    }
+    #liquidTooltip.visible {
+      opacity: 1;
+      transform: translate(-50%, -100%) translateY(-8px) scale(1);
+    }
   </style>
 </head>
 <body>
@@ -758,20 +790,20 @@
       </div>
 
       <nav class="nav-tabs">
-        <button class="nav-tab-btn active" onclick="switchView('home', this)">首页地图</button>
-        <button class="nav-tab-btn" onclick="switchView('forum', this)">创客贴吧</button>
-        <button class="nav-tab-btn" onclick="switchView('product', this)">产品橱窗</button>
-        <button class="nav-tab-btn" onclick="switchView('policy', this)">政策雷达</button>
-        <button class="nav-tab-btn" onclick="switchView('demand', this)">需求外包池</button>
-        <button class="nav-tab-btn" onclick="switchView('sop', this)">流程SOP文书</button>
-        <button class="nav-tab-btn" onclick="switchView('perks', this)">支持算力券</button>
-        <button class="nav-tab-btn" onclick="switchView('user', this)">用户权益</button>
-        <button class="nav-tab-btn" onclick="switchView('backend-orch', this)">后端编排</button>
-        <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)">前端低代码</button>
+        <button class="nav-tab-btn active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
+        <button class="nav-tab-btn" onclick="switchView('forum', this)" data-tooltip="创客社区交流、实战经验与踩坑问答">创客贴吧</button>
+        <button class="nav-tab-btn" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
+        <button class="nav-tab-btn" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
+        <button class="nav-tab-btn" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
+        <button class="nav-tab-btn" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
+        <button class="nav-tab-btn" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
+        <button class="nav-tab-btn" onclick="switchView('user', this)" data-tooltip="创客档案管理与VIP收费权益中心">用户权益</button>
+        <button class="nav-tab-btn" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台">后端编排</button>
+        <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器">前端编排</button>
       </nav>
 
       <div class="nav-right-actions">
-        <button class="theme-btn" onclick="toggleTheme()">
+        <button class="theme-btn" onclick="toggleTheme()" data-tooltip="切换视觉风格：深色液态玻璃 / 浅色通透玻璃">
           <span class="theme-dot"></span>
           <span id="themeLabel">深色模式</span>
         </button>
@@ -792,11 +824,11 @@
         </p>
 
         <div style="display: flex; gap: 12px; margin-bottom: 36px;">
-          <button class="btn-liquid" onclick="switchView('sop')">
+          <button class="btn-liquid" onclick="switchView('sop')" data-tooltip="开启创客合规全流程导引并生成标准材料">
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path></svg>
-            <span>开启 SOP 向导</span>
+            <span>开始体验</span>
           </button>
-          <button class="btn-liquid-outline" onclick="switchView('policy')">
+          <button class="btn-liquid-outline" onclick="switchView('policy')" data-tooltip="浏览长三角与全国扶持政策白话库">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path><line x1="12" y1="12" x2="19" y2="5"></line></svg>
             <span>政策雷达</span>
           </button>
@@ -865,7 +897,7 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客交流贴吧</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">超级个体经验沉淀 · 独立出海问答 · 踩坑互助交流</p>
           </div>
-          <button class="btn-liquid" onclick="openPostModal()">
+          <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在创客贴吧发起新实战经验与商业讨论帖">
             <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
             <span>发帖</span>
           </button>
@@ -885,7 +917,7 @@
         </div>
 
         <!-- Right: Tieba Posts List -->
-        <div class="glass-box" style="padding: 20px 28px;">
+        <div class="glass-box" style="padding: 20px 28px;" id="forumPostsContainer">
           <div class="post-card">
             <div class="post-title">
               <span class="post-pinned">置顶</span>
@@ -943,7 +975,7 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">超级个体产品橱窗</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)">
+          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)" data-tooltip="提交独立产品入驻橱窗与首页置顶打榜">
             <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             <span>提交产品</span>
           </button>
@@ -962,9 +994,9 @@
               结合本地知识库与大模型的无干扰写作工作台，专为长文研究员与独立小说创作者打造。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">作者: @Alex_Writer</span>
-            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 InkFlow AI 专注编辑器" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 InkFlow AI 独立产品预览环境与创客主页...', 'INFO')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验</button>
           </div>
         </div>
 
@@ -979,9 +1011,9 @@
               通过自然语言定义实体关系，1秒生成高质量 PostgreSQL 物理 DDL 与具备充血模型的 FastAPI 代码。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">作者: @ZeroDev</span>
-            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 FastSchema DB 自动生成引擎" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 FastSchema DB 独立产品预览环境与创客主页...', 'INFO')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验</button>
           </div>
         </div>
 
@@ -996,9 +1028,9 @@
               为国内独立开发者提供合规无损的全球收单路由，支持 Apple Pay、Google Pay 与主流海外信用卡。
             </p>
           </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; font-size: 12.5px;">
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">作者: @GlobalPayMaster</span>
-            <a href="javascript:void(0)" style="color: var(--text-primary); text-decoration: none; font-weight: 500;">体验产品 ↗</a>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 ShipGlobal 独立站支付聚合网关" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ShipGlobal 独立产品预览环境与创客主页...', 'INFO')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验</button>
           </div>
         </div>
       </div>
@@ -1027,7 +1059,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">截止 2027-12-31</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格</button>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="showLiquidNotice('政策匹配测评', '正在为您检索全国税务知识库与小微免税测算规则，当前主体符合免税条件！', 'SUCCESS')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格</button>
           </div>
         </div>
 
@@ -1044,7 +1076,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">剩余 12 天</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>申报材料</button>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="查看并导出智能算力券标准申报流程与材料清单" onclick="showLiquidNotice('申报材料指南', '智能算力券补贴申领指南已打包生成，可前往流程文书中心直接下载申报！', 'INFO')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>申报材料</button>
           </div>
         </div>
 
@@ -1061,7 +1093,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">常年开放申报</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>入库测评</button>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="在线测评科技型中小企业入库指标与研发费用加计扣除" onclick="showLiquidNotice('企业入库测评', '研发费用加计扣除合规指标自测已通过（综合合规评分 92/100）！', 'SUCCESS')"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>入库测评</button>
           </div>
         </div>
       </div>
@@ -1077,7 +1109,7 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>发布需求</button>
+          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)" data-tooltip="发布外包寻源需求并进入企业资金托管通道"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>发布需求</button>
         </div>
       </div>
 
@@ -1095,7 +1127,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">3 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
@@ -1112,7 +1144,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">1 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
@@ -1129,7 +1161,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">5 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
       </div>
@@ -1189,8 +1221,8 @@
                 <option value="实际办公场地租赁合同">实际办公场地租赁合同</option>
               </select>
             </div>
-            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 12px;" onclick="downloadGeneratedDoc()">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出登记文书 (.docx)
+            <button class="btn-liquid" style="width: 100%; justify-content: center; margin-top: 12px;" onclick="downloadGeneratedDoc()" data-tooltip="生成并下载《个体工商户设立登记标准申请书.docx》">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出文书
             </button>
           </div>
 
@@ -1244,7 +1276,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">剩余额度: 38/50</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('AWS Activate 兑换码')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('AWS Activate 兑换码')" data-tooltip="领取 AWS Activate $5,000 云服务积分专属兑换码"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取</button>
           </div>
         </div>
 
@@ -1261,7 +1293,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">已接入通道</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('API 路由 Key')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>配置</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('API 路由 Key')" data-tooltip="配置 OpenAI / Claude 高并发代理路由独享密钥"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>配置</button>
           </div>
         </div>
 
@@ -1278,7 +1310,7 @@
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">认证专属通道</span>
-            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('出海开户绿色通道')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>申请</button>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('出海开户绿色通道')" data-tooltip="申请 Stripe & 派安盈 0.4% 超级出海结汇绿色通道"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>申请</button>
           </div>
         </div>
       </div>
@@ -1313,7 +1345,7 @@
               <label class="form-label">绑定企业统一社会信用代码</label>
               <input type="text" class="glass-input" value="92330106MA2XXXXXX">
             </div>
-            <button class="btn-liquid" style="margin-top: 8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
+            <button class="btn-liquid" style="margin-top: 8px;" onclick="showLiquidNotice('创客档案保存', '创客企业信用代码与基本信息档案已成功更新至云端数据库！', 'SUCCESS')" data-tooltip="保存创客个人基本档案与企业信用代码"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
           </div>
 
           <!-- Right: Entitlements Switcher & Monetization -->
@@ -1354,8 +1386,8 @@
             </div>
 
             <div style="margin-top: 20px; text-align: right;">
-              <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>升级黑钻 (¥999)
+              <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)" data-tooltip="升级开通创客年度全权益黑钻通行证 (¥999/年)">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>升级黑钻
               </button>
             </div>
           </div>
@@ -1386,8 +1418,8 @@
               </select>
               <span style="color: #34C759; font-size: 11px;">● 就绪</span>
             </div>
-            <button class="btn-liquid-outline" onclick="previewDagConfigJson()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>查看配置</button>
-            <button class="btn-liquid" onclick="deployDagConfiguration()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>部署生效</button>
+            <button class="btn-liquid-outline" onclick="previewDagConfigJson()" data-tooltip="预览微内核 DAG 编排配置 (JSON 格式)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>查看配置</button>
+            <button class="btn-liquid" onclick="deployDagConfiguration()" data-tooltip="向微内核引擎提交拓扑图并即时热载生效"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>部署生效</button>
           </div>
         </div>
 
@@ -1486,7 +1518,7 @@
                 <span style="width: 7px; height: 7px; border-radius: 50%; background: #34C759; box-shadow: 0 0 8px #34C759;"></span>
                 <span>微内核已加载 4 节点 · 3 边 | 支持按住鼠标任意拖拽节点及重绘连线</span>
               </div>
-              <button class="btn-liquid" style="font-size: 12.5px; padding: 6px 14px;" onclick="runDagPulseSimulation()">
+              <button class="btn-liquid" style="font-size: 12.5px; padding: 6px 14px;" onclick="runDagPulseSimulation()" data-tooltip="向统一网关发起调度仿真运行 (POST /api/v1/gateway)">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>仿真运行
               </button>
             </div>
@@ -1526,7 +1558,7 @@
               <input type="text" class="glass-input" value="ENT_POL_VIP (未持有时中断并弹出收银台)">
             </div>
 
-            <button class="btn-liquid-outline" style="color: #FF3B30; margin-top: 8px; justify-content: center;" onclick="deleteSelectedDagNode()">
+            <button class="btn-liquid-outline" style="color: #FF3B30; margin-top: 8px; justify-content: center;" onclick="deleteSelectedDagNode()" data-tooltip="从编排画布中删除当前选中的节点与关联边">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>移除节点
             </button>
           </div>
@@ -1539,7 +1571,7 @@
               <span style="font-weight: 600; font-size: 15px;">Python 业务脚本热载上传与 AST 安全沙箱</span>
               <span class="mono-tag" style="margin-left: 8px;">FILE: invoice_tax_calc.py</span>
             </div>
-            <button class="btn-liquid-outline" style="font-size: 12px; padding: 4px 10px;" onclick="toggleScriptPanel()"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>源码沙箱</button>
+            <button class="btn-liquid-outline" style="font-size: 12px; padding: 4px 10px;" onclick="toggleScriptPanel()" data-tooltip="展开或折叠 Python 业务脚本热载沙箱编辑器"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>源码沙箱</button>
           </div>
 
           <div id="dagScriptContainer">
@@ -1557,8 +1589,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     return ctx
             </textarea>
             <div style="display: flex; gap: 10px; margin-top: 10px; align-items: center;">
-              <button class="btn-liquid" onclick="validatePythonAST()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>AST 校验</button>
-              <button class="btn-liquid-outline" onclick="registerPipelineMethod()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>热载注册</button>
+              <button class="btn-liquid" onclick="validatePythonAST()" data-tooltip="运行 Python AST 静态语法树检测与安全沙箱编译"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>安全编译</button>
+              <button class="btn-liquid-outline" onclick="registerPipelineMethod()" data-tooltip="将当前脚本方法热载注册至微内核节点字典"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>热载注册</button>
               <span id="astOutput" style="font-family: var(--font-mono); font-size: 12px; color: #34C759; display: none;">
                 ✔ AST 检查通过: 无危险系统模块，已注册进微内核字典。
               </span>
@@ -1576,8 +1608,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
           <h1 class="page-title" style="font-size: 26px;">前端页面可视化低代码构建器</h1>
           <div style="display: flex; gap: 8px;">
-            <button class="btn-liquid-outline" onclick="rollbackRelease()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>版本回滚</button>
-            <button class="btn-liquid" onclick="publishReleaseBundle()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>原子发布 v1.0.4</button>
+            <button class="btn-liquid-outline" onclick="rollbackRelease()" data-tooltip="一键零停机安全回滚至上一稳定版本"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>版本回滚</button>
+            <button class="btn-liquid" onclick="publishReleaseBundle()" data-tooltip="前后端微内核原子联合发布至生产环境 (v1.0.4)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>联合发布</button>
           </div>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
@@ -1589,10 +1621,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <div style="background: var(--glass-surface-subtle); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
             <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">COMPONENT PALETTE</div>
             <div style="display: flex; flex-direction: column; gap: 8px;">
-              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('stat')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>统计指标卡</button>
-              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('table')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>数据表格列表</button>
-              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('form')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>提交表单组件</button>
-              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('chart')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>折射趋势图表</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('stat')" data-tooltip="向画布置入 6/12 栅格统计指标卡组件"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="13" x2="15" y2="13"/></svg>指标卡片</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('table')" data-tooltip="向画布置入后端绑定的数据表格列表组件"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 3h18v18H3zM3 9h18M3 15h18M9 3v18M15 3v18"/></svg>数据表格</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('form')" data-tooltip="向画布置入即时合规校验的输入表单组件"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>输入表单</button>
+              <button class="btn-liquid-outline" style="font-size: 12.5px; padding: 8px 12px;" onclick="addWidgetToCanvas('chart')" data-tooltip="向画布置入数据趋势分析折线图表组件"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>趋势图表</button>
             </div>
           </div>
 
@@ -1650,7 +1682,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
                 <option value="ENT_POL_VIP" selected>ENT_POL_VIP (需高级内参凭据)</option>
               </select>
             </div>
-            <button class="btn-liquid" style="width: 100%; justify-content: center; font-size: 13px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存配置</button>
+            <button class="btn-liquid" style="width: 100%; justify-content: center; font-size: 13px;" onclick="showLiquidNotice('属性保存', '组件栅格跨度与后端网关 Scenario 映射配置已成功保存！', 'SUCCESS')" data-tooltip="保存当前选中前端组件的属性与接口映射"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存配置</button>
           </div>
         </div>
       </div>
@@ -1660,24 +1692,311 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
   <!-- Reusable Entitlement & Payment Modal Sheet -->
   <div class="sheet-modal" id="modalSheet">
     <div class="sheet-body">
-      <h3 style="font-size: 19px; font-weight: 600; margin-bottom: 8px;" id="sheetModalTitle">开通创客专享权益</h3>
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px;">
+        <div>
+          <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent); margin-bottom: 6px; display: inline-block;">ENTITLEMENT PASS</span>
+          <h3 style="font-size: 19px; font-weight: 600;" id="sheetModalTitle">开通创客专享权益</h3>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeEntitlementModal()" style="padding: 4px 8px;" data-tooltip="关闭收银台"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
       <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;" id="sheetModalDesc">
-        该操作将为您的用户账号强绑定权益 ID，开通后即刻解锁对应功能模块。
+        该操作将为您的用户账号强绑定权益 ID，开通后即刻解锁对应功能模块与API调用配额。
       </p>
 
-      <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <div style="font-size: 28px; font-weight: 600; font-family: var(--font-display);" id="sheetModalPrice">¥ 499.00</div>
-        <div style="font-size: 12px; color: var(--text-tertiary);">一次性永久或年度授权凭据</div>
+      <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); border-radius: var(--radius-md); padding: 18px; margin-bottom: 22px;">
+        <div style="font-size: 32px; font-weight: 600; font-family: var(--font-display); letter-spacing: -0.02em;" id="sheetModalPrice">¥ 499.00</div>
+        <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 4px;">一次性永久或年度授权凭据 · 支持对公增值税专票</div>
       </div>
 
       <div style="display: flex; gap: 10px;">
-        <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeEntitlementModal()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
-        <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="confirmEntitlementPayment()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>激活权益</button>
+        <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeEntitlementModal()" data-tooltip="取消支付并关闭窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="confirmEntitlementPayment()" data-tooltip="完成支付并为创客账号激活专属权益"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="20 6 9 17 4 12"/></svg>激活权益</button>
       </div>
     </div>
   </div>
 
+  <!-- Unified Liquid Glass Notice / Prompt Modal -->
+  <div class="sheet-modal" id="liquidNoticeModal">
+    <div class="sheet-body" style="max-width: 440px;">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 12px;">
+        <div id="liquidNoticeIcon" style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent); flex-shrink: 0;"></div>
+        <div>
+          <h3 style="font-size: 17px; font-weight: 600;" id="liquidNoticeTitle">提示</h3>
+          <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);" id="liquidNoticeSub">SYSTEM PROMPT</div>
+        </div>
+      </div>
+      <div style="font-size: 13.5px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px; white-space: pre-wrap;" id="liquidNoticeMessage"></div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn-liquid" onclick="closeLiquidNotice()" data-tooltip="确认并关闭当前提示"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Code / DAG Config Viewer Modal -->
+  <div class="sheet-modal" id="liquidCodeModal">
+    <div class="sheet-body" style="max-width: 620px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 16px; font-weight: 600;" id="liquidCodeModalTitle">微内核 DAG 编排配置 (JSON)</h3>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">TOPOLOGY COMPILED PAYLOAD</div>
+          </div>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeLiquidCodeModal()" style="padding: 4px 8px;" data-tooltip="关闭配置视图"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div style="position: relative; margin-bottom: 18px;">
+        <pre id="liquidCodeContent" style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; background: var(--glass-surface-solid); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 16px; max-height: 380px; overflow: auto; color: var(--text-secondary);"></pre>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn-liquid-outline" onclick="closeLiquidCodeModal()" data-tooltip="关闭窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>关闭</button>
+        <button class="btn-liquid" onclick="copyLiquidCode()" data-tooltip="复制 JSON 配置代码至剪贴板"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Forum Post Modal -->
+  <div class="sheet-modal" id="liquidPostModal">
+    <div class="sheet-body" style="max-width: 520px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">发起创客讨论帖</h3>
+        <button class="btn-liquid-outline" onclick="closePostModal()" style="padding: 4px 8px;" data-tooltip="放弃本次发帖"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">讨论分类</label>
+        <select class="glass-select" id="newPostCategory">
+          <option>技术实战 (DEV)</option>
+          <option>出海商业 (BIZ)</option>
+          <option>财税合规 (TAX)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">讨论主题</label>
+        <input type="text" class="glass-input" id="newPostTitle" placeholder="例如：一人公司使用 FastAPI + Stripe 实现自动化出海结汇踩坑记">
+      </div>
+      <div class="form-group">
+        <label class="form-label">正文内容</label>
+        <textarea class="glass-textarea" id="newPostContent" rows="4" placeholder="在此分享您的实战经验、架构设计或遇到的技术困惑..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePostModal()" data-tooltip="取消发帖"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitNewPost()" data-tooltip="发布讨论帖至创客贴吧"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>发布</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global Fixed Liquid Tooltip Element -->
+  <div id="liquidTooltip"></div>
+
   <script>
+    // -------------------------------------------------------------
+    // Liquid Glass Tooltip Engine (Zero-Overflow Single Instance)
+    // -------------------------------------------------------------
+    function initLiquidTooltips() {
+      let tooltip = document.getElementById('liquidTooltip');
+      if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.id = 'liquidTooltip';
+        document.body.appendChild(tooltip);
+      }
+
+      document.body.addEventListener('mouseover', (e) => {
+        const trigger = e.target.closest('[data-tooltip]');
+        if (!trigger) return;
+        const text = trigger.getAttribute('data-tooltip');
+        if (!text) return;
+
+        tooltip.textContent = text;
+        tooltip.classList.add('visible');
+
+        const rect = trigger.getBoundingClientRect();
+        const tipRect = tooltip.getBoundingClientRect();
+
+        let left = rect.left + (rect.width / 2) - (tipRect.width / 2);
+        left = Math.max(12, Math.min(left, window.innerWidth - tipRect.width - 12));
+
+        let top = rect.top - tipRect.height - 8;
+        if (top < 10) {
+          top = rect.bottom + 8;
+        }
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+      });
+
+      document.body.addEventListener('mouseout', (e) => {
+        const trigger = e.target.closest('[data-tooltip]');
+        if (trigger) {
+          if (e.relatedTarget && trigger.contains(e.relatedTarget)) {
+            return;
+          }
+          tooltip.classList.remove('visible');
+        }
+      });
+
+      window.addEventListener('scroll', () => {
+        tooltip.classList.remove('visible');
+      }, true);
+    }
+    initLiquidTooltips();
+
+    // -------------------------------------------------------------
+    // Unified Liquid Notice / Prompt Controller
+    // -------------------------------------------------------------
+    function showLiquidNotice(title, message, type = 'INFO') {
+      const modal = document.getElementById('liquidNoticeModal');
+      const titleEl = document.getElementById('liquidNoticeTitle');
+      const msgEl = document.getElementById('liquidNoticeMessage');
+      const subEl = document.getElementById('liquidNoticeSub');
+      const iconEl = document.getElementById('liquidNoticeIcon');
+      
+      if (!modal) return;
+      if (titleEl) titleEl.textContent = title || '系统提示';
+      if (msgEl) msgEl.textContent = message || '';
+      
+      if (type === 'SUCCESS') {
+        if (subEl) subEl.textContent = 'SYSTEM SUCCESS · OPERATION OK';
+        if (iconEl) {
+          iconEl.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.2"><polyline points="20 6 9 17 4 12"/></svg>`;
+          iconEl.style.background = 'rgba(52, 199, 89, 0.15)';
+        }
+      } else if (type === 'WARNING') {
+        if (subEl) subEl.textContent = 'SYSTEM WARNING · ATTENTION';
+        if (iconEl) {
+          iconEl.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
+          iconEl.style.background = 'rgba(255, 149, 0, 0.15)';
+        }
+      } else {
+        if (subEl) subEl.textContent = 'SYSTEM NOTICE · INFORMATIONAL';
+        if (iconEl) {
+          iconEl.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
+          iconEl.style.background = 'var(--accent-glass)';
+        }
+      }
+      
+      modal.classList.add('active');
+    }
+
+    function closeLiquidNotice() {
+      const modal = document.getElementById('liquidNoticeModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    // -------------------------------------------------------------
+    // Liquid Code / DAG Config Viewer Modal Controller
+    // -------------------------------------------------------------
+    function showLiquidCodeModal(title, code) {
+      const modal = document.getElementById('liquidCodeModal');
+      const titleEl = document.getElementById('liquidCodeModalTitle');
+      const codeEl = document.getElementById('liquidCodeContent');
+      if (!modal) return;
+      if (titleEl) titleEl.textContent = title || '微内核 DAG 编排配置 (JSON)';
+      if (codeEl) codeEl.textContent = code || '';
+      modal.classList.add('active');
+    }
+
+    function closeLiquidCodeModal() {
+      const modal = document.getElementById('liquidCodeModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function copyLiquidCode() {
+      const codeEl = document.getElementById('liquidCodeContent');
+      if (!codeEl) return;
+      navigator.clipboard.writeText(codeEl.textContent).then(() => {
+        showLiquidNotice('代码复制成功', '微内核 DAG JSON 拓扑配置已复制到系统剪贴板！', 'SUCCESS');
+      }).catch(() => {
+        showLiquidNotice('复制提示', '可直接在文本区域全选并复制配置内容。', 'INFO');
+      });
+    }
+
+    // -------------------------------------------------------------
+    // Forum Post Modal Controller
+    // -------------------------------------------------------------
+    function openPostModal() {
+      const modal = document.getElementById('liquidPostModal');
+      if (modal) {
+        document.getElementById('newPostTitle').value = '';
+        document.getElementById('newPostContent').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePostModal() {
+      const modal = document.getElementById('liquidPostModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function submitNewPost() {
+      const cat = document.getElementById('newPostCategory').value;
+      const title = document.getElementById('newPostTitle').value.trim();
+      const content = document.getElementById('newPostContent').value.trim();
+      
+      if (!title) {
+        showLiquidNotice('请填写主题', '讨论帖主题不能为空，请输入清晰的主题以便其他创客理解交流。', 'WARNING');
+        return;
+      }
+
+      const container = document.getElementById('forumPostsContainer') || document.querySelector('.forum-container .glass-box:last-child');
+      if (container) {
+        const postCard = document.createElement('div');
+        postCard.className = 'post-card';
+        postCard.innerHTML = `
+          <div class="post-title">
+            <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">${escapeHtml(cat.split(' ')[0])}</span>
+            <span>${escapeHtml(title)}</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+            ${escapeHtml(content || '（暂无详细正文内容）')}
+          </p>
+          <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            <span>作者: 赵玄 (您)</span>
+            <span>回复: 0</span>
+            <span>刚刚发布</span>
+          </div>
+        `;
+        const firstPost = container.querySelector('.post-card');
+        if (firstPost) {
+          container.insertBefore(postCard, firstPost);
+        } else {
+          container.appendChild(postCard);
+        }
+      }
+
+      closePostModal();
+      showLiquidNotice('发帖成功', '您的讨论帖已成功发布至创客交流贴吧！', 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // Perk Claiming Controller
+    // -------------------------------------------------------------
+    function claimPerk(perkName) {
+      const code = 'OPC-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-2026';
+      showLiquidNotice(
+        `${perkName} 领取成功`,
+        `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n生效状态: 已激活\n说明: 凭据已同步至创客控制台，可直接在服务商控制台兑换抵扣。`,
+        'SUCCESS'
+      );
+    }
+
+    // Backdrop click listener to close modals
+    document.addEventListener('click', (e) => {
+      if (e.target.classList && e.target.classList.contains('sheet-modal')) {
+        e.target.classList.remove('active');
+      }
+    });
+
     // -------------------------------------------------------------
     // View Switcher (Router)
     // -------------------------------------------------------------
@@ -1822,7 +2141,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     function registerPipelineMethod() {
-      alert('已成功将方法 custom.invoice_tax_calc.execute 热载并注册入微内核编排方法池！');
+      showLiquidNotice('微内核热载', '已成功将方法 custom.invoice_tax_calc.execute 热载并注册入微内核编排方法池！', 'SUCCESS');
     }
 
     function testPipelineExecution() {
@@ -1857,11 +2176,11 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     function publishReleaseBundle() {
-      alert('已打包生成前后端原子发布包 (Release Bundle v1.0.4)，状态已流转为 PUBLISHED！');
+      showLiquidNotice('联合发布', '已打包生成前后端原子发布包 (Release Bundle v1.0.4)，全链路拓扑状态已流转为 PUBLISHED！', 'SUCCESS');
     }
 
     function rollbackRelease() {
-      alert('已触发零停机安全回滚，系统已恢复至版本 v1.0.3！');
+      showLiquidNotice('零停机回滚', '已触发零停机安全回滚，生产环境微内核与页面拓扑已恢复至稳定版本 v1.0.3！', 'SUCCESS');
     }
 
     // -------------------------------------------------------------
@@ -1878,15 +2197,15 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     function confirmEntitlementPayment() {
-      alert('已成功绑定权益凭据并完成支付鉴权，对应功能模块已开启！');
+      showLiquidNotice('权益激活', '已成功绑定创客专属权益凭据并完成支付鉴权，对应高级模块与 API 配额已开启！', 'SUCCESS');
       closeEntitlementModal();
     }
 
     function toggleFeature(checkbox, entitlementId) {
       if (checkbox.checked) {
-        alert(`已开启功能 [${entitlementId}]，已通过网关鉴权。`);
+        showLiquidNotice('功能开关', `已开启功能 [${entitlementId}]，已通过微内核网关鉴权。`, 'INFO');
       } else {
-        alert(`已关闭功能 [${entitlementId}]。`);
+        showLiquidNotice('功能开关', `已关闭功能 [${entitlementId}]。`, 'INFO');
       }
     }
 
@@ -2026,7 +2345,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
     function deleteSelectedDagNode() {
       if (!dagState.selectedNodeId || dagState.selectedNodeId === "dnode-1") {
-        alert("网关入参协议解析节点不允许删除！");
+        showLiquidNotice('节点保护', '网关入参协议解析节点属于全链路入口根节点，系统保护不允许删除！', 'WARNING');
         return;
       }
       const el = document.getElementById(dagState.selectedNodeId);
@@ -2076,16 +2395,16 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
     function previewDagConfigJson() {
       const json = generateDagConfigJson();
-      alert("【微内核 DAG 编排配置生成成功】\n\n" + json);
+      showLiquidCodeModal('微内核 DAG 编排配置 (JSON)', json);
     }
 
     function deployDagConfiguration() {
-      alert(`已成功向后端框架提交 DAG 流程图配置！\n工作版本 [${dagState.version}] 已编译加载至微内核执行引擎中，即刻生效！`);
+      showLiquidNotice('部署生效', `已成功向后端框架提交 DAG 流程图配置！\n工作版本 [${dagState.version}] 已编译加载至微内核执行引擎中，即刻生效！`, 'SUCCESS');
     }
 
     function switchWorkingDagVersion(ver) {
       dagState.version = ver;
-      alert(`已切换微内核上下文为版本 [${ver}]，对应 DAG 图拓扑已同步重载！`);
+      showLiquidNotice('版本切换', `已切换微内核上下文为版本 [${ver}]，对应 DAG 拓扑图与算子依赖已同步重载！`, 'INFO');
     }
 
     async function runDagPulseSimulation() {
@@ -2098,7 +2417,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           el.classList.remove("pulse-running");
         }
       }
-      alert("✔ 调度链路仿真成功！\n入参: {quarterly_income: 280000}\n结果: HTTP 200 OK | Pipeline: 12ms | 免税判定: TRUE (免征增值税)");
+      showLiquidNotice('调度链路仿真完成', '✔ 微内核全链路脉冲仿真调度成功！\n\n链路入参: { "quarterly_income": 280000 }\n链路响应: HTTP 200 OK | 响应耗时: 12ms\n免税判定: TRUE (免征小微企业增值税)', 'SUCCESS');
     }
 
     function toggleScriptPanel() {
@@ -2114,6 +2433,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       initDagDraggables();
       selectDagNode("dnode-3");
       setTimeout(renderDagEdges, 300);
+      initLiquidTooltips();
     });
     window.addEventListener("resize", renderDagEdges);
   </script>
