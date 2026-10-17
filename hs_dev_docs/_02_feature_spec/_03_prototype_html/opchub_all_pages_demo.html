@@ -1404,7 +1404,7 @@
             <p style="font-size: 13px; color: var(--text-secondary);">汇集长三角、大湾区及全国针对超级个体与初创团队的扶持红利，拒绝官话套话，直达关键要求。</p>
           </div>
           <div style="display: flex; align-items: center; gap: 12px;">
-            <span id="policyPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_POLICY_MATCH_PIPELINE</span>
+            <span id="policyPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">政策智能匹配</span>
             <button class="btn-liquid" onclick="openPublishPolicyModal()" data-tooltip="发布与收录最新政府扶持政策与免税指引">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               <span>发布</span>
@@ -1489,7 +1489,7 @@
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 26px; margin: 0;">需求外包与商机集市</h1>
-              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_DEMAND_PUBLISH_PIPELINE & OPC_DEMAND_BID_PIPELINE</span>
+              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">企业商机撮合</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
@@ -1606,7 +1606,7 @@
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 26px; margin: 0;">创客合规 SOP 与标准化材料生成器</h1>
-              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_SOP_DOCUMENT_RENDER_PIPELINE</span>
+              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">合规申报材料</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary);">
               串联创业从 0 到 1 的全流程填写流图。通过信息录入，系统自动生成符合政务与银行规范的标准申报材料，支持即时预览与一键下载。
@@ -1712,7 +1712,7 @@
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 26px; margin: 0;">算力与开发者基础设施支持</h1>
-              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_PERK_CLAIM_PIPELINE</span>
+              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">全球特权通道</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary);">已为超级个体接入全球顶尖算力与基础设施专属补贴通道，大幅削减一人公司的启动成本。</p>
           </div>
@@ -1784,7 +1784,7 @@
     <div id="view-user" class="view-panel">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
           <h1 class="page-title" style="font-size: 26px; margin: 0;">创客用户体系与收费权益中心</h1>
-          <span id="userProfilePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_USER_PROFILE_PIPELINE</span>
+          <span id="userProfilePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">创客权益体系</span>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
           基于 user_id 与 entitlement_id 强绑定架构。涵盖三级用户体系（管理员、创客、游客）与功能权限开关控制。
@@ -3388,7 +3388,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     <div class="sheet-body" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 12px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_FORUM_COMMENT_PUBLISH</span>
+          <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">创客讨论</span>
           <span id="detailThreadCategory" class="mono-tag">DEV</span>
         </div>
         <button class="btn-liquid-outline" onclick="closeThreadDetailModal()" style="padding: 4px 8px;" data-tooltip="关闭详情"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
@@ -4110,7 +4110,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
       if (input) input.value = '';
       cancelReplyTo();
-      showLiquidNotice('回复成功', '微内核 DAG OPC_FORUM_COMMENT_PUBLISH 编排已成功持久化并挂载至物化路径树！', 'SUCCESS');
+      showLiquidNotice('回复成功', '您的讨论观点已成功发布！', 'SUCCESS');
 
       // Reload thread comments
       openThreadDetailModal(currentActiveThreadId);
@@ -6044,8 +6044,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
       }
       const pipeBadge = document.getElementById('homePipelineBadge');
-      if (pipeBadge && data.orchestrated_by) {
-        pipeBadge.textContent = `DAG: ${data.orchestrated_by}`;
+      if (pipeBadge) {
+        pipeBadge.textContent = `微内核引擎 · 运行正常`;
       }
 
       // If backend returns dynamic quick links, render them seamlessly
@@ -6301,8 +6301,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const profile = gwRes.data;
       if (profile) {
         const pipeBadge = document.getElementById('userProfilePipelineBadge');
-        if (pipeBadge && profile.orchestrated_by) {
-          pipeBadge.textContent = `DAG: ${profile.orchestrated_by}`;
+        if (pipeBadge) {
+          pipeBadge.textContent = `认证超级个体`;
         }
         const compElem = document.querySelector('#view-user h1');
         if (compElem && profile.company_name) {
@@ -6331,8 +6331,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       ]);
       if (resChecks && resChecks.ok && resChecks.data) {
         const compBadge = document.getElementById('compliancePipelineBadge');
-        if (compBadge && resChecks.data.orchestrated_by) {
-          compBadge.textContent = `DAG: ${resChecks.data.orchestrated_by}`;
+        if (compBadge) {
+          compBadge.textContent = `六维合规防线已就绪`;
         }
       }
     }
