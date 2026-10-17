@@ -257,6 +257,28 @@ gateway:
       is_default: true
       handler: "src.core.gateway.adapters:user_entitlement_activate_adapter"
 
+    - scenario: "auth.register"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "创客邮箱快速注册与租户主体初始化"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_register_adapter"
+
+    - scenario: "auth.login"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "创客邮箱与密码身份鉴权及会话 Token 签发"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_login_adapter"
+
+    - scenario: "auth.session"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "验证创客会话 Token 并获取登录工作台状态"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_session_adapter"
+
+
     # --------------------------------------------------------------------------
     # 9. Content Moderation (内容治理)
     # --------------------------------------------------------------------------

@@ -273,6 +273,7 @@
     .nav-right-actions {
       display: flex;
       align-items: center;
+      gap: 10px;
     }
 
     /* Unified VisionOS Glass Toolbar Island (同一图层) */
@@ -1095,6 +1096,12 @@
       </div>
 
       <div class="nav-right-actions">
+        <!-- 0. Dynamic Auth Bar (Login / Register / Session Profile) -->
+        <div id="navAuthBar" style="display: inline-flex; align-items: center; gap: 8px;">
+          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="登录已有创客账号">登录</button>
+          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="注册新创客账号 (支持邮箱)">注册</button>
+        </div>
+
         <!-- Unified VisionOS Frosted Island Layer (同一个图层：视角切换、暗黑模式、用户信息三合一) -->
         <div class="nav-actions-island" id="navActionsIsland">
           <!-- 1. Perspective / Role Switcher Icon Button -->
@@ -3353,6 +3360,100 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     </div>
   </div>
 
+  <!-- Maker Login Modal Sheet -->
+  <div class="sheet-modal" id="liquidLoginModal">
+    <div class="sheet-body" style="max-width: 440px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 17px; font-weight: 600;">创客登录 · OpcHub</h3>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">MAKER SESSION AUTHENTICATION</div>
+          </div>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeAuthModals()" style="padding: 4px 8px;" data-tooltip="关闭登录窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">登录邮箱</label>
+          <input type="email" id="loginEmailInput" class="glass-input" placeholder="maker@opchub.cn 或 您的注册邮箱" style="width: 100%; box-sizing: border-box;" />
+        </div>
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">登录密码</label>
+          <input type="password" id="loginPasswordInput" class="glass-input" placeholder="输入密码" style="width: 100%; box-sizing: border-box;" onkeydown="if(event.key==='Enter') submitLogin()" />
+        </div>
+        <div id="loginErrorMsg" style="display: none; color: #ff453a; font-size: 12px; padding: 6px 10px; background: rgba(255, 69, 58, 0.1); border-radius: var(--radius-sm);"></div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeAuthModals()">取消</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" id="loginSubmitBtn" onclick="submitLogin()">登录</button>
+      </div>
+
+      <div style="text-align: center; font-size: 12.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 12px;">
+        还没有创客账号？ <a href="javascript:void(0)" onclick="openRegisterModal()" style="color: var(--accent); font-weight: 500; text-decoration: none;">立即免费注册邮箱账号</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Maker Email Registration Modal Sheet -->
+  <div class="sheet-modal" id="liquidRegisterModal">
+    <div class="sheet-body" style="max-width: 480px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <div>
+            <h3 style="font-size: 17px; font-weight: 600;">创客注册 · 开启超级个体之旅</h3>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">EMAIL REGISTRATION · OPC HUB</div>
+          </div>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeAuthModals()" style="padding: 4px 8px;" data-tooltip="关闭注册窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">创客邮箱 <span style="color: #ff453a;">*</span></label>
+          <input type="email" id="regEmailInput" class="glass-input" placeholder="例如: yourname@gmail.com / qq.com" style="width: 100%; box-sizing: border-box;" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">登录密码 <span style="color: #ff453a;">*</span></label>
+            <input type="password" id="regPasswordInput" class="glass-input" placeholder="至少 6 位密码" style="width: 100%; box-sizing: border-box;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">确认密码 <span style="color: #ff453a;">*</span></label>
+            <input type="password" id="regConfirmPasswordInput" class="glass-input" placeholder="再次输入密码" style="width: 100%; box-sizing: border-box;" />
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">创客昵称 (选填)</label>
+            <input type="text" id="regNicknameInput" class="glass-input" placeholder="默认取邮箱前缀" style="width: 100%; box-sizing: border-box;" />
+          </div>
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">工作室/组织 (选填)</label>
+            <input type="text" id="regCompanyInput" class="glass-input" placeholder="如：极客视界独立工作室" style="width: 100%; box-sizing: border-box;" />
+          </div>
+        </div>
+        <div id="regErrorMsg" style="display: none; color: #ff453a; font-size: 12px; padding: 6px 10px; background: rgba(255, 69, 58, 0.1); border-radius: var(--radius-sm);"></div>
+      </div>
+
+      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+        <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeAuthModals()">取消</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" id="regSubmitBtn" onclick="submitRegister()">创建创客账号</button>
+      </div>
+
+      <div style="text-align: center; font-size: 12.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 12px;">
+        已有创客账号？ <a href="javascript:void(0)" onclick="openLoginModal()" style="color: var(--accent); font-weight: 500; text-decoration: none;">直接登录</a>
+      </div>
+    </div>
+  </div>
+
   <!-- Liquid Forum Post Modal -->
   <div class="sheet-modal" id="liquidPostModal">
     <div class="sheet-body" style="max-width: 520px;">
@@ -5437,6 +5538,238 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     // -------------------------------------------------------------
+    // Maker Authentication & Email Registration Controller
+    // -------------------------------------------------------------
+    let currentUserSession = null;
+
+    function openLoginModal() {
+      const err = document.getElementById('loginErrorMsg');
+      if (err) err.style.display = 'none';
+      document.getElementById('liquidRegisterModal').classList.remove('active');
+      document.getElementById('liquidLoginModal').classList.add('active');
+      const input = document.getElementById('loginEmailInput');
+      if (input) setTimeout(() => input.focus(), 100);
+    }
+
+    function openRegisterModal() {
+      const err = document.getElementById('regErrorMsg');
+      if (err) err.style.display = 'none';
+      document.getElementById('liquidLoginModal').classList.remove('active');
+      document.getElementById('liquidRegisterModal').classList.add('active');
+      const input = document.getElementById('regEmailInput');
+      if (input) setTimeout(() => input.focus(), 100);
+    }
+
+    function closeAuthModals() {
+      document.getElementById('liquidLoginModal').classList.remove('active');
+      document.getElementById('liquidRegisterModal').classList.remove('active');
+    }
+
+    function renderAuthHeader() {
+      const bar = document.getElementById('navAuthBar');
+      if (!bar) return;
+
+      if (currentUserSession && currentUserSession.token) {
+        const initial = (currentUserSession.nickname || currentUserSession.email || 'M').charAt(0).toUpperCase();
+        const displayLabel = currentUserSession.nickname || currentUserSession.email.split('@')[0];
+        const tier = currentUserSession.tier_name || '标准创客';
+        bar.innerHTML = `
+          <div style="display: inline-flex; align-items: center; gap: 7px; background: var(--glass-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 3px 10px 3px 5px; box-shadow: var(--glass-specular);">
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #5856D6); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="switchView('user')" title="进入创客中心">${initial}</div>
+            <span style="font-size: 12.5px; font-weight: 600; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" onclick="switchView('user')" title="${currentUserSession.email}">${displayLabel}</span>
+            <span class="mono-tag" style="font-size: 9.5px; padding: 1px 5px; background: var(--accent-glass); color: var(--accent); border-radius: 4px;">${tier}</span>
+            <button onclick="handleLogout()" class="btn-liquid-outline" style="padding: 2px 7px; font-size: 11px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer;" title="安全退出">退出</button>
+          </div>
+        `;
+      } else {
+        bar.innerHTML = `
+          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="登录已有创客账号">登录</button>
+          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="注册新创客账号 (支持邮箱)">注册</button>
+        `;
+      }
+    }
+
+    async function submitRegister() {
+      const email = (document.getElementById('regEmailInput').value || '').trim();
+      const pwd = document.getElementById('regPasswordInput').value || '';
+      const confirmPwd = document.getElementById('regConfirmPasswordInput').value || '';
+      const nickname = (document.getElementById('regNicknameInput').value || '').trim();
+      const company = (document.getElementById('regCompanyInput').value || '').trim();
+      const errBox = document.getElementById('regErrorMsg');
+      const submitBtn = document.getElementById('regSubmitBtn');
+
+      errBox.style.display = 'none';
+
+      const emailPattern = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+      if (!email || !emailPattern.test(email)) {
+        errBox.textContent = '请输入合法的邮箱地址 (例如: name@example.com)';
+        errBox.style.display = 'block';
+        return;
+      }
+      if (pwd.length < 6) {
+        errBox.textContent = '密码长度不能少于 6 位';
+        errBox.style.display = 'block';
+        return;
+      }
+      if (pwd !== confirmPwd) {
+        errBox.textContent = '两次输入的密码不一致，请核对';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '注册中...';
+
+      try {
+        let authData = null;
+        // 1. First try gateway dispatch
+        const gwRes = await dispatchGateway('auth.register', {
+          email: email,
+          password: pwd,
+          nickname: nickname,
+          company_name: company
+        });
+
+        if (gwRes.ok && gwRes.data) {
+          authData = gwRes.data;
+        } else {
+          // 2. Fallback to direct REST endpoint
+          const res = await fetch('/api/auth/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              password: pwd,
+              nickname: nickname,
+              company_name: company
+            })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.ok && json.token) {
+            authData = json;
+          } else {
+            throw new Error(json.detail || json.message || (gwRes && gwRes.error) || '注册失败，请检查网络或更换邮箱');
+          }
+        }
+
+        // Registration success
+        currentUserSession = authData;
+        localStorage.setItem('opchub_session_token', authData.token);
+        renderAuthHeader();
+        closeAuthModals();
+        showLiquidNotice(
+          '注册成功',
+          `恭喜！创客账号 ${authData.email} 已成功创建并完成数据库持久化。\n创客昵称: ${authData.nickname}\n工作台身份: ${authData.tier_name}\n已为您自动登录并初始化超级个体工作区！`,
+          'SUCCESS'
+        );
+      } catch (err) {
+        errBox.textContent = err.message || '注册发生异常，请稍后重试';
+        errBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '创建创客账号';
+      }
+    }
+
+    async function submitLogin() {
+      const email = (document.getElementById('loginEmailInput').value || '').trim();
+      const pwd = document.getElementById('loginPasswordInput').value || '';
+      const errBox = document.getElementById('loginErrorMsg');
+      const submitBtn = document.getElementById('loginSubmitBtn');
+
+      errBox.style.display = 'none';
+
+      if (!email) {
+        errBox.textContent = '请输入注册邮箱';
+        errBox.style.display = 'block';
+        return;
+      }
+      if (!pwd) {
+        errBox.textContent = '请输入登录密码';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = '登录中...';
+
+      try {
+        let authData = null;
+        // 1. Try gateway dispatch
+        const gwRes = await dispatchGateway('auth.login', { email: email, password: pwd });
+        if (gwRes.ok && gwRes.data) {
+          authData = gwRes.data;
+        } else {
+          // 2. Fallback to direct REST endpoint
+          const res = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: email, password: pwd })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.ok && json.token) {
+            authData = json;
+          } else {
+            throw new Error(json.detail || json.message || (gwRes && gwRes.error) || '邮箱或密码错误');
+          }
+        }
+
+        // Login success
+        currentUserSession = authData;
+        localStorage.setItem('opchub_session_token', authData.token);
+        renderAuthHeader();
+        closeAuthModals();
+        showLiquidNotice(
+          '登录成功',
+          `欢迎回来，${authData.nickname || authData.email}！\n已恢复创客工作台会话。\n主体组织: ${authData.company_name || '独立创客'}`,
+          'SUCCESS'
+        );
+      } catch (err) {
+        errBox.textContent = err.message || '登录失败，请核对邮箱与密码';
+        errBox.style.display = 'block';
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '登录';
+      }
+    }
+
+    function handleLogout() {
+      localStorage.removeItem('opchub_session_token');
+      currentUserSession = null;
+      renderAuthHeader();
+      showLiquidNotice('已退出登录', '您已安全退出当前创客会话。可随时点击右上角重新登录。', 'INFO');
+    }
+
+    async function restoreUserSession() {
+      const token = localStorage.getItem('opchub_session_token');
+      if (!token) {
+        renderAuthHeader();
+        return;
+      }
+
+      try {
+        // Try gateway dispatch first
+        const gwRes = await dispatchGateway('auth.session', { token: token });
+        if (gwRes.ok && gwRes.data) {
+          currentUserSession = gwRes.data;
+        } else {
+          // Try direct REST
+          const res = await fetch(`/api/auth/session?token=${encodeURIComponent(token)}`);
+          if (res.ok) {
+            const data = await res.json();
+            currentUserSession = data;
+          } else {
+            localStorage.removeItem('opchub_session_token');
+            currentUserSession = null;
+          }
+        }
+      } catch (e) {
+        console.warn('Session restoration note:', e);
+      }
+      renderAuthHeader();
+    }
+
+    // -------------------------------------------------------------
     // DAG Graph State & Dragging Controller (Liquid Glass Visual Orchestrator)
     // -------------------------------------------------------------
     const dagState = {
@@ -6422,6 +6755,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       updateModerationStats();
       initSelfAuditChecklist();
       initNavScroll();
+      restoreUserSession();
       syncAllDataFromBackend();
     });
     window.addEventListener("resize", renderDagEdges);

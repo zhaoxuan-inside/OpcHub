@@ -503,3 +503,44 @@ async def external_rag_forum_qa_adapter(p: Dict[str, Any], c: Dict[str, Any] = N
         top_k=top_k,
     )
 
+
+async def auth_register_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Register maker account via email."""
+    from src.domains.user.models import UserRegisterRequest
+    req = UserRegisterRequest(**p)
+    res = await user_service.register_by_email(req)
+    return res.model_dump()
+
+
+async def auth_login_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Authenticate maker via email and password."""
+    from src.domains.user.models import UserLoginRequest
+    req = UserLoginRequest(**p)
+    res = await user_service.login_by_email(req)
+    return res.model_dump()
+
+
+async def auth_session_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Verify session token and retrieve current maker info."""
+    from src.core.security import verify_session_token
+    token = p.get("token") or (c or {}).get("token") or ""
+    payload = verify_session_token(token)
+    if not payload:
+        raise ValueError("会话已失效或未提供有效登录凭据")
+    uid = payload.get("uid", "usr_2026_opc_9981")
+    email = payload.get("email", "")
+    nickname = payload.get("nickname", "创客")
+    profile = user_service.get_profile(uid=uid)
+    return {
+        "valid": True,
+        "token": token,
+        "uid": uid,
+        "email": email,
+        "nickname": nickname,
+        "role": payload.get("role", "MAKER"),
+        "tier_name": profile.tier_name if profile else "标准创客",
+        "session": payload,
+        "profile": profile.model_dump() if profile else {},
+    }
+
+

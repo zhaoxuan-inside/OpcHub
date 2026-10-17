@@ -40,6 +40,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(32), default="MAKER", nullable=False)  # 'ADMIN', 'MAKER', 'GUEST'
     company_name: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     unified_social_credit_code: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    password_hash: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     metadata_payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)

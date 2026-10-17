@@ -1,5 +1,6 @@
 import os
 import time
+from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -68,7 +69,11 @@ from src.domains.user.models import (
     MakerProfileResponse,
     EntitlementActivateRequest,
     EntitlementActivateResponse,
+    UserRegisterRequest,
+    UserLoginRequest,
+    AuthSessionResponse,
 )
+from src.infrastructure.database.repository import db_repository
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import (
     DAGConfigSaveRequest,
@@ -107,12 +112,24 @@ from src.core.gateway import (
 register_default_scenario_routes()
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifecycle manager: initialize database schemas and seeds on startup."""
+    try:
+        await db_repository.ensure_schema_and_seed()
+    except Exception as e:
+        import logging
+        logging.getLogger("uvicorn").warning(f"Database schema/seed check note: {e}")
+    yield
+
+
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Microkernel DAG Orchestration & Cross-Platform Telemetry Gateway for Super Individuals",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -634,6 +651,67 @@ async def claim_perk(payload: PerkClaimRequest):
         raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ==========================================
+# Authentication & Identity Endpoints
+# ==========================================
+@app.post(
+    f"{settings.api_prefix}/auth/register",
+    response_model=AuthSessionResponse,
+    status_code=201,
+    tags=["Auth & Identity"]
+)
+@app.post(
+    "/api/auth/register",
+    response_model=AuthSessionResponse,
+    status_code=201,
+    tags=["Auth & Identity"]
+)
+async def register_by_email(payload: UserRegisterRequest):
+    """Register a new maker account by email."""
+    try:
+        return await user_service.register_by_email(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post(
+    f"{settings.api_prefix}/auth/login",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"]
+)
+@app.post(
+    "/api/auth/login",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"]
+)
+async def login_by_email(payload: UserLoginRequest):
+    """Login with email and password to receive session token."""
+    try:
+        return await user_service.login_by_email(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=str(e))
+
+
+@app.get(
+    f"{settings.api_prefix}/auth/session",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"]
+)
+@app.get(
+    "/api/auth/session",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"]
+)
+async def get_current_session(token: str | None = None):
+    """Verify session token and retrieve current maker profile."""
+    if not token:
+        raise HTTPException(status_code=401, detail="Token is required")
+    res = await user_service.get_session_by_token(token)
+    if not res:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+    return res
 
 
 # ==========================================

@@ -35,3 +35,27 @@ class EntitlementActivateResponse(BaseModel):
     status: str = "ACTIVATED"
     receipt_no: str
     message: str
+
+
+class UserRegisterRequest(BaseModel):
+    email: str
+    password: str
+    nickname: Optional[str] = None
+    company_name: Optional[str] = None
+
+
+class UserLoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class AuthSessionResponse(BaseModel):
+    token: str
+    uid: str
+    email: str
+    nickname: str
+    role: str = "MAKER"
+    company_name: Optional[str] = None
+    tier_name: str = "标准创客"
+    message: str = "登录成功"
+
