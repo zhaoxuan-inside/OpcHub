@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>OpcHub — One Person Company Complete System Demo</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%230071E3'/><circle cx='16' cy='16' r='6' fill='%23ffffff'/></svg>">
   <style>
     /* -------------------------------------------------------------
        OpcHub Complete System — Apple VisionOS Liquid Glass Design
@@ -5318,6 +5319,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // -------------------------------------------------------------
     // SOP Document Generator & Backend Persistence Engine
     // -------------------------------------------------------------
+    let currentSopStep = 1;
     let currentSopTemplateId = "tpl_individual_biz_reg";
     let currentSavedDocId = null;
     let sopDebounceTimer = null;
@@ -5427,6 +5429,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     function setSopStep(stepNum) {
+      currentSopStep = stepNum;
       document.querySelectorAll('.sop-step-node').forEach((node, idx) => {
         if (idx + 1 === stepNum) {
           node.classList.add('active');
@@ -6587,12 +6590,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         const stepper = document.querySelector('.sop-stepper');
         if (stepper) {
           stepper.innerHTML = '';
+          const activeStep = (typeof currentSopStep !== 'undefined' ? currentSopStep : 1);
           data.stages.forEach(st => {
             const node = document.createElement('div');
-            node.className = `sop-step-node ${st.stage === currentSopStep ? 'active' : ''}`;
+            const isActive = st.stage === activeStep;
+            node.className = `sop-step-node ${isActive ? 'active' : ''}`;
             node.onclick = () => setSopStep(st.stage);
             node.innerHTML = `
-              <div style="font-family: var(--font-mono); font-size: 11px; color: ${st.stage === currentSopStep ? 'var(--accent)' : 'var(--text-tertiary)'};">阶段 0${st.stage}</div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: ${isActive ? 'var(--accent)' : 'var(--text-tertiary)'};">阶段 0${st.stage}</div>
               <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">${escapeHtml(st.name.replace(/^阶段\s*\d+:\s*/, ''))}</div>
             `;
             stepper.appendChild(node);

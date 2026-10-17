@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
@@ -163,6 +163,15 @@ async def serve_web_console():
                 },
             )
     return HTMLResponse("<h1>OpcHub Console</h1><p>Demo prototype file not found.</p>", status_code=200)
+
+
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0071E3"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>"""
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def serve_favicon():
+    """Serve lightweight SVG favicon for OpcHub Console to avoid 404 console errors."""
+    return Response(content=FAVICON_SVG, media_type="image/svg+xml")
 
 
 class ScriptValidationRequest(BaseModel):
