@@ -105,4 +105,16 @@ class ProductService:
         return prod
 
 
+    def delete_product(self, product_id: str) -> bool:
+        """Physically delete product for Saga reverse compensation."""
+        if product_id in self._products:
+            del self._products[product_id]
+            return True
+        return False
+
+    def clear(self) -> None:
+        """Reset products state for isolated test execution."""
+        self._products.clear()
+
+
 product_service = ProductService()

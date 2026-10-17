@@ -1336,10 +1336,13 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">超级个体产品橱窗</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
           </div>
-          <button class="btn-liquid" onclick="openPublishProductModal()" data-tooltip="发布独立产品至橱窗与首页打榜">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
-            <span>发布产品</span>
-          </button>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="productPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_PRODUCT_PUBLISH_PIPELINE</span>
+            <button class="btn-liquid" onclick="openPublishProductModal()" data-tooltip="发布独立产品至橱窗与首页打榜">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+              <span>发布</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -4076,58 +4079,49 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const url = document.getElementById('pubProductUrl').value.trim() || 'https://opchub.dev';
       const desc = document.getElementById('pubProductDesc').value.trim();
 
-      if (!title) {
-        showLiquidNotice('请填写产品名称', '产品作品名称不能为空，请输入清晰的作品全称。', 'WARNING');
+      if (!title || title.length < 2) {
+        showLiquidNotice('标题过短', '产品作品名称至少需要 2 个字。', 'WARNING');
+        return;
+      }
+      if (!tagline && !desc) {
+        showLiquidNotice('简介过短', '请填写作品一句话介绍或详细说明（至少 5 个字）。', 'WARNING');
         return;
       }
 
-      let prodId = 'prod_' + Date.now();
       const gwRes = await dispatchGateway('products.publish', {
         title: title,
         tagline: tagline || title,
-        description: desc || "独立创客自主研发商业作品",
+        description: desc || tagline || "独立创客自主研发商业作品",
         category: category.includes("AI") ? "AI" : category.includes("跨境") ? "SAAS" : "DEV",
         pricing_model: pricing,
         price_cny: price,
         demo_url: url,
         author_id: "usr_2026_opc_9981"
       });
-      if (gwRes.ok && gwRes.data) {
-        prodId = gwRes.data.id || prodId;
+
+      if (!gwRes.ok) {
+        showLiquidNotice('发布受阻', `编排流水线拦截: ${gwRes.error || '合规审查或校验未通过'}`, 'CRITICAL');
+        return;
       }
 
-      const grid = document.getElementById('productCardsGrid');
-      if (grid) {
-        const card = document.createElement('div');
-        card.className = 'glass-card';
-        card.innerHTML = `
-          <div>
-            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-              <span class="mono-tag">${escapeHtml(category)}</span>
-              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ 1 赞</span>
-            </div>
-            <h3 style="font-size: 17px; margin-bottom: 8px;">${escapeHtml(title)}</h3>
-            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
-              ${escapeHtml(tagline || desc || '独立创客商业作品')}
-            </p>
-          </div>
-          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">作者: @赵玄 (您)</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验产品" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(title)} 独立产品预览环境...', 'INFO')">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
-            </button>
-          </div>
-        `;
-        const first = grid.querySelector('.glass-card');
-        if (first) {
-          grid.insertBefore(card, first);
-        } else {
-          grid.appendChild(card);
-        }
-      }
+      const created = gwRes.data || {};
+      const prodId = created.id || ('prod_' + Date.now());
 
       closePublishProductModal();
-      showLiquidNotice('产品发布成功', `作品《${title}》已入驻产品橱窗并持久化保存至后端！\n作品ID: ${prodId}`, 'SUCCESS');
+      showLiquidNotice('产品发布成功', `微内核 DAG OPC_PRODUCT_PUBLISH_PIPELINE 编排执行完成！\n作品ID: ${prodId}`, 'SUCCESS');
+
+      // Refresh product list from backend
+      fetchProducts();
+    }
+
+    async function upvoteProduct(productId) {
+      const gwRes = await dispatchGateway('products.upvote', { product_id: productId });
+      if (!gwRes.ok) {
+        showLiquidNotice('点赞失败', gwRes.error || '无法完成作品打榜点赞', 'WARNING');
+        return;
+      }
+      showLiquidNotice('打榜成功', '已为该独立商用作品投出宝贵的创客赞同票！', 'SUCCESS');
+      fetchProducts();
     }
 
     // -------------------------------------------------------------
@@ -5841,9 +5835,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">作者: @${escapeHtml(p.author_id.substring(0, 12))}</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 ${escapeHtml(p.title)}" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(p.title)} 独立产品预览环境与创客主页...', 'INFO')">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
-            </button>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-liquid-outline" style="padding: 3px 8px; font-size: 11.5px;" data-tooltip="为作品打榜点赞" onclick="upvoteProduct('${p.id}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></svg>点赞
+              </button>
+              <button class="btn-liquid-outline" style="padding: 3px 8px; font-size: 11.5px;" data-tooltip="前往体验 ${escapeHtml(p.title)}" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(p.title)} 独立产品预览环境与创客主页...', 'INFO')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
+              </button>
+            </div>
           </div>
         `;
         grid.appendChild(card);

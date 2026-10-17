@@ -193,6 +193,31 @@ class OrchestrationService:
             )
         )
 
+        # 7. Product Showcase Publish DAG Pipeline: OPC_PRODUCT_PUBLISH_PIPELINE
+        topo_product_publish = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "product.validate_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "product.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "product.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_PRODUCT_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_product_publish,
+                status="ACTIVE",
+            )
+        )
+
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(

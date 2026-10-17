@@ -50,10 +50,9 @@ gateway:
     - scenario: "products.publish"
       version: "v1.0.0"
       domain: "products"
-      description: "发布新独立创客作品至橱窗"
+      description: "发布新独立创客作品至橱窗 (微内核 DAG 编排驱动)"
       is_default: true
-      handler: "src.domains.products.service.product_service:create_product"
-      model: "src.domains.products.models:ProductCreate"
+      handler: "src.core.gateway.adapters:product_publish_adapter"
 
     - scenario: "products.upvote"
       version: "v1.0.0"

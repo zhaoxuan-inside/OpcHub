@@ -401,6 +401,89 @@ class AtomicRegistry:
             }
         self.register("forum.telemetry.incr", forum_telemetry_incr, domain="forum", description="头脑风暴社区互动度量指标递增算子")
 
+        # Domain 7: Product Showcase Domain (产品橱窗微内核算子与 Saga 补偿)
+        async def product_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            title = inputs.get("title", "").strip()
+            tagline = inputs.get("tagline", "").strip()
+            desc = inputs.get("description", "").strip()
+            price = float(inputs.get("price_cny", 0.0))
+            if len(title) < 2:
+                raise ValueError("Product title must be at least 2 characters long")
+            if len(tagline) < 5 and len(desc) < 5:
+                raise ValueError("Product tagline or description must be at least 5 characters long")
+            if price < 0:
+                raise ValueError("Product price cannot be negative")
+            
+            # Content moderation check
+            full_text = f"{title} {tagline} {desc}"
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            for f in forbidden:
+                if f in full_text:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in product showcase")
+            
+            return {
+                "guard_passed": True,
+                "title": title,
+                "tagline": tagline,
+                "description": desc or tagline,
+                "category": inputs.get("category", "DEV"),
+                "pricing_model": inputs.get("pricing_model", "FREE" if price == 0 else "ONE_TIME"),
+                "price_cny": price,
+                "demo_url": inputs.get("demo_url", "https://opchub.dev"),
+                "author_id": inputs.get("author_id", "usr_maker_2026"),
+            }
+        self.register("product.validate_guard", product_validate_guard, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
+
+        async def product_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.products.service import product_service
+            from src.domains.products.models import ProductCreate
+            payload = ProductCreate(
+                author_id=inputs.get("author_id", "usr_maker_2026"),
+                title=inputs.get("title", ""),
+                tagline=inputs.get("tagline", ""),
+                description=inputs.get("description", "") or inputs.get("tagline", ""),
+                category=inputs.get("category", "DEV"),
+                pricing_model=inputs.get("pricing_model", "FREE"),
+                price_cny=float(inputs.get("price_cny", 0.0)),
+                demo_url=inputs.get("demo_url", "https://opchub.dev"),
+            )
+            created = product_service.create_product(payload)
+            return {
+                "product_id": created.id,
+                "created_product": created.model_dump(),
+                "status": "PUBLISHED",
+            }
+
+        async def product_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.products.service import product_service
+            product_id = inputs.get("product_id") or (inputs.get("created_product", {}).get("id"))
+            if product_id:
+                deleted = product_service.delete_product(product_id)
+                return {"product_id": product_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No product_id to rollback"}
+
+        self.register(
+            "product.persist",
+            product_persist,
+            domain="product",
+            description="产品橱窗独立商用作品持久化存储算子",
+            compensator=product_persist_compensate,
+        )
+
+        async def product_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            # Trigger downstream failure for Saga rollback verification if requested
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure to trigger Saga rollback")
+            product_id = inputs.get("product_id", "unknown")
+            return {
+                "telemetry_recorded": True,
+                "metric": "showcase.product.published",
+                "product_id": product_id,
+                "increment": 1,
+            }
+        self.register("product.telemetry.incr", product_telemetry_incr, domain="product", description="产品橱窗作品收录与度量打点算子")
+
+
 
 
     def _register_external_gateway_handlers(self):
