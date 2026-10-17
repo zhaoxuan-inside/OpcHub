@@ -185,6 +185,10 @@ flowchart TD
 2. **多端自适应 (Multi-Client Readiness)**：
    - API 输出标准 RESTful / JSON 契约；
    - 界面无横向滚动条，移动端排版体验完美，适配屏幕宽度 $360\text{px} \sim 2560\text{px}$。
-3. **内容时效与免责 (Legal & Compliance)**：
-   - 政策详情页强制展示：“政策信息由 AI 提炼自官方渠道，申报前请以官方最新发文为准”；
-   - 社区 UGC 内容具备敏感词过滤与一键举报处置通道。
+3. **全域合法合规与数据安全 (Legal & Compliance)**：
+   - 严格执行架构规约 [`hs_dev_docs/_03_architecture_design/_02_system_architecture/opchub_legal_compliance_spec.md`](file:///home/hardstone/Share/Common/CodeSpace/OpcHub/hs_dev_docs/_03_architecture_design/_02_system_architecture/opchub_legal_compliance_spec.md)；
+   - **政策采集安全**：仅采集 `gov.cn` 官方公开公文，严禁采集第三方商业数据库或涉密内部公文；限频低速错峰运行；
+   - **政策出处与免责**：政策卡片必须标明发文机构与官方原件链接，强制渲染法律免责提示，禁止假借官方机关名义背书；
+   - **UGC 内容治理**：敏感词 Trie 树前置拦截，前台一键举报直通 View 12 内容治理控制台，下架言论留痕存证，网络日志依法保留至少 180 天；
+   - **身份与协议**：严格落实后台手机号实名、前台发帖 IP 属地强制展示；用户协议与隐私政策禁止默认勾选；
+   - **金融防二清**：撮合交易款项与报酬全部对接持牌第三方支付机构分账，平台绝不设私有资金池。
