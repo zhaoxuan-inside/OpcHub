@@ -46,12 +46,12 @@
       --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", sans-serif;
       --font-mono: "SF Mono", "iA Writer Mono", "Menlo", monospace;
 
-      --blur-strength: blur(24px) saturate(190%);
+      --blur-strength: blur(14px) saturate(160%);
       --radius-sm: 8px;
       --radius-md: 14px;
       --radius-lg: 20px;
       --radius-full: 9999px;
-      --transition-liquid: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+      --transition-liquid: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
     }
 
     [data-theme="dark"] {
@@ -104,7 +104,7 @@
       transition: background-color 0.4s ease, color 0.4s ease;
     }
 
-    /* ---------------- Fluid Ambient Background ---------------- */
+    /* ---------------- Fluid Ambient Background (GPU Isolated) ---------------- */
     .ambient-container {
       position: fixed;
       top: 0;
@@ -114,48 +114,16 @@
       pointer-events: none;
       z-index: 0;
       overflow: hidden;
+      contain: strict;
+      transform: translate3d(0, 0, 0);
+      background: 
+        radial-gradient(circle at 12% 10%, var(--orb-1) 0%, transparent 45%),
+        radial-gradient(circle at 88% 35%, var(--orb-2) 0%, transparent 45%),
+        radial-gradient(circle at 35% 85%, var(--orb-3) 0%, transparent 45%);
     }
 
     .ambient-orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(90px);
-      opacity: 0.85;
-      animation: floatMotion 24s infinite alternate ease-in-out;
-    }
-
-    .orb-1 {
-      width: 650px;
-      height: 650px;
-      background: radial-gradient(circle, var(--orb-1) 0%, transparent 70%);
-      top: -100px;
-      left: -80px;
-    }
-
-    .orb-2 {
-      width: 750px;
-      height: 750px;
-      background: radial-gradient(circle, var(--orb-2) 0%, transparent 70%);
-      top: 30%;
-      right: -120px;
-      animation-duration: 28s;
-      animation-delay: -5s;
-    }
-
-    .orb-3 {
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, var(--orb-3) 0%, transparent 70%);
-      bottom: -120px;
-      left: 25%;
-      animation-duration: 30s;
-      animation-delay: -10s;
-    }
-
-    @keyframes floatMotion {
-      0% { transform: translate(0px, 0px) scale(1); }
-      50% { transform: translate(50px, 40px) scale(1.06); }
-      100% { transform: translate(-40px, 60px) scale(0.95); }
+      display: none;
     }
 
     /* ---------------- Navigation Bar & Sub-Bar ---------------- */
@@ -451,6 +419,7 @@
       position: relative;
       overflow: hidden;
       margin-bottom: 32px;
+      transform: translate3d(0, 0, 0);
       transition: var(--transition-liquid);
     }
 
@@ -473,6 +442,7 @@
       position: relative;
       overflow: hidden;
       cursor: pointer;
+      transform: translate3d(0, 0, 0);
       transition: var(--transition-liquid);
     }
 
@@ -5199,19 +5169,42 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     // -------------------------------------------------------------
-    // Dynamic Mouse Spotlight Lighting (悬停变亮跟随光效)
+    // Dynamic Mouse Spotlight Lighting (悬停变亮跟随光效 - 高性能 rAF 节流)
     // -------------------------------------------------------------
+    let _mouseLightingInitialized = false;
     function initMouseLighting() {
-      const items = document.querySelectorAll('.glass-card, .sitemap-card, .glass-box, .canvas-widget');
-      items.forEach(el => {
-        el.addEventListener('mousemove', (e) => {
-          const rect = el.getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          el.style.setProperty('--mouse-x', `${x}px`);
-          el.style.setProperty('--mouse-y', `${y}px`);
-        });
-      });
+      if (_mouseLightingInitialized) return;
+      _mouseLightingInitialized = true;
+
+      let currentTarget = null;
+      let cachedRect = null;
+      let rafId = null;
+
+      document.addEventListener('mousemove', (e) => {
+        const target = e.target.closest('.glass-card, .sitemap-card, .glass-box, .canvas-widget');
+        if (!target) {
+          currentTarget = null;
+          cachedRect = null;
+          return;
+        }
+
+        if (target !== currentTarget) {
+          currentTarget = target;
+          cachedRect = target.getBoundingClientRect();
+        }
+
+        if (!rafId) {
+          rafId = requestAnimationFrame(() => {
+            if (currentTarget && cachedRect) {
+              const x = e.clientX - cachedRect.left;
+              const y = e.clientY - cachedRect.top;
+              currentTarget.style.setProperty('--mouse-x', `${x}px`);
+              currentTarget.style.setProperty('--mouse-y', `${y}px`);
+            }
+            rafId = null;
+          });
+        }
+      }, { passive: true });
     }
     initMouseLighting();
 
@@ -6389,17 +6382,24 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     async function syncAllDataFromBackend() {
+      // Prioritize active view (home overview) for instant zero-jank initial paint
       fetchHomeOverview();
-      fetchForumThreads();
-      fetchProducts();
-      fetchPolicies();
-      fetchDemands();
-      fetchSopTemplates();
-      fetchPerks();
-      fetchUserProfile();
-      refreshOpsData();
-      refreshModerationList();
-      fetchComplianceData();
+
+      // Non-blocking idle prefetch for adjacent modules without saturating browser network
+      const prefetchIdle = () => {
+        fetchForumThreads();
+        fetchProducts();
+        fetchPolicies();
+        fetchDemands();
+        fetchSopTemplates();
+        fetchPerks();
+      };
+
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(prefetchIdle, { timeout: 2000 });
+      } else {
+        setTimeout(prefetchIdle, 800);
+      }
     }
 
     function initNavScroll() {
