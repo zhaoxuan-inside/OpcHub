@@ -253,37 +253,69 @@
     .nav-right-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .theme-btn {
+    .nav-icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: var(--radius-full);
       background: var(--glass-surface-subtle);
       border: 1px solid var(--glass-border);
       color: var(--text-primary);
-      border-radius: var(--radius-full);
-      padding: 4px 12px;
-      font-size: 12px;
-      font-family: var(--font-sans);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      justify-content: center;
+      position: relative;
       backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
       transition: var(--transition-liquid);
+      user-select: none;
+      flex-shrink: 0;
+      padding: 0;
     }
 
-    .theme-btn:hover {
-      transform: scale(1.03);
+    .nav-icon-btn:hover {
+      transform: scale(1.06);
+      background: var(--glass-surface-hover);
       border-color: var(--glass-border-hover);
       box-shadow: var(--glass-glow-halo);
+      color: var(--accent);
     }
 
-    .theme-dot {
-      width: 6px;
-      height: 6px;
+    .nav-icon-btn.active {
+      background: var(--accent-glass);
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 14px rgba(0, 113, 227, 0.35);
+    }
+
+    .nav-icon-btn svg {
+      width: 17px;
+      height: 17px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .nav-icon-btn:hover svg {
+      transform: scale(1.12);
+    }
+
+    .nav-user-badge {
+      position: absolute;
+      bottom: 2px;
+      right: 2px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent-glow);
+      background: #34C759;
+      border: 1.5px solid var(--bg-canvas);
+      box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
     }
 
     /* ---------------- Main View Container ---------------- */
@@ -979,16 +1011,22 @@
         <button class="nav-tab-btn" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
         <button class="nav-tab-btn" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
         <button class="nav-tab-btn" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
-        <button class="nav-tab-btn" onclick="switchView('user', this)" data-tooltip="创客档案管理与VIP收费权益中心">用户权益</button>
         <button class="nav-tab-btn" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台">后端编排</button>
         <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器">前端编排</button>
         <button class="nav-tab-btn" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示">运营大盘</button>
       </nav>
 
       <div class="nav-right-actions">
-        <button class="theme-btn" onclick="toggleTheme()" data-tooltip="切换视觉风格：深色液态玻璃 / 浅色通透玻璃">
-          <span class="theme-dot"></span>
-          <span id="themeLabel">深色模式</span>
+        <!-- Dark / Light Theme Icon Toggle -->
+        <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" data-tooltip="切换视觉风格 (深色 / 浅色)">
+          <svg id="themeIconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <svg id="themeIconSun" viewBox="0 0 24 24" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+        </button>
+
+        <!-- User Profile & Entitlements Icon Button -->
+        <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)" data-tooltip="创客档案与权益中心 (管理用户信息)">
+          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span class="nav-user-badge" title="企业创客已认证"></span>
         </button>
       </div>
     </div>
@@ -1520,35 +1558,72 @@
         </p>
 
         <div class="grid-2" style="align-items: start;">
-          <!-- Left: User Profile -->
+          <!-- Left: User Profile & Management -->
           <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-              <h3 style="font-size: 16px;">创客基本信息档案</h3>
-              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: USER (普通创客)</span>
+            <!-- Avatar & Identity Pill -->
+            <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 14px 16px; background: var(--glass-surface); border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
+              <div style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, var(--accent), #5856D6); display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: #fff; position: relative; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35);">
+                ZX
+                <span style="position: absolute; bottom: 0; right: 0; width: 13px; height: 13px; border-radius: 50%; background: #34C759; border: 2.5px solid var(--bg-canvas);"></span>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <span style="font-size: 15.5px; font-weight: 600;">赵玄 (Zhao Xuan)</span>
+                  <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759;">已认证主体</span>
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px;">UID: usr_2026_opc_9981 · 黑钻创客</div>
+              </div>
+              <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="showLiquidNotice('头像更新', '创客专属液态毛玻璃头像已同步更新！', 'SUCCESS')" data-tooltip="更新创客个人头像"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>更换头像</button>
             </div>
-            <div class="form-group">
-              <label class="form-label">用户绑定 UID</label>
-              <input type="text" class="glass-input" value="usr_2026_opc_9981" disabled style="opacity: 0.7;">
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
+              <h3 style="font-size: 15px; font-weight: 600;">创客基本信息与主体档案</h3>
+              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: SUPER INDIVIDUAL</span>
             </div>
+
+            <div class="grid-2" style="gap: 12px; margin-bottom: 0;">
+              <div class="form-group">
+                <label class="form-label">创客真实姓名</label>
+                <input type="text" class="glass-input" value="赵玄">
+              </div>
+              <div class="form-group">
+                <label class="form-label">绑定联系手机</label>
+                <input type="text" class="glass-input" value="138-0010-8888">
+              </div>
+            </div>
+
             <div class="form-group">
-              <label class="form-label">创客昵称 / 电子邮箱</label>
+              <label class="form-label">创客电子邮箱 (已完成安全认证)</label>
               <input type="text" class="glass-input" value="zhaoxuan@opchub.com">
             </div>
+
             <div class="form-group">
-              <label class="form-label">绑定企业统一社会信用代码</label>
+              <label class="form-label">绑定统一社会信用代码</label>
               <input type="text" class="glass-input" value="92330106MA2XXXXXX">
             </div>
-            <button class="btn-liquid" style="margin-top: 8px;" onclick="showLiquidNotice('创客档案保存', '创客企业信用代码与基本信息档案已成功更新至云端数据库！', 'SUCCESS')" data-tooltip="保存创客个人基本档案与企业信用代码"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
+
+            <div class="form-group">
+              <label class="form-label">经营主体全称</label>
+              <input type="text" class="glass-input" value="极客视界（杭州）信息技术工作室">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 14px;">
+              <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="showLiquidNotice('创客档案保存', '创客企业信用代码与基本信息档案已成功更新至后端数据库！', 'SUCCESS')" data-tooltip="保存创客个人基本档案与企业信用代码"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
+              <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="showLiquidNotice('重置表单', '档案填报项已重置为最近一次云端保存版本。', 'INFO')" data-tooltip="放弃修改并还原为云端原始档案"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重置信息</button>
+            </div>
           </div>
 
           <!-- Right: Entitlements Switcher & Monetization -->
           <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
-            <h3 style="font-size: 16px; margin-bottom: 16px;">收费权益与专属功能开关</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+              <h3 style="font-size: 15px; font-weight: 600;">收费权益与专属功能开关</h3>
+              <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">VIP ACTIVE</span>
+            </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
               <div>
-                <div style="font-weight: 600; font-size: 14px;">政策雷达全量深度内参 (ENT_POL_VIP)</div>
-                <div style="font-size: 12px; color: var(--text-secondary);">包含政策原文对照、长三角直通车辅导</div>
+                <div style="font-weight: 600; font-size: 13.5px;">政策雷达全量深度内参 (ENT_POL_VIP)</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">包含政策原文对照、长三角直通车辅导</div>
               </div>
               <label class="switch-toggle">
                 <input type="checkbox" checked onchange="toggleFeature(this, 'ENT_POL_VIP')">
@@ -1558,8 +1633,8 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
               <div>
-                <div style="font-weight: 600; font-size: 14px;">高级商机线索与需求竞标 (ENT_BIZ_LEADS)</div>
-                <div style="font-size: 12px; color: var(--text-secondary);">解锁外包集市客户直连电话与资金托管通道</div>
+                <div style="font-weight: 600; font-size: 13.5px;">高级商机线索与需求竞标 (ENT_BIZ_LEADS)</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">解锁外包集市客户直连电话与资金托管通道</div>
               </div>
               <label class="switch-toggle">
                 <input type="checkbox" onchange="toggleFeature(this, 'ENT_BIZ_LEADS')">
@@ -1569,8 +1644,8 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
               <div>
-                <div style="font-weight: 600; font-size: 14px;">出海 Stripe 0.4% 超级费率特权 (ENT_STRIPE_PERK)</div>
-                <div style="font-size: 12px; color: var(--text-secondary);">每年节省超 1.2 万元跨境结汇手续费</div>
+                <div style="font-weight: 600; font-size: 13.5px;">出海 Stripe 0.4% 超级费率特权 (ENT_STRIPE_PERK)</div>
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">每年节省超 1.2 万元跨境结汇手续费</div>
               </div>
               <label class="switch-toggle">
                 <input type="checkbox" onchange="toggleFeature(this, 'ENT_STRIPE_PERK')">
@@ -1578,7 +1653,20 @@
               </label>
             </div>
 
-            <div style="margin-top: 20px; text-align: right;">
+            <!-- API Credentials Box -->
+            <div style="margin-top: 18px; padding: 14px; background: var(--glass-surface); border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">微内核 API 访问凭据 (Developer Key)</span>
+                <span class="mono-tag" style="font-size: 10px;">READ/WRITE</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="password" class="glass-input" value="opc_live_9981_77a94fa10b9c3e" readonly style="font-family: var(--font-mono); font-size: 12px; padding: 6px 10px; margin: 0;">
+                <button class="btn-liquid-outline" style="padding: 6px 12px; font-size: 12px;" onclick="showLiquidNotice('复制成功', '创客专属微内核网关 API Token 已复制至剪贴板！', 'SUCCESS')" data-tooltip="复制创客专属微内核调用私钥"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制密钥</button>
+                <button class="btn-liquid-outline" style="padding: 6px 12px; font-size: 12px;" onclick="showLiquidNotice('密钥重置', '微内核网关 API 凭证已重新签发，旧密钥已即刻作废！', 'WARNING')" data-tooltip="重新生成微内核网关私钥"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>重置密钥</button>
+              </div>
+            </div>
+
+            <div style="margin-top: 18px; text-align: right;">
               <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)" data-tooltip="升级开通创客年度全权益黑钻通行证 (¥999/年)">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>升级黑钻
               </button>
@@ -2858,17 +2946,22 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         target.classList.add('active');
       }
 
+      // Update both nav tabs and icon buttons
+      document.querySelectorAll('.nav-tab-btn, .nav-icon-btn').forEach(b => b.classList.remove('active'));
+
       if (btnElement) {
-        document.querySelectorAll('.nav-tab-btn').forEach(b => b.classList.remove('active'));
         btnElement.classList.add('active');
       } else {
-        // Find corresponding button
-        document.querySelectorAll('.nav-tab-btn').forEach(b => {
-          if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${viewName}'`)) {
-            document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
-            b.classList.add('active');
-          }
-        });
+        if (viewName === 'user') {
+          const userBtn = document.getElementById('userProfileNavBtn');
+          if (userBtn) userBtn.classList.add('active');
+        } else {
+          document.querySelectorAll('.nav-tab-btn').forEach(b => {
+            if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${viewName}'`)) {
+              b.classList.add('active');
+            }
+          });
+        }
       }
 
       if (viewName === 'backend-orch') {
@@ -2882,23 +2975,29 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     // -------------------------------------------------------------
-    // Liquid Glass Theme Controller (Light / Dark)
+    // Liquid Glass Theme Controller (Light / Dark via SVG Icon)
     // -------------------------------------------------------------
     function toggleTheme() {
       const current = document.documentElement.getAttribute('data-theme');
       const target = current === 'dark' ? 'light' : 'dark';
       document.documentElement.setAttribute('data-theme', target);
       localStorage.setItem('opchub_complete_theme', target);
-      updateThemeLabel(target);
+      updateThemeIcon(target);
       renderDagEdges();
     }
 
-    function updateThemeLabel(theme) {
-      const label = document.getElementById('themeLabel');
+    function updateThemeIcon(theme) {
+      const moon = document.getElementById('themeIconMoon');
+      const sun = document.getElementById('themeIconSun');
+      const btn = document.getElementById('themeToggleBtn');
       if (theme === 'dark') {
-        label.textContent = '浅色模式';
+        if (moon) moon.style.display = 'none';
+        if (sun) sun.style.display = 'block';
+        if (btn) btn.setAttribute('data-tooltip', '切换为浅色通透模式');
       } else {
-        label.textContent = '深色模式';
+        if (moon) moon.style.display = 'block';
+        if (sun) sun.style.display = 'none';
+        if (btn) btn.setAttribute('data-tooltip', '切换为深色液态模式');
       }
     }
 
@@ -2906,10 +3005,12 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const saved = localStorage.getItem('opchub_complete_theme');
       if (saved) {
         document.documentElement.setAttribute('data-theme', saved);
-        updateThemeLabel(saved);
+        updateThemeIcon(saved);
       } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
         document.documentElement.setAttribute('data-theme', 'dark');
-        updateThemeLabel('dark');
+        updateThemeIcon('dark');
+      } else {
+        updateThemeIcon('light');
       }
     })();
 
