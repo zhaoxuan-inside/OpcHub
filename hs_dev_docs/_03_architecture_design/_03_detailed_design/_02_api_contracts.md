@@ -361,4 +361,14 @@ api_contract:
 - `POST /api/v1/frontend/layouts`: 保存前端 24 栅格低代码画布布局配置。
 - `GET /api/v1/frontend/layouts`: 加载最新发布的前端画布布局配置。
 
+### 1.12 管理员网页违规言论处理与下架接口 (`GET/POST /api/v1/admin/moderation/...`)
+- `GET /api/v1/admin/moderation/items`: 管理员查询全站被举报或系统监测标记的待审言论清单。
+  - **响应 Schema**：`List[ModerationItemResponse]` (含 item_id, target_type, target_id, author_id, author_name, snippet_content, violation_type, status, reported_at)
+- `POST /api/v1/admin/moderation/takedown`: 执行违规言论下架处置。
+  - **请求载荷**：`{ "item_id": "mod-1", "reason": "涉嫌商业机密泄露与灰产倒卖", "moderator_id": "admin_001", "ban_author": false }`
+  - **响应 Schema**：`{ "item_id": "mod-1", "status": "TAKEN_DOWN", "moderated_at": "2026-10-17T00:30:00Z", "note": "言论已全站下架" }`
+- `POST /api/v1/admin/moderation/restore`: 撤销下架处罚，恢复正常展示。
+  - **请求载荷**：`{ "item_id": "mod-1", "moderator_id": "admin_001" }`
+  - **响应 Schema**：`{ "item_id": "mod-1", "status": "NORMAL", "moderated_at": "2026-10-17T00:30:00Z" }`
+
 

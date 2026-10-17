@@ -318,6 +318,53 @@
       box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
     }
 
+    .nav-role-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      border-radius: var(--radius-full);
+      background: var(--glass-surface-subtle);
+      border: 1px solid var(--glass-border);
+      color: var(--text-primary);
+      font-size: 11.5px;
+      font-weight: 500;
+      cursor: pointer;
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      transition: var(--transition-liquid);
+      user-select: none;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .nav-role-badge:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-glow-halo);
+    }
+
+    .role-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #34C759;
+      box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
+      transition: background 0.25s ease;
+    }
+
+    .nav-role-badge.admin-active .role-dot {
+      background: #FF9500;
+      box-shadow: 0 0 6px rgba(255, 149, 0, 0.8);
+    }
+
+    .nav-role-badge.admin-active {
+      border-color: rgba(255, 149, 0, 0.4);
+      background: rgba(255, 149, 0, 0.08);
+      color: #FF9500;
+    }
+
     /* ---------------- Main View Container ---------------- */
     main {
       position: relative;
@@ -997,26 +1044,36 @@
   <!-- Sticky Liquid Navigation -->
   <header>
     <div class="nav-glass-bar">
-      <div class="brand-group" onclick="switchView('home')">
+      <div class="brand-group" onclick="switchView(currentUserRole === 'ADMIN' ? 'ops' : 'home')">
         <div class="brand-mark"></div>
         <span class="brand-name">OpcHub</span>
-        <span class="brand-tag">OS 2.0</span>
+        <span class="brand-tag" id="brandTagRole">OS 2.0</span>
       </div>
 
-      <nav class="nav-tabs">
-        <button class="nav-tab-btn active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
-        <button class="nav-tab-btn" onclick="switchView('forum', this)" data-tooltip="创客社区交流、实战经验与踩坑问答">创客贴吧</button>
-        <button class="nav-tab-btn" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
-        <button class="nav-tab-btn" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
-        <button class="nav-tab-btn" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
-        <button class="nav-tab-btn" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
-        <button class="nav-tab-btn" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
-        <button class="nav-tab-btn" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台">后端编排</button>
-        <button class="nav-tab-btn" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器">前端编排</button>
-        <button class="nav-tab-btn" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示">运营大盘</button>
+      <nav class="nav-tabs" id="mainNavTabs">
+        <!-- Maker / User Only Tabs (管理员不可见) -->
+        <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)" data-tooltip="创客社区交流、实战经验与踩坑问答">创客贴吧</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
+
+        <!-- Administrator Only Tabs (普通用户不可见，且不能与其他页面同时存在) -->
+        <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台" style="display: none;">后端编排</button>
+        <button class="nav-tab-btn tab-admin-only" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器" style="display: none;">前端编排</button>
+        <button class="nav-tab-btn tab-admin-only" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示" style="display: none;">运营大盘</button>
+        <button class="nav-tab-btn tab-admin-only" onclick="switchView('moderation', this)" data-tooltip="违规违法言论监控、审核与全网下架" style="display: none;">内容治理</button>
       </nav>
 
       <div class="nav-right-actions">
+        <!-- Role Switcher (创客视角 / 管理视角) -->
+        <button class="nav-role-badge" id="roleToggleBtn" onclick="toggleUserRole()" data-tooltip="点击在创客视角与管理员视角之间切换">
+          <span class="role-dot" id="roleDot"></span>
+          <span id="roleLabel">创客视角</span>
+        </button>
+
         <!-- Dark / Light Theme Icon Toggle -->
         <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" data-tooltip="切换视觉风格 (深色 / 浅色)">
           <svg id="themeIconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
@@ -1574,6 +1631,20 @@
                 <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px;">UID: usr_2026_opc_9981 · 黑钻创客</div>
               </div>
               <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="showLiquidNotice('头像更新', '创客专属液态毛玻璃头像已同步更新！', 'SUCCESS')" data-tooltip="更新创客个人头像"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>更换头像</button>
+            </div>
+
+            <!-- Workspace Role Switcher Card -->
+            <div style="background: var(--glass-surface); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+              <div>
+                <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
+                  <span>当前工作区身份:</span>
+                  <span id="userRoleBadgeText" style="color: var(--accent); font-family: var(--font-mono);">普通创客 (USER)</span>
+                </div>
+                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                  管理员独占编排、运营与内容治理；创客独占贴吧与业务流。
+                </div>
+              </div>
+              <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="toggleUserRole()" data-tooltip="切换当前工作区权限视角"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><span id="userRoleBtnText">切换管理</span></button>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
@@ -2505,6 +2576,182 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         </div>
       </div>
     </div>
+
+    <!-- ==========================================
+         VIEW 12: 网页违规内容处理与言论下架控制台 (Content Moderation & Speech Takedown)
+         ========================================== -->
+    <div id="view-moderation" class="view-panel">
+      <!-- Top Title & Global Controls -->
+      <div class="glass-box" style="padding: 24px 32px 18px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
+              <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">ADMIN CONTENT GOVERNANCE</span>
+              <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">POLICY ENGINE: ACTIVE</span>
+            </div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">网页违规内容处理与言论下架控制台</h1>
+            <p style="font-size: 13px; color: var(--text-secondary); max-width: 780px;">
+              专供平台管理员监控与处置全网创客贴吧、需求集市与评论交流区。对涉嫌违法违规、侵犯商业秘密、虚假偷逃税宣传或恶意灰产引流的言论执行一键全网下架及作者封禁。
+            </p>
+          </div>
+
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button class="btn-liquid" onclick="refreshModerationList()" data-tooltip="刷新最新违规言论待审队列">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+              <span>刷新清单</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Summary Cards -->
+        <div class="grid-4" style="margin-top: 20px; gap: 16px;">
+          <div class="glass-card" style="padding: 16px 20px;">
+            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">待处置违规言论</div>
+            <div style="font-size: 24px; font-weight: 700; color: #FF9500; margin: 4px 0;" id="modCountFlagged">2 条</div>
+            <div style="font-size: 11px; color: var(--text-tertiary);">需人工管理员介入核验</div>
+          </div>
+          <div class="glass-card" style="padding: 16px 20px;">
+            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">今日已执行下架</div>
+            <div style="font-size: 24px; font-weight: 700; color: #FF3B30; margin: 4px 0;" id="modCountTakenDown">2 条</div>
+            <div style="font-size: 11px; color: #34C759;">已全网屏蔽并留痕审计</div>
+          </div>
+          <div class="glass-card" style="padding: 16px 20px;">
+            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">违规内容拦截率</div>
+            <div style="font-size: 24px; font-weight: 700; color: #34C759; margin: 4px 0;">99.2%</div>
+            <div style="font-size: 11px; color: var(--text-tertiary);">包含微内核关键词过滤</div>
+          </div>
+          <div class="glass-card" style="padding: 16px 20px;">
+            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">平均处置响应时延</div>
+            <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin: 4px 0;">1.8 分钟</div>
+            <div style="font-size: 11px; color: var(--text-tertiary);">自动化哨兵与即时审核</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Moderation Filter Tabs & Item List -->
+      <div class="glass-box" style="padding: 24px 32px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; gap: 8px;">
+            <button class="nav-tab-btn active" id="modTabAll" onclick="filterModerationItems('ALL', this)" data-tooltip="显示全部言论">全部言论</button>
+            <button class="nav-tab-btn" id="modTabFlagged" onclick="filterModerationItems('FLAGGED', this)" data-tooltip="仅看待下架审核言论">待审言论</button>
+            <button class="nav-tab-btn" id="modTabTakenDown" onclick="filterModerationItems('TAKEN_DOWN', this)" data-tooltip="仅看已下架屏蔽言论">已下架</button>
+          </div>
+          <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">AUDIT LOG RECORDED · 违规言论即刻全网屏蔽</span>
+        </div>
+
+        <div id="moderationListContainer" style="display: flex; flex-direction: column; gap: 16px;">
+          <!-- Item 1: FLAGGED -->
+          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-101" style="padding: 20px; border-left: 4px solid #FF9500;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">商业机密泄露</span>
+                <span class="mono-tag" style="background: var(--glass-surface-subtle);">创客贴吧 · 帖子</span>
+                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-101 · 目标: th_viol_01</span>
+              </div>
+              <span class="mono-tag" id="modStatus-mod-101" style="background: rgba(255, 149, 0, 0.2); color: #FF9500; font-weight: 600;">● 待下架 (FLAGGED)</span>
+            </div>
+
+            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px;">
+              出售未经脱敏的某大厂内网 API 鉴权私钥及爬虫套件，支持大批量导出企业画像数据...
+            </div>
+
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+              涉嫌原因: 涉嫌商业机密泄露与非法倒卖 API 鉴权私钥 · 举报人: 社区安全哨兵系统
+            </p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">作者: 匿名外包工作室 (usr_leak_0821) · 举报时间: 12分钟前</span>
+              <div style="display: flex; gap: 8px;" id="modActions-mod-101">
+                <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-101', '泄露商业机密与非法倒卖API私钥')" data-tooltip="下架该违规言论并向全网隐藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>下架言论</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-101', '恶意泄露商业秘密，封禁作者', true)" data-tooltip="封禁该违规作者发帖权限"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>封禁作者</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 2: TAKEN_DOWN -->
+          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-102" style="padding: 20px; border-left: 4px solid #FF3B30;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">涉税违法欺诈</span>
+                <span class="mono-tag" style="background: var(--glass-surface-subtle);">政策雷达 · 评论</span>
+                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-102 · 目标: cm_viol_02</span>
+              </div>
+              <span class="mono-tag" id="modStatus-mod-102" style="background: rgba(255, 59, 48, 0.2); color: #FF3B30; font-weight: 600;">● 已下架 (TAKEN_DOWN)</span>
+            </div>
+
+            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px; text-decoration: line-through; opacity: 0.85;">
+              保证月入十万！加 V 信 138XXXX 一对一包过工商免征偷逃税，买发票冲抵进项全套服务...
+            </div>
+
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+              涉嫌原因: 虚假违规宣传与涉税违法黑产引流 · 执行人: admin_001
+            </p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">作者: 财税黑中介 (usr_tax_fake_33) · 下架时间: 今日 07:00</span>
+              <div style="display: flex; gap: 8px;" id="modActions-mod-102">
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-102')" data-tooltip="撤销处罚并恢复言论正常展示"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>恢复展示</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 3: TAKEN_DOWN -->
+          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-103" style="padding: 20px; border-left: 4px solid #FF3B30;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">外汇违法洗钱</span>
+                <span class="mono-tag" style="background: var(--glass-surface-subtle);">生态特权 · 评论</span>
+                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-103 · 目标: cm_viol_03</span>
+              </div>
+              <span class="mono-tag" id="modStatus-mod-103" style="background: rgba(255, 59, 48, 0.2); color: #FF3B30; font-weight: 600;">● 已下架 (TAKEN_DOWN)</span>
+            </div>
+
+            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px; text-decoration: line-through; opacity: 0.85;">
+              跨境洗钱与地下钱庄结汇免审查通道，支持高频 USDT 变现直达境内个人卡...
+            </div>
+
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+              涉嫌原因: 外汇违法及地下钱庄非法结汇 · 执行人: admin_001
+            </p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">作者: 离岸黑产号 (usr_wash_9912) · 下架时间: 今日 05:35</span>
+              <div style="display: flex; gap: 8px;" id="modActions-mod-103">
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-103')" data-tooltip="撤销处罚并恢复言论正常展示"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>恢复展示</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Item 4: FLAGGED -->
+          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-104" style="padding: 20px; border-left: 4px solid #FF9500;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">作弊刷量灌水</span>
+                <span class="mono-tag" style="background: var(--glass-surface-subtle);">产品橱窗 · 评价</span>
+                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-104 · 目标: pr_viol_04</span>
+              </div>
+              <span class="mono-tag" id="modStatus-mod-104" style="background: rgba(255, 149, 0, 0.2); color: #FF9500; font-weight: 600;">● 待下架 (FLAGGED)</span>
+            </div>
+
+            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px;">
+              低价承接贴吧热帖批量刷赞、虚假点赞刷量与竞标霸榜脚本，秒杀同行...
+            </div>
+
+            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
+              涉嫌原因: 作弊刷量与恶意竞争垃圾灌水 · 举报人: 创客自律委员会
+            </p>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">作者: 黑灰脚本号 (usr_bot_4490) · 举报时间: 25分钟前</span>
+              <div style="display: flex; gap: 8px;" id="modActions-mod-104">
+                <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-104', '作弊刷量恶意灌水')" data-tooltip="下架该违规言论并向全网隐藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>下架言论</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-104', '恶意刷量，封禁账号', true)" data-tooltip="封禁该违规作者发帖权限"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>封禁作者</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- Reusable Entitlement & Payment Modal Sheet -->
@@ -2938,6 +3185,16 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // View Switcher (Router)
     // -------------------------------------------------------------
     function switchView(viewName, btnElement) {
+      // Role-based Access Guard
+      const adminOnlyViews = ['backend-orch', 'frontend-orch', 'ops', 'moderation'];
+      const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks'];
+
+      if (currentUserRole === 'ADMIN' && userOnlyViews.includes(viewName)) {
+        viewName = 'ops';
+      } else if (currentUserRole === 'USER' && adminOnlyViews.includes(viewName)) {
+        viewName = 'home';
+      }
+
       document.querySelectorAll('.view-panel').forEach(panel => {
         panel.classList.remove('active');
       });
@@ -3013,6 +3270,297 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         updateThemeIcon('light');
       }
     })();
+
+    // -------------------------------------------------------------
+    // Workspace Role Controller (创客端 vs 管理端 绝对权限隔离)
+    // -------------------------------------------------------------
+    let currentUserRole = localStorage.getItem('opchub_current_role') || 'USER';
+
+    function updateUserRoleUI(silent = true) {
+      const userTabs = document.querySelectorAll('.tab-user-only');
+      const adminTabs = document.querySelectorAll('.tab-admin-only');
+      const roleDot = document.getElementById('roleDot');
+      const roleLabel = document.getElementById('roleLabel');
+      const roleToggleBtn = document.getElementById('roleToggleBtn');
+      const userRoleBadgeText = document.getElementById('userRoleBadgeText');
+      const userRoleBtnText = document.getElementById('userRoleBtnText');
+
+      if (currentUserRole === 'ADMIN') {
+        userTabs.forEach(t => t.style.setProperty('display', 'none', 'important'));
+        adminTabs.forEach(t => t.style.setProperty('display', 'inline-flex', 'important'));
+        
+        if (roleDot) roleDot.classList.add('admin');
+        if (roleLabel) roleLabel.textContent = '管理视角';
+        if (roleToggleBtn) roleToggleBtn.setAttribute('data-tooltip', '当前处于管理视角（点击切换为创客视角）');
+        if (userRoleBadgeText) userRoleBadgeText.textContent = '平台管理员 (ADMIN)';
+        if (userRoleBtnText) userRoleBtnText.textContent = '切换创客';
+
+        // Check active view: if current view is a user-only view, redirect to 'ops'
+        const currentActivePanel = document.querySelector('.view-panel.active');
+        const activeId = currentActivePanel ? currentActivePanel.id.replace('view-', '') : '';
+        const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks'];
+        if (userOnlyViews.includes(activeId)) {
+          switchView('ops');
+        }
+      } else {
+        userTabs.forEach(t => t.style.setProperty('display', 'inline-flex', 'important'));
+        adminTabs.forEach(t => t.style.setProperty('display', 'none', 'important'));
+
+        if (roleDot) roleDot.classList.remove('admin');
+        if (roleLabel) roleLabel.textContent = '创客视角';
+        if (roleToggleBtn) roleToggleBtn.setAttribute('data-tooltip', '当前处于创客视角（点击切换为管理视角）');
+        if (userRoleBadgeText) userRoleBadgeText.textContent = '普通创客 (USER)';
+        if (userRoleBtnText) userRoleBtnText.textContent = '切换管理';
+
+        // Check active view: if current view is an admin-only view, redirect to 'home'
+        const currentActivePanel = document.querySelector('.view-panel.active');
+        const activeId = currentActivePanel ? currentActivePanel.id.replace('view-', '') : '';
+        const adminOnlyViews = ['backend-orch', 'frontend-orch', 'ops', 'moderation'];
+        if (adminOnlyViews.includes(activeId)) {
+          switchView('home');
+        }
+      }
+    }
+
+    function toggleUserRole() {
+      currentUserRole = (currentUserRole === 'USER' ? 'ADMIN' : 'USER');
+      localStorage.setItem('opchub_current_role', currentUserRole);
+      updateUserRoleUI(false);
+      if (currentUserRole === 'ADMIN') {
+        showLiquidNotice('工作区切换', '已切换至【管理视角】！\n工作区仅展示：后端编排、前端编排、运营大盘、内容治理。\n普通创客业务页面已物理隔离并完全隐藏。', 'SUCCESS');
+      } else {
+        showLiquidNotice('工作区切换', '已切换至【创客视角】！\n工作区仅展示：首页、贴吧、产品、政策、需求、文书与特权。\n管理端编排及治理页面已物理隔离并完全隐藏。', 'SUCCESS');
+      }
+    }
+
+    // -------------------------------------------------------------
+    // Content Moderation Controller (违规言论全网下架与治理引擎)
+    // -------------------------------------------------------------
+    let moderationState = {
+      filter: 'ALL',
+      items: {
+        'mod-101': {
+          id: 'mod-101',
+          target_type: 'FORUM_POST',
+          target_id: 'th_viol_01',
+          status: 'FLAGGED',
+          title: '出售未经脱敏的某大厂内网 API 鉴权私钥及爬虫套件，支持大批量导出企业画像数据...',
+          violation_type: '商业机密泄露',
+          source: '创客贴吧 · 帖子',
+          author: '匿名外包工作室 (usr_leak_0821)',
+          reason: '涉嫌商业机密泄露与非法倒卖 API 鉴权私钥',
+          reporter: '社区安全哨兵系统',
+          time: '12分钟前',
+          takedown_reason: null,
+          operator: null
+        },
+        'mod-102': {
+          id: 'mod-102',
+          target_type: 'FORUM_COMMENT',
+          target_id: 'cm_viol_02',
+          status: 'TAKEN_DOWN',
+          title: '保证月入十万！加 V 信 138XXXX 一对一包过工商免征偷逃税，买发票冲抵进项全套服务...',
+          violation_type: '涉税违法欺诈',
+          source: '政策雷达 · 评论',
+          author: '财税黑中介 (usr_tax_fake_33)',
+          reason: '虚假违规宣传与涉税违法黑产引流',
+          reporter: '创客自律委员会',
+          time: '今日 07:00',
+          takedown_reason: '虚假宣传涉税欺诈',
+          operator: 'admin_001'
+        },
+        'mod-103': {
+          id: 'mod-103',
+          target_type: 'COMMENT',
+          target_id: 'cm_viol_03',
+          status: 'TAKEN_DOWN',
+          title: '跨境洗钱与地下钱庄结汇免审查通道，支持高频 USDT 变现直达境内个人卡...',
+          violation_type: '外汇违法洗钱',
+          source: '生态特权 · 评论',
+          author: '离岸黑产号 (usr_wash_9912)',
+          reason: '外汇违法及地下钱庄非法结汇',
+          reporter: '微内核合规哨兵',
+          time: '今日 05:35',
+          takedown_reason: '外汇洗钱违规',
+          operator: 'admin_001'
+        },
+        'mod-104': {
+          id: 'mod-104',
+          target_type: 'REVIEW',
+          target_id: 'pr_viol_04',
+          status: 'FLAGGED',
+          title: '低价承接贴吧热帖批量刷赞、虚假点赞刷量与竞标霸榜脚本，秒杀同行...',
+          violation_type: '作弊刷量灌水',
+          source: '产品橱窗 · 评价',
+          author: '黑灰脚本号 (usr_bot_4490)',
+          reason: '作弊刷量与恶意竞争垃圾灌水',
+          reporter: '创客自律委员会',
+          time: '25分钟前',
+          takedown_reason: null,
+          operator: null
+        }
+      }
+    };
+
+    function updateModerationStats() {
+      let flaggedCount = 0;
+      let takenDownCount = 0;
+      Object.values(moderationState.items).forEach(item => {
+        if (item.status === 'FLAGGED') flaggedCount++;
+        if (item.status === 'TAKEN_DOWN') takenDownCount++;
+      });
+      const flaggedEl = document.getElementById('modCountFlagged');
+      const takenEl = document.getElementById('modCountTakenDown');
+      if (flaggedEl) flaggedEl.textContent = `${flaggedCount} 条`;
+      if (takenEl) takenEl.textContent = `${takenDownCount} 条`;
+    }
+
+    async function takedownModerationItem(id, reason, banAuthor = false) {
+      const item = moderationState.items[id];
+      if (!item) return;
+
+      const payload = {
+        item_id: id,
+        operator_id: "admin_001",
+        operator_name: "系统安全管理员",
+        takedown_reason: reason || "违反国家法律法规与平台社区公约",
+        ban_author: banAuthor
+      };
+
+      try {
+        await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/takedown", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        // Fallback for standalone demo mode
+      }
+
+      item.status = 'TAKEN_DOWN';
+      item.takedown_reason = reason;
+      item.operator = 'admin_001';
+
+      renderModerationCard(id);
+      updateModerationStats();
+      filterModerationCardsUI();
+
+      const banNotice = banAuthor ? '\n同时已对该违规作者账号执行全网发帖封禁处置！' : '';
+      showLiquidNotice('言论下架成功', `【下架已生效】\n言论编号: ${id}\n下架原因: ${reason}\n该条违规言论已自全站彻底下架屏蔽，外网爬虫已阻断。${banNotice}`, 'SUCCESS');
+    }
+
+    async function restoreModerationItem(id) {
+      const item = moderationState.items[id];
+      if (!item) return;
+
+      const payload = {
+        item_id: id,
+        operator_id: "admin_001",
+        restore_reason: "经管理员人工复核无实质合规风险，予以恢复展示"
+      };
+
+      try {
+        await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/restore", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+      } catch (err) {
+        // Fallback for standalone demo mode
+      }
+
+      item.status = 'FLAGGED';
+      item.takedown_reason = null;
+      item.operator = null;
+
+      renderModerationCard(id);
+      updateModerationStats();
+      filterModerationCardsUI();
+
+      showLiquidNotice('言论恢复展示', `【恢复展示已生效】\n言论编号: ${id}\n已解除屏蔽封锁，言论已恢复至前台正常可见。`, 'INFO');
+    }
+
+    function renderModerationCard(id) {
+      const item = moderationState.items[id];
+      const card = document.getElementById(`modCard-${id}`);
+      const statusEl = document.getElementById(`modStatus-${id}`);
+      const actionsEl = document.getElementById(`modActions-${id}`);
+      if (!card || !statusEl || !actionsEl) return;
+
+      card.setAttribute('data-status', item.status);
+
+      if (item.status === 'TAKEN_DOWN') {
+        card.style.borderLeft = '4px solid #FF3B30';
+        statusEl.style.background = 'rgba(255, 59, 48, 0.2)';
+        statusEl.style.color = '#FF3B30';
+        statusEl.textContent = '● 已下架 (TAKEN_DOWN)';
+        
+        actionsEl.innerHTML = `
+          <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('${id}')" data-tooltip="撤销处罚并恢复言论正常展示">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+            <span>恢复展示</span>
+          </button>
+        `;
+      } else {
+        card.style.borderLeft = '4px solid #FF9500';
+        statusEl.style.background = 'rgba(255, 149, 0, 0.2)';
+        statusEl.style.color = '#FF9500';
+        statusEl.textContent = '● 待下架 (FLAGGED)';
+
+        actionsEl.innerHTML = `
+          <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('${id}', '${item.reason}')" data-tooltip="下架该违规言论并向全网隐藏">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            <span>下架言论</span>
+          </button>
+          <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('${id}', '${item.reason}，封禁作者', true)" data-tooltip="封禁该违规作者发帖权限">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <span>封禁作者</span>
+          </button>
+        `;
+      }
+    }
+
+    function filterModerationItems(filter, btn) {
+      moderationState.filter = filter;
+      document.querySelectorAll('#view-moderation .nav-tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      filterModerationCardsUI();
+    }
+
+    function filterModerationCardsUI() {
+      const cards = document.querySelectorAll('.mod-item-card');
+      cards.forEach(card => {
+        const status = card.getAttribute('data-status');
+        if (moderationState.filter === 'ALL') {
+          card.style.display = 'block';
+        } else if (moderationState.filter === status) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    async function refreshModerationList() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/items");
+        if (res.ok) {
+          const data = await res.json();
+          if (data && Array.isArray(data.items)) {
+            data.items.forEach(srvItem => {
+              if (moderationState.items[srvItem.id]) {
+                moderationState.items[srvItem.id].status = srvItem.status;
+                moderationState.items[srvItem.id].takedown_reason = srvItem.takedown_reason;
+                renderModerationCard(srvItem.id);
+              }
+            });
+          }
+        }
+      } catch (err) {}
+      updateModerationStats();
+      filterModerationCardsUI();
+      showLiquidNotice('巡检清单已刷新', '已完成全网贴吧与评论区舆情雷达扫描，当前数据已是最新！', 'SUCCESS');
+    }
 
     // -------------------------------------------------------------
     // Dynamic Mouse Spotlight Lighting (悬停变亮跟随光效)
@@ -3522,6 +4070,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       selectDagNode("dnode-3");
       setTimeout(renderDagEdges, 300);
       initLiquidTooltips();
+      updateUserRoleUI(true);
+      updateModerationStats();
     });
     window.addEventListener("resize", renderDagEdges);
   </script>

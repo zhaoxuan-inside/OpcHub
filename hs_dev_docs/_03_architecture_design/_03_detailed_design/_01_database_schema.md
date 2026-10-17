@@ -348,4 +348,24 @@ CREATE TABLE IF NOT EXISTS perk_claims (
 CREATE INDEX idx_perk_claims_user ON perk_claims(user_id);
 ```
 
+### 1.16 内容治理与违规言论下架记录表 (`content_moderation_logs`)
+```sql
+CREATE TABLE IF NOT EXISTS content_moderation_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    target_type VARCHAR(32) NOT NULL, -- 'FORUM_THREAD', 'FORUM_COMMENT', 'PRODUCT_REVIEW'
+    target_id VARCHAR(64) NOT NULL, -- 帖子或评论的 UUID
+    author_id VARCHAR(64) NOT NULL, -- 被处罚用户 UID
+    violation_type VARCHAR(64) NOT NULL, -- 'ILLEGAL_TRADE', 'SENSITIVE_SPEECH', 'SCAM', 'SPAM'
+    snippet_content TEXT NOT NULL, -- 违规言论内容摘要
+    action_type VARCHAR(32) NOT NULL, -- 'TAKEN_DOWN', 'RESTORED', 'AUTHOR_BANNED'
+    reason VARCHAR(255) NOT NULL, -- 下架处置说明
+    moderator_id VARCHAR(64) NOT NULL, -- 执行管理员 UID
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_moderation_target ON content_moderation_logs(target_type, target_id);
+CREATE INDEX idx_moderation_author ON content_moderation_logs(author_id);
+CREATE INDEX idx_moderation_created ON content_moderation_logs(created_at DESC);
+```
+
 

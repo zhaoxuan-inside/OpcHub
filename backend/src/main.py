@@ -70,6 +70,13 @@ from src.domains.orchestration.models import (
     FrontendLayoutSaveRequest,
     FrontendLayoutRecord,
 )
+from src.domains.moderation.service import moderation_service
+from src.domains.moderation.models import (
+    ModerationItemResponse,
+    TakedownRequest,
+    RestoreRequest,
+    ModerationActionResponse,
+)
 
 
 app = FastAPI(
@@ -563,5 +570,39 @@ async def get_frontend_layout(layout_name: str = "main_console_layout"):
         return orchestration_service.get_frontend_layout(layout_name)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+# ==========================================
+# Administrator Content Moderation Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/admin/moderation/items",
+    response_model=list[ModerationItemResponse],
+    tags=["Content Moderation"]
+)
+async def list_moderation_items(status: str | None = None):
+    """Retrieve reported and flagged content items for administrative review."""
+    return moderation_service.list_items(status=status)
+
+
+@app.post(
+    f"{settings.api_prefix}/admin/moderation/takedown",
+    response_model=ModerationActionResponse,
+    tags=["Content Moderation"]
+)
+async def takedown_content(payload: TakedownRequest):
+    """Take down violating speech and hide from public view."""
+    return moderation_service.takedown(payload)
+
+
+@app.post(
+    f"{settings.api_prefix}/admin/moderation/restore",
+    response_model=ModerationActionResponse,
+    tags=["Content Moderation"]
+)
+async def restore_content(payload: RestoreRequest):
+    """Restore mistakenly flagged content item."""
+    return moderation_service.restore(payload)
+
 
 

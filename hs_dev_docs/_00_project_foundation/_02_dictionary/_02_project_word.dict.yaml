@@ -73,6 +73,11 @@ terms:
     description: "创客对企业发布的委托需求提交的实施方案与报价条目"
     forbidden_alias: ["bid_offer", "price_quote"]
 
+  - term: "内容治理下架"
+    en_name: "ContentModeration"
+    description: "管理员对发现的违法违规言论、灌水营销或违规帖子进行审查并执行下架处置"
+    forbidden_alias: ["delete_talk", "remove_post_flag"]
+
 lifecycle_terms:
   - concept: "DAG Pipeline Lifecycle"
     command: "execute_pipeline"
@@ -115,3 +120,9 @@ lifecycle_terms:
     event: "thread.bookmarked"
     status: "BOOKMARKED"
     forbidden_alias: ["do_favorite", "fav_done"]
+
+  - concept: "Content Moderation Lifecycle"
+    command: "moderate_content"
+    event: "content.moderated"
+    status: "TAKEN_DOWN"
+    forbidden_alias: ["kill_msg", "ban_post"]
