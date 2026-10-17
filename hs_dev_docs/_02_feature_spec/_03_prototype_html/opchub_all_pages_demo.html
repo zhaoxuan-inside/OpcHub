@@ -175,21 +175,49 @@
       border: 1px solid var(--glass-border);
       border-radius: var(--radius-full);
       box-shadow: var(--glass-shadow), var(--glass-specular);
-      padding: 0 20px;
+      padding: 0 10px;
       height: 52px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 10px;
       transition: var(--transition-liquid);
     }
 
-    .brand-group {
-      display: flex;
+    /* Independent VisionOS Brand Island Layer (OpcHub OS 2.0 独立图层) */
+    .brand-island {
+      display: inline-flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
+      padding: 5px 14px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      box-shadow: var(--glass-specular);
+      flex-shrink: 0;
+      white-space: nowrap !important;
+      cursor: pointer;
+      user-select: none;
+      transition: var(--transition-liquid);
       text-decoration: none;
       color: var(--text-primary);
-      cursor: pointer;
+    }
+
+    .brand-island:hover {
+      background: var(--glass-surface-hover);
+      border-color: var(--glass-border-hover);
+      box-shadow: var(--glass-glow-halo);
+      transform: scale(1.02);
+    }
+
+    .brand-island-divider {
+      width: 1px;
+      height: 14px;
+      background: var(--glass-border-subtle);
+      margin: 0 1px;
+      flex-shrink: 0;
     }
 
     .brand-mark {
@@ -198,13 +226,16 @@
       border-radius: 3px;
       background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
       box-shadow: 0 0 12px var(--accent-glow);
+      flex-shrink: 0;
     }
 
     .brand-name {
       font-family: var(--font-display);
-      font-size: 16px;
+      font-size: 15px;
       font-weight: 600;
       letter-spacing: -0.02em;
+      white-space: nowrap !important;
+      flex-shrink: 0;
     }
 
     .brand-tag {
@@ -212,14 +243,35 @@
       color: var(--text-tertiary);
       font-family: var(--font-mono);
       letter-spacing: 0.05em;
+      white-space: nowrap !important;
+      flex-shrink: 0;
+    }
+
+    /* Scrollable Nav Tabs Wrapper with Smooth Gradient Fades */
+    .nav-tabs-wrapper {
+      flex: 1 1 auto;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+      mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
+      -webkit-mask-image: linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent);
     }
 
     .nav-tabs {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 4px;
       overflow-x: auto;
+      overflow-y: hidden;
       scrollbar-width: none;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+      white-space: nowrap !important;
+      flex: 1 1 auto;
+      min-width: 0;
+      padding: 2px 14px;
     }
     .nav-tabs::-webkit-scrollbar { display: none; }
 
@@ -1043,29 +1095,34 @@
   <!-- Sticky Liquid Navigation -->
   <header>
     <div class="nav-glass-bar">
-      <div class="brand-group" onclick="switchView(currentUserRole === 'ADMIN' ? 'ops' : 'home')">
+      <!-- 1. Left VisionOS Island Layer: OpcHub OS 2.0 (独立图层，永不换行) -->
+      <div class="brand-island" id="brandIsland" onclick="switchView(currentUserRole === 'ADMIN' ? 'ops' : 'home')" data-tooltip="OpcHub OS 2.0 空间地图与工作区">
         <div class="brand-mark"></div>
         <span class="brand-name">OpcHub</span>
+        <div class="brand-island-divider"></div>
         <span class="brand-tag" id="brandTagRole">OS 2.0</span>
       </div>
 
-      <nav class="nav-tabs" id="mainNavTabs">
-        <!-- Maker / User Only Tabs (管理员不可见) -->
-        <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)" data-tooltip="创客灵感碰撞、实战经验与商业头脑风暴">头脑风暴</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
-        <button class="nav-tab-btn tab-user-only" onclick="switchView('compliance', this)" data-tooltip="产品开发合规全景指南、典型避坑案例库与上线前自检清单">合规指南</button>
+      <!-- 2. Middle Scrollable Nav Tabs Wrapper (平滑横向滚动导航容器) -->
+      <div class="nav-tabs-wrapper">
+        <nav class="nav-tabs" id="mainNavTabs">
+          <!-- Maker / User Only Tabs (管理员不可见) -->
+          <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)" data-tooltip="创客灵感碰撞、实战经验与商业头脑风暴">头脑风暴</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('compliance', this)" data-tooltip="产品开发合规全景指南、典型避坑案例库与上线前自检清单">合规指南</button>
 
-        <!-- Administrator Only Tabs (普通用户不可见，且不能与其他页面同时存在) -->
-        <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台" style="display: none;">后端编排</button>
-        <button class="nav-tab-btn tab-admin-only" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器" style="display: none;">前端编排</button>
-        <button class="nav-tab-btn tab-admin-only" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示" style="display: none;">运营大盘</button>
-        <button class="nav-tab-btn tab-admin-only" onclick="switchView('moderation', this)" data-tooltip="违规违法言论监控、审核与全网下架" style="display: none;">内容治理</button>
-      </nav>
+          <!-- Administrator Only Tabs (普通用户不可见，且不能与其他页面同时存在) -->
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台" style="display: none;">后端编排</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器" style="display: none;">前端编排</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示" style="display: none;">运营大盘</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('moderation', this)" data-tooltip="违规违法言论监控、审核与全网下架" style="display: none;">内容治理</button>
+        </nav>
+      </div>
 
       <div class="nav-right-actions">
         <!-- Unified VisionOS Frosted Island Layer (同一个图层：视角切换、暗黑模式、用户信息三合一) -->
@@ -3531,6 +3588,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       // Update both nav tabs and icon buttons
       document.querySelectorAll('.nav-tab-btn, .nav-icon-btn').forEach(b => b.classList.remove('active'));
 
+      let activeTabBtn = btnElement;
       if (btnElement) {
         btnElement.classList.add('active');
       } else {
@@ -3541,9 +3599,15 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           document.querySelectorAll('.nav-tab-btn').forEach(b => {
             if (b.getAttribute('onclick') && b.getAttribute('onclick').includes(`'${viewName}'`)) {
               b.classList.add('active');
+              activeTabBtn = b;
             }
           });
         }
+      }
+
+      // Smoothly center the active tab inside the scrollable nav-tabs container
+      if (activeTabBtn && activeTabBtn.scrollIntoView) {
+        activeTabBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
       }
 
       if (viewName === 'backend-orch') {
@@ -4549,6 +4613,17 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       });
     }
 
+    function initNavScroll() {
+      const navTabs = document.getElementById('mainNavTabs');
+      if (!navTabs) return;
+      navTabs.addEventListener('wheel', (e) => {
+        if (e.deltaY !== 0) {
+          e.preventDefault();
+          navTabs.scrollLeft += e.deltaY;
+        }
+      }, { passive: false });
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       initDagDraggables();
       selectDagNode("dnode-3");
@@ -4557,6 +4632,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       updateUserRoleUI(true);
       updateModerationStats();
       initSelfAuditChecklist();
+      initNavScroll();
     });
     window.addEventListener("resize", renderDagEdges);
   </script>
