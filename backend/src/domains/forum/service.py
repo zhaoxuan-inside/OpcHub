@@ -29,56 +29,6 @@ class ForumService:
         self._upvotes: Set[Tuple[str, str, str]] = set()
         # Key: (user_id, thread_id)
         self._bookmarks: Dict[Tuple[str, str], str] = {}  # maps to folder_name
-        self._seed_default_threads()
-
-    def _seed_default_threads(self):
-        t1 = ForumThreadResponse(
-            id="th_tax_annual_2026",
-            category_code="TAX",
-            author_id="usr_admin_platform",
-            title="【必读】2026 一人公司工商年报与增值税免征额度最新操作细则",
-            content="针对季度营收 30 万以下免税政策的电子税务局申报实录，附常见报错与退税处理流程...",
-            view_count=1420,
-            upvote_count=89,
-            comment_count=23,
-            bookmark_count=45,
-            is_pinned=True,
-            status="PUBLISHED",
-            created_at=utc_now_iso(),
-            updated_at=utc_now_iso(),
-        )
-        t2 = ForumThreadResponse(
-            id="th_subsidy_compute_review",
-            category_code="BIZ",
-            author_id="usr_maker_nomad",
-            title="从 0 到 1 拿到长三角智能算力补贴 12 万元的全周期复盘 (附审批材料格式)",
-            content="很多朋友以为个体户申报不了算力券，其实只要软著+科技型中小企业入库登记即可破局...",
-            view_count=980,
-            upvote_count=65,
-            comment_count=18,
-            bookmark_count=32,
-            is_pinned=True,
-            status="PUBLISHED",
-            created_at=utc_now_iso(),
-            updated_at=utc_now_iso(),
-        )
-        t3 = ForumThreadResponse(
-            id="th_stripe_cross_border",
-            category_code="DEV",
-            author_id="usr_maker_solodev",
-            title="独立开发者 Stripe 绑定万里汇香港对公户结汇流程避坑指南",
-            content="最近很多人遇到银行合规风控抽检要求提供发票与服务履约截图，这里分享一份标准回复模版...",
-            view_count=760,
-            upvote_count=42,
-            comment_count=15,
-            bookmark_count=28,
-            is_pinned=False,
-            status="PUBLISHED",
-            created_at=utc_now_iso(),
-            updated_at=utc_now_iso(),
-        )
-        for t in [t1, t2, t3]:
-            self._threads[t.id] = t
 
     def clear(self) -> None:
         """Reset service state for isolated testing."""

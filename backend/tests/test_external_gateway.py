@@ -7,8 +7,6 @@ from src.infrastructure.external_gateway import (
     ai_gateway,
     siliconflow_gateway,
     payment_gateway,
-    WeChatPayGateway,
-    StripeGateway,
     sms_auth_gateway,
     gov_crawler_gateway,
     AsyncTokenBucket,

@@ -1,5 +1,5 @@
 """Compliance Service managing developer guidelines, pitfall cases, and self-audit radar."""
-from typing import Dict, List, Optional
+from typing import List
 from src.domains.compliance.models import (
     ComplianceDimension,
     ComplianceCase,
@@ -13,9 +13,9 @@ class ComplianceService:
     """Provides product compliance knowledge and evaluates maker self-audit checklists."""
 
     def __init__(self):
-        self._dimensions = self._build_dimensions()
-        self._cases = self._build_cases()
-        self._checkpoints = self._build_checkpoints()
+        self._dimensions: List[ComplianceDimension] = []
+        self._cases: List[ComplianceCase] = []
+        self._checkpoints: List[AuditCheckItem] = []
 
     def _build_dimensions(self) -> List[ComplianceDimension]:
         return [

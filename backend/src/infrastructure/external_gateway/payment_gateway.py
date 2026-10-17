@@ -158,16 +158,17 @@ class PaymentGateway(BaseOutboundClient):
                 description=f"OpcHub Order {order_id}"
             )
             return {
-                "status": "SUCCESS",
+                "status": res.get("status", "ERROR"),
                 "order_id": order_id,
                 "channel": "STRIPE_CONNECT",
-                "escrow_channel": "LICENSED_STRIPE_SPLIT",
+                "escrow_channel": "LICENSED_STRIPE_SPLIT" if res.get("status") == "SUCCESS" else "NONE",
                 "total_amount": amount_cny,
                 "maker_share": maker_share,
                 "platform_fee": platform_fee,
-                "transaction_no": res.get("id", f"stripe_tx_{order_id}"),
-                "escrow_verified": True,
-                "trace_id": res.get("trace_id", "")
+                "transaction_no": res.get("id", ""),
+                "escrow_verified": res.get("status") == "SUCCESS",
+                "trace_id": res.get("trace_id", ""),
+                "mocked": res.get("mocked", False),
             }
 
         # Default WeChat Pay V3
@@ -194,16 +195,17 @@ class PaymentGateway(BaseOutboundClient):
         )
 
         return {
-            "status": "SUCCESS",
+            "status": wx_res.get("status", "ERROR"),
             "order_id": order_id,
             "channel": "WECHAT_PAY_V3",
-            "escrow_channel": "LICENSED_WECHAT_SPLIT",
+            "escrow_channel": "LICENSED_WECHAT_SPLIT" if wx_res.get("status") == "SUCCESS" else "NONE",
             "total_amount": amount_cny,
             "maker_share": maker_share,
             "platform_fee": platform_fee,
-            "transaction_no": wx_res.get("wechat_order_id", f"wx_tx_{order_id}"),
-            "escrow_verified": True,
-            "trace_id": wx_res.get("trace_id", "")
+            "transaction_no": wx_res.get("wechat_order_id", ""),
+            "escrow_verified": wx_res.get("status") == "SUCCESS",
+            "trace_id": wx_res.get("trace_id", ""),
+            "mocked": wx_res.get("mocked", False),
         }
 
 

@@ -2,9 +2,8 @@
 import uuid
 import hashlib
 import json
-import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Tuple
 
 from src.domains.orchestration.models import (
     DAGConfigSaveRequest,
@@ -16,7 +15,7 @@ from src.domains.orchestration.models import (
     ScenarioExecuteRequest,
     ScenarioExecuteResponse,
 )
-from src.core.microkernel.dispatcher import dispatcher, DispatchMode
+from src.core.microkernel.dispatcher import dispatcher
 from src.core.microkernel.engine import microkernel_engine
 from src.core.microkernel.models import (
     DAGConfig,
@@ -579,15 +578,15 @@ class OrchestrationService:
             )
         )
 
-        # Default frontend layout
+        # Default frontend layout (no hardcoded demo figures)
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(
                 layout_name="main_console_layout",
                 version="v1.0.4",
                 grid_schema={"columns": 24, "row_gap": 16, "col_gap": 16},
                 widgets=[
-                    {"id": "w1", "type": "stat", "span": 6, "title": "本季总创收", "value": "¥ 280,000"},
-                    {"id": "w2", "type": "stat", "span": 6, "title": "免征增值税", "value": "¥ 8,400"},
+                    {"id": "w1", "type": "stat", "span": 6, "title": "本季总创收", "value": ""},
+                    {"id": "w2", "type": "stat", "span": 6, "title": "免征增值税", "value": ""},
                     {"id": "w3", "type": "form", "span": 12, "title": "政策核算申报入口"},
                 ],
             )

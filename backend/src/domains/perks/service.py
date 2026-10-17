@@ -22,57 +22,6 @@ class PerkService:
         self._perks: Dict[str, PerkResponse] = {}
         # Key: (user_id, perk_id)
         self._claims: Dict[Tuple[str, str], PerkClaimResponse] = {}
-        self._seed_default_perks()
-
-    def _seed_default_perks(self):
-        items = [
-            (
-                "perk_aws_activate",
-                "AWS Activate 创客计划",
-                "Amazon Web Services",
-                35000.0,
-                "CLOUD",
-                "价值 $5,000 云端算力与全球负载均衡抵扣券，覆盖 EC2、S3 及 Bedrock。",
-                42,
-            ),
-            (
-                "perk_aliyun_bailian",
-                "阿里云百炼大模型专属算力包",
-                "阿里云",
-                12000.0,
-                "AI",
-                "赠送 1,000 万通义千问 Qwen-Max 与 Qwen-Plus 旗舰模型推理 Tokens 额度。",
-                150,
-            ),
-            (
-                "perk_cloudflare_workers",
-                "Cloudflare Workers Pro 特权",
-                "Cloudflare",
-                1800.0,
-                "INFRA",
-                "全球边缘无服务器函数 1 年期 Pro 订阅，免除边缘并发冷启动与流量费用。",
-                88,
-            ),
-            (
-                "perk_stripe_atlas",
-                "Stripe Atlas 离岸开办绿色通道",
-                "Stripe",
-                1800.0,
-                "FINANCE",
-                "立减 $250 美元注册费用，极速设立特拉华州 C-Corp 或 LLC 并开立企业银行账户。",
-                25,
-            ),
-        ]
-        for pid, name, provider, val, cat, summary, quota in items:
-            self._perks[pid] = PerkResponse(
-                id=pid,
-                name=name,
-                provider=provider,
-                value_cny=val,
-                category=cat,
-                summary=summary,
-                quota_remaining=quota,
-            )
 
     def list_perks(self) -> List[PerkResponse]:
         return list(self._perks.values())

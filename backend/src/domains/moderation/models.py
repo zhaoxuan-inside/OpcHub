@@ -1,5 +1,5 @@
 """Data models and schemas for Content Moderation domain."""
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field
 
 

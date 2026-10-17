@@ -3,6 +3,7 @@
 Loads application settings and gateway endpoints from backend/config/application.yaml
 with environment variable overrides, achieving zero hardcoded values in source code.
 """
+import logging
 import os
 from pathlib import Path
 from typing import List, Optional
@@ -40,6 +41,7 @@ _PAYMENT_SECTION = _EXT_SECTION.get("payment", {})
 _WECHAT_SECTION = _PAYMENT_SECTION.get("wechat", {})
 _STRIPE_SECTION = _PAYMENT_SECTION.get("stripe", {})
 _CRAWLER_SECTION = _EXT_SECTION.get("gov_crawler", {})
+_SMS_SECTION = _EXT_SECTION.get("sms_auth", {})
 _RAG_SECTION = _EXT_SECTION.get("rag", {})
 _DB_SECTION = _YAML_DATA.get("database", {})
 
@@ -48,19 +50,13 @@ class Settings(BaseSettings):
     """Application global settings loaded from configuration files."""
     app_name: str = _APP_SECTION.get("name", "OpcHub Microkernel Platform")
     app_version: str = _APP_SECTION.get("version", "v1.0.4-live")
-    environment: str = _APP_SECTION.get("environment", "development")
-    debug: bool = _APP_SECTION.get("debug", True)
     api_prefix: str = _APP_SECTION.get("api_prefix", "/api/v1")
     docs_url: Optional[str] = _APP_SECTION.get("docs_url", "/docs")
     redoc_url: Optional[str] = _APP_SECTION.get("redoc_url", "/redoc")
-    console_html_path: str = _APP_SECTION.get(
-        "console_html_path",
-        "hs_dev_docs/_02_feature_spec/_03_prototype_html/opchub_all_pages_demo.html"
-    )
     cors_origins: List[str] = _APP_SECTION.get("cors_origins", ["*"])
 
     server_host: str = _SERVER_SECTION.get("host", "0.0.0.0")
-    server_port: int = _SERVER_SECTION.get("port", 8000)
+    server_port: int = int(_SERVER_SECTION.get("port", 8000))
 
     # Inbound Unified Gateway Endpoints
     gateway_endpoints: List[str] = _GATEWAY_SECTION.get(
@@ -75,7 +71,6 @@ class Settings(BaseSettings):
         "routes_config_file",
         "config/gateway_routes.yaml"
     )
-
     # Outbound External Ecosystem Gateways
     siliconflow_base_url: str = _SILICONFLOW_SECTION.get("base_url", "https://api.siliconflow.cn/v1")
     siliconflow_api_key_env: str = _SILICONFLOW_SECTION.get("api_key_env", "SILICONFLOW_API_KEY")
@@ -98,10 +93,13 @@ class Settings(BaseSettings):
     gov_crawler_timeout: float = float(_CRAWLER_SECTION.get("timeout_seconds", 15))
     gov_crawler_mock_mode: bool = bool(_CRAWLER_SECTION.get("mock_mode", True))
 
+    sms_auth_base_url: str = _SMS_SECTION.get("base_url", "https://dysmsapi.aliyuncs.com")
+    sms_auth_api_key_env: str = _SMS_SECTION.get("api_key_env", "ALIYUN_SMS_ACCESS_KEY")
+    sms_auth_mock_mode: bool = bool(_SMS_SECTION.get("mock_mode", True))
+
     # Lightweight SQLite Vector Store & RAG Engine
     rag_embedding_model: str = _RAG_SECTION.get("embedding_model", "BAAI/bge-large-zh-v1.5")
     rag_vector_dim: int = int(_RAG_SECTION.get("vector_dim", 128))
-    rag_similarity_top_k: int = int(_RAG_SECTION.get("similarity_top_k", 5))
     rag_db_path: str = _RAG_SECTION.get("db_path", "data/rag_vectors.sqlite")
 
     # PostgreSQL 16 + pgvector Core Relational & Vector Storage (ADR-002 & ADR-003)
@@ -109,6 +107,17 @@ class Settings(BaseSettings):
     database_echo: bool = bool(_DB_SECTION.get("echo", False))
     database_pool_size: int = int(_DB_SECTION.get("pool_size", 10))
     database_max_overflow: int = int(_DB_SECTION.get("max_overflow", 20))
+
+    # Built-in administrator bootstrap (RBAC §1.1): credentials from env with safe defaults.
+    # The account is flagged must_change_password and forced to rotate on first login.
+    admin_email: str = os.getenv("OPCHUB_ADMIN_EMAIL", "admin@opchub.cn")
+    admin_initial_password: str = os.getenv("OPCHUB_ADMIN_INITIAL_PASSWORD", "OpcHub@Admin#2026")
+    admin_nickname: str = os.getenv("OPCHUB_ADMIN_NICKNAME", "平台超级管理员")
+
+    # Audit & archival (legal_compliance §80: encrypted retention >= 180 days)
+    audit_retention_days: int = int(os.getenv("OPCHUB_AUDIT_RETENTION_DAYS", "180"))
+    audit_secret: str = os.getenv("OPCHUB_AUDIT_SECRET", "")
+    audit_archive_batch_size: int = int(os.getenv("OPCHUB_AUDIT_ARCHIVE_BATCH_SIZE", "500"))
 
     model_config = SettingsConfigDict(env_prefix="OPCHUB_", env_file=".env", extra="ignore")
 

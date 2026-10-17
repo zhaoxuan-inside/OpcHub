@@ -23,27 +23,27 @@ async def test_ops_dashboard_endpoint():
     assert response.status_code == 200
     data = response.json()
 
-    # Verify DAU, UV, PV metrics exist and match specs
-    assert data["dau"]["value"] == "14,820"
-    assert data["dau"]["delta_percent"] == 12.4
-    assert data["uv"]["value"] == "89,540"
-    assert data["pv"]["value"] == "628,300"
-    assert data["mau"]["value"] == "182,450"
+    # Metrics without instrumentation source report 0 (no fabricated numbers)
+    assert data["dau"]["value"] == "0"
+    assert data["dau"]["delta_percent"] == 0.0
+    assert data["uv"]["value"] == "0"
+    assert data["pv"]["value"] == "0"
+    assert data["mau"]["value"] == "0"
 
-    # Verify 3-terminal distribution matches prototype
-    assert data["terminal_distribution"]["ios_percentage"] == 46.2
-    assert data["terminal_distribution"]["android_percentage"] == 35.8
-    assert data["terminal_distribution"]["desktop_web_percentage"] == 18.0
+    # Terminal distribution reports 0 until real telemetry is wired in
+    assert data["terminal_distribution"]["ios_percentage"] == 0.0
+    assert data["terminal_distribution"]["android_percentage"] == 0.0
+    assert data["terminal_distribution"]["desktop_web_percentage"] == 0.0
 
-    # Verify 7-day daily trend points
-    assert len(data["daily_trends"]) == 7
-    assert data["daily_trends"][-1]["date"] == "10-16"
-    assert data["daily_trends"][-1]["pv"] == 628300
+    # Daily trend reflects live state (today's point with 0 fabricated traffic)
+    assert len(data["daily_trends"]) == 1
+    assert data["daily_trends"][-1]["pv"] == 0
+    assert data["daily_trends"][-1]["uv"] == 0
 
-    # Verify Module Heatmap
-    assert len(data["module_heatmaps"]) >= 5
-    assert data["module_heatmaps"][0]["module_name"] == "政策雷达"
-    assert data["module_heatmaps"][0]["percentage"] == 32.0
+    # Module heatmaps reflect live domain record counts (may be empty on blank DB)
+    for hm in data["module_heatmaps"]:
+        assert hm["pv_count"] >= 0
+        assert hm["percentage"] >= 0.0
 
 
 @pytest.mark.asyncio

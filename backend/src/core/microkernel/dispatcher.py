@@ -82,8 +82,12 @@ class DualModeDispatcher:
     def list_descriptors(self) -> list[OperatorDescriptor]:
         return list(self._descriptors.values())
 
-    def get_stats(self) -> dict[str, Any]:
-        return dict(self._stats)
+    def unregister_descriptor(self, name: str) -> bool:
+        """Remove a previously registered operator descriptor and its mode override."""
+        existed = name in self._descriptors
+        self._descriptors.pop(name, None)
+        self._operator_modes.pop(name, None)
+        return existed
 
     async def dispatch(
         self,

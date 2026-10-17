@@ -2,11 +2,10 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any
-from fastapi import FastAPI, HTTPException, Response
+from typing import Any, Optional
+from fastapi import FastAPI, HTTPException, Response, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from src.core.config import settings
@@ -18,6 +17,9 @@ from src.core.telemetry import (
 from src.core.microkernel.models import DAGConfig, ExecutionResult
 from src.core.microkernel.engine import microkernel_engine
 from src.core.microkernel.sandbox import validate_python_code
+from src.core.microkernel.script_ingestion import script_ingestion_service
+from src.core.audit import audit_service
+from src.core.security import verify_session_token
 from src.core.microkernel.registry import registry
 from src.domains.telemetry.service import telemetry_service
 from src.domains.telemetry.models import OpsDashboardResponse
@@ -67,11 +69,13 @@ from src.domains.perks.models import (
 from src.domains.user.service import user_service
 from src.domains.user.models import (
     MakerProfileResponse,
+    UserProfileUpdateRequest,
     EntitlementActivateRequest,
     EntitlementActivateResponse,
     UserRegisterRequest,
     UserLoginRequest,
     AuthSessionResponse,
+    ChangePasswordRequest,
 )
 from src.infrastructure.database.repository import db_repository
 from src.domains.orchestration.service import orchestration_service
@@ -114,12 +118,22 @@ register_default_scenario_routes()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Lifecycle manager: initialize database schemas and seeds on startup."""
+    """Lifecycle manager: initialize DB schema, provision built-in admin, run retention archival."""
     try:
         await db_repository.ensure_schema_and_seed()
+        admin = user_service._users_by_uid.get("usr_admin_builtin")
+        if admin:
+            await db_repository.ensure_builtin_admin(
+                uid=admin["uid"],
+                email=admin["email"],
+                nickname=admin["nickname"],
+                password_hash=admin["password_hash"],
+            )
+        # Retention: move audit records older than the configured window to cold archive
+        await audit_service.archive_older_than()
     except Exception as e:
         import logging
-        logging.getLogger("uvicorn").warning(f"Database schema/seed check note: {e}")
+        logging.getLogger("uvicorn").warning(f"Startup initialization note: {e}")
     yield
 
 
@@ -127,8 +141,8 @@ app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="Microkernel DAG Orchestration & Cross-Platform Telemetry Gateway for Super Individuals",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=settings.docs_url,
+    redoc_url=settings.redoc_url,
     lifespan=lifespan,
 )
 
@@ -145,24 +159,33 @@ app.add_middleware(TracePropagationMiddleware)
 @app.get("/", response_class=HTMLResponse, tags=["Web Console"])
 @app.get("/app", response_class=HTMLResponse, tags=["Web Console"])
 async def serve_web_console():
-    """Serve the complete 12-page OpcHub interactive visual console."""
-    candidates = [
-        Path(settings.console_html_path),
-        Path(__file__).resolve().parents[2] / settings.console_html_path,
-        Path(__file__).resolve().parents[1] / settings.console_html_path,
-    ]
-    for c in candidates:
-        if c.is_file():
-            return FileResponse(
-                c,
-                media_type="text/html; charset=utf-8",
-                headers={
-                    "Cache-Control": "no-cache, no-store, must-revalidate",
-                    "Pragma": "no-cache",
-                    "Expires": "0",
-                },
-            )
-    return HTMLResponse("<h1>OpcHub Console</h1><p>Demo prototype file not found.</p>", status_code=200)
+    """Serve the OpcHub API landing page (no prototype mock data)."""
+    return HTMLResponse(
+        """
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head><meta charset="utf-8"><title>OpcHub API</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+          body { font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+                 background:#F8F9FD; color:#121316; display:flex; align-items:center;
+                 justify-content:center; min-height:100vh; margin:0; }
+          .card { background:rgba(255,255,255,.75); border:1px solid rgba(255,255,255,.8);
+                  border-radius:20px; padding:48px 56px; max-width:560px;
+                  box-shadow: inset 0 1px 1px rgba(255,255,255,.95), 0 20px 60px rgba(0,0,0,.06); }
+          h1 { font-size:26px; letter-spacing:-.03em; margin:0 0 8px; }
+          p  { color:#4B4E56; line-height:1.7; margin:8px 0; }
+          code{ font-family:"SF Mono", Menlo, monospace; font-size:13px;
+                background:rgba(0,113,227,.08); color:#0071E3; padding:2px 6px; border-radius:6px; }
+        </style></head>
+        <body><div class="card">
+          <h1>OpcHub 微内核服务平台</h1>
+          <p>API-First 服务已就绪。交互式 API 文档：<code>/docs</code>，统一网关入口：<code>/api/welcom/opc_world</code>。</p>
+          <p>健康探针：<code>/livez</code> · <code>/readyz</code> · <code>/healthz</code></p>
+        </div></body></html>
+        """,
+        status_code=200,
+    )
 
 
 FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0071E3"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>"""
@@ -179,13 +202,45 @@ class ScriptValidationRequest(BaseModel):
     action_name: str | None = None
 
 
+class ScriptUploadRequest(BaseModel):
+    """Admin dynamic operator script ingestion request (RBAC §3.2)."""
+    name: str
+    code: str
+    entry_function: str | None = None
+    description: str = ""
+    overwrite: bool = False
+    token: str | None = None
+
+
+def _extract_bearer(authorization: str | None) -> str:
+    if not authorization:
+        return ""
+    parts = authorization.split(" ", 1)
+    return parts[1].strip() if len(parts) == 2 and parts[0].lower() == "bearer" else authorization.strip()
+
+
+def require_admin(token: str | None) -> str:
+    """RBAC guard: dynamic script ingestion is restricted to ADMIN (rbac §2 / §3.2)."""
+    payload = verify_session_token(token or "")
+    if not payload or payload.get("role") != "ADMIN":
+        raise HTTPException(
+            status_code=403,
+            detail="ADMIN privilege required for dynamic Python script ingestion",
+        )
+    return payload.get("uid", "admin")
+
+
 class DAGExecutionRequest(BaseModel):
     config: DAGConfig
     inputs: dict[str, Any] | None = None
 
 
-async def dispatch_scenario(payload: DispatchRequest):
+async def dispatch_scenario(payload: DispatchRequest, request: Request):
     """Unified entrypoint receiving any business request and dynamically routing by scenario."""
+    if not payload.token:
+        auth = request.headers.get("Authorization", "")
+        if auth.lower().startswith("bearer "):
+            payload.token = auth.split(" ", 1)[1].strip()
     return await scenario_router.dispatch(payload)
 
 
@@ -223,13 +278,6 @@ for _meta_endpoint in settings.gateway_metadata_endpoints:
 
 app.add_api_route(
     "/api/welcom/opc_world/reload",
-    reload_scenario_routes,
-    methods=["POST"],
-    tags=["Unified Gateway Dispatcher"],
-    summary="Reload Routes and Version Policies from YAML",
-)
-app.add_api_route(
-    "/api/welcome/opc_world/reload",
     reload_scenario_routes,
     methods=["POST"],
     tags=["Unified Gateway Dispatcher"],
@@ -349,6 +397,104 @@ async def validate_script_sandbox(payload: ScriptValidationRequest):
 
 
 # ==========================================
+# Admin Dynamic Operator Script Ingestion (RBAC §3.2 four-firewall pipeline)
+# ==========================================
+@app.post(f"{settings.api_prefix}/scripts/upload", tags=["Dynamic Operators"])
+async def upload_dynamic_operator(
+    payload: ScriptUploadRequest,
+    authorization: str | None = Header(default=None),
+):
+    """Firewall 1-4: scan, verify entry-point, restricted-load and register an admin Python operator."""
+    operator_id = require_admin(payload.token or _extract_bearer(authorization))
+    try:
+        record = script_ingestion_service.upload_and_register(
+            name=payload.name,
+            code=payload.code,
+            operator_id=operator_id,
+            entry_function=payload.entry_function,
+            description=payload.description,
+            overwrite=payload.overwrite,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    return {"status": "REGISTERED", **record}
+
+
+@app.get(f"{settings.api_prefix}/scripts/operators", tags=["Dynamic Operators"])
+async def list_dynamic_operators(
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+):
+    """List all runtime-registered dynamic operators (ADMIN only)."""
+    require_admin(token or _extract_bearer(authorization))
+    return script_ingestion_service.list_dynamic_operators()
+
+
+@app.post(f"{settings.api_prefix}/scripts/{{name}}/unregister", tags=["Dynamic Operators"])
+async def unregister_dynamic_operator(
+    name: str,
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+):
+    """Remove a runtime-registered dynamic operator (ADMIN only)."""
+    operator_id = require_admin(token or _extract_bearer(authorization))
+    removed = script_ingestion_service.unregister(name, operator_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail=f"Dynamic operator '{name}' not found")
+    return {"operator_name": name, "status": "UNREGISTERED"}
+
+
+@app.get(f"{settings.api_prefix}/scripts/audit", tags=["Dynamic Operators"])
+async def list_script_audit_log(
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+    limit: int = 50,
+):
+    """Retrieve the tamper-evident script ingestion audit log (ADMIN only)."""
+    require_admin(token or _extract_bearer(authorization))
+    return script_ingestion_service.audit_log(limit=limit)
+
+
+# ==========================================
+# Security Audit & Cold Archive (ADMIN only) — legal_compliance §80
+# ==========================================
+@app.get(f"{settings.api_prefix}/admin/audit/logs", tags=["Security Audit"])
+async def list_security_audit_logs(
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+    limit: int = 100,
+    actor_id: str | None = None,
+    action: str | None = None,
+):
+    """Query hot security audit logs (RBAC/ABAC decisions and privileged operations)."""
+    require_admin(token or _extract_bearer(authorization))
+    return await audit_service.list_logs(limit=limit, actor_id=actor_id, action=action)
+
+
+@app.get(f"{settings.api_prefix}/admin/audit/archive", tags=["Security Audit"])
+async def list_archived_security_audit_logs(
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+    limit: int = 100,
+):
+    """Query cold-archived security audit logs past the retention window."""
+    require_admin(token or _extract_bearer(authorization))
+    return await audit_service.list_archived(limit=limit)
+
+
+@app.post(f"{settings.api_prefix}/admin/audit/archive/run", tags=["Security Audit"])
+async def run_security_audit_archive(
+    authorization: str | None = Header(default=None),
+    token: str | None = None,
+    days: int | None = None,
+):
+    """Trigger retention archival: move audit records older than `days` into the cold archive."""
+    require_admin(token or _extract_bearer(authorization))
+    moved = await audit_service.archive_older_than(days=days)
+    return {"status": "OK", "archived_records": moved, "retention_days": days or settings.audit_retention_days}
+
+
+# ==========================================
 # Forum Domain Endpoints (Threads, Nested Tree, Upvotes & Bookmarks)
 # ==========================================
 @app.post(
@@ -435,20 +581,32 @@ async def toggle_forum_bookmark(payload: BookmarkRequest):
 @app.get(f"{settings.api_prefix}/home/overview", tags=["Home Overview"])
 async def get_home_overview():
     """Retrieve platform aggregate overview statistics and navigation summary."""
+    from src.domains.user.service import user_service
+    from src.domains.forum.service import forum_service
+    from src.domains.demands.service import demand_service
+    from src.domains.policies.service import policy_service
+    from src.domains.sop.service import sop_service
+
+    users_count = len([u for u in user_service._users_by_uid.values() if u.get("role") != "GUEST"])
+    demands = demand_service.list_demands()
+    policies = policy_service.list_policies()
+    threads = forum_service.list_threads()
+    templates_count = len(sop_service._templates)
+
     return {
-        "active_makers_count": 14820,
-        "active_dags_count": 482,
-        "matched_policies_count": 128,
-        "demands_orders_count": 89,
-        "perks_saved_cny": 1820000.0,
+        "active_makers_count": users_count,
+        "active_dags_count": 0,
+        "matched_policies_count": len(policies),
+        "demands_orders_count": len(demands),
+        "perks_saved_cny": 0.0,
         "quick_links": [
-            {"name": "头脑风暴", "route": "forum", "count_desc": "1,240 篇实战经验"},
-            {"name": "流程文书", "route": "sop", "count_desc": "4 阶段合规材料"},
-            {"name": "政策雷达", "route": "policy", "count_desc": "30万增值税免征"},
-            {"name": "需求集市", "route": "demand", "count_desc": "89 笔进行中委托"},
-            {"name": "生态特权", "route": "perks", "count_desc": "最高 $5,000 算力券"},
+            {"name": "头脑风暴", "route": "forum", "count_desc": f"{len(threads)} 篇讨论"},
+            {"name": "流程文书", "route": "sop", "count_desc": f"{templates_count} 阶段合规材料"},
+            {"name": "政策雷达", "route": "policy", "count_desc": f"{len(policies)} 条扶持政策"},
+            {"name": "需求集市", "route": "demand", "count_desc": f"{len(demands)} 笔进行中委托"},
+            {"name": "生态特权", "route": "perks", "count_desc": "特权福利通道"},
             {"name": "合规指南", "route": "compliance", "count_desc": "6大防线自检雷达"},
-            {"name": "后端编排", "route": "backend-orch", "count_desc": "微内核 DAG 引擎"},
+            {"name": "创客中心", "route": "user", "count_desc": "创客会员中心"},
         ],
     }
 
@@ -723,6 +881,26 @@ async def get_current_session(token: str | None = None):
     return res
 
 
+@app.post(
+    f"{settings.api_prefix}/auth/change-password",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"],
+)
+@app.post(
+    "/api/auth/change-password",
+    response_model=AuthSessionResponse,
+    tags=["Auth & Identity"],
+)
+async def change_password(payload: ChangePasswordRequest):
+    """Rotate the caller's password (clears the built-in admin must_change_password flag)."""
+    try:
+        return user_service.change_password(payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 # ==========================================
 # User Profile & Entitlements Endpoints
 # ==========================================
@@ -731,9 +909,29 @@ async def get_current_session(token: str | None = None):
     response_model=MakerProfileResponse,
     tags=["User & Entitlements"]
 )
-async def get_user_profile():
+async def get_user_profile(user_id: Optional[str] = None, token: Optional[str] = None):
     """Get maker account profile and active feature entitlements."""
-    return user_service.get_profile()
+    if not user_id and token:
+        from src.core.security import verify_session_token
+        payload = verify_session_token(token)
+        if payload and payload.get("uid"):
+            user_id = payload.get("uid")
+    if not user_id:
+        user_id = "usr_guest"
+    return user_service.get_profile(user_id)
+
+
+@app.post(
+    f"{settings.api_prefix}/user/profile",
+    response_model=MakerProfileResponse,
+    tags=["User & Entitlements"]
+)
+async def update_user_profile(payload: UserProfileUpdateRequest):
+    """Update maker account profile."""
+    try:
+        return await user_service.update_profile(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.post(
@@ -906,6 +1104,12 @@ async def get_compliance_checkpoints():
 async def evaluate_compliance_audit(payload: AuditEvaluateRequest):
     """Evaluate developer's self-audit submission and generate a compliance score report."""
     return compliance_service.evaluate_audit(payload)
+
+
+if __name__ == "__main__":
+    import uvicorn
+    # Server host/port are configuration-driven (application.yaml) per detailed design §3.3-3
+    uvicorn.run(app, host=settings.server_host, port=settings.server_port)
 
 
 

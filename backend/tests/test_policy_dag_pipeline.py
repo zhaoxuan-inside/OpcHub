@@ -10,10 +10,41 @@ from src.domains.orchestration.models import ScenarioExecuteRequest
 
 @pytest.fixture(autouse=True)
 def clean_policy_state():
-    """Reset policy service state before each test."""
+    """Reset policy service state before each test and seed test-only policies."""
     policy_service.clear()
-    policy_service._seed_default_policies()
+    from src.domains.policies.models import PolicyResponse
+    policy_service._policies["pol_vat_exemption_2026"] = PolicyResponse(
+        id="pol_vat_exemption_2026",
+        title="小规模纳税人月销售额 10 万以下（季度 30 万）免征增值税",
+        policy_level="国家级",
+        category="TAX",
+        subsidy_amount_max=9000.0,
+        summary="小规模纳税人合计月销售额未超过10万元（以1个季度为纳税期限的，季度销售额未超过30万元）的，免征增值税。",
+        eligible_conditions=["纳税主体为小规模纳税人（个体工商户或小微企业）"],
+        legal_basis="财政部 税务总局公告 2023年第12号",
+    )
+    policy_service._policies["pol_ai_compute_voucher_hz"] = PolicyResponse(
+        id="pol_ai_compute_voucher_hz",
+        title="杭州高新区超级个体与小微人工智能算力券补贴",
+        policy_level="省市级",
+        category="SUBSIDY",
+        subsidy_amount_max=50000.0,
+        summary="为注册在本区开展大模型微调、生成式AI应用独立研发的创客主体，提供最高 30% 的实际算力消费抵扣凭据。",
+        eligible_conditions=["在杭州市高新技术产业园区完成注册登记"],
+        legal_basis="杭高新发〔2024〕18号",
+    )
+    policy_service._policies["pol_rnd_deduction_100"] = PolicyResponse(
+        id="pol_rnd_deduction_100",
+        title="科技型中小微企业研发费用 100% 税前加计扣除",
+        policy_level="国家级",
+        category="TAX",
+        subsidy_amount_max=150000.0,
+        summary="科技型中小企业开展研发活动中实际发生的研发费用在税前加计扣除100%。",
+        eligible_conditions=["入库全国科技型中小企业信息库"],
+        legal_basis="财政部 税务总局 科技部公告 2023年第11号",
+    )
     yield
+    policy_service.clear()
 
 
 @pytest.fixture

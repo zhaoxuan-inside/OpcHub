@@ -6,9 +6,56 @@ from src.main import app
 from src.core.microkernel.dispatcher import dispatcher, DispatchMode
 from src.core.microkernel.registry import registry
 from src.domains.orchestration.service import orchestration_service
-from src.domains.orchestration.models import ScenarioExecuteRequest, OperatorModeUpdateRequest
+from src.domains.orchestration.models import ScenarioExecuteRequest
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def seed_composable_dependencies():
+    """Seed test-only SOP template and compliance checkpoints for composable pipelines."""
+    from src.domains.sop.service import sop_service
+    from src.domains.sop.models import SOPTemplate, SOPField
+    from src.domains.compliance.service import compliance_service
+    from src.domains.compliance.models import AuditCheckItem
+
+    sop_service._templates["tpl_test_charter"] = SOPTemplate(
+        id="tpl_test_charter",
+        stage=1,
+        code="TEST_CHARTER",
+        name="测试一人公司章程模板",
+        category="LEGAL",
+        description="测试用章程模板",
+        template_content="""{company_name} 章程
+---------------------------------------------
+唯一股东：{founder_name}
+经营范围：{biz_scope}
+---------------------------------------------""",
+        required_fields=[
+            SOPField(key="company_name", label="公司全称", default=""),
+            SOPField(key="founder_name", label="股东姓名", default=""),
+            SOPField(key="biz_scope", label="经营范围", default=""),
+        ],
+        is_active=True,
+    )
+
+    compliance_service._checkpoints = [
+        AuditCheckItem(
+            id="chk-privacy", dimension_id="dim_privacy", title="隐私政策",
+            description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk-escrow-thirdparty", dimension_id="dim_payment", title="资金托管",
+            description="d", severity="CRITICAL", weight=15, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk-opensource-license", dimension_id="dim_ip_oss", title="开源许可",
+            description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
+        ),
+    ]
+    yield
+    sop_service._templates.clear()
+    compliance_service._checkpoints = []
 
 
 def test_list_registered_operators_across_domains():
@@ -79,6 +126,12 @@ async def test_execute_composable_startup_compliance_flow():
             "quarterly_income": 250000.0,
             "company_name": "杭州极客超级个体科技有限公司",
             "owner_name": "李创客",
+            "template_id": "tpl_test_charter",
+            "form_data": {
+                "company_name": "杭州极客超级个体科技有限公司",
+                "founder_name": "李创客",
+                "biz_scope": "人工智能算力服务",
+            },
             "checked_ids": ["chk-privacy", "chk-escrow-thirdparty", "chk-opensource-license"],
         },
         override_dispatch_mode=DispatchMode.IN_PROCESS,

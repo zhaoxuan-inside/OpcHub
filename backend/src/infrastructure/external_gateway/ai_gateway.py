@@ -1,6 +1,5 @@
 """Unified SiliconFlow AI Large Language Model Gateway Adapter (DeepSeek / Qwen / Gemini)."""
 from typing import Any, Dict, List, Optional
-import json
 from src.core.config import settings
 from .base_client import BaseOutboundClient
 
@@ -101,8 +100,8 @@ class SiliconFlowGateway(BaseOutboundClient):
                 "policy_title": policy_title,
                 "model_used": target_model,
                 "plain_summary": (
-                    f"【政策要点】针对小微企业与一人创客，本通知明确符合条件的主体可享受阶段性增值税减按1%征收，"
-                    f"月销售额10万元以下免征，重点支持科技软件与出海数字化研发申报。"
+                    "【政策要点】针对小微企业与一人创客，本通知明确符合条件的主体可享受阶段性增值税减按1%征收，"
+                    "月销售额10万元以下免征，重点支持科技软件与出海数字化研发申报。"
                 ),
                 "target_audience": "个体工商户 / 一人有限公司 / 科技型小微企业",
                 "max_benefit": "年减免最高 15 万元",

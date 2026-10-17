@@ -144,7 +144,8 @@ def test_dynamic_scenario_registration_without_http_code_change():
         assert data["scenario"] == "pricing.custom_calculator"
         assert data["data"]["final_price"] == 400.0
         assert data["data"]["processed_by"] == "custom_domain_dynamic_handler"
-        assert data["data"]["user_id"] == "usr_maker_alice"
+        # Identity is enforced from the session token; client-supplied context.user_id is not trusted.
+        assert data["data"]["user_id"] == "usr_admin_builtin"
     finally:
         scenario_router.unregister("pricing.custom_calculator")
 

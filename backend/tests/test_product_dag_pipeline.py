@@ -10,10 +10,27 @@ from src.domains.orchestration.models import ScenarioExecuteRequest
 
 @pytest.fixture(autouse=True)
 def clean_product_state():
-    """Reset product service state before each test."""
+    """Reset product service state and seed a test-only product before each test."""
     product_service.clear()
-    product_service._seed_default_products()
+    from src.domains.products.service import utc_now_iso
+    from src.domains.products.models import ProductResponse
+    product_service._products["prod_test_seed_2026"] = ProductResponse(
+        id="prod_test_seed_2026",
+        author_id="usr_test_author",
+        title="测试种子产品",
+        tagline="用于产品橱窗点赞与列表测试",
+        description="测试用独立创客作品",
+        category="DEV",
+        pricing_model="FREE",
+        price_cny=0.0,
+        demo_url="",
+        upvote_count=3,
+        status="PUBLISHED",
+        created_at=utc_now_iso(),
+        updated_at=utc_now_iso(),
+    )
     yield
+    product_service.clear()
 
 
 @pytest.fixture

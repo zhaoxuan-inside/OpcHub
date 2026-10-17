@@ -9,9 +9,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import (
     Boolean,
     DateTime,
-    Float,
     ForeignKey,
-    Index,
     Integer,
     Numeric,
     String,
@@ -341,4 +339,45 @@ class RAGVector(Base):
     metadata_payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class AuditLog(Base):
+    """Security & Operation Audit Log (audit_logs).
+
+    Records every privileged / state-changing operation with an encrypted detail
+    payload for compliance retention (>= 180 days) per opchub_legal_compliance_spec §80.
+    """
+    __tablename__ = "audit_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    actor_role: Mapped[str] = mapped_column(String(32), default="GUEST", nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    permission: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    result: Mapped[str] = mapped_column(String(16), default="SUCCESS", nullable=False, index=True)
+    ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    trace_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    detail_encrypted: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
+
+
+class AuditLogArchive(Base):
+    """Cold-storage archive of audit_logs past the retention window (audit_logs_archive)."""
+    __tablename__ = "audit_logs_archive"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
+    actor_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    actor_role: Mapped[str] = mapped_column(String(32), default="GUEST", nullable=False)
+    action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    resource_type: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    resource_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    permission: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    result: Mapped[str] = mapped_column(String(16), default="SUCCESS", nullable=False)
+    ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    trace_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    detail_encrypted: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 

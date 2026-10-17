@@ -1,6 +1,6 @@
 """Data models for Maker Profile and Paid Entitlements."""
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class EntitlementItem(BaseModel):
@@ -20,7 +20,17 @@ class MakerProfileResponse(BaseModel):
     company_name: str
     credit_code: str
     tier_name: str
+    phone: Optional[str] = ""
+    email: Optional[str] = ""
     entitlements: List[EntitlementItem]
+
+
+class UserProfileUpdateRequest(BaseModel):
+    user_id: Optional[str] = None
+    nickname: Optional[str] = None
+    phone: Optional[str] = None
+    company_name: Optional[str] = None
+    credit_code: Optional[str] = None
 
 
 class EntitlementActivateRequest(BaseModel):
@@ -58,4 +68,13 @@ class AuthSessionResponse(BaseModel):
     company_name: Optional[str] = None
     tier_name: str = "标准创客"
     message: str = "登录成功"
+    must_change_password: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    """Change password (used to rotate the built-in admin's initial credential)."""
+    old_password: str
+    new_password: str
+    user_id: Optional[str] = None
+    token: Optional[str] = None
 

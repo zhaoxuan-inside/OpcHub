@@ -4,8 +4,37 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.domains.perks.service import perk_service
+from src.domains.perks.models import PerkResponse
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import ScenarioExecuteRequest
+
+
+@pytest.fixture(autouse=True)
+def seed_test_perks():
+    """Seed test-only perks so claim pipelines have real targets."""
+    perk_service._perks.clear()
+    perk_service._claims.clear()
+    perk_service._perks["perk_aliyun_bailian"] = PerkResponse(
+        id="perk_aliyun_bailian",
+        name="阿里云百炼大模型专属算力包",
+        provider="阿里云",
+        value_cny=12000.0,
+        category="AI",
+        summary="测试用算力包",
+        quota_remaining=150,
+    )
+    perk_service._perks["perk_cloudflare_workers"] = PerkResponse(
+        id="perk_cloudflare_workers",
+        name="Cloudflare Workers Pro 特权",
+        provider="Cloudflare",
+        value_cny=1800.0,
+        category="INFRA",
+        summary="测试用边缘函数特权",
+        quota_remaining=88,
+    )
+    yield
+    perk_service._perks.clear()
+    perk_service._claims.clear()
 
 
 @pytest.fixture

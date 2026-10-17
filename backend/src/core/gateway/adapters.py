@@ -1,16 +1,11 @@
 """Generic adapters for domain services referenced by gateway routes configuration."""
 import time
 from typing import Any, Dict
-from src.domains.demands.service import demand_service
-from src.domains.demands.models import BidCreate
-from src.domains.forum.service import forum_service
-from src.domains.forum.models import ForumCommentCreate
 from src.domains.user.service import user_service
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import (
     ScenarioExecuteRequest,
     FrontendLayoutSaveRequest,
-    DAGConfigSaveRequest,
 )
 from src.infrastructure.external_gateway import (
     siliconflow_gateway,
@@ -56,14 +51,6 @@ async def demand_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any
         error_msg = res.error_message or "Demand bidding pipeline failed"
         raise ValueError(error_msg)
     return res.final_output.get("created_bid") or res.final_output
-
-
-def demands_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Legacy alias redirecting to demand_service directly or adapter."""
-    return demand_service.submit_bid(
-        demand_id=p.get("demand_id"),
-        payload=BidCreate(**p.get("bid_payload", p)),
-    )
 
 
 async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -305,11 +292,11 @@ async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
     )
     if res.status != "SUCCESS":
         return {
-            "active_makers_count": 14820,
-            "active_dags_count": 482,
-            "matched_policies_count": 128,
-            "demands_orders_count": 89,
-            "perks_saved_cny": 1820000.0,
+            "active_makers_count": 0,
+            "active_dags_count": 0,
+            "matched_policies_count": 0,
+            "demands_orders_count": 0,
+            "perks_saved_cny": 0.0,
             "quick_links": [],
             "orchestrated": False,
         }
@@ -321,6 +308,11 @@ async def user_profile_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     inputs = dict(p or {})
     if "user_payload" in inputs and isinstance(inputs["user_payload"], dict):
         inputs.update(inputs["user_payload"])
+    if c:
+        if "token" in c and "token" not in inputs:
+            inputs["token"] = c["token"]
+        if "user_id" in c and "user_id" not in inputs:
+            inputs["user_id"] = c["user_id"]
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
@@ -333,6 +325,22 @@ async def user_profile_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
         error_msg = res.error_message or "User profile pipeline failed"
         raise ValueError(error_msg)
     return res.final_output.get("profile") or res.final_output
+
+
+async def user_profile_update_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Update maker profile in memory and DB."""
+    from src.domains.user.service import user_service
+    from src.domains.user.models import UserProfileUpdateRequest
+    token = p.get("token") or (c or {}).get("token") or ""
+    req = UserProfileUpdateRequest(
+        user_id=p.get("user_id") or (c or {}).get("user_id"),
+        nickname=p.get("nickname"),
+        phone=p.get("phone"),
+        company_name=p.get("company_name"),
+        credit_code=p.get("credit_code"),
+    )
+    profile = await user_service.update_profile(req=req, token=token)
+    return profile.model_dump()
 
 
 async def user_entitlement_activate_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -527,7 +535,7 @@ async def auth_session_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     payload = verify_session_token(token)
     if not payload:
         raise ValueError("会话已失效或未提供有效登录凭据")
-    uid = payload.get("uid", "usr_2026_opc_9981")
+    uid = payload.get("uid", "")
     email = payload.get("email", "")
     nickname = payload.get("nickname", "创客")
     profile = user_service.get_profile(uid=uid)

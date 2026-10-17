@@ -2,6 +2,9 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
+from src.core.security import create_session_token
+
+_TEST_ADMIN_TOKEN = create_session_token({"uid": "usr_admin_builtin", "role": "ADMIN"})
 from src.domains.moderation.service import moderation_service
 from src.domains.moderation.models import ModerationItemResponse
 
@@ -42,6 +45,7 @@ async def test_moderation_takedown_pipeline_success():
     """Verify OPC_MODERATION_TAKEDOWN_PIPELINE successfully takes down violating content."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "moderation.takedown",
             "version": "v1.0.4",
@@ -76,6 +80,7 @@ async def test_moderation_takedown_saga_rollback_on_failure():
     """Verify Saga reverse compensation restores original status when downstream fails."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "moderation.takedown",
             "version": "v1.0.4",
@@ -104,6 +109,7 @@ async def test_moderation_restore_pipeline_success():
     """Verify OPC_MODERATION_RESTORE_PIPELINE successfully restores taken down content."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "moderation.restore",
             "version": "v1.0.4",
@@ -135,6 +141,7 @@ async def test_moderation_restore_saga_rollback_on_failure():
     """Verify Saga reverse compensation re-marks status as TAKEN_DOWN if restore downstream fails."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "moderation.restore",
             "version": "v1.0.4",
@@ -161,6 +168,7 @@ async def test_moderation_guard_validation_failure():
     """Verify Guard blocks requests with non-existent item or empty reason."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         # Non-existent item
         req_body = {
             "scenario": "moderation.takedown",

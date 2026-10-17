@@ -13,7 +13,6 @@ from src.core.security import (
 from src.domains.user.service import user_service
 from src.domains.user.models import UserRegisterRequest, UserLoginRequest
 from src.core.gateway import scenario_router, DispatchRequest
-from src.infrastructure.database.repository import db_repository
 
 
 client = TestClient(app)

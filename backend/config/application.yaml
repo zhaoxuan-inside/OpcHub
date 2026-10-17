@@ -5,19 +5,15 @@
 app:
   name: "OpcHub Microkernel Platform"
   version: "v1.0.4-live"
-  environment: "development"
-  debug: true
   api_prefix: "/api/v1"
   docs_url: "/docs"
   redoc_url: "/redoc"
-  console_html_path: "hs_dev_docs/_02_feature_spec/_03_prototype_html/opchub_all_pages_demo.html"
   cors_origins:
     - "*"
 
 server:
   host: "0.0.0.0"
   port: 8000
-  reload: true
 
 # PostgreSQL 16 + pgvector Core Relational & Vector Storage (ADR-002 & ADR-003)
 database:
@@ -77,9 +73,14 @@ external_gateway:
     timeout_seconds: 15
     mock_mode: true
 
+  # SMS & Real-name Identity Verification Gateway (Aliyun SMS / corp entity check)
+  sms_auth:
+    base_url: "https://dysmsapi.aliyuncs.com"
+    api_key_env: "ALIYUN_SMS_ACCESS_KEY"
+    mock_mode: true
+
   # Lightweight SQLite Vector Store & RAG Engine
   rag:
     embedding_model: "BAAI/bge-large-zh-v1.5"
     vector_dim: 128
-    similarity_top_k: 5
     db_path: "data/rag_vectors.sqlite"

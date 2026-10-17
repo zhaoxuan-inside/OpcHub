@@ -1,11 +1,10 @@
 """RAG Service coordinating VectorStore, EmbeddingProviders, and AI Gateways."""
 import asyncio
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from src.core.config import settings
 from src.infrastructure.external_gateway.ai_gateway import siliconflow_gateway
-from .embeddings import get_default_embedding_provider, LocalDeterministicEmbeddingProvider
-from .vector_store import BaseVectorStore, SQLiteVectorStore, VectorDocument, default_vector_store
+from .embeddings import get_default_embedding_provider
+from .vector_store import BaseVectorStore, VectorDocument, default_vector_store
 
 
 class PolicyRagService:

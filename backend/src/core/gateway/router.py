@@ -12,6 +12,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import logging
 
 from src.core.telemetry import get_current_trace_id
+from src.core.rbac import has_permission, is_owner_or_admin, parse_identity, HIGH_RISK_PERMISSIONS
+from src.core.audit import audit_service
 from src.core.gateway.models import (
     DispatchRequest,
     DispatchResponse,
@@ -31,12 +33,16 @@ class RouteRule:
         version: str = "v1.0.0",
         domain: str = "general",
         description: str = "",
+        required_permission: str = "",
+        owner_check: Optional[Dict[str, Any]] = None,
     ):
         self.scenario = scenario
         self.handler = handler
         self.version = version
         self.domain = domain
         self.description = description
+        self.required_permission = required_permission or ""
+        self.owner_check = owner_check or None
         self.is_async = inspect.iscoroutinefunction(handler)
         self.sig = inspect.signature(handler)
 
@@ -102,6 +108,8 @@ class ScenarioRouter:
         domain: str = "general",
         description: str = "",
         is_default: bool = True,
+        required_permission: str = "",
+        owner_check: Optional[Dict[str, Any]] = None,
     ) -> None:
         """Register a new scenario routing rule under a specific code version."""
         rule = RouteRule(
@@ -110,6 +118,8 @@ class ScenarioRouter:
             version=version,
             domain=domain,
             description=description,
+            required_permission=required_permission,
+            owner_check=owner_check,
         )
         self._routes[(scenario, version)] = rule
         if is_default or scenario not in self._default_versions:
@@ -168,9 +178,6 @@ class ScenarioRouter:
                 return rule
 
         return None
-
-    def has_scenario(self, scenario: str, version: Optional[str] = None) -> bool:
-        return self.get_rule(scenario, version) is not None
 
     def list_rules(self) -> List[RouteRuleDescriptor]:
         """Return list of all registered scenario descriptors with version info."""
@@ -240,8 +247,108 @@ class ScenarioRouter:
                 duration_ms=duration_ms,
             )
 
+        # 2.5 RBAC (declarative permission) + ABAC (ownership) enforcement
+        identity = parse_identity(
+            req.token
+            or (req.context or {}).get("token")
+            or (req.payload or {}).get("token")
+        )
+        client_ip = (req.context or {}).get("client_ip", "")
+
+        if not has_permission(identity["role"], rule.required_permission):
+            await audit_service.record(
+                action=f"rbac.denied:{req.scenario}",
+                actor_id=identity["uid"],
+                actor_role=identity["role"],
+                permission=rule.required_permission,
+                result="DENIED",
+                ip_address=client_ip,
+                trace_id=trace_id,
+                detail={"scenario": req.scenario, "authenticated": identity["authenticated"]},
+            )
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            if not identity["authenticated"]:
+                return DispatchResponse(
+                    code=401,
+                    scenario=req.scenario,
+                    version=rule.version,
+                    message="该操作需要登录，请先登录创客账号",
+                    data={"login_required": True, "required_permission": rule.required_permission},
+                    trace_id=trace_id,
+                    timestamp=now_iso,
+                    duration_ms=duration_ms,
+                )
+            return DispatchResponse(
+                code=403,
+                scenario=req.scenario,
+                version=rule.version,
+                message=f"权限不足：缺少所需权限 '{rule.required_permission}'",
+                data={"required_permission": rule.required_permission, "role": identity["role"]},
+                trace_id=trace_id,
+                timestamp=now_iso,
+                duration_ms=duration_ms,
+            )
+
+        # First-login enforcement: rotate credentials before high-risk operations
+        if identity.get("must_change_password") and rule.required_permission in HIGH_RISK_PERMISSIONS:
+            await audit_service.record(
+                action=f"auth.must_change_password:{req.scenario}",
+                actor_id=identity["uid"],
+                actor_role=identity["role"],
+                permission=rule.required_permission,
+                result="DENIED",
+                ip_address=client_ip,
+                trace_id=trace_id,
+                detail={"scenario": req.scenario, "reason": "must_change_password"},
+            )
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            return DispatchResponse(
+                code=403,
+                scenario=req.scenario,
+                version=rule.version,
+                message="首次登录安全策略：请先修改初始密码后再执行该操作",
+                data={"must_change_password": True},
+                trace_id=trace_id,
+                timestamp=now_iso,
+                duration_ms=duration_ms,
+            )
+
+        if rule.owner_check:
+            rt = rule.owner_check.get("resource_type", "")
+            id_field = rule.owner_check.get("id_field", "resource_id")
+            rid = str(
+                (req.payload or {}).get(id_field)
+                or (req.context or {}).get(id_field)
+                or ""
+            )
+            if not is_owner_or_admin(identity["uid"], identity["role"], rt, rid):
+                await audit_service.record(
+                    action=f"abac.denied:{req.scenario}",
+                    actor_id=identity["uid"],
+                    actor_role=identity["role"],
+                    resource_type=rt,
+                    resource_id=rid,
+                    result="DENIED",
+                    ip_address=client_ip,
+                    trace_id=trace_id,
+                    detail={"scenario": req.scenario, "id_field": id_field},
+                )
+                duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+                return DispatchResponse(
+                    code=403,
+                    scenario=req.scenario,
+                    version=rule.version,
+                    message="权限拒绝：您无权修改或操作非本人拥有的资产",
+                    data={"abac_denied": True, "resource_type": rt},
+                    trace_id=trace_id,
+                    timestamp=now_iso,
+                    duration_ms=duration_ms,
+                )
+
         # 3. Context Injection & Deprecation Inspection
         ctx = dict(req.context)
+        ctx["user_id"] = identity["uid"]
+        ctx["user_role"] = identity["role"]
         ctx["requested_version"] = requested_ver
         ctx["matched_version"] = rule.version
         ctx["is_fallback"] = (rule.version != requested_ver and rule.version != "*")
@@ -254,6 +361,19 @@ class ScenarioRouter:
         try:
             res_data = await rule.execute(req.payload, ctx)
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+
+            # Audit privileged state-changing scenarios (those declaring a required permission)
+            if rule.required_permission:
+                await audit_service.record(
+                    action=f"scenario:{req.scenario}",
+                    actor_id=identity["uid"],
+                    actor_role=identity["role"],
+                    permission=rule.required_permission,
+                    result="SUCCESS",
+                    ip_address=client_ip,
+                    trace_id=trace_id,
+                    detail={"scenario": req.scenario},
+                )
             
             # If deprecated, include deprecation hint in response message or data
             msg = "success"

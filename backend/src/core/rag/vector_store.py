@@ -319,8 +319,6 @@ class PGVectorStore(BaseVectorStore):
         filter_meta: Optional[Dict[str, Any]] = None,
     ) -> List[Tuple[VectorDocument, float]]:
         """Asynchronously query pgvector using an existing SQLAlchemy AsyncSession."""
-        from src.infrastructure.database.models import RAGVector
-
         stmt = self.build_query(collection, query_vector, top_k)
         result = await session.execute(stmt)
         rows = result.all()

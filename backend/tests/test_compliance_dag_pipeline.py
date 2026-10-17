@@ -4,8 +4,58 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.domains.compliance.service import compliance_service
+from src.domains.compliance.models import AuditCheckItem
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import ScenarioExecuteRequest
+
+
+@pytest.fixture(autouse=True)
+def seed_compliance_checkpoints():
+    """Seed test-only compliance checkpoints so audit scoring has real items."""
+    compliance_service._checkpoints = [
+        AuditCheckItem(
+            id="chk_01", dimension_id="dim_privacy", title="隐私政策明示",
+            description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_02", dimension_id="dim_privacy", title="注销通道",
+            description="d", severity="HIGH", weight=10, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_03", dimension_id="dim_payment", title="资金防二清",
+            description="d", severity="CRITICAL", weight=15, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_04", dimension_id="dim_filing", title="ICP 备案",
+            description="d", severity="HIGH", weight=10, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_05", dimension_id="dim_filing", title="算法备案",
+            description="d", severity="HIGH", weight=10, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_06", dimension_id="dim_ip_oss", title="开源许可证",
+            description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_07", dimension_id="dim_ugc_security", title="IP 属地展示",
+            description="d", severity="HIGH", weight=8, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_08", dimension_id="dim_ugc_security", title="敏感词过滤",
+            description="d", severity="HIGH", weight=10, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_09", dimension_id="dim_ugc_security", title="日志留存 180 天",
+            description="d", severity="MEDIUM", weight=5, advice="a", legal_basis="l",
+        ),
+        AuditCheckItem(
+            id="chk_10", dimension_id="dim_cross_border", title="GDPR 合规",
+            description="d", severity="MEDIUM", weight=8, advice="a", legal_basis="l",
+        ),
+    ]
+    yield
+    compliance_service._checkpoints = []
 
 
 @pytest.fixture

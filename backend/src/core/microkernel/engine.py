@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Any, Optional
 from .models import (
-    DAGConfig, ExecutionResult, ExecutionStatus, NodeExecutionTrace, NodeType, CompensationTrace
+    DAGConfig, ExecutionResult, ExecutionStatus, NodeExecutionTrace, CompensationTrace
 )
 from .registry import registry
 from .dispatcher import dispatcher, DispatchMode, DualModeDispatcher

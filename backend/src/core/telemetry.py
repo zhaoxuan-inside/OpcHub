@@ -5,14 +5,12 @@ Complies with hs-dev-skill auxiliary_governance.md §5:
 - Structured JSON logging contract
 - Tri-state standard health probes (/livez, /readyz, /healthz)
 """
-import os
 import time
 import json
 import uuid
 import logging
 from contextvars import ContextVar
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response

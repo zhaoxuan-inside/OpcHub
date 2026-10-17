@@ -1,5 +1,5 @@
 """Models and Schemas for Ops Telemetry & Cross-Platform Metrics."""
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class KpiMetric(BaseModel):

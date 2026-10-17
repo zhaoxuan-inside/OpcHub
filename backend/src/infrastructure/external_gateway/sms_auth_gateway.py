@@ -1,13 +1,23 @@
 """Unified SMS and Identity Authentication Gateway."""
-from typing import Any
+from typing import Any, Optional
+from src.core.config import settings
 from .base_client import BaseOutboundClient
 
 
 class SMSAuthGateway(BaseOutboundClient):
     """Outbound proxy for SMS verification and legal entity identity checks."""
 
-    def __init__(self, base_url: str = "https://dysmsapi.aliyuncs.com", mock_mode: bool = True):
-        super().__init__(service_name="SMS_AUTH", base_url=base_url, mock_mode=mock_mode)
+    def __init__(
+        self,
+        base_url: Optional[str] = None,
+        mock_mode: Optional[bool] = None,
+    ):
+        super().__init__(
+            service_name="SMS_AUTH",
+            base_url=base_url or settings.sms_auth_base_url,
+            mock_mode=mock_mode if mock_mode is not None else settings.sms_auth_mock_mode,
+            api_key_env=settings.sms_auth_api_key_env,
+        )
 
     async def send_verification_code(self, phone_number: str, code: str) -> dict[str, Any]:
         """Send 6-digit SMS verification code for real-name authentication."""

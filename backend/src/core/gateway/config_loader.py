@@ -112,9 +112,24 @@ class GatewayConfigLoader:
 
     @classmethod
     def find_config_file(cls, config_path: Optional[str] = None) -> Path:
-        """Find the configuration file from provided path, env var, or search paths."""
+        """Find the configuration file from provided path, config setting, env var, or search paths."""
         if config_path and Path(config_path).is_file():
             return Path(config_path)
+
+        # Configuration-driven routes file path (application.yaml gateway.routes_config_file)
+        try:
+            from src.core.config import settings
+            cfg_path = getattr(settings, "gateway_routes_config_file", "")
+            if cfg_path:
+                candidate = Path(cfg_path)
+                if candidate.is_file():
+                    return candidate.resolve()
+                for base in cls.DEFAULT_CONFIG_LOCATIONS:
+                    sibling = base.parent.parent / cfg_path
+                    if sibling.is_file():
+                        return sibling.resolve()
+        except Exception:
+            pass
 
         env_path = os.getenv("OPCHUB_GATEWAY_ROUTES_CONFIG")
         if env_path and Path(env_path).is_file():
@@ -178,6 +193,8 @@ class GatewayConfigLoader:
             args_type = entry.get("args_type")
             key_name = entry.get("key_name")
             upgrade_adapter_str = entry.get("upgrade_adapter")
+            required_permission = entry.get("required_permission", "")
+            owner_check = entry.get("owner_check")
 
             raw_handler = _import_symbol(handler_str) if handler_str else None
             model_cls = _import_symbol(model_str) if model_str else None
@@ -202,6 +219,8 @@ class GatewayConfigLoader:
                 domain=domain,
                 description=description,
                 is_default=is_default,
+                required_permission=required_permission,
+                owner_check=owner_check,
             )
             count += 1
 

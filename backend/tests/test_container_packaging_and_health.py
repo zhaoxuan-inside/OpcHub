@@ -2,7 +2,6 @@
 import os
 import stat
 from pathlib import Path
-import pytest
 import yaml
 from fastapi.testclient import TestClient
 
@@ -57,8 +56,10 @@ def test_dockerignore_and_env_template():
     env_path = root_dir / ".env.example"
     assert env_path.is_file()
     env_content = env_path.read_text(encoding="utf-8")
-    assert "OPCHUB_PORT" in env_content
+    assert "OPCHUB_SERVER_PORT" in env_content
     assert "SILICONFLOW_API_KEY" in env_content
+    assert "OPCHUB_ADMIN_EMAIL" in env_content
+    assert "OPCHUB_AUDIT_RETENTION_DAYS" in env_content
 
 
 def test_quickstart_scripts_exist():

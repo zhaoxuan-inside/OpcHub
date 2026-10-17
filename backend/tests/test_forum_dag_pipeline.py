@@ -10,10 +10,27 @@ from src.domains.orchestration.models import ScenarioExecuteRequest
 
 @pytest.fixture(autouse=True)
 def clean_forum_state():
-    """Reset forum service state to default seeded threads before each test."""
+    """Reset forum service state and seed a test-only thread before each test."""
     forum_service.clear()
-    forum_service._seed_default_threads()
+    from src.domains.forum.service import utc_now_iso
+    from src.domains.forum.models import ForumThreadResponse
+    forum_service._threads["th_test_seed_2026"] = ForumThreadResponse(
+        id="th_test_seed_2026",
+        category_code="TAX",
+        author_id="usr_test_author",
+        title="【测试】2026 一人公司增值税免征额度操作细则",
+        content="测试种子帖子，用于物化路径评论树测试。",
+        view_count=0,
+        upvote_count=0,
+        comment_count=0,
+        bookmark_count=0,
+        is_pinned=False,
+        status="PUBLISHED",
+        created_at=utc_now_iso(),
+        updated_at=utc_now_iso(),
+    )
     yield
+    forum_service.clear()
 
 
 @pytest.fixture

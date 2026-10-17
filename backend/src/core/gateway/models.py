@@ -1,5 +1,5 @@
 """Data models for Unified Inbound Gateway Dispatcher."""
-from typing import Any, Optional, Dict
+from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 
 
@@ -21,6 +21,10 @@ class DispatchRequest(BaseModel):
     context: Dict[str, Any] = Field(
         default_factory=dict,
         description="调用上下文 (如 user_id, client, trace_id 等)"
+    )
+    token: Optional[str] = Field(
+        default=None,
+        description="调用者会话令牌，用于网关 RBAC/ABAC 身份解析 (也可置于 context.token)"
     )
 
 

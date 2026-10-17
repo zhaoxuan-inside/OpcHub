@@ -2,6 +2,43 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
+from src.domains.moderation.service import moderation_service
+from src.domains.moderation.models import ModerationItemResponse
+
+
+@pytest.fixture(autouse=True)
+def seed_moderation_items():
+    """Seed test-only moderation items so take-down/restore APIs have real targets."""
+    from src.domains.moderation.service import utc_now_iso
+    moderation_service._items.clear()
+    moderation_service._items["mod-101"] = ModerationItemResponse(
+        id="mod-101",
+        target_type="FORUM_THREAD",
+        target_id="th_viol_01",
+        author_id="usr_leak_test",
+        author_name="测试违规用户",
+        snippet_content="测试违规内容：出售未经脱敏的企业数据。",
+        violation_type="ILLEGAL_TRADE",
+        status="FLAGGED",
+        reported_at=utc_now_iso(),
+        reason="测试原因：商业机密泄露",
+    )
+    moderation_service._items["mod-102"] = ModerationItemResponse(
+        id="mod-102",
+        target_type="FORUM_COMMENT",
+        target_id="cm_viol_02",
+        author_id="usr_tax_fake_test",
+        author_name="测试财税黑中介",
+        snippet_content="测试违规内容：买发票冲抵进项。",
+        violation_type="SCAM",
+        status="TAKEN_DOWN",
+        reported_at=utc_now_iso(),
+        moderated_at=utc_now_iso(),
+        reason="测试原因：虚假宣传",
+        moderator_id="admin_test",
+    )
+    yield
+    moderation_service._items.clear()
 
 
 @pytest.mark.asyncio
@@ -11,7 +48,7 @@ async def test_list_moderation_items():
         res = await ac.get("/api/v1/admin/moderation/items")
         assert res.status_code == 200
         items = res.json()
-        assert len(items) >= 4
+        assert len(items) >= 2
         ids = [it["id"] for it in items]
         assert "mod-101" in ids
         assert "mod-102" in ids

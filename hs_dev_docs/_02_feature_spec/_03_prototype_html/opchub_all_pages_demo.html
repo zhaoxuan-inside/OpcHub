@@ -53,6 +53,7 @@
       --radius-lg: 20px;
       --radius-full: 9999px;
       --transition-liquid: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+      color-scheme: light;
     }
 
     [data-theme="dark"] {
@@ -83,6 +84,7 @@
       --orb-1: rgba(56, 75, 140, 0.4);
       --orb-2: rgba(99, 44, 133, 0.3);
       --orb-3: rgba(28, 100, 148, 0.35);
+      color-scheme: dark;
     }
 
     * {
@@ -363,9 +365,58 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #34C759;
+      background: #8E8E93;
       border: 1.5px solid var(--bg-canvas);
-      box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
+      box-shadow: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .nav-user-badge.online {
+      background: #34C759;
+      box-shadow: 0 0 6px rgba(52, 199, 89, 0.75);
+    }
+
+    .nav-user-badge.offline {
+      background: #8E8E93;
+      box-shadow: none;
+    }
+
+    .nav-icon-btn.unlogged {
+      color: var(--text-tertiary);
+    }
+
+    .nav-icon-btn.unlogged:hover {
+      color: var(--accent);
+      border-color: var(--accent-glass);
+      box-shadow: 0 0 10px rgba(0, 113, 227, 0.2);
+    }
+
+    .nav-icon-btn.logged-in {
+      color: var(--accent);
+    }
+
+    .auth-tab-btn {
+      flex: 1;
+      padding: 7px 12px;
+      font-size: 13px;
+      font-weight: 500;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: var(--radius-xs, 6px);
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .auth-tab-btn.active {
+      background: var(--glass-surface);
+      color: var(--text-primary);
+      font-weight: 600;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
     }
 
     .nav-role-dot {
@@ -590,7 +641,7 @@
     }
 
     /* ---------------- Inputs & Form Controls ---------------- */
-    .glass-input, .glass-select, .glass-textarea {
+    .glass-input, .glass-select, .glass-textarea, .input-liquid {
       width: 100%;
       background: var(--glass-surface-subtle);
       border: 1px solid var(--glass-border-subtle);
@@ -601,12 +652,75 @@
       font-size: 13.5px;
       outline: none;
       transition: var(--transition-liquid);
+      box-sizing: border-box;
     }
 
-    .glass-input:focus, .glass-select:focus, .glass-textarea:focus {
+    .glass-input:focus, .glass-select:focus, .glass-textarea:focus, .input-liquid:focus {
       border-color: var(--accent);
-      box-shadow: 0 0 12px var(--accent-glow);
+      box-shadow: 0 0 14px var(--accent-glow);
       background: var(--glass-surface-hover);
+    }
+
+    .glass-input::placeholder, .glass-textarea::placeholder, .input-liquid::placeholder {
+      color: var(--text-tertiary);
+      opacity: 0.85;
+    }
+
+    /* Dedicated Liquid Search Bar Capsule for Policy & Forum */
+    .search-bar-liquid {
+      background: var(--glass-surface);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--glass-shadow), var(--glass-specular);
+      padding: 10px 18px;
+      margin-top: 14px;
+      margin-bottom: 20px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      transition: var(--transition-liquid);
+    }
+
+    .search-bar-liquid:focus-within {
+      border-color: var(--accent);
+      box-shadow: var(--glass-shadow-hover), 0 0 16px var(--accent-glow);
+    }
+
+    /* Dark Mode specific input & search overrides (No harsh glaring white!) */
+    [data-theme="dark"] .glass-input,
+    [data-theme="dark"] .glass-select,
+    [data-theme="dark"] .glass-textarea,
+    [data-theme="dark"] .input-liquid {
+      background: rgba(18, 22, 34, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #F5F7FA;
+    }
+
+    [data-theme="dark"] .glass-input:focus,
+    [data-theme="dark"] .glass-select:focus,
+    [data-theme="dark"] .glass-textarea:focus,
+    [data-theme="dark"] .input-liquid:focus {
+      background: rgba(24, 30, 48, 0.9);
+      border-color: #2997FF;
+      box-shadow: 0 0 16px rgba(41, 151, 255, 0.35);
+    }
+
+    [data-theme="dark"] .glass-input::placeholder,
+    [data-theme="dark"] .input-liquid::placeholder {
+      color: #757C8A;
+      opacity: 0.9;
+    }
+
+    [data-theme="dark"] .search-bar-liquid {
+      background: rgba(16, 18, 28, 0.65);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    [data-theme="dark"] .search-bar-liquid:focus-within {
+      background: rgba(20, 24, 38, 0.85);
+      border-color: rgba(41, 151, 255, 0.6);
     }
 
     .form-group {
@@ -1097,11 +1211,8 @@
       </div>
 
       <div class="nav-right-actions">
-        <!-- 0. Dynamic Auth Bar (Login / Register / Session Profile) -->
-        <div id="navAuthBar" style="display: inline-flex; align-items: center; gap: 8px;">
-          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;">登录</button>
-          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;">注册</button>
-        </div>
+        <!-- 0. Dynamic Auth Bar (Session Profile only when logged in) -->
+        <div id="navAuthBar" style="display: none; align-items: center; gap: 8px;"></div>
 
         <!-- Unified VisionOS Frosted Island Layer (同一个图层：视角切换、暗黑模式、用户信息三合一) -->
         <div class="nav-actions-island" id="navActionsIsland">
@@ -1125,9 +1236,10 @@
           <div class="nav-island-divider"></div>
 
           <!-- 3. User Profile & Entitlements Icon Button -->
-          <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)">
-            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            <span class="nav-user-badge"></span>
+          <button class="nav-icon-btn unlogged" id="userProfileNavBtn" onclick="handleUserProfileClick(this)" title="未登录 · 点击登录或注册" data-tooltip="未登录 · 点击登录或注册">
+            <svg id="userNavDefaultIcon" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <div id="userNavAvatarInitial" style="display: none; width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--accent), #5856D6); box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);"></div>
+            <span class="nav-user-badge offline" id="navUserBadge" title="未登录"></span>
           </button>
         </div>
       </div>
@@ -1140,7 +1252,7 @@
          ========================================== -->
     <div id="view-home" class="view-panel active">
       <div class="glass-box">
-        <span class="mono-tag">SYSTEM PLATFORM OVERVIEW</span>
+        <span class="mono-tag" id="homeOverviewBadge">超级个体创客服务平台</span>
         <h1 class="page-title" style="margin-top: 12px;">超级个体一站式赋能服务平台</h1>
         <p class="page-desc">
           为一人公司（One-Person Company）构建全生命周期操作系统。以微内核流程编排与充血领域模型为基石，打通合规SOP、政策申报、算力折扣、产品打榜与商机外包。
@@ -1198,7 +1310,7 @@
               <h3 style="font-size: 16px; margin: 8px 0 6px;">产品合规指南</h3>
               <p style="font-size: 13px; color: var(--text-secondary);">六维合规防线、典型避坑案例库与上线前自检雷达。</p>
             </div>
-            <div class="sitemap-card" onclick="switchView('user')">
+            <div class="sitemap-card" onclick="handleUserProfileClick()">
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">07 · ENTITLEMENT</div>
               <h3 style="font-size: 16px; margin: 8px 0 6px;">用户管理与权益开通</h3>
               <p style="font-size: 13px; color: var(--text-secondary);">多级会员凭证强绑定、按量功能开关与支付鉴权控制中心。</p>
@@ -1267,8 +1379,8 @@
               <span class="mono-tag" style="font-size: 11px;">RAG: SQLite-VSS + LLM</span>
             </div>
             <div style="display: flex; gap: 8px;">
-              <input id="forumRagInput" type="text" class="input-liquid" placeholder="输入您的一人公司经营疑问（如：注册地址如何选？银行开户如何防风控？）..." style="flex: 1; padding: 7px 12px; font-size: 13px;" onkeydown="if(event.key==='Enter') askForumWithRAG()" />
-              <button class="btn-liquid" onclick="askForumWithRAG()" style="padding: 7px 14px; font-size: 12.5px;" data-tooltip="通过 RAG 召回真实经验贴并生成 AI 专家解答">
+              <input id="forumRagInput" type="text" class="glass-input input-liquid" placeholder="输入您的一人公司经营疑问（如：注册地址如何选？银行开户如何防风控？）..." style="flex: 1; padding: 8px 12px; font-size: 13px;" onkeydown="if(event.key==='Enter') askForumWithRAG()" />
+              <button class="btn-liquid" onclick="askForumWithRAG()" style="padding: 8px 16px; font-size: 12.5px; white-space: nowrap;" data-tooltip="通过 RAG 召回真实经验贴并生成 AI 专家解答">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
                 <span>智能问答</span>
               </button>
@@ -1422,14 +1534,14 @@
       </div>
 
       <!-- P04 RAG Semantic Vector Search Bar -->
-      <div class="glass-box" style="padding: 14px 24px; margin-top: 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: center;">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-tertiary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input id="policyRagInput" type="text" class="input-liquid" placeholder="输入业务特征（如：AI算力微调、出海独立开发、小规模免税）进行向量语义检索..." style="flex: 1; padding: 7px 12px; font-size: 13px;" onkeydown="if(event.key==='Enter') searchPolicyWithRAG()" />
-        <button class="btn-liquid" onclick="searchPolicyWithRAG()" style="padding: 7px 14px; font-size: 12.5px;" data-tooltip="调用轻量向量库执行余弦相似度混合召回">
+      <div class="search-bar-liquid">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--accent); flex-shrink: 0;"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="policyRagInput" type="text" class="glass-input input-liquid" placeholder="输入业务特征（如：AI算力微调、出海独立开发、小规模免税）进行向量语义检索..." style="flex: 1; padding: 8px 14px; font-size: 13.5px;" onkeydown="if(event.key==='Enter') searchPolicyWithRAG()" />
+        <button class="btn-liquid" onclick="searchPolicyWithRAG()" style="padding: 8px 16px; font-size: 12.5px; white-space: nowrap;" data-tooltip="调用轻量向量库执行余弦相似度混合召回">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
           <span>语义检索</span>
         </button>
-        <button class="btn-liquid-outline" onclick="fetchPolicies()" style="padding: 7px 12px; font-size: 12.5px;" data-tooltip="重置为全量政策列表">
+        <button class="btn-liquid-outline" onclick="fetchPolicies()" style="padding: 8px 14px; font-size: 12.5px; white-space: nowrap;" data-tooltip="重置为全量政策列表">
           <span>重置列表</span>
         </button>
       </div>
@@ -1654,11 +1766,11 @@
             <h3 style="font-size: 16px; margin-bottom: 16px;">填写申报实体关键信息</h3>
             <div class="form-group">
               <label class="form-label">拟定经营主体字号 / 公司全称</label>
-              <input type="text" id="sopCompanyName" class="glass-input" value="极客视界（杭州）信息技术工作室" oninput="updateDocPreview()">
+              <input type="text" id="sopCompanyName" class="glass-input" placeholder="例如：某某（杭州）信息技术工作室" oninput="updateDocPreview()">
             </div>
             <div class="form-group">
               <label class="form-label">法定代表创客姓名 / 身份证号</label>
-              <input type="text" id="sopFounderName" class="glass-input" value="赵玄 (33010619920101XXXX)" oninput="updateDocPreview()">
+              <input type="text" id="sopFounderName" class="glass-input" placeholder="例如：创客姓名 (身份证号)" oninput="updateDocPreview()">
             </div>
             <div class="form-group">
               <label class="form-label">主营经营范围代码</label>
@@ -1693,11 +1805,11 @@
             <div id="sopDocOutput" style="font-family: var(--font-mono); font-size: 12.5px; line-height: 1.7; color: var(--text-secondary); white-space: pre-wrap;">
 个体工商户设立登记申请书
 ---------------------------------------------
-登记机关：杭州市市场监督管理局
-主体全称：极客视界（杭州）信息技术工作室
-经营者：赵玄 (33010619920101XXXX)
+登记机关：市场监督管理局高新区分局
+主体全称：[待填报主体全称]
+经营者：[待填报创客姓名]
 资金数额：人民币 100,000 元整
-经营场所：杭州市高新技术产业园区集群登记地址
+经营场所：高新技术产业园区集群登记地址
 主营范围：软件开发；信息技术咨询服务；人工智能应用软件开发
 
 承诺签署：
@@ -1791,11 +1903,11 @@
          ========================================== -->
     <div id="view-user" class="view-panel">
         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <h1 class="page-title" style="font-size: 26px; margin: 0;">创客用户体系与收费权益中心</h1>
+          <h1 class="page-title" style="font-size: 26px; margin: 0;">创客用户中心与生态权益</h1>
           <span id="userProfilePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">创客权益体系</span>
         </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
-          基于 user_id 与 entitlement_id 强绑定架构。涵盖三级用户体系（管理员、创客、游客）与功能权限开关控制。
+          维护创客个人与企业主体档案，自主管理专属业务赋能权益与出海通道。
         </p>
 
         <div class="grid-2" style="align-items: start;">
@@ -1804,128 +1916,129 @@
             <!-- Avatar & Identity Pill -->
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 14px 16px; background: var(--glass-surface); border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
               <div id="userAvatarLetter" style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, var(--accent), #5856D6); display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: #fff; position: relative; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35);">
-                ZX
-                <span style="position: absolute; bottom: 0; right: 0; width: 13px; height: 13px; border-radius: 50%; background: #34C759; border: 2.5px solid var(--bg-canvas);"></span>
+                OP
+                <span id="userAvatarOnlineBadge" style="position: absolute; bottom: 0; right: 0; width: 13px; height: 13px; border-radius: 50%; background: #8E8E93; border: 2.5px solid var(--bg-canvas);"></span>
               </div>
               <div style="flex: 1; min-width: 0;">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span id="userDisplayName" style="font-size: 15.5px; font-weight: 600;">赵玄 (Zhao Xuan)</span>
-                  <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759;">已认证主体</span>
+                  <span id="userDisplayName" style="font-size: 15.5px; font-weight: 600;">未登录创客</span>
+                  <span id="userTierBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent); font-weight: 600;">标准创客</span>
+                  <span id="userAuthStatusBadge" class="mono-tag" style="background: rgba(142, 142, 147, 0.15); color: var(--text-tertiary);">未认证主体</span>
                 </div>
-                <div id="userUidAndTier" style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px;">UID: usr_2026_opc_9981 · 黑钻创客</div>
+                <div id="userUidAndTier" style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 4px;">UID: -- · 状态: 访客</div>
               </div>
-              <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="showLiquidNotice('头像更新', '创客专属液态毛玻璃头像已同步更新！', 'SUCCESS')" data-tooltip="更新创客个人头像"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>更换头像</button>
-            </div>
-
-            <!-- Workspace Role Switcher Card -->
-            <div style="background: var(--glass-surface); padding: 12px 16px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border); margin-bottom: 18px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
-              <div>
-                <div style="font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px;">
-                  <span>当前工作区身份:</span>
-                  <span id="userRoleBadgeText" style="color: var(--accent); font-family: var(--font-mono);">普通创客 (USER)</span>
-                </div>
-                <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
-                  管理员独占编排、运营与内容治理；创客独占头脑风暴与业务流。
-                </div>
+              <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="showLiquidNotice('头像更新', '创客专属液态毛玻璃头像已同步更新！', 'SUCCESS')" data-tooltip="更新创客个人头像"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>更换头像</button>
+                <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px; color: #ff453a; border-color: rgba(255, 69, 58, 0.35);" onclick="handleLogout()" data-tooltip="安全退出当前创客登录状态"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>退出</button>
               </div>
-              <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="toggleUserRole()" data-tooltip="切换当前工作区权限视角"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg><span id="userRoleBtnText">切换管理</span></button>
             </div>
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
               <h3 style="font-size: 15px; font-weight: 600;">创客基本信息与主体档案</h3>
-              <span id="userRoleBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: SUPER INDIVIDUAL</span>
             </div>
 
             <div class="grid-2" style="gap: 12px; margin-bottom: 0;">
               <div class="form-group">
                 <label class="form-label">创客真实姓名</label>
-                <input type="text" id="userRealName" class="glass-input" value="赵玄">
+                <input type="text" id="userRealName" class="glass-input" placeholder="请输入创客真实姓名">
               </div>
               <div class="form-group">
                 <label class="form-label">绑定联系手机</label>
-                <input type="text" id="userPhone" class="glass-input" value="138-0010-8888">
+                <input type="text" id="userPhone" class="glass-input" placeholder="请输入手机联系电话">
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">创客电子邮箱 (已完成安全认证)</label>
-              <input type="text" id="userEmail" class="glass-input" value="zhaoxuan@opchub.com">
+              <input type="text" id="userEmail" class="glass-input" placeholder="创客注册邮箱" readonly style="opacity: 0.85;">
             </div>
 
             <div class="form-group">
               <label class="form-label">绑定统一社会信用代码</label>
-              <input type="text" id="userCreditCode" class="glass-input" value="92330106MA2XXXXXX">
+              <input type="text" id="userCreditCode" class="glass-input" placeholder="18位统一社会信用代码 (选填)">
             </div>
 
             <div class="form-group">
               <label class="form-label">经营主体全称</label>
-              <input type="text" id="userCompanyName" class="glass-input" value="极客视界（杭州）信息技术工作室">
+              <input type="text" id="userCompanyName" class="glass-input" placeholder="例如：某某（杭州）信息技术工作室">
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">创客会员等级与用户状态</label>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <input type="text" id="userTierInput" class="glass-input" value="标准创客" readonly style="opacity: 0.9; font-weight: 600; color: var(--accent); flex: 1;">
+                <button class="btn-liquid-outline" style="padding: 6px 14px; font-size: 12px; white-space: nowrap;" onclick="openEntitlementModal('升级为黑钻创客 VIP', 899)" data-tooltip="一键开通黑钻创客 VIP 专属特权"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>权益升级</button>
+              </div>
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 14px;">
-              <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="showLiquidNotice('创客档案保存', '创客企业信用代码与基本信息档案已成功更新至后端数据库！', 'SUCCESS')" data-tooltip="保存创客个人基本档案与企业信用代码"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
-              <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="showLiquidNotice('重置表单', '档案填报项已重置为最近一次云端保存版本。', 'INFO')" data-tooltip="放弃修改并还原为云端原始档案"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重置信息</button>
+              <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="saveUserProfile()" data-tooltip="保存创客个人基本档案与企业信用代码"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>保存档案</button>
+              <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="fetchUserProfile(); showLiquidNotice('已刷新', '档案填报项已重置为云端保存版本。', 'INFO')" data-tooltip="放弃修改并还原为云端原始档案"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M1 4v6h6"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>重置信息</button>
             </div>
           </div>
 
-          <!-- Right: Entitlements Switcher & Monetization -->
-          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-              <h3 style="font-size: 15px; font-weight: 600;">收费权益与专属功能开关</h3>
-              <span id="userEntitlementsStatusTag" class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">VIP ACTIVE</span>
-            </div>
+          <!-- Right: Membership Entitlements & Platform Privileges -->
+          <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle); display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h3 style="font-size: 15px; font-weight: 600;">创客会员专属业务特权</h3>
+                <span id="userEntitlementsStatusTag" class="mono-tag" style="background: rgba(0, 113, 227, 0.15); color: var(--accent);">标准创客权益</span>
+              </div>
 
-            <div id="userEntitlementsList">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-                <div>
-                  <div style="font-weight: 600; font-size: 13.5px;">微内核高并发编排算力通道 (ent_microkernel_pipeline)</div>
-                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">基础微内核 DAG 串联与沙箱执行能力 · 配额: 10,000 次/日</div>
+              <div id="userEntitlementsList">
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                  <div>
+                    <div style="font-weight: 600; font-size: 13.5px;">超级个体全链路出海与合规通道</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">一站式连通海外支付结算、企业合规自检与政务申报 · 配额: 实时就绪</div>
+                  </div>
+                  <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759; border-color: rgba(52, 199, 89, 0.3); font-weight: 600;">已生效</span>
                 </div>
-                <label class="switch-toggle">
-                  <input type="checkbox" checked onchange="toggleFeature(this, 'ent_microkernel_pipeline')">
-                  <span class="slider"></span>
-                </label>
-              </div>
 
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-                <div>
-                  <div style="font-weight: 600; font-size: 13.5px;">全国与地方政策雷达白话提炼 (ent_policy_radar_basic)</div>
-                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">免费查阅与匹配国家级增值税与小微企业免税政策 · 配额: 实时全量</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                  <div>
+                    <div style="font-weight: 600; font-size: 13.5px;">全国与地方政策雷达白话提炼</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">免费查阅与匹配国家级增值税与小微企业免税政策 · 配额: 实时全量</div>
+                  </div>
+                  <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759; border-color: rgba(52, 199, 89, 0.3); font-weight: 600;">已生效</span>
                 </div>
-                <label class="switch-toggle">
-                  <input type="checkbox" checked onchange="toggleFeature(this, 'ent_policy_radar_basic')">
-                  <span class="slider"></span>
-                </label>
-              </div>
 
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-                <div>
-                  <div style="font-weight: 600; font-size: 13.5px;">AI 政策智能测算与申报材料极速出具 (ent_ai_tax_assistant)</div>
-                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">解锁一键生成符合政务标准的设立登记、软著申报全套文书 · 配额: 无限次导出</div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                  <div>
+                    <div style="font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                      <span>AI 政策智能测算与申报材料极速出具</span>
+                      <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500; font-size: 10px; padding: 1px 5px;">黑钻专属</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">一键生成符合政务标准的设立登记、软著申报全套文书 · 配额: 无限次导出</div>
+                  </div>
+                  <button class="btn-liquid-outline" style="font-size: 11px; padding: 4px 10px;" onclick="openEntitlementModal('升级为黑钻创客 VIP', 899)">升级解锁</button>
                 </div>
-                <label class="switch-toggle">
-                  <input type="checkbox" onchange="toggleFeature(this, 'ent_ai_tax_assistant')">
-                  <span class="slider"></span>
-                </label>
-              </div>
-            </div>
 
-            <!-- API Credentials Box -->
-            <div style="margin-top: 18px; padding: 14px; background: var(--glass-surface); border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary);">微内核 API 访问凭据 (Developer Key)</span>
-                <span class="mono-tag" style="font-size: 10px;">READ/WRITE</span>
-              </div>
-              <div style="display: flex; gap: 8px; align-items: center;">
-                <input type="password" class="glass-input" value="opc_live_9981_77a94fa10b9c3e" readonly style="font-family: var(--font-mono); font-size: 12px; padding: 6px 10px; margin: 0;">
-                <button class="btn-liquid-outline" style="padding: 6px 12px; font-size: 12px;" onclick="showLiquidNotice('复制成功', '创客专属微内核网关 API Token 已复制至剪贴板！', 'SUCCESS')" data-tooltip="复制创客专属微内核调用私钥"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>复制密钥</button>
-                <button class="btn-liquid-outline" style="padding: 6px 12px; font-size: 12px;" onclick="showLiquidNotice('密钥重置', '微内核网关 API 凭证已重新签发，旧密钥已即刻作废！', 'WARNING')" data-tooltip="重新生成微内核网关私钥"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>重置密钥</button>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                  <div>
+                    <div style="font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                      <span>黑钻合伙人 VIP 优先需求派单特权</span>
+                      <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500; font-size: 10px; padding: 1px 5px;">黑钻专属</span>
+                    </div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">获得企业技术外包与出海委托优先推荐接单权限，技术担保履约背书 · 配额: 顶格优先派单</div>
+                  </div>
+                  <button class="btn-liquid-outline" style="font-size: 11px; padding: 4px 10px;" onclick="openEntitlementModal('升级为黑钻创客 VIP', 899)">升级解锁</button>
+                </div>
               </div>
             </div>
 
-            <div style="margin-top: 18px; text-align: right;">
-              <button class="btn-liquid" onclick="openEntitlementModal('开通创客年度全权益通行证', 999)" data-tooltip="升级开通创客年度全权益黑钻通行证 (¥999/年)">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>升级黑钻
+            <!-- VIP Promotion Banner Card -->
+            <div style="margin-top: 20px; padding: 16px; background: linear-gradient(135deg, rgba(255,149,0,0.08), rgba(0,113,227,0.08)); border-radius: var(--radius-sm); border: 1px solid rgba(255,149,0,0.25); display: flex; justify-content: space-between; align-items: center; gap: 14px;">
+              <div>
+                <div style="font-weight: 600; font-size: 13.5px; color: #FF9500; display: flex; align-items: center; gap: 6px;">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                  <span>晋升黑钻创客 VIP</span>
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 3px;">
+                  解锁高阶 AI 政务合规文书无限导出与万级企业外包优先派单。
+                </div>
+              </div>
+              <button class="btn-liquid" style="font-size: 12px; padding: 6px 14px; white-space: nowrap;" onclick="openEntitlementModal('升级为黑钻创客 VIP', 899)">
+                立即升级
               </button>
             </div>
           </div>
@@ -2702,7 +2815,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
                   一人公司出海绿色通道，协助开立香港与新加坡虚拟对公子账户，资金阳光结汇直达境内。
                 </p>
                 <div style="display: flex; gap: 12px; font-size: 10.5px; color: var(--text-tertiary); margin-top: 6px;">
-                  <span>作者: 赵玄</span>
+                  <span>作者: 平台认证创客</span>
                   <span>互动: 142</span>
                 </div>
               </div>
@@ -2811,7 +2924,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
                 <p style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
                   集成分镜排版、多语言出海分发与本地 Markdown 导出，本周创客点赞数 428 次。
                 </p>
-                <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 4px;">开发者: 赵玄 · 极客视界工作室</div>
+                <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 4px;">开发者: 认证创客 · 独立工作室</div>
               </div>
 
               <!-- Android Feature 3: Official Notice -->
@@ -3381,6 +3494,18 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         <button class="btn-liquid-outline" onclick="closeAuthModals()" style="padding: 4px 8px;" data-tooltip="关闭登录窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
+      <!-- Segmented Auth Mode Switcher -->
+      <div style="display: flex; background: var(--glass-surface-subtle); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle); margin-bottom: 16px;">
+        <button class="auth-tab-btn active" type="button" onclick="openLoginModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          创客登录
+        </button>
+        <button class="auth-tab-btn" type="button" onclick="openRegisterModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          免费注册
+        </button>
+      </div>
+
       <div style="display: flex; flex-direction: column; gap: 14px; margin-bottom: 20px;">
         <div>
           <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">登录邮箱</label>
@@ -3418,6 +3543,18 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           </div>
         </div>
         <button class="btn-liquid-outline" onclick="closeAuthModals()" style="padding: 4px 8px;" data-tooltip="关闭注册窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+
+      <!-- Segmented Auth Mode Switcher -->
+      <div style="display: flex; background: var(--glass-surface-subtle); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle); margin-bottom: 16px;">
+        <button class="auth-tab-btn" type="button" onclick="openLoginModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          创客登录
+        </button>
+        <button class="auth-tab-btn active" type="button" onclick="openRegisterModal()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          免费注册
+        </button>
       </div>
 
       <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
@@ -4063,7 +4200,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         title: title,
         content: content,
         category_code: catCode,
-        author_id: "usr_2026_opc_9981"
+        author_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest"
       });
 
       if (!gwRes.ok) {
@@ -4210,7 +4347,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const payload = {
         thread_id: currentActiveThreadId,
         content: content,
-        author_id: "usr_2026_opc_9981",
+        author_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest",
         parent_id: currentReplyingParentId || null
       };
 
@@ -4282,7 +4419,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         pricing_model: pricing,
         price_cny: price,
         demo_url: url,
-        author_id: "usr_2026_opc_9981"
+        author_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest"
       });
 
       if (!gwRes.ok) {
@@ -4531,7 +4668,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         budget_cny: budget,
         category: cat,
         deadline_days: deadline,
-        creator_id: "usr_2026_opc_9981"
+        creator_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest"
       });
       if (gwRes.ok && gwRes.data) {
         demandId = gwRes.data.id || demandId;
@@ -4614,7 +4751,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
       const gwRes = await dispatchGateway('demands.bid', {
         demand_id: demandId,
-        bidder_id: 'usr_2026_opc_9981',
+        bidder_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest",
         bid_amount_cny: amount,
         delivery_days: days,
         proposal_text: proposal
@@ -4772,8 +4909,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       // Update current preview directly
       const docOut = document.getElementById('sopDocOutput');
       if (docOut && content) {
-        const comp = document.getElementById('sopCompanyName') ? document.getElementById('sopCompanyName').value : '极客视界（杭州）信息技术工作室';
-        const founder = document.getElementById('sopFounderName') ? document.getElementById('sopFounderName').value : '赵玄';
+        const comp = (document.getElementById('sopCompanyName') && document.getElementById('sopCompanyName').value) || (currentUserSession && currentUserSession.company_name) || '拟定企业全称';
+        const founder = (document.getElementById('sopFounderName') && document.getElementById('sopFounderName').value) || (currentUserSession && (currentUserSession.nickname || currentUserSession.email)) || '创客姓名';
         docOut.textContent = content.replace(/\{company_name\}/g, comp).replace(/\{founder_name\}/g, founder);
       }
 
@@ -4791,9 +4928,12 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (perkName.includes("Cloudflare") || perkName.includes("Workers")) perkId = "perk_cloudflare_workers";
       if (perkName.includes("Stripe") || perkName.includes("Atlas") || perkName.includes("PingPong")) perkId = "perk_stripe_atlas";
 
+      const uid = (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest";
+      const uName = (currentUserSession && (currentUserSession.nickname || currentUserSession.email)) || "当前创客";
+
       const gwRes = await dispatchGateway('perks.claim', {
         perk_id: perkId,
-        user_id: "usr_2026_opc_9981"
+        user_id: uid
       });
       if (gwRes.ok && gwRes.data) {
         code = gwRes.data.voucher_code || gwRes.data.license_code || code;
@@ -4801,7 +4941,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
       showLiquidNotice(
         `${perkName} 领取成功`,
-        `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n生效状态: 已激活\n说明: 凭据已由 OPC_PERK_CLAIM_PIPELINE 完成配额扣减与持久化。`,
+        `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: ${uName} (${uid})\n生效状态: 已激活\n说明: 凭据已由 OPC_PERK_CLAIM_PIPELINE 完成配额扣减与持久化。`,
         'SUCCESS'
       );
     }
@@ -5019,9 +5159,6 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         if (roleIconAdmin) roleIconAdmin.style.display = 'block';
         if (roleDot) roleDot.style.background = '#FF9500';
 
-        if (userRoleBadgeText) userRoleBadgeText.textContent = '平台管理员 (ADMIN)';
-        if (userRoleBtnText) userRoleBtnText.textContent = '切换创客';
-
         // Check active view: if current view is a user-only view, redirect to 'ops'
         const currentActivePanel = document.querySelector('.view-panel.active');
         const activeId = currentActivePanel ? currentActivePanel.id.replace('view-', '') : '';
@@ -5040,9 +5177,6 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         if (roleIconMaker) roleIconMaker.style.display = 'block';
         if (roleIconAdmin) roleIconAdmin.style.display = 'none';
         if (roleDot) roleDot.style.background = '#34C759';
-
-        if (userRoleBadgeText) userRoleBadgeText.textContent = '普通创客 (USER)';
-        if (userRoleBtnText) userRoleBtnText.textContent = '切换管理';
 
         // Check active view: if current view is an admin-only view, redirect to 'home'
         const currentActivePanel = document.querySelector('.view-panel.active');
@@ -5350,7 +5484,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
       const payload = {
         template_id: currentSopTemplateId,
-        user_id: "usr_2026_opc_9981",
+        user_id: (currentUserSession && currentUserSession.uid) ? currentUserSession.uid : "usr_guest",
         form_data: {
           company_name: company,
           founder_name: founder,
@@ -5529,17 +5663,29 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
     async function confirmEntitlementPayment() {
       let code = "ENT_VIP";
+      if (!currentUserSession || !currentUserSession.token) {
+        closeEntitlementModal();
+        openAuthModal('login');
+        showLiquidNotice('请先登录', '请先登录创客账号后再升级开通会员特权。', 'INFO');
+        return;
+      }
+      const uid = currentUserSession.uid;
+      const uName = currentUserSession.nickname || currentUserSession.email || "当前创客";
+
       const gwRes = await dispatchGateway('user.entitlements.activate', {
-        user_id: "usr_2026_opc_9981",
+        user_id: uid,
         entitlement_code: code,
         duration_months: 12
       });
       if (gwRes.ok && gwRes.data) {
-        code = gwRes.data.entitlement_code || code;
+        currentUserSession.tier_name = "黑钻创客 VIP";
+        localStorage.setItem('opchub_auth_session', JSON.stringify(currentUserSession));
+        showLiquidNotice('会员升级成功', `恭喜！您的创客账号已正式晋升为【黑钻创客 VIP】！\n主体绑定: ${uName}\n全量政务申报文书导出与高额需求优先派单特权已即刻生效！`, 'SUCCESS');
+      } else {
+        showLiquidNotice('升级受阻', (gwRes.error || '开通黑钻权益失败，请重试'), 'CRITICAL');
       }
-
-      showLiquidNotice('权益激活', `已成功持久化创客专属权益凭据并完成支付鉴权！\n权益编号: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n高级模块与微内核 API 配额已开启！`, 'SUCCESS');
       closeEntitlementModal();
+      fetchUserProfile();
     }
 
     function toggleFeature(checkbox, entitlementId) {
@@ -5554,6 +5700,22 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // Maker Authentication & Email Registration Controller
     // -------------------------------------------------------------
     let currentUserSession = null;
+
+    function handleUserProfileClick(btn) {
+      if (currentUserSession && currentUserSession.token) {
+        switchView('user', btn || document.getElementById('userProfileNavBtn'));
+      } else {
+        openAuthModal('login');
+      }
+    }
+
+    function openAuthModal(defaultTab = 'login') {
+      if (defaultTab === 'register') {
+        openRegisterModal();
+      } else {
+        openLoginModal();
+      }
+    }
 
     function openLoginModal() {
       const err = document.getElementById('loginErrorMsg');
@@ -5580,25 +5742,52 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
     function renderAuthHeader() {
       const bar = document.getElementById('navAuthBar');
-      if (!bar) return;
+      if (bar) {
+        bar.style.display = 'none';
+        bar.innerHTML = '';
+      }
 
-      if (currentUserSession && currentUserSession.token) {
-        const initial = (currentUserSession.nickname || currentUserSession.email || 'M').charAt(0).toUpperCase();
+      const userBtn = document.getElementById('userProfileNavBtn');
+      const defaultIcon = document.getElementById('userNavDefaultIcon');
+      const avatarInitial = document.getElementById('userNavAvatarInitial');
+      const userBadge = document.getElementById('navUserBadge');
+
+      const isLoggedIn = !!(currentUserSession && currentUserSession.token);
+
+      if (isLoggedIn) {
+        const initial = (currentUserSession.nickname || currentUserSession.email || 'M').slice(0, 2).toUpperCase();
         const displayLabel = currentUserSession.nickname || currentUserSession.email.split('@')[0];
-        const tier = currentUserSession.tier_name || '标准创客';
-        bar.innerHTML = `
-          <div style="display: inline-flex; align-items: center; gap: 7px; background: var(--glass-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 3px 10px 3px 5px; box-shadow: var(--glass-specular);">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #5856D6); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="switchView('user')">${initial}</div>
-            <span style="font-size: 12.5px; font-weight: 600; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" onclick="switchView('user')">${displayLabel}</span>
-            <span class="mono-tag" style="font-size: 9.5px; padding: 1px 5px; background: var(--accent-glass); color: var(--accent); border-radius: 4px;">${tier}</span>
-            <button onclick="handleLogout()" class="btn-liquid-outline" style="padding: 2px 7px; font-size: 11px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer;">退出</button>
-          </div>
-        `;
+
+        if (userBtn) {
+          userBtn.classList.remove('unlogged');
+          userBtn.classList.add('logged-in');
+          const tip = `创客档案: ${displayLabel} · 点击进入个人中心`;
+          userBtn.setAttribute('data-tooltip', tip);
+          userBtn.title = tip;
+        }
+        if (defaultIcon) defaultIcon.style.display = 'none';
+        if (avatarInitial) {
+          avatarInitial.style.display = 'flex';
+          avatarInitial.textContent = initial;
+        }
+        if (userBadge) {
+          userBadge.className = 'nav-user-badge online';
+          userBadge.title = '在线 · 已登录认证会话';
+        }
       } else {
-        bar.innerHTML = `
-          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;">登录</button>
-          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;">注册</button>
-        `;
+        if (userBtn) {
+          userBtn.classList.remove('logged-in');
+          userBtn.classList.add('unlogged');
+          const tip = '未登录 · 点击登录或注册';
+          userBtn.setAttribute('data-tooltip', tip);
+          userBtn.title = tip;
+        }
+        if (defaultIcon) defaultIcon.style.display = 'block';
+        if (avatarInitial) avatarInitial.style.display = 'none';
+        if (userBadge) {
+          userBadge.className = 'nav-user-badge offline';
+          userBadge.title = '未登录 · 游客状态';
+        }
       }
     }
 
@@ -5670,6 +5859,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         localStorage.setItem('opchub_session_token', authData.token);
         renderAuthHeader();
         closeAuthModals();
+        fetchUserProfile();
+        switchView('user', document.getElementById('userProfileNavBtn'));
         showLiquidNotice(
           '注册成功',
           `恭喜！创客账号 ${authData.email} 已成功创建并完成数据库持久化。\n创客昵称: ${authData.nickname}\n工作台身份: ${authData.tier_name}\n已为您自动登录并初始化超级个体工作区！`,
@@ -5732,6 +5923,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         localStorage.setItem('opchub_session_token', authData.token);
         renderAuthHeader();
         closeAuthModals();
+        fetchUserProfile();
+        switchView('user', document.getElementById('userProfileNavBtn'));
         showLiquidNotice(
           '登录成功',
           `欢迎回来，${authData.nickname || authData.email}！\n已恢复创客工作台会话。\n主体组织: ${authData.company_name || '独立创客'}`,
@@ -5750,7 +5943,11 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       localStorage.removeItem('opchub_session_token');
       currentUserSession = null;
       renderAuthHeader();
-      showLiquidNotice('已退出登录', '您已安全退出当前创客会话。可随时点击右上角重新登录。', 'INFO');
+      const curActive = document.querySelector('.view-panel.active');
+      if (curActive && curActive.id === 'view-user') {
+        switchView('home');
+      }
+      showLiquidNotice('已退出登录', '您已安全退出当前创客会话。可随时点击用户头像重新登录。', 'INFO');
     }
 
     async function restoreUserSession() {
@@ -6147,8 +6344,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         scenario_code: currentScenarioCode,
         inputs: {
           quarterly_income: 260000,
-          company_name: "杭州智启超级个体科技有限公司",
-          owner_name: "赵玄",
+          company_name: (currentUserSession && currentUserSession.company_name) || "智启超级个体科技有限公司",
+          owner_name: (currentUserSession && (currentUserSession.nickname || currentUserSession.email)) || "创客代表",
           checked_ids: ["chk_01", "chk_03", "chk_06", "chk_08"]
         },
         override_dispatch_mode: currentDispatchMode
@@ -6385,9 +6582,9 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const gwRes = await dispatchGateway("home.overview");
       if (!gwRes.ok || !gwRes.data) return;
       const data = gwRes.data;
-      const overviewBadge = document.querySelector('#view-home .mono-tag');
-      if (overviewBadge && data.active_makers_count) {
-        overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
+      const overviewBadge = document.getElementById('homeOverviewBadge');
+      if (overviewBadge) {
+        overviewBadge.textContent = `超级个体创客服务平台 · 服务就绪`;
       }
       const pipeBadge = document.getElementById('homePipelineBadge');
       if (pipeBadge) {
@@ -6644,53 +6841,153 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       });
     }
 
+    async function saveUserProfile() {
+      if (!currentUserSession || !currentUserSession.uid) {
+        showLiquidNotice('请先登录', '请先在右上角登录您的创客账户后再保存个人档案！', 'WARNING');
+        openLoginModal();
+        return;
+      }
+      const nickname = (document.getElementById('userRealName').value || '').trim();
+      const phone = (document.getElementById('userPhone').value || '').trim();
+      const company = (document.getElementById('userCompanyName').value || '').trim();
+      const credit = (document.getElementById('userCreditCode').value || '').trim();
+
+      const gwRes = await dispatchGateway('user.profile.update', {
+        user_id: currentUserSession.uid,
+        token: currentUserSession.token,
+        nickname: nickname,
+        phone: phone,
+        company_name: company,
+        credit_code: credit
+      });
+
+      if (gwRes.ok && gwRes.data) {
+        currentUserSession.nickname = gwRes.data.nickname || nickname;
+        currentUserSession.phone = gwRes.data.phone || phone;
+        currentUserSession.company_name = gwRes.data.company_name || company;
+        currentUserSession.credit_code = gwRes.data.credit_code || credit;
+        localStorage.setItem('opchub_auth_session', JSON.stringify(currentUserSession));
+        updateUserAuthBadge();
+        fetchUserProfile();
+        showLiquidNotice('创客档案保存', '创客真实姓名与企业主体档案已成功保存并持久化！', 'SUCCESS');
+      } else {
+        showLiquidNotice('保存受阻', (gwRes.error || '保存创客档案失败，请重试'), 'CRITICAL');
+      }
+    }
+
     async function fetchUserProfile() {
-      const gwRes = await dispatchGateway("user.profile");
+      const payload = {};
+      if (currentUserSession && currentUserSession.uid) {
+        payload.user_id = currentUserSession.uid;
+      }
+      if (currentUserSession && currentUserSession.token) {
+        payload.token = currentUserSession.token;
+      }
+      const gwRes = await dispatchGateway("user.profile", payload);
       if (!gwRes.ok || !gwRes.data) return;
       const profile = gwRes.data;
       if (profile) {
         const pipeBadge = document.getElementById('userProfilePipelineBadge');
         if (pipeBadge) {
-          pipeBadge.textContent = `认证超级个体`;
+          pipeBadge.textContent = currentUserSession ? `认证超级个体` : `游客预览模式`;
         }
         const compElem = document.querySelector('#view-user h1');
-        if (compElem && profile.company_name) {
-          compElem.textContent = `${profile.company_name} · 创客空间`;
+        if (compElem) {
+          const cName = (currentUserSession && currentUserSession.company_name) || profile.company_name || (currentUserSession ? '独立创客' : '创客空间');
+          compElem.textContent = `${cName} · 创客空间`;
         }
         const tierTag = document.getElementById('userRoleBadge');
-        if (tierTag && profile.role) {
-          tierTag.textContent = `ROLE: ${profile.role}`;
+        if (tierTag) {
+          tierTag.textContent = `ROLE: ${(currentUserSession && currentUserSession.role) || profile.role || 'USER'}`;
         }
         const statusTag = document.getElementById('userEntitlementsStatusTag');
-        if (statusTag && profile.tier_name) {
-          statusTag.textContent = profile.tier_name.toUpperCase();
+        if (statusTag) {
+          statusTag.textContent = ((currentUserSession && currentUserSession.tier_name) || profile.tier_name || 'STANDARD').toUpperCase();
         }
 
         // Form Inputs
         const nameInput = document.getElementById('userRealName');
-        if (nameInput) nameInput.value = profile.nickname || '';
+        if (nameInput) nameInput.value = (currentUserSession && currentUserSession.nickname) || (profile.uid !== 'usr_guest' ? profile.nickname : '');
         const phoneInput = document.getElementById('userPhone');
-        if (phoneInput) phoneInput.value = profile.phone || (currentUserSession ? currentUserSession.phone : '') || '138-0010-8888';
+        if (phoneInput) phoneInput.value = (currentUserSession && currentUserSession.phone) || profile.phone || '';
         const emailInput = document.getElementById('userEmail');
-        if (emailInput) emailInput.value = (currentUserSession ? currentUserSession.email : '') || profile.email || 'maker@opchub.com';
+        if (emailInput) emailInput.value = (currentUserSession && currentUserSession.email) || (profile.uid !== 'usr_guest' ? profile.email : '');
         const creditInput = document.getElementById('userCreditCode');
-        if (creditInput) creditInput.value = profile.credit_code || '';
+        if (creditInput) creditInput.value = (currentUserSession && currentUserSession.credit_code) || profile.credit_code || '';
         const companyInput = document.getElementById('userCompanyName');
-        if (companyInput) companyInput.value = profile.company_name || '';
+        if (companyInput) companyInput.value = (currentUserSession && currentUserSession.company_name) || profile.company_name || '';
 
         // Avatar Letter & Profile Header
         const avatarEl = document.getElementById('userAvatarLetter');
         if (avatarEl) {
-          const letter = (profile.nickname || (currentUserSession ? currentUserSession.email : 'ZX')).slice(0, 2).toUpperCase();
+          let letter = 'OP';
+          if (currentUserSession) {
+            letter = (currentUserSession.nickname || currentUserSession.email || 'OP').slice(0, 2).toUpperCase();
+          } else if (profile.nickname && profile.uid !== 'usr_guest') {
+            letter = profile.nickname.slice(0, 2).toUpperCase();
+          }
           avatarEl.childNodes[0].nodeValue = letter + '\n                ';
+        }
+        const onlineBadge = document.getElementById('userAvatarOnlineBadge');
+        if (onlineBadge) {
+          onlineBadge.style.background = currentUserSession ? '#34C759' : '#8E8E93';
+        }
+        const authBadge = document.getElementById('userAuthStatusBadge');
+        if (authBadge) {
+          const hasCredit = (currentUserSession && currentUserSession.credit_code) || profile.credit_code;
+          if (hasCredit) {
+            authBadge.textContent = '已认证企业主体';
+            authBadge.style.background = 'rgba(52, 199, 89, 0.15)';
+            authBadge.style.color = '#34C759';
+          } else if (currentUserSession) {
+            authBadge.textContent = '未认证个体';
+            authBadge.style.background = 'rgba(255, 149, 0, 0.15)';
+            authBadge.style.color = '#FF9500';
+          } else {
+            authBadge.textContent = '未登录访客';
+            authBadge.style.background = 'rgba(142, 142, 147, 0.15)';
+            authBadge.style.color = 'var(--text-tertiary)';
+          }
+        }
+        const tier = (currentUserSession && currentUserSession.tier_name) || profile.tier_name || '标准创客';
+        const isVip = tier.includes('黑钻');
+        const entStatusTag = document.getElementById('userEntitlementsStatusTag');
+        if (entStatusTag) {
+          entStatusTag.textContent = isVip ? '黑钻 VIP 生效中' : '标准创客权益';
+          entStatusTag.style.background = isVip ? 'rgba(255, 149, 0, 0.15)' : 'rgba(0, 113, 227, 0.15)';
+          entStatusTag.style.color = isVip ? '#FF9500' : 'var(--accent)';
+        }
+        const tierBadge = document.getElementById('userTierBadge');
+        if (tierBadge) {
+          if (currentUserSession) {
+            tierBadge.style.display = 'inline-block';
+            tierBadge.textContent = tier;
+            if (isVip) {
+              tierBadge.style.background = 'rgba(255, 149, 0, 0.15)';
+              tierBadge.style.color = '#FF9500';
+            } else {
+              tierBadge.style.background = 'var(--accent-glass)';
+              tierBadge.style.color = 'var(--accent)';
+            }
+          } else {
+            tierBadge.style.display = 'inline-block';
+            tierBadge.textContent = '访客模式';
+            tierBadge.style.background = 'rgba(142, 142, 147, 0.15)';
+            tierBadge.style.color = 'var(--text-tertiary)';
+          }
+        }
+        const tierInput = document.getElementById('userTierInput');
+        if (tierInput) {
+          tierInput.value = currentUserSession ? tier : '访客预览状态 (未登录)';
         }
         const nameDisplay = document.getElementById('userDisplayName');
         if (nameDisplay) {
-          nameDisplay.textContent = profile.nickname || (currentUserSession ? currentUserSession.email : '创客');
+          nameDisplay.textContent = (currentUserSession && (currentUserSession.nickname || currentUserSession.email)) || (profile.uid !== 'usr_guest' ? profile.nickname : '未登录创客');
         }
         const uidTierDisplay = document.getElementById('userUidAndTier');
         if (uidTierDisplay) {
-          uidTierDisplay.textContent = `UID: ${profile.uid} · ${profile.tier_name || '认证创客'}`;
+          const uid = (currentUserSession && currentUserSession.uid) || (profile.uid !== 'usr_guest' ? profile.uid : '--');
+          uidTierDisplay.textContent = `UID: ${uid} · 状态: ${currentUserSession ? tier : '未认证访客'}`;
         }
 
         // Dynamic Entitlements List
@@ -6699,14 +6996,19 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           if (entListEl) {
             entListEl.innerHTML = profile.entitlements.map(ent => `
               <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-                <div>
-                  <div style="font-weight: 600; font-size: 13.5px;">${escapeHtml(ent.name)} (${escapeHtml(ent.id)})</div>
-                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(ent.description)} · 配额: ${escapeHtml(ent.quota_desc || '实时全量')}</div>
+                <div style="flex: 1; padding-right: 12px;">
+                  <div style="font-weight: 600; font-size: 13.5px; display: flex; align-items: center; gap: 6px;">
+                    <span>${escapeHtml(ent.name)}</span>
+                    ${ent.tier === 'BLACK_DIAMOND' ? '<span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500; font-size: 10px; padding: 1px 5px;">黑钻专属</span>' : ''}
+                  </div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(ent.description)} · 配额: ${escapeHtml(ent.quota_desc || '实时就绪')}</div>
                 </div>
-                <label class="switch-toggle">
-                  <input type="checkbox" ${ent.is_active ? 'checked' : ''} onchange="toggleFeature(this, '${escapeHtml(ent.id)}')">
-                  <span class="slider"></span>
-                </label>
+                <div>
+                  ${ent.is_active 
+                    ? '<span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759; border-color: rgba(52, 199, 89, 0.3); font-weight: 600;">已生效</span>'
+                    : '<button class="btn-liquid-outline" style="font-size: 11px; padding: 4px 10px;" onclick="openEntitlementModal(\'升级为黑钻创客 VIP\', 899)">升级解锁</button>'
+                  }
+                </div>
               </div>
             `).join('');
           }

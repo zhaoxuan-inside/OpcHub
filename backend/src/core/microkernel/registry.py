@@ -1,6 +1,5 @@
 """Atomic Operator Registry supporting Dynamic Hot-Reloading and Domain Auto-Registration."""
 from typing import Any, Callable, Awaitable, Optional
-import inspect
 import logging
 
 from src.core.microkernel.dispatcher import dispatcher, DispatchMode
@@ -43,10 +42,15 @@ class AtomicRegistry:
         )
         logger.info(f"Registered atomic action handler: {name} (domain={domain}, mode={dispatch_mode.value})")
 
-    def register_compensator(self, name: str, handler: ActionHandler):
-        """Register a Saga reverse compensation handler for an action operator."""
-        self._compensators[name] = handler
-        logger.info(f"Registered Saga compensator for operator: {name}")
+    def unregister(self, name: str) -> bool:
+        """Remove a dynamically registered handler, its compensator and descriptor."""
+        existed = name in self._handlers
+        self._handlers.pop(name, None)
+        self._compensators.pop(name, None)
+        dispatcher.unregister_descriptor(name)
+        if existed:
+            logger.info(f"Unregistered atomic action handler: {name}")
+        return existed
 
     def get(self, name: str) -> ActionHandler | None:
         return self._handlers.get(name)
@@ -60,12 +64,12 @@ class AtomicRegistry:
     def _register_default_handlers(self):
         # 1. Gateway Ingress
         async def gateway_ingress(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            quarterly_income = float(inputs.get("quarterly_income", 280000.0))
+            quarterly_income = float(inputs.get("quarterly_income", 0.0))
             return {
                 "parsed": True,
                 "quarterly_income": quarterly_income,
                 "company_type": inputs.get("company_type", "SOLE_PROPRIETORSHIP"),
-                "auth_token": inputs.get("auth_token", "opc_token_valid"),
+                "auth_token": inputs.get("auth_token", ""),
             }
         self.register("gateway_ingress", gateway_ingress, domain="core", description="统一网关参数清洗与反序列化")
 
@@ -74,11 +78,17 @@ class AtomicRegistry:
             token = inputs.get("auth_token", "")
             if token == "invalid_token":
                 raise PermissionError("HTTP 402: Entitlement required or invalid token")
+            user_id = inputs.get("user_id", "")
+            if not user_id and token:
+                from src.core.security import verify_session_token
+                p = verify_session_token(token)
+                if p and p.get("uid"):
+                    user_id = p.get("uid")
             return {
                 "auth_passed": True,
-                "user_id": inputs.get("user_id", "usr_2026_opc_9981"),
-                "role": "MAKER",
-                "entitlement": "ENT_VIP",
+                "user_id": user_id,
+                "role": "MAKER" if user_id else "GUEST",
+                "entitlement": "",
             }
         self.register("auth_guard", auth_guard, domain="auth", description="创客权益身份与令牌准入门禁拦截")
 
@@ -99,22 +109,33 @@ class AtomicRegistry:
 
         # 4. Policy Matcher
         async def policy_matcher(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.policies.service import policy_service
+            from src.domains.policies.models import PolicyMatchRequest
+            region = inputs.get("region") or inputs.get("city", "杭州")
+            maker_type = inputs.get("maker_type", "INDIVIDUAL")
+            income = float(inputs.get("quarterly_income", 0.0))
+            req = PolicyMatchRequest(
+                quarterly_income=income,
+                maker_type=maker_type,
+                region=region,
+            )
+            resp = policy_service.match_policies(req)
             return {
-                "matched_count": 3,
-                "recommended_subsidies": [
-                    "长三角智能算力券 (最高 ¥120,000)",
-                    "小微企业研发费用 100% 加计扣除",
-                    "创客集聚区集群地址免实际租赁入驻补贴",
-                ],
+                "matched_count": len(resp.matched_policies),
+                "matched_policies": [p.model_dump() for p in resp.matched_policies],
+                "recommended_subsidies": [p.title for p in resp.matched_policies],
+                "eligible": resp.eligible,
+                "estimated_tax_savings": resp.estimated_tax_savings,
             }
         self.register("policy_matcher", policy_matcher, domain="policy", description="政策智能匹配引擎")
 
         # 5. ES Audit Sync
         async def es_audit_sync(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from datetime import datetime, timezone
             return {
                 "audit_recorded": True,
-                "es_index": "opc_audit_log_2026_10",
-                "synced_timestamp": "2026-10-17T02:00:00Z",
+                "es_index": f"opc_audit_log_{datetime.now(timezone.utc).strftime('%Y_%m')}",
+                "synced_timestamp": datetime.now(timezone.utc).isoformat(),
             }
         self.register("es_audit_sync", es_audit_sync, domain="core", description="审计日志与执行快照存储同步")
 
@@ -256,7 +277,7 @@ class AtomicRegistry:
         # Domain 2: SOP Document Domain (商事登记与合规文书生成微内核算子与 Saga 补偿)
         async def sop_document_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.sop.service import sop_service
-            template_id = inputs.get("template_id", "tpl_individual_biz_reg")
+            template_id = inputs.get("template_id", "").strip()
             if not template_id:
                 raise ValueError("template_id is required for document rendering")
             try:
@@ -279,7 +300,7 @@ class AtomicRegistry:
                 "guard_passed": True,
                 "template_id": template_id,
                 "template_name": template.name,
-                "user_id": inputs.get("user_id", "usr_maker_2026"),
+                "user_id": inputs.get("user_id", ""),
                 "form_data": form_data,
             }
         self.register("sop.document.validate_guard", sop_document_validate_guard, domain="sop", description="合规文书模版准入与表单合规风控门禁")
@@ -287,8 +308,10 @@ class AtomicRegistry:
         async def sop_document_render_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.sop.service import sop_service
             from src.domains.sop.models import SOPDocumentCreate
-            template_id = inputs.get("template_id", "tpl_individual_biz_reg")
-            user_id = inputs.get("user_id", "usr_maker_2026")
+            template_id = inputs.get("template_id", "").strip()
+            if not template_id:
+                raise ValueError("template_id is required for document rendering")
+            user_id = inputs.get("user_id", "")
             form_data = inputs.get("form_data", {})
             doc = sop_service.render_and_save_document(
                 SOPDocumentCreate(
@@ -559,53 +582,55 @@ class AtomicRegistry:
 
         # Domain 5: Home & Sitemap Domain
         async def home_metrics_collector(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            from src.domains.telemetry.service import telemetry_service
             from src.domains.products.service import product_service
             from src.domains.demands.service import demand_service
             from src.domains.policies.service import policy_service
+            from src.domains.user.service import user_service
             
             prods = product_service.list_products()
             demands = demand_service.list_demands()
             policies = policy_service.list_policies()
-            metrics = telemetry_service.get_dashboard_metrics()
+            real_users_count = len([u for u in user_service._users_by_uid.values() if u.get("role") != "GUEST"])
             
             return {
-                "active_makers_count": metrics.active_makers_count if hasattr(metrics, "active_makers_count") else 14820,
-                "active_dags_count": 482,
+                "active_makers_count": real_users_count,
+                "active_dags_count": 0,
                 "matched_policies_count": len(policies),
                 "demands_orders_count": len(demands),
-                "perks_saved_cny": 1820000.0,
+                "perks_saved_cny": 0.0,
                 "products_count": len(prods),
             }
         self.register("home.metrics.collector", home_metrics_collector, domain="home", description="首页全域宏观核心指标聚合算子")
 
         async def home_sitemap_builder(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            threads_count = len(forum_service.list_threads())
             quick_links = [
                 {
                     "name": "头脑风暴",
                     "route": "forum",
-                    "count_desc": "1,240 篇实战经验",
+                    "count_desc": f"{threads_count} 篇讨论",
                     "tag": "社区",
                     "description": "灵感碰撞交流、出海实战答疑、经验置顶与干货讨论区。",
                 },
                 {
                     "name": "产品橱窗",
                     "route": "product",
-                    "count_desc": f"{inputs.get('products_count', 12)} 款独立商用作品",
+                    "count_desc": f"{inputs.get('products_count', 0)} 款独立商用作品",
                     "tag": "商机",
                     "description": "独立创客产品画廊，支持点赞打榜、产品收录与出海获客。",
                 },
                 {
                     "name": "政策雷达",
                     "route": "policy",
-                    "count_desc": f"{inputs.get('matched_policies_count', 8)} 条扶持减免红利",
+                    "count_desc": f"{inputs.get('matched_policies_count', 0)} 条扶持减免红利",
                     "tag": "政策",
                     "description": "全网政策白话提炼，税收减免、算力返还与地方补贴精准匹配。",
                 },
                 {
                     "name": "需求集市",
                     "route": "demand",
-                    "count_desc": f"{inputs.get('demands_orders_count', 9)} 笔外包寻源委托",
+                    "count_desc": f"{inputs.get('demands_orders_count', 0)} 笔外包寻源委托",
                     "tag": "委托",
                     "description": "真实企业寻源商机、AI Agent 外包撮合与资金托管担保。",
                 },
@@ -651,11 +676,11 @@ class AtomicRegistry:
         async def home_overview_aggregator(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from datetime import datetime, timezone
             return {
-                "active_makers_count": inputs.get("active_makers_count", 14820),
-                "active_dags_count": inputs.get("active_dags_count", 482),
-                "matched_policies_count": inputs.get("matched_policies_count", 8),
-                "demands_orders_count": inputs.get("demands_orders_count", 9),
-                "perks_saved_cny": inputs.get("perks_saved_cny", 1820000.0),
+                "active_makers_count": inputs.get("active_makers_count", 0),
+                "active_dags_count": inputs.get("active_dags_count", 0),
+                "matched_policies_count": inputs.get("matched_policies_count", 0),
+                "demands_orders_count": inputs.get("demands_orders_count", 0),
+                "perks_saved_cny": inputs.get("perks_saved_cny", 0.0),
                 "quick_links": inputs.get("quick_links", []),
                 "server_time": datetime.now(timezone.utc).isoformat(),
                 "orchestrated_by": "OPC_HOME_OVERVIEW_PIPELINE",
@@ -683,7 +708,7 @@ class AtomicRegistry:
                 "title": title,
                 "content": content,
                 "category_code": category,
-                "author_id": inputs.get("author_id", "usr_maker_nomad"),
+                "author_id": inputs.get("author_id", ""),
             }
         self.register("forum.thread.validate_guard", forum_thread_validate_guard, domain="forum", description="头脑风暴发帖准入校验与敏感词审查门禁")
 
@@ -692,7 +717,7 @@ class AtomicRegistry:
             from src.domains.forum.models import ForumThreadCreate
             payload = ForumThreadCreate(
                 category_code=inputs.get("category_code", "GENERAL"),
-                author_id=inputs.get("author_id", "usr_maker_nomad"),
+                author_id=inputs.get("author_id", ""),
                 title=inputs.get("title", ""),
                 content=inputs.get("content", ""),
             )
@@ -744,7 +769,7 @@ class AtomicRegistry:
                 "thread_id": thread_id,
                 "content": content,
                 "parent_id": parent_id,
-                "author_id": inputs.get("author_id", "usr_maker_solodev"),
+                "author_id": inputs.get("author_id", ""),
                 "reply_to_user_id": inputs.get("reply_to_user_id"),
             }
         self.register("forum.comment.validate_guard", forum_comment_validate_guard, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
@@ -754,7 +779,7 @@ class AtomicRegistry:
             from src.domains.forum.models import ForumCommentCreate
             thread_id = inputs.get("thread_id", "")
             payload = ForumCommentCreate(
-                author_id=inputs.get("author_id", "usr_maker_solodev"),
+                author_id=inputs.get("author_id", ""),
                 content=inputs.get("content", ""),
                 parent_id=inputs.get("parent_id"),
                 reply_to_user_id=inputs.get("reply_to_user_id"),
@@ -826,8 +851,8 @@ class AtomicRegistry:
                 "category": inputs.get("category", "DEV"),
                 "pricing_model": inputs.get("pricing_model", "FREE" if price == 0 else "ONE_TIME"),
                 "price_cny": price,
-                "demo_url": inputs.get("demo_url", "https://opchub.dev"),
-                "author_id": inputs.get("author_id", "usr_maker_2026"),
+                "demo_url": inputs.get("demo_url", ""),
+                "author_id": inputs.get("author_id", ""),
             }
         self.register("product.validate_guard", product_validate_guard, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
 
@@ -835,14 +860,14 @@ class AtomicRegistry:
             from src.domains.products.service import product_service
             from src.domains.products.models import ProductCreate
             payload = ProductCreate(
-                author_id=inputs.get("author_id", "usr_maker_2026"),
+                author_id=inputs.get("author_id", ""),
                 title=inputs.get("title", ""),
                 tagline=inputs.get("tagline", ""),
                 description=inputs.get("description", "") or inputs.get("tagline", ""),
                 category=inputs.get("category", "DEV"),
                 pricing_model=inputs.get("pricing_model", "FREE"),
                 price_cny=float(inputs.get("price_cny", 0.0)),
-                demo_url=inputs.get("demo_url", "https://opchub.dev"),
+                demo_url=inputs.get("demo_url", ""),
             )
             created = product_service.create_product(payload)
             return {
@@ -887,7 +912,7 @@ class AtomicRegistry:
             budget = float(inputs.get("budget_cny", 0.0))
             category = inputs.get("category", "DEV").upper()
             deadline_days = int(inputs.get("deadline_days", 14))
-            creator_id = inputs.get("creator_id", "usr_client_corp_default")
+            creator_id = inputs.get("creator_id", "")
 
             if len(title) < 2:
                 raise ValueError("Demand title must be at least 2 characters long")
@@ -928,7 +953,7 @@ class AtomicRegistry:
                 budget_cny=float(inputs.get("budget_cny", 0.0)),
                 category=inputs.get("category", "DEV"),
                 deadline_days=int(inputs.get("deadline_days", 14)),
-                creator_id=inputs.get("creator_id", "usr_client_corp_default"),
+                creator_id=inputs.get("creator_id", ""),
             )
             created = demand_service.create_demand(payload)
             return {
@@ -956,7 +981,7 @@ class AtomicRegistry:
         async def demand_bid_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.demands.service import demand_service
             demand_id = inputs.get("demand_id", "").strip()
-            bidder_id = inputs.get("bidder_id", "usr_maker_2026").strip()
+            bidder_id = inputs.get("bidder_id", "").strip()
             amount = float(inputs.get("bid_amount_cny", 0.0))
             delivery_days = int(inputs.get("delivery_days", 7))
             proposal = inputs.get("proposal_text", "").strip()
@@ -996,7 +1021,7 @@ class AtomicRegistry:
             from src.domains.demands.models import BidCreate
             demand_id = inputs.get("demand_id")
             payload = BidCreate(
-                bidder_id=inputs.get("bidder_id", "usr_maker_2026"),
+                bidder_id=inputs.get("bidder_id", ""),
                 bid_amount_cny=float(inputs.get("bid_amount_cny", 0.0)),
                 delivery_days=int(inputs.get("delivery_days", 7)),
                 proposal_text=inputs.get("proposal_text", ""),
@@ -1041,7 +1066,7 @@ class AtomicRegistry:
         async def perk_claim_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.perks.service import perk_service
             perk_id = inputs.get("perk_id", "").strip()
-            user_id = inputs.get("user_id", "usr_maker_2026").strip()
+            user_id = inputs.get("user_id", "").strip()
 
             if not perk_id:
                 raise ValueError("perk_id is required for claiming perk")
@@ -1064,7 +1089,7 @@ class AtomicRegistry:
             from src.domains.perks.service import perk_service
             from src.domains.perks.models import PerkClaimRequest
             perk_id = inputs.get("perk_id")
-            user_id = inputs.get("user_id", "usr_maker_2026")
+            user_id = inputs.get("user_id", "")
             claim = perk_service.claim_perk(PerkClaimRequest(user_id=user_id, perk_id=perk_id))
             return {
                 "claim_id": claim.claim_id,
@@ -1200,8 +1225,9 @@ class AtomicRegistry:
             return {
                 "crawler_fetched": True,
                 "source_title": res.get("title"),
-                "authority": res.get("issuing_authority"),
-                "publish_date": res.get("publish_date"),
+                "authority": res.get("department"),
+                "publish_date": res.get("published_date"),
+                "source_url": res.get("source_url"),
                 "content_preview": res.get("content", "")[:200],
             }
         self.register("external.crawler.fetch_policy", external_crawler_fetch_policy, domain="external", description="统一外部网关低速合规采集政务公文")
@@ -1209,30 +1235,39 @@ class AtomicRegistry:
         # 3. Payment Gateway
         async def external_payment_split_order(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.infrastructure.external_gateway import payment_gateway
-            order_id = inputs.get("order_id", "ord_demo_2026")
-            amount = float(inputs.get("amount", 2000.0))
-            maker_amt = amount * 0.9
-            platform_fee = amount * 0.1
-            res = await payment_gateway.create_split_order(order_id, amount, maker_amt, platform_fee, "mch_sub_maker_01")
+            order_id = inputs.get("order_id", "")
+            amount = float(inputs.get("amount", 0.0))
+            channel = inputs.get("channel", "WECHAT")
+            merchant_account = inputs.get("merchant_account", "")
+            maker_account = inputs.get("maker_account", "")
+            res = await payment_gateway.create_split_order(
+                order_id=order_id,
+                amount_cny=amount,
+                merchant_account=merchant_account,
+                maker_account=maker_account,
+                channel=channel,
+            )
             return {
-                "split_order_executed": True,
+                "split_order_executed": res.get("status") == "SUCCESS",
                 "platform_fee": res.get("platform_fee"),
-                "maker_amount": res.get("maker_amount"),
-                "clearing_status": res.get("clearing_status"),
+                "maker_amount": res.get("maker_share"),
+                "clearing_status": res.get("status"),
+                "transaction_no": res.get("transaction_no"),
+                "escrow_verified": res.get("escrow_verified", False),
             }
         self.register("external.payment.split_order", external_payment_split_order, domain="external", description="统一外部网关持牌分账结算指令")
 
         # 4. SMS Gateway
         async def external_sms_send_auth_code(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.infrastructure.external_gateway import sms_auth_gateway
-            phone = inputs.get("phone", "13800138000")
-            code = inputs.get("code", "689201")
+            phone = inputs.get("phone", "")
+            code = inputs.get("code", "")
             res = await sms_auth_gateway.send_verification_code(phone, code)
             return {
-                "sms_sent": True,
-                "phone": res.get("phone"),
-                "sms_channel": res.get("channel"),
-                "verification_code": res.get("code"),
+                "sms_sent": res.get("status") == "SUCCESS",
+                "phone_masked": res.get("phone_masked"),
+                "sms_channel": res.get("sms_channel"),
+                "sent_code_stub": res.get("sent_code_stub"),
             }
         self.register("external.sms.send_auth_code", external_sms_send_auth_code, domain="external", description="统一外部网关发送实名验证码")
 
@@ -1319,9 +1354,16 @@ class AtomicRegistry:
 
         # Domain 11: User & Maker Domain (创客档案画像、收费权益激活与防伪凭据签发算子及 Saga 补偿)
         async def user_profile_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            user_id = inputs.get("user_id", "usr_2026_opc_9981").strip()
+            user_id = (inputs.get("user_id") or (context or {}).get("user_id") or "").strip()
             if not user_id:
-                raise ValueError("user_id cannot be empty")
+                token = inputs.get("token") or (context or {}).get("token") or ""
+                if token:
+                    from src.core.security import verify_session_token
+                    p = verify_session_token(token)
+                    if p and p.get("uid"):
+                        user_id = p.get("uid")
+            if not user_id:
+                user_id = "usr_guest"
             return {
                 "guard_passed": True,
                 "user_id": user_id,
@@ -1331,7 +1373,7 @@ class AtomicRegistry:
 
         async def user_profile_load(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.user.service import user_service
-            user_id = inputs.get("user_id", "usr_2026_opc_9981")
+            user_id = inputs.get("user_id") or (context or {}).get("user_id") or "usr_guest"
             profile = user_service.get_profile(user_id)
             profile_dict = profile.model_dump()
             profile_dict["orchestrated_by"] = "OPC_USER_PROFILE_PIPELINE"
@@ -1380,9 +1422,15 @@ class AtomicRegistry:
         async def user_entitlement_activate_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.user.service import user_service
             ent_id = inputs.get("entitlement_id")
+            user_id = inputs.get("user_id")
             if ent_id:
-                deactivated = user_service.deactivate_entitlement(ent_id)
-                return {"entitlement_id": ent_id, "compensated": deactivated, "action": "ROLLED_BACK"}
+                deactivated = user_service.deactivate_entitlement(ent_id, user_id=user_id)
+                return {
+                    "entitlement_id": ent_id,
+                    "user_id": user_id,
+                    "compensated": deactivated,
+                    "action": "ROLLED_BACK",
+                }
             return {"compensated": False, "reason": "No entitlement_id to rollback"}
 
         self.register(

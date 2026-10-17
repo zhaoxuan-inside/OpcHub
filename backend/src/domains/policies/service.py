@@ -15,54 +15,6 @@ class PolicyService:
 
     def __init__(self):
         self._policies: Dict[str, PolicyResponse] = {}
-        self._seed_default_policies()
-
-    def _seed_default_policies(self):
-        p1 = PolicyResponse(
-            id="pol_vat_exemption_2026",
-            title="小规模纳税人月销售额 10 万以下（季度 30 万）免征增值税",
-            policy_level="国家级",
-            category="TAX",
-            subsidy_amount_max=9000.0,
-            summary="小规模纳税人合计月销售额未超过10万元（以1个季度为纳税期限的，季度销售额未超过30万元）的，免征增值税。",
-            eligible_conditions=[
-                "纳税主体为小规模纳税人（个体工商户或小微企业）",
-                "单一季度累计销售额不超过人民币 300,000 元",
-                "开具普通增值税发票",
-            ],
-            legal_basis="财政部 税务总局公告 2023年第12号",
-        )
-
-        p2 = PolicyResponse(
-            id="pol_rnd_deduction_100",
-            title="科技型中小微企业研发费用 100% 税前加计扣除",
-            policy_level="国家级",
-            category="TAX",
-            subsidy_amount_max=150000.0,
-            summary="科技型中小企业开展研发活动中实际发生的研发费用，未形成无形资产计入当期损益的，按规定据实扣除的基础上，自2023年1月1日起，再按照实际发生额的100%在税前加计扣除。",
-            eligible_conditions=[
-                "入库全国科技型中小企业信息库",
-                "研发费用核算真实独立且符合加计扣除研发归集规范",
-            ],
-            legal_basis="财政部 税务总局 科技部公告 2023年第11号",
-        )
-
-        p3 = PolicyResponse(
-            id="pol_ai_compute_voucher_hz",
-            title="杭州高新区超级个体与小微人工智能算力券补贴",
-            policy_level="省市级",
-            category="SUBSIDY",
-            subsidy_amount_max=50000.0,
-            summary="为注册在本区开展大模型微调、生成式AI应用独立研发的创客主体，提供最高 30% 的实际算力消费抵扣凭据。",
-            eligible_conditions=[
-                "在杭州市高新技术产业园区完成注册登记",
-                "采购指定合规公共算力服务平台算力资源",
-            ],
-            legal_basis="杭高新发〔2024〕18号 人工智能产业高质量发展支持政策",
-        )
-
-        for p in [p1, p2, p3]:
-            self._policies[p.id] = p
 
     def list_policies(self, category: Optional[str] = None) -> List[PolicyResponse]:
         policies = list(self._policies.values())

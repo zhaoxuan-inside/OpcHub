@@ -3,7 +3,7 @@
 Provides asynchronous database connections via asyncpg and SQLAlchemy 2.0 AsyncSession.
 """
 import logging
-from typing import AsyncGenerator, Optional
+from typing import Optional
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -53,18 +53,6 @@ def get_async_sessionmaker() -> async_sessionmaker[AsyncSession]:
         get_async_engine()
     assert _async_session_factory is not None
     return _async_session_factory
-
-
-async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
-    """FastAPI Dependency for database sessions."""
-    session_factory = get_async_sessionmaker()
-    async with session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
 
 
 async def check_database_health() -> dict:

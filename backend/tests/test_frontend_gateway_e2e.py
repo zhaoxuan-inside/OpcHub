@@ -7,6 +7,7 @@ Validates that:
 4. Interactive operations (publish thread, claim perk, bid demand, evaluate compliance)
    pass through the microkernel DAG pipelines and return expected data.
 """
+import uuid
 import pytest
 from fastapi.testclient import TestClient
 
@@ -15,14 +16,69 @@ from src.main import app
 client = TestClient(app)
 
 
+@pytest.fixture(autouse=True)
+def seed_e2e_dependencies():
+    """Seed test-only perk and compliance checkpoints for interactive e2e actions."""
+    from src.domains.perks.service import perk_service
+    from src.domains.perks.models import PerkResponse
+    from src.domains.compliance.service import compliance_service
+    from src.domains.compliance.models import AuditCheckItem
+    from src.domains.sop.service import sop_service
+    from src.domains.sop.models import SOPTemplate, SOPField
+
+    perk_service._perks.clear()
+    perk_service._claims.clear()
+    perk_service._perks["perk_aliyun_bailian"] = PerkResponse(
+        id="perk_aliyun_bailian",
+        name="阿里云百炼大模型专属算力包",
+        provider="阿里云",
+        value_cny=12000.0,
+        category="AI",
+        summary="测试用算力包",
+        quota_remaining=150,
+    )
+
+    compliance_service._checkpoints = [
+        AuditCheckItem(
+            id=f"chk_{i:02d}", dimension_id=f"dim_{i}",
+            title=f"测试检查点 {i}", description="d",
+            severity="HIGH", weight=10, advice="a", legal_basis="l",
+        )
+        for i in range(1, 11)
+    ]
+
+    sop_service._templates.clear()
+    sop_service._documents.clear()
+    sop_service._templates["tpl_e2e_charter"] = SOPTemplate(
+        id="tpl_e2e_charter",
+        stage=1,
+        code="E2E_CHARTER",
+        name="测试章程模板",
+        category="LEGAL",
+        description="测试模板",
+        template_content="{company_name} 章程\n唯一股东：{founder_name}\n核验流水号: {verify_serial}",
+        required_fields=[
+            SOPField(key="company_name", label="公司全称", default=""),
+            SOPField(key="founder_name", label="股东姓名", default=""),
+        ],
+        is_active=True,
+    )
+    yield
+    perk_service._perks.clear()
+    perk_service._claims.clear()
+    compliance_service._checkpoints = []
+    sop_service._templates.clear()
+    sop_service._documents.clear()
+
+
 def test_frontend_console_served():
-    """Verify that root GET / and /app serve the interactive single-page application."""
+    """Verify that root GET / and /app serve the OpcHub API landing page."""
     resp = client.get("/")
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
     assert "OpcHub" in resp.text
-    assert "/api/welcom/opc_world" in resp.text
-    assert "dispatchGateway" in resp.text
+    resp_app = client.get("/app")
+    assert resp_app.status_code == 200
 
 
 def test_frontend_all_views_hydration_via_gateway():
@@ -117,3 +173,135 @@ def test_frontend_interactive_actions_e2e():
     assert "score" in report
     assert report["passed_items_count"] == 8
     assert report["failed_items_count"] == 2
+
+
+def test_frontend_user_icon_and_auth_state_integration():
+    """Verify root page serves and auth gateway scenarios function properly."""
+    resp = client.get("/")
+    assert resp.status_code == 200
+    html = resp.text
+    assert "OpcHub" in html
+
+    # Verify auth gateway scenarios function properly
+    # Register test user
+    test_email = "test_icon_maker@opchub.cn"
+    reg_res = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.register",
+        "version": "v1.0.0",
+        "payload": {
+            "email": test_email,
+            "password": "password123",
+            "nickname": "图标测试员",
+            "company_name": "极客视界"
+        }
+    })
+    assert reg_res.status_code == 200
+    reg_data = reg_res.json()
+    assert reg_data["code"] == 200
+    token = reg_data["data"]["token"]
+    assert token
+
+    # Session verification
+    session_res = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.session",
+        "version": "v1.0.0",
+        "payload": {
+            "token": token
+        }
+    })
+    assert session_res.status_code == 200
+    assert session_res.json()["data"]["email"] == test_email
+
+
+def test_frontend_no_fake_data_and_profile_persistence_e2e():
+    """Verify newly registered users have genuine registered data (no fake placeholders) and can update profile."""
+    # 1. Verify served HTML has no hardcoded placeholder identity
+    html_resp = client.get("/")
+    assert html_resp.status_code == 200
+    html = html_resp.text
+    assert 'value="赵玄"' not in html
+    assert 'value="138-0010-8888"' not in html
+    assert 'value="92330106MA2XXXXXX"' not in html
+    assert 'value="zhaoxuan@opchub.com"' not in html
+    assert 'UID: usr_2026_opc_9981' not in html
+    assert 'opc_live_9981' not in html
+    assert 'ROLE: SUPER INDIVIDUAL' not in html
+    assert '切换管理' not in html
+
+    # 2. Register fresh end-to-end testing user
+    e2e_email = f"e2e_tester_{uuid.uuid4().hex[:6]}@example.com"
+    reg_resp = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.register",
+        "version": "v1.0.0",
+        "payload": {
+            "email": e2e_email,
+            "password": "tester_secure_password_99",
+            "nickname": "实测创客",
+            "company_name": "杭州实测云软工作室"
+        }
+    })
+    assert reg_resp.status_code == 200
+    reg_data = reg_resp.json()
+    assert reg_data["code"] == 200
+    reg_payload = reg_data["data"]
+    test_uid = reg_payload["uid"]
+    test_token = reg_payload["token"]
+    assert test_uid
+    # Verify UID is in standard UUID format
+    assert uuid.UUID(test_uid)
+    assert test_token
+
+    # 3. Retrieve user profile via user.profile gateway scenario
+    prof_resp = client.post("/api/welcom/opc_world", json={
+        "scenario": "user.profile",
+        "version": "v1.0.0",
+        "payload": {
+            "user_id": test_uid,
+            "token": test_token
+        }
+    })
+    assert prof_resp.status_code == 200
+    prof_data = prof_resp.json()["data"]
+    assert prof_data["uid"] == test_uid
+    assert prof_data["email"] == e2e_email
+    assert prof_data["nickname"] == "实测创客"
+    assert prof_data["company_name"] == "杭州实测云软工作室"
+    assert prof_data["credit_code"] == ""  # Zero fake random credit code
+    assert prof_data["phone"] == ""        # Zero fake phone
+    assert prof_data["tier_name"] == "标准创客"
+
+    # 4. Update profile via user.profile.update
+    update_resp = client.post("/api/welcom/opc_world", json={
+        "scenario": "user.profile.update",
+        "version": "v1.0.0",
+        "payload": {
+            "user_id": test_uid,
+            "token": test_token,
+            "nickname": "实测创客升级版",
+            "phone": "13900001111",
+            "company_name": "杭州实测云软超级科技有限公司",
+            "credit_code": "91330100MA2ABCDEF1"
+        }
+    })
+    assert update_resp.status_code == 200
+    upd_data = update_resp.json()["data"]
+    assert upd_data["nickname"] == "实测创客升级版"
+    assert upd_data["phone"] == "13900001111"
+    assert upd_data["company_name"] == "杭州实测云软超级科技有限公司"
+    assert upd_data["credit_code"] == "91330100MA2ABCDEF1"
+
+    # 5. Verify persisted profile
+    re_prof_resp = client.post("/api/welcom/opc_world", json={
+        "scenario": "user.profile",
+        "version": "v1.0.0",
+        "payload": {
+            "user_id": test_uid,
+            "token": test_token
+        }
+    })
+    assert re_prof_resp.status_code == 200
+    persisted = re_prof_resp.json()["data"]
+    assert persisted["nickname"] == "实测创客升级版"
+    assert persisted["phone"] == "13900001111"
+    assert persisted["company_name"] == "杭州实测云软超级科技有限公司"
+    assert persisted["credit_code"] == "91330100MA2ABCDEF1"

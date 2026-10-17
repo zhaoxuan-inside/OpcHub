@@ -4,8 +4,45 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.domains.sop.service import sop_service
+from src.domains.sop.models import SOPTemplate, SOPField
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import ScenarioExecuteRequest
+
+
+@pytest.fixture(autouse=True)
+def seed_sop_templates():
+    """Seed test-only SOP templates for document rendering tests."""
+    sop_service._templates.clear()
+    sop_service._documents.clear()
+    sop_service._templates["tpl_individual_biz_reg"] = SOPTemplate(
+        id="tpl_individual_biz_reg",
+        stage=1,
+        code="INDIVIDUAL_BIZ_REG",
+        name="个体工商户设立登记标准申请书",
+        category="TAX",
+        description="测试用个体户设立登记模板",
+        template_content="""个体工商户设立登记申请书
+---------------------------------------------
+登记机关：{registration_office}
+主体全称：{company_name}
+经营者：{founder_name}
+主营范围：{biz_scope}
+
+申报承诺：本人保证所提交材料真实、合法、有效。
+---------------------------------------------
+[电子印签] 状态: READY FOR SUBMISSION
+核验流水号: {verify_serial}""",
+        required_fields=[
+            SOPField(key="registration_office", label="登记市场监管部门", default=""),
+            SOPField(key="company_name", label="拟定经营主体字号", default=""),
+            SOPField(key="founder_name", label="法定代表创客姓名", default=""),
+            SOPField(key="biz_scope", label="主营经营范围描述", default=""),
+        ],
+        is_active=True,
+    )
+    yield
+    sop_service._templates.clear()
+    sop_service._documents.clear()
 
 
 @pytest.fixture

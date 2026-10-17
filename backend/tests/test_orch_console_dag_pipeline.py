@@ -2,6 +2,9 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
+from src.core.security import create_session_token
+
+_TEST_ADMIN_TOKEN = create_session_token({"uid": "usr_admin_builtin", "role": "ADMIN"})
 from src.domains.orchestration.service import orchestration_service
 
 
@@ -10,6 +13,7 @@ async def test_orchestration_operators_list_pipeline():
     """Verify OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE returns full set of domain operators."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "orchestration.operators.list",
             "version": "v1.0.4",
@@ -36,6 +40,7 @@ async def test_orchestration_control_pipeline_save_dag_success():
     """Verify OPC_ORCHESTRATION_CONTROL_PIPELINE compiles and deploys new DAG topology."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         test_topo = {
             "topology": "DAG",
             "entry_node": "n1",
@@ -81,6 +86,7 @@ async def test_orchestration_control_saga_rollback_on_downstream_failure():
     """Verify Saga reverse compensation deletes DAG config if downstream step fails."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         test_topo = {
             "topology": "DAG",
             "entry_node": "n1",
@@ -114,6 +120,7 @@ async def test_orchestration_control_guard_validation():
     """Verify Guard blocks requests with missing scenario_code or version."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        ac.headers["Authorization"] = f"Bearer {_TEST_ADMIN_TOKEN}"
         req_body = {
             "scenario": "orchestration.dag.save",
             "version": "v1.0.4",

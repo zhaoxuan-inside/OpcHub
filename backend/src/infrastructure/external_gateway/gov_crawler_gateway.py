@@ -1,5 +1,5 @@
 """Unified Government Policy Public Data Fetcher Gateway with Rate-Limiting & Compliance."""
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 import asyncio
 import time
 from src.core.config import settings
@@ -91,7 +91,7 @@ class GovCrawlerGateway(BaseOutboundClient):
                 "status": "SUCCESS",
                 "department": "国家税务总局",
                 "doc_code": doc_code,
-                "title": f"国家税务总局关于进一步支持小微企业和个体工商户发展有关税费政策的公告",
+                "title": "国家税务总局关于进一步支持小微企业和个体工商户发展有关税费政策的公告",
                 "legal_source_url": f"{self.sat_base_url}/n810341/n810755/c5211993/content.html",
                 "effective_date": f"{year}-01-01",
                 "expiry_date": f"{year+4}-12-31",
@@ -110,21 +110,6 @@ class GovCrawlerGateway(BaseOutboundClient):
             payload={"year": year, "num": num},
             mock_handler=mock_sat
         )
-
-    async def search_open_policies(self, keywords: List[str], limit: int = 5) -> List[Dict[str, Any]]:
-        """Search official government open policy database by keywords."""
-        await self.limiter.acquire()
-        res = await self.fetch_sat_announcement(year=2023, num=12)
-        policy_item = {
-            "id": "pol_sat_2023_12",
-            "title": res.get("title", "小微企业与个体工商户增值税减免政策"),
-            "doc_code": res.get("doc_code", "国家税务总局公告2023年第12号"),
-            "department": "国家税务总局",
-            "keywords": keywords,
-            "core_rules": res.get("core_benefits", []),
-            "source_url": res.get("legal_source_url", "https://www.chinatax.gov.cn")
-        }
-        return [policy_item]
 
 
 gov_crawler_gateway = GovCrawlerGateway()

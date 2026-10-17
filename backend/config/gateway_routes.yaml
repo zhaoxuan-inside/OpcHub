@@ -53,6 +53,7 @@ gateway:
       description: "发布新独立创客作品至橱窗 (微内核 DAG 编排驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:product_publish_adapter"
+      required_permission: "gallery:submit"
 
     - scenario: "products.upvote"
       version: "v1.0.0"
@@ -60,6 +61,7 @@ gateway:
       description: "为独立作品点赞打榜"
       is_default: true
       handler: "src.domains.products.service.product_service:upvote_product"
+      required_permission: "gallery:upvote"
       args_type: "key"
       key_name: "product_id"
 
@@ -80,6 +82,7 @@ gateway:
       description: "发布最新政府扶持与补贴政策 (微内核 DAG 编排驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:policy_publish_adapter"
+      required_permission: "data:schema_manage"
 
     - scenario: "policies.match"
       version: "v1.0.0"
@@ -105,6 +108,7 @@ gateway:
       description: "微内核DAG编排：发布企业外包委托与法律求助"
       is_default: true
       handler: "src.core.gateway.adapters:demand_publish_adapter"
+      required_permission: "market:create_demand"
 
     - scenario: "demands.bid"
       version: "v1.0.0"
@@ -112,6 +116,7 @@ gateway:
       description: "微内核DAG编排：提交创客竞标方案与撮合"
       is_default: true
       handler: "src.core.gateway.adapters:demand_bid_adapter"
+      required_permission: "market:vendor_apply"
 
 
     # --------------------------------------------------------------------------
@@ -130,6 +135,7 @@ gateway:
       description: "发布并登记新合规文书模板"
       is_default: true
       handler: "src.domains.sop.service.sop_service:create_template"
+      required_permission: "data:schema_manage"
       model: "src.domains.sop.models:SOPTemplateCreate"
 
     - scenario: "sop.document.render"
@@ -138,6 +144,7 @@ gateway:
       description: "微内核DAG编排：根据用户输入渲染并持久化合规文书"
       is_default: true
       handler: "src.core.gateway.adapters:sop_document_render_adapter"
+      required_permission: "sop:save_progress"
 
 
     - scenario: "sop.document.get"
@@ -173,6 +180,7 @@ gateway:
       description: "微内核DAG编排：提报并上线生态特权福利"
       is_default: true
       handler: "src.core.gateway.adapters:perk_publish_adapter"
+      required_permission: "data:schema_manage"
 
     - scenario: "perks.claim"
       version: "v1.0.0"
@@ -180,6 +188,7 @@ gateway:
       description: "微内核DAG编排：领取特权并生成专属兑换凭据"
       is_default: true
       handler: "src.core.gateway.adapters:perk_claim_adapter"
+      required_permission: "perk:claim_coupon"
 
 
     # --------------------------------------------------------------------------
@@ -199,6 +208,7 @@ gateway:
       description: "发布新创客讨论帖与踩坑复盘 (微内核 DAG 编排驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:forum_thread_publish_adapter"
+      required_permission: "forum:post_comment"
 
     - scenario: "forum.threads.get"
       version: "v1.0.0"
@@ -215,6 +225,7 @@ gateway:
       description: "发表一级回答或物化路径嵌套子回复"
       is_default: true
       handler: "src.core.gateway.adapters:forum_comment_adapter"
+      required_permission: "forum:post_comment"
 
     # --------------------------------------------------------------------------
     # 7. Telemetry & Platform Overview (运营大盘与全景)
@@ -232,6 +243,7 @@ gateway:
       description: "全域运营大盘实时核心指标聚合 (由微内核 DAG OPC_OPS_DASHBOARD_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:ops_dashboard_adapter"
+      required_permission: "review:audit_all"
 
     - scenario: "ops.dashboard"
       version: "v1.0.0"
@@ -239,6 +251,7 @@ gateway:
       description: "运营大盘三端指标检索别名 (由微内核 DAG OPC_OPS_DASHBOARD_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:ops_dashboard_adapter"
+      required_permission: "review:audit_all"
 
     # --------------------------------------------------------------------------
     # 8. User Profile & Entitlements (创客档案与权益)
@@ -249,6 +262,16 @@ gateway:
       description: "获取创客个人主体档案与已激活权益 (由微内核 DAG OPC_USER_PROFILE_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:user_profile_adapter"
+
+    - scenario: "user.profile.update"
+      version: "v1.0.0"
+      domain: "user"
+      description: "更新创客基本信息与主体档案"
+      is_default: true
+      handler: "src.core.gateway.adapters:user_profile_update_adapter"
+      owner_check:
+        resource_type: "user"
+        id_field: "user_id"
 
     - scenario: "user.entitlements.activate"
       version: "v1.0.0"
@@ -288,6 +311,7 @@ gateway:
       description: "获取内容安全与敏感词审核队列"
       is_default: true
       handler: "src.domains.moderation.service.moderation_service:list_items"
+      required_permission: "review:audit_all"
       args_type: "kwargs"
 
     - scenario: "moderation.takedown"
@@ -296,6 +320,7 @@ gateway:
       description: "执行违规内容一键全网下架 (由微内核 DAG OPC_MODERATION_TAKEDOWN_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:moderation_takedown_adapter"
+      required_permission: "review:audit_all"
 
     - scenario: "moderation.restore"
       version: "v1.0.0"
@@ -303,6 +328,7 @@ gateway:
       description: "恢复误判下架内容至正常展示 (由微内核 DAG OPC_MODERATION_RESTORE_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:moderation_restore_adapter"
+      required_permission: "review:audit_all"
 
     # --------------------------------------------------------------------------
     # 10. Compliance (合规避坑与自检)
@@ -345,6 +371,7 @@ gateway:
       description: "获取全域微内核原子算子清单与元数据 (由微内核 DAG OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:list_operators_adapter"
+      required_permission: "page:orchestrate"
 
     - scenario: "orchestration.dag.save"
       version: "v1.0.0"
@@ -352,6 +379,7 @@ gateway:
       description: "保存并部署微内核 DAG 编排配置 (由微内核 DAG OPC_ORCHESTRATION_CONTROL_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:save_dag_config_adapter"
+      required_permission: "page:orchestrate"
 
     - scenario: "orchestration.dag.list"
       version: "v1.0.0"
@@ -359,6 +387,7 @@ gateway:
       description: "获取微内核 DAG 编排配置列表"
       is_default: true
       handler: "src.domains.orchestration.service.orchestration_service:list_dag_configs"
+      required_permission: "page:orchestrate"
       args_type: "kwargs"
 
     - scenario: "orchestration.scenarios.execute"
@@ -367,6 +396,7 @@ gateway:
       description: "执行低代码平台编排的有向无环图场景流水线"
       is_default: true
       handler: "src.core.gateway.adapters:async_scenario_executor"
+      required_permission: "page:orchestrate"
 
     - scenario: "frontend.layouts.get"
       version: "v1.0.0"
@@ -381,6 +411,7 @@ gateway:
       description: "保存 24 栅格低代码前端可视化布局"
       is_default: true
       handler: "src.core.gateway.adapters:save_layout_adapter"
+      required_permission: "page:orchestrate"
 
     # --------------------------------------------------------------------------
     # 13. External Ecosystem Outbound Gateways (第三方生态集成)

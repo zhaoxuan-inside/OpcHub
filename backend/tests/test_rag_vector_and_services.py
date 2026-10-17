@@ -6,7 +6,6 @@ from src.main import app
 from src.core.rag import (
     cosine_similarity,
     LocalDeterministicEmbeddingProvider,
-    SiliconFlowEmbeddingProvider,
     VectorDocument,
     SQLiteVectorStore,
     PolicyRagService,
@@ -18,7 +17,6 @@ from src.core.rag import (
 def mem_vector_store():
     """Isolated in-memory SQLite vector store for testing."""
     return SQLiteVectorStore(db_path=":memory:")
-
 
 def test_cosine_similarity_math():
     """Verify cosine similarity calculation edge cases and accuracy."""
@@ -101,24 +99,75 @@ def test_sqlite_vector_store_crud_and_search(mem_vector_store):
 
 @pytest.mark.asyncio
 async def test_policy_rag_service_hybrid_search(mem_vector_store):
-    """Verify PolicyRagService hybrid search and ranking."""
+    """Verify PolicyRagService hybrid search and ranking with self-seeded corpus."""
     provider = LocalDeterministicEmbeddingProvider(dim=64)
-    service = PolicyRagService(vector_store=mem_vector_store, embedding_provider=provider)
+    # Seed test-only policy docs into the vector store (upsert is synchronous)
+    v1 = await provider.embed_query("人工智能算力补贴")
+    mem_vector_store.upsert(VectorDocument(
+        doc_id="pol_hz_ai_voucher",
+        collection="policies",
+        title="杭州高新区超级个体与小微人工智能算力券补贴",
+        content="人工智能算力补贴。杭州高新区。大模型微调。",
+        metadata={
+            "policy_id": "pol_hz_ai_voucher",
+            "policy_level": "省市级",
+            "category": "SUBSIDY",
+            "subsidy_amount_max": 50000.0,
+            "summary": "人工智能算力券补贴",
+            "eligible_conditions": ["杭州注册"],
+            "legal_basis": "测试规约",
+        },
+        vector=v1,
+    ))
+    v2 = await provider.embed_query("增值税免征")
+    mem_vector_store.upsert(VectorDocument(
+        doc_id="pol_vat_free",
+        collection="policies",
+        title="小规模纳税人季度30万免征增值税",
+        content="小规模纳税人增值税免征政策。",
+        metadata={
+            "policy_id": "pol_vat_free",
+            "policy_level": "国家级",
+            "category": "TAX",
+            "subsidy_amount_max": 9000.0,
+            "summary": "增值税免征",
+            "eligible_conditions": ["小规模"],
+            "legal_basis": "测试规约",
+        },
+        vector=v2,
+    ))
 
+    service = PolicyRagService(vector_store=mem_vector_store, embedding_provider=provider)
     res = await service.search_policies(query="人工智能算力补贴", top_k=3)
     assert res["status"] == "SUCCESS"
     assert res["total_matched"] >= 1
-    # Top match should be Hangzhou AI compute voucher
+    # Top match should be AI compute voucher doc
     top_policy = res["results"][0]
     assert "算力" in top_policy["title"] or "人工智能" in top_policy["title"]
 
 
 @pytest.mark.asyncio
 async def test_forum_rag_service_qa(mem_vector_store):
-    """Verify ForumRagService community search and expert Q&A."""
+    """Verify ForumRagService community search and expert Q&A with self-seeded corpus."""
     provider = LocalDeterministicEmbeddingProvider(dim=64)
-    service = ForumRagService(vector_store=mem_vector_store, embedding_provider=provider)
+    # Seed test-only forum thread into the vector store (upsert is synchronous)
+    v = await provider.embed_query("Stripe 结汇")
+    mem_vector_store.upsert(VectorDocument(
+        doc_id="th_stripe_cross_border",
+        collection="forum_threads",
+        title="独立开发者 Stripe 绑定万里汇香港对公户结汇流程避坑指南",
+        content="Stripe 结汇收款避免银行风控的实战流程。",
+        metadata={
+            "thread_id": "th_stripe_cross_border",
+            "category_code": "DEV",
+            "author_id": "usr_test",
+            "upvote_count": 0,
+            "comment_count": 0,
+        },
+        vector=v,
+    ))
 
+    service = ForumRagService(vector_store=mem_vector_store, embedding_provider=provider)
     qa_res = await service.ask_forum_rag(question="独立开发者如何结汇收款避免被银行风控？", top_k=2)
     assert qa_res["status"] == "SUCCESS"
     assert "ai_answer" in qa_res
@@ -130,6 +179,46 @@ async def test_forum_rag_service_qa(mem_vector_store):
 
 def test_gateway_dispatch_rag_scenarios():
     """Verify unified dispatch gateway executes RAG scenarios end-to-end."""
+    # Seed test-only corpus into the shared vector store so gateway RAG has data
+    import asyncio
+    from src.core.rag import default_vector_store, LocalDeterministicEmbeddingProvider, VectorDocument
+    provider = LocalDeterministicEmbeddingProvider(dim=128)
+
+    async def _seed():
+        pv = await provider.embed_query("算力券补贴")
+        default_vector_store.upsert(VectorDocument(
+            doc_id="gw_pol_ai_voucher",
+            collection="policies",
+            title="小微企业长三角算力券补贴",
+            content="小微企业可以申领长三角算力券补贴政策。",
+            metadata={
+                "policy_id": "gw_pol_ai_voucher",
+                "policy_level": "省市级",
+                "category": "SUBSIDY",
+                "subsidy_amount_max": 50000.0,
+                "summary": "算力券补贴",
+                "eligible_conditions": ["长三角"],
+                "legal_basis": "测试规约",
+            },
+            vector=pv,
+        ))
+        tv = await provider.embed_query("算力券补贴")
+        default_vector_store.upsert(VectorDocument(
+            doc_id="gw_th_stripe",
+            collection="forum_threads",
+            title="小微企业 Stripe 结汇算力券申领经验",
+            content="长三角算力券补贴申领流程，Stripe 结汇实战。",
+            metadata={
+                "thread_id": "gw_th_stripe",
+                "category_code": "DEV",
+                "author_id": "usr_test",
+                "upvote_count": 0,
+                "comment_count": 0,
+            },
+            vector=tv,
+        ))
+
+    asyncio.run(_seed())
     client = TestClient(app)
 
     # 1. Policy RAG Search Scenario

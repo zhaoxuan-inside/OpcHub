@@ -1,5 +1,4 @@
 """Data models for Corporate Demands and Maker Bids."""
-from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
