@@ -69,3 +69,10 @@ external_gateway:
     rate_limit_per_second: 2.0
     timeout_seconds: 15
     mock_mode: true
+
+  # Lightweight SQLite Vector Store & RAG Engine
+  rag:
+    embedding_model: "BAAI/bge-large-zh-v1.5"
+    vector_dim: 128
+    similarity_top_k: 5
+    db_path: "data/rag_vectors.sqlite"

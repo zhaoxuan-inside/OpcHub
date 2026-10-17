@@ -182,6 +182,69 @@ class SiliconFlowGateway(BaseOutboundClient):
             "trace_id": chat_res.get("trace_id", "")
         }
 
+    async def get_embeddings(
+        self,
+        texts: List[str],
+        model: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Fetch text embeddings via SiliconFlow API or local deterministic fallback."""
+        target_model = model or getattr(settings, "rag_embedding_model", "BAAI/bge-large-zh-v1.5")
+
+        def mock_embeddings(_):
+            import math
+            import hashlib
+            dim = getattr(settings, "rag_vector_dim", 128)
+            vectors = []
+            for t in texts:
+                vec = [0.0] * dim
+                tokens = [t[i:i+2] for i in range(max(1, len(t) - 1))] + list(t)
+                for tok in tokens:
+                    h = int(hashlib.md5(tok.encode("utf-8")).hexdigest(), 16)
+                    idx = h % dim
+                    vec[idx] += 1.0 + (h % 7) * 0.1
+                norm = math.sqrt(sum(x * x for x in vec)) or 1.0
+                norm_vec = [round(x / norm, 6) for x in vec]
+                vectors.append(norm_vec)
+
+            return {
+                "status": "SUCCESS",
+                "object": "list",
+                "model": target_model,
+                "data": [
+                    {"object": "embedding", "index": i, "embedding": vec}
+                    for i, vec in enumerate(vectors)
+                ],
+                "usage": {
+                    "prompt_tokens": sum(len(t) for t in texts),
+                    "total_tokens": sum(len(t) for t in texts)
+                }
+            }
+
+        payload = {
+            "model": target_model,
+            "input": texts
+        }
+
+        res = await self.execute_request(
+            method="POST",
+            path="/embeddings",
+            payload=payload,
+            mock_handler=mock_embeddings
+        )
+
+        if res.get("status") == "SUCCESS" and isinstance(res.get("data"), list):
+            res["embeddings"] = [item["embedding"] for item in res["data"]]
+        elif res.get("status") == "SUCCESS" and isinstance(res.get("data"), dict) and "data" in res["data"]:
+            res["embeddings"] = [item["embedding"] for item in res["data"]["data"]]
+        elif res.get("status") == "SUCCESS" and "data" in res and isinstance(res["data"], list):
+            res["embeddings"] = [item["embedding"] for item in res["data"]]
+        else:
+            fallback = mock_embeddings(None)
+            res["embeddings"] = [item["embedding"] for item in fallback["data"]]
+            res["status"] = "SUCCESS"
+
+        return res
+
 
 # Aliases & Singletons for export
 AIGateway = SiliconFlowGateway

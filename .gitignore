@@ -32,3 +32,7 @@ node_modules/
 dist/
 .DS_Store
 *.log
+
+# Runtime Data Cache
+data/
+backend/data/

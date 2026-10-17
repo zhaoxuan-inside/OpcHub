@@ -1279,6 +1279,29 @@
 
         <!-- Right: Brainstorm Posts List -->
         <div class="glass-box" style="padding: 20px 28px;" id="forumPostsContainer">
+          <!-- P05 RAG Community AI Q&A Box -->
+          <div style="background: rgba(0, 113, 227, 0.05); border: 1px solid var(--accent-glass); border-radius: var(--radius-md); padding: 14px 18px; margin-bottom: 20px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 13.5px; color: var(--accent);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                <span>创客问答</span>
+              </div>
+              <span class="mono-tag" style="font-size: 11px;">RAG: SQLite-VSS + LLM</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <input id="forumRagInput" type="text" class="input-liquid" placeholder="输入您的一人公司经营疑问（如：注册地址如何选？银行开户如何防风控？）..." style="flex: 1; padding: 7px 12px; font-size: 13px;" onkeydown="if(event.key==='Enter') askForumWithRAG()" />
+              <button class="btn-liquid" onclick="askForumWithRAG()" style="padding: 7px 14px; font-size: 12.5px;" data-tooltip="通过 RAG 召回真实经验贴并生成 AI 专家解答">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>智能问答</span>
+              </button>
+            </div>
+            <div id="forumRagResultBox" style="display: none; margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--glass-border-subtle);">
+              <div style="font-weight: 600; font-size: 13px; color: var(--text-primary); margin-bottom: 6px;">AI 顾问解答：</div>
+              <p id="forumRagAnswerText" style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; white-space: pre-wrap; margin-bottom: 10px;"></p>
+              <div style="font-size: 11.5px; color: var(--text-tertiary);" id="forumRagRefsBox"></div>
+            </div>
+          </div>
+
           <div class="post-card">
             <div class="post-title">
               <span class="post-pinned">置顶</span>
@@ -1418,6 +1441,19 @@
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- P04 RAG Semantic Vector Search Bar -->
+      <div class="glass-box" style="padding: 14px 24px; margin-top: 14px; margin-bottom: 14px; display: flex; gap: 10px; align-items: center;">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-tertiary);"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input id="policyRagInput" type="text" class="input-liquid" placeholder="输入业务特征（如：AI算力微调、出海独立开发、小规模免税）进行向量语义检索..." style="flex: 1; padding: 7px 12px; font-size: 13px;" onkeydown="if(event.key==='Enter') searchPolicyWithRAG()" />
+        <button class="btn-liquid" onclick="searchPolicyWithRAG()" style="padding: 7px 14px; font-size: 12.5px;" data-tooltip="调用轻量向量库执行余弦相似度混合召回">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+          <span>语义检索</span>
+        </button>
+        <button class="btn-liquid-outline" onclick="fetchPolicies()" style="padding: 7px 12px; font-size: 12.5px;" data-tooltip="重置为全量政策列表">
+          <span>重置列表</span>
+        </button>
       </div>
 
       <div class="grid-3" id="policyCardsGrid">
@@ -4292,6 +4328,87 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       } else {
         showLiquidNotice('AI 提炼失败', gwRes.error || '模型推理服务暂不可用', 'WARNING');
       }
+    }
+
+    async function searchPolicyWithRAG() {
+      const inputEl = document.getElementById('policyRagInput');
+      const query = inputEl ? inputEl.value.trim() : '';
+      if (!query) {
+        showLiquidNotice('提示', '请输入检索词，如“人工智能算力”、“增值税减免”', 'INFO');
+        return;
+      }
+      showLiquidNotice('向量检索中', `正在通过 SQLite 向量库余弦相似度检索：“${query}”...`, 'INFO');
+      const gwRes = await dispatchGateway('external.rag.policy_search', { query, top_k: 5 });
+      if (!gwRes.ok || !gwRes.data || !gwRes.data.results) {
+        showLiquidNotice('检索失败', gwRes.error || '检索无响应', 'WARNING');
+        return;
+      }
+      const results = gwRes.data.results;
+      const grid = document.getElementById('policyCardsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      if (results.length === 0) {
+        grid.innerHTML = '<div style="color: var(--text-tertiary); padding: 20px;">未检索到相关政策，建议更换关键词</div>';
+        return;
+      }
+      results.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(p.policy_id.toUpperCase().substring(0, 14))}</span>
+              <span style="font-size: 11.5px; color: var(--accent); font-weight: 600;">相似度: ${(p.similarity_score * 100).toFixed(1)}%</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】${escapeHtml(p.summary)}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">最高补: ¥${(p.subsidy_amount_max || 0).toLocaleString()}</span>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-liquid-outline" style="padding: 3px 8px; font-size: 11.5px;" data-tooltip="调用 SiliconFlow 大模型提炼大白话核心收益" onclick="summarizePolicyWithAI('${escapeHtml(p.title)}', '${escapeHtml(p.summary)}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>白话提炼
+              </button>
+              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="evaluatePolicyQualification('${escapeHtml(p.title)}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
+              </button>
+            </div>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
+      showLiquidNotice('检索完成', `已基于向量余弦相似度召回 ${results.length} 条高匹配政策`, 'SUCCESS');
+    }
+
+    async function askForumWithRAG() {
+      const inputEl = document.getElementById('forumRagInput');
+      const question = inputEl ? inputEl.value.trim() : '';
+      if (!question) {
+        showLiquidNotice('提示', '请输入疑问内容', 'INFO');
+        return;
+      }
+      showLiquidNotice('RAG 检索中', `正在检索互助圈子并调度 AI 生成指导：“${question}”...`, 'INFO');
+      const gwRes = await dispatchGateway('external.rag.forum_qa', { question, top_k: 3 });
+      if (!gwRes.ok || !gwRes.data) {
+        showLiquidNotice('问答失败', gwRes.error || '大模型暂时无法回答', 'WARNING');
+        return;
+      }
+      const data = gwRes.data;
+      const resBox = document.getElementById('forumRagResultBox');
+      const ansText = document.getElementById('forumRagAnswerText');
+      const refsBox = document.getElementById('forumRagRefsBox');
+      if (resBox && ansText) {
+        ansText.textContent = data.ai_answer || '暂无解答';
+        if (refsBox && Array.isArray(data.referenced_threads)) {
+          refsBox.innerHTML = '参考经验：' + data.referenced_threads.map(t => 
+            `<span class="mono-tag" style="margin-left: 4px; cursor: pointer;">${escapeHtml(t.title)}</span>`
+          ).join('');
+        }
+        resBox.style.display = 'block';
+      }
+      showLiquidNotice('解答生成完成', 'AI 创客顾问已结合社区真实经验为您生成答复！', 'SUCCESS');
     }
 
     // -------------------------------------------------------------

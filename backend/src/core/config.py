@@ -25,8 +25,8 @@ def _load_yaml_config() -> dict:
             try:
                 with open(p, "r", encoding="utf-8") as f:
                     return yaml.safe_load(f) or {}
-            except Exception:
-                pass
+            except Exception as exc:
+                logging.getLogger("opchub.config").debug("Failed to load config from %s: %s", p, exc)
     return {}
 
 
@@ -40,6 +40,7 @@ _PAYMENT_SECTION = _EXT_SECTION.get("payment", {})
 _WECHAT_SECTION = _PAYMENT_SECTION.get("wechat", {})
 _STRIPE_SECTION = _PAYMENT_SECTION.get("stripe", {})
 _CRAWLER_SECTION = _EXT_SECTION.get("gov_crawler", {})
+_RAG_SECTION = _EXT_SECTION.get("rag", {})
 
 
 class Settings(BaseSettings):
@@ -95,6 +96,12 @@ class Settings(BaseSettings):
     gov_crawler_rate_limit: float = float(_CRAWLER_SECTION.get("rate_limit_per_second", 2.0))
     gov_crawler_timeout: float = float(_CRAWLER_SECTION.get("timeout_seconds", 15))
     gov_crawler_mock_mode: bool = bool(_CRAWLER_SECTION.get("mock_mode", True))
+
+    # Lightweight SQLite Vector Store & RAG Engine
+    rag_embedding_model: str = _RAG_SECTION.get("embedding_model", "BAAI/bge-large-zh-v1.5")
+    rag_vector_dim: int = int(_RAG_SECTION.get("vector_dim", 128))
+    rag_similarity_top_k: int = int(_RAG_SECTION.get("similarity_top_k", 5))
+    rag_db_path: str = _RAG_SECTION.get("db_path", "data/rag_vectors.sqlite")
 
     model_config = SettingsConfigDict(env_prefix="OPCHUB_", env_file=".env", extra="ignore")
 

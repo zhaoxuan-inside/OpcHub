@@ -17,6 +17,7 @@ from src.infrastructure.external_gateway import (
     payment_gateway,
     gov_crawler_gateway,
 )
+from src.core.rag import policy_rag_service, forum_rag_service
 
 
 async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -477,4 +478,28 @@ async def external_gov_sat_policy_adapter(p: Dict[str, Any], c: Dict[str, Any] =
     year = int(p.get("year", 2023))
     num = int(p.get("num", 12))
     return await gov_crawler_gateway.fetch_sat_announcement(year=year, num=num)
+
+
+async def external_rag_policy_search_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes RAG semantic hybrid vector search over government policies."""
+    query = p.get("query", p.get("search_query", "增值税减免"))
+    top_k = int(p.get("top_k", 5))
+    region = p.get("region")
+    category = p.get("category")
+    return await policy_rag_service.search_policies(
+        query=query,
+        top_k=top_k,
+        region=region,
+        category=category,
+    )
+
+
+async def external_rag_forum_qa_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes RAG community Q&A search and AI expert answer generation."""
+    question = p.get("question", p.get("query", "一人公司如何报税与开设银行对公户？"))
+    top_k = int(p.get("top_k", 3))
+    return await forum_rag_service.ask_forum_rag(
+        question=question,
+        top_k=top_k,
+    )
 

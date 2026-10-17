@@ -398,3 +398,17 @@ gateway:
       is_default: true
       handler: "src.core.gateway.adapters:external_gov_sat_policy_adapter"
 
+    - scenario: "external.rag.policy_search"
+      version: "v1.0.0"
+      domain: "external"
+      description: "基于轻量向量引擎与余弦相似度检索政策雷达公文库 (RAG 混合召回)"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_rag_policy_search_adapter"
+
+    - scenario: "external.rag.forum_qa"
+      version: "v1.0.0"
+      domain: "external"
+      description: "基于轻量向量引擎与大模型协同的一人公司互助社区经验 RAG 智能问答"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_rag_forum_qa_adapter"
+

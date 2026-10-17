@@ -1,0 +1,5 @@
+{"version": "1.0", "category": "root", "root": "hs_dev_docs"}
+{"id": "doc_reading_guide", "title": "项目文档阅读说明与全局索引导航", "path": "_00_docs_compass.md", "status": "active", "digest": "663c14a9"}
+{"id": "task_active", "title": "活跃任务索引", "path": "_05_task_orchestration/_00_task.idx", "status": "active", "digest": "d9da0869"}
+{"id": "task_archive", "title": "归档任务索引", "path": "_05_task_orchestration/_00_task_archive.idx", "status": "active", "digest": "fa7abf90"}
+{"id": "task_brief", "title": "任务简述索引", "path": "_05_task_orchestration/_01_task_brief/_00_task_brief.idx", "status": "active", "digest": "d689dc20"}
