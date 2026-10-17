@@ -27,23 +27,26 @@ def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
     )
 
 
-def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
-    return {
-        "active_makers_count": 14820,
-        "active_dags_count": 482,
-        "matched_policies_count": 128,
-        "demands_orders_count": 89,
-        "perks_saved_cny": 1820000.0,
-        "quick_links": [
-            {"name": "头脑风暴", "route": "forum", "count_desc": "1,240 篇实战经验"},
-            {"name": "流程文书", "route": "sop", "count_desc": "4 阶段合规材料"},
-            {"name": "政策雷达", "route": "policy", "count_desc": "30万增值税免征"},
-            {"name": "需求集市", "route": "demand", "count_desc": "89 笔进行中委托"},
-            {"name": "生态特权", "route": "perks", "count_desc": "最高 $5,000 算力券"},
-            {"name": "合规指南", "route": "compliance", "count_desc": "6大防线自检雷达"},
-            {"name": "后端编排", "route": "backend-orch", "count_desc": "微内核 DAG 引擎"},
-        ],
-    }
+async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
+    """Executes the microkernel DAG pipeline for the Home page overview."""
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_HOME_OVERVIEW_PIPELINE",
+            version="v1.0.0",
+            inputs=p or {},
+        )
+    )
+    if res.status != "SUCCESS":
+        return {
+            "active_makers_count": 14820,
+            "active_dags_count": 482,
+            "matched_policies_count": 128,
+            "demands_orders_count": 89,
+            "perks_saved_cny": 1820000.0,
+            "quick_links": [],
+            "orchestrated": False,
+        }
+    return res.final_output
 
 
 def user_profile_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:

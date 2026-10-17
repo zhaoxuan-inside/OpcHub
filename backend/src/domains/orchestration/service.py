@@ -122,6 +122,29 @@ class OrchestrationService:
             )
         )
 
+        # 4. Composable Home Overview Pipeline: OPC_HOME_OVERVIEW_PIPELINE
+        topo_home = {
+            "topology": "DAG",
+            "entry_node": "step_metrics",
+            "nodes": [
+                {"id": "step_metrics", "action_handler": "home.metrics.collector", "type": "BIZ"},
+                {"id": "step_sitemap", "action_handler": "home.sitemap.builder", "type": "BIZ"},
+                {"id": "step_agg", "action_handler": "home.overview.aggregator", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_metrics", "to": "step_sitemap"},
+                {"from": "step_sitemap", "to": "step_agg"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_HOME_OVERVIEW_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_home,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(

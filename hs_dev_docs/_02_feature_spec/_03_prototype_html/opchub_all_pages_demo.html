@@ -1180,8 +1180,11 @@
         </div>
 
         <div class="section-divider" style="border-top: 1px solid var(--glass-border-subtle); padding-top: 24px;">
-          <h2 style="font-size: 19px; font-weight: 600; margin-bottom: 16px;">功能全景地图 (Capability Matrix)</h2>
-          <div class="grid-3">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h2 style="font-size: 19px; font-weight: 600; margin: 0;">功能全景地图 (Capability Matrix)</h2>
+            <span id="homePipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_HOME_OVERVIEW_PIPELINE</span>
+          </div>
+          <div class="grid-3" id="homeCapabilityGrid">
             <div class="sitemap-card" onclick="switchView('forum')">
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">01 · COMMUNITY</div>
               <h3 style="font-size: 16px; margin: 8px 0 6px;">头脑风暴社区</h3>
@@ -5538,6 +5541,45 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const overviewBadge = document.querySelector('#view-home .mono-tag');
       if (overviewBadge && data.active_makers_count) {
         overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
+      }
+      const pipeBadge = document.getElementById('homePipelineBadge');
+      if (pipeBadge && data.orchestrated_by) {
+        pipeBadge.textContent = `DAG: ${data.orchestrated_by}`;
+      }
+
+      // If backend returns dynamic quick links, render them seamlessly
+      if (Array.isArray(data.quick_links) && data.quick_links.length > 0) {
+        const grid = document.getElementById('homeCapabilityGrid');
+        if (grid) {
+          grid.innerHTML = '';
+          const routeDescriptions = {
+            'forum': '灵感碰撞交流、出海实战答疑、经验置顶与干货讨论区。',
+            'product': '独立创客产品画廊，支持点赞打榜、产品收录与出海获客。',
+            'policy': '全网政策白话提炼，税收减免、算力返还与地方补贴精准匹配。',
+            'demand': '真实企业寻源商机、AI Agent 外包撮合与资金托管担保。',
+            'sop': '工商设立到离岸资金流全阶段表单收集，一键导出标准申报材料。',
+            'perks': '云厂商激活特权、Token 优惠券、Stripe 结汇通道及工具折扣。',
+            'compliance': '六维合规防线、典型避坑案例库与上线前自检雷达。',
+            'user': '多级会员凭证强绑定、按量功能开关与支付鉴权控制中心。',
+            'backend-orch': 'Python 脚本热上传、AST 安全沙箱验证与微内核 Scenario 路由编排。',
+          };
+          data.quick_links.forEach((ql, idx) => {
+            const card = document.createElement('div');
+            card.className = 'sitemap-card';
+            card.onclick = () => switchView(ql.route);
+            const numStr = String(idx + 1).padStart(2, '0');
+            const desc = routeDescriptions[ql.route] || '微内核编排业务能力节点。';
+            card.innerHTML = `
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">${numStr} · ${(ql.tag || 'SYSTEM').toUpperCase()}</span>
+                <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent); font-size: 10px; padding: 2px 6px;">${escapeHtml(ql.count_desc || '')}</span>
+              </div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">${escapeHtml(ql.name)}</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;">${escapeHtml(desc)}</p>
+            `;
+            grid.appendChild(card);
+          });
+        }
       }
     }
 
