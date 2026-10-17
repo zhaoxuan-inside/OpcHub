@@ -11,10 +11,11 @@ ActionHandler = Callable[[dict[str, Any], dict[str, Any]], Awaitable[dict[str, A
 
 
 class AtomicRegistry:
-    """Central method registry for atomic DAG node handlers."""
+    """Central method registry for atomic DAG node handlers and Saga compensators."""
 
     def __init__(self):
         self._handlers: dict[str, ActionHandler] = {}
+        self._compensators: dict[str, ActionHandler] = {}
         self._register_default_handlers()
         self._register_domain_handlers()
         self._register_external_gateway_handlers()
@@ -27,9 +28,12 @@ class AtomicRegistry:
         description: str = "",
         dispatch_mode: DispatchMode = DispatchMode.IN_PROCESS,
         remote_endpoint: Optional[str] = None,
+        compensator: Optional[ActionHandler] = None,
     ):
-        """Register an atomic handler and its metadata descriptor."""
+        """Register an atomic handler, optional compensator, and metadata descriptor."""
         self._handlers[name] = handler
+        if compensator:
+            self._compensators[name] = compensator
         dispatcher.register_descriptor(
             name=name,
             domain=domain,
@@ -39,8 +43,16 @@ class AtomicRegistry:
         )
         logger.info(f"Registered atomic action handler: {name} (domain={domain}, mode={dispatch_mode.value})")
 
+    def register_compensator(self, name: str, handler: ActionHandler):
+        """Register a Saga reverse compensation handler for an action operator."""
+        self._compensators[name] = handler
+        logger.info(f"Registered Saga compensator for operator: {name}")
+
     def get(self, name: str) -> ActionHandler | None:
         return self._handlers.get(name)
+
+    def get_compensator(self, name: str) -> ActionHandler | None:
+        return self._compensators.get(name)
 
     def list_handlers(self) -> list[str]:
         return list(self._handlers.keys())

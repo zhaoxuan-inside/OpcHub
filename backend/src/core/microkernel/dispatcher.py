@@ -6,6 +6,7 @@ Supports:
 """
 from enum import Enum
 from typing import Any, Callable, Awaitable, Optional, Dict, Tuple
+import inspect
 import logging
 import httpx
 from pydantic import BaseModel
@@ -101,7 +102,10 @@ class DualModeDispatcher:
                 raise KeyError(f"In-process handler for action '{name}' not found in registry")
             self._stats["in_process_count"] += 1
             logger.debug(f"[IN_PROCESS] Dispatching '{name}' locally (TraceID: {trace_id})")
-            return await handler(inputs, context)
+            res = handler(inputs, context)
+            if inspect.iscoroutine(res):
+                return await res
+            return res
 
         elif mode == DispatchMode.HTTP_REMOTE:
             self._stats["http_remote_count"] += 1

@@ -4,7 +4,7 @@ import time
 import uuid
 from typing import Any, Optional
 from .models import (
-    DAGConfig, ExecutionResult, ExecutionStatus, NodeExecutionTrace, NodeType
+    DAGConfig, ExecutionResult, ExecutionStatus, NodeExecutionTrace, NodeType, CompensationTrace
 )
 from .registry import registry
 from .dispatcher import dispatcher, DispatchMode, DualModeDispatcher
@@ -84,6 +84,8 @@ class MicrokernelEngine:
             )
 
         final_output: dict[str, Any] = {}
+        executed_nodes: list[tuple[str, str]] = []
+
         for nid in order:
             node_def = node_map[nid]
             t_start = time.perf_counter()
@@ -103,18 +105,30 @@ class MicrokernelEngine:
                     trace_id=tid,
                     error=err_msg,
                 ))
+                comp_traces, comp_ok = await self._rollback_saga(
+                    config=config,
+                    executed_nodes=executed_nodes,
+                    inputs=inputs,
+                    context=context,
+                    trace_id=tid,
+                )
+                final_status = (
+                    ExecutionStatus.ROLLED_BACK if (comp_traces and comp_ok)
+                    else (ExecutionStatus.COMPENSATION_FAILED if (comp_traces and not comp_ok) else ExecutionStatus.FAILED)
+                )
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
                     trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
-                    status=ExecutionStatus.FAILED,
+                    status=final_status,
                     total_duration_ms=round(total_dur, 2),
                     entry_node=config.execution_graph.entry_node,
                     node_traces=traces,
                     final_output=final_output,
                     error_message=err_msg,
+                    compensation_traces=comp_traces,
                 )
 
             try:
@@ -140,6 +154,7 @@ class MicrokernelEngine:
                     trace_id=tid,
                     output=out,
                 ))
+                executed_nodes.append((nid, node_def.action_handler))
                 if isinstance(out, dict):
                     inputs.update(out)
                     final_output.update(out)
@@ -155,18 +170,30 @@ class MicrokernelEngine:
                     trace_id=tid,
                     error=str(e),
                 ))
+                comp_traces, comp_ok = await self._rollback_saga(
+                    config=config,
+                    executed_nodes=executed_nodes,
+                    inputs=inputs,
+                    context=context,
+                    trace_id=tid,
+                )
+                final_status = (
+                    ExecutionStatus.ROLLED_BACK if (comp_traces and comp_ok)
+                    else (ExecutionStatus.COMPENSATION_FAILED if (comp_traces and not comp_ok) else ExecutionStatus.GUARD_REJECTED)
+                )
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
                     trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
-                    status=ExecutionStatus.GUARD_REJECTED,
+                    status=final_status,
                     total_duration_ms=round(total_dur, 2),
                     entry_node=config.execution_graph.entry_node,
                     node_traces=traces,
                     final_output=final_output,
                     error_message=f"Guard check failed: {e}",
+                    compensation_traces=comp_traces,
                 )
             except Exception as e:
                 dur = (time.perf_counter() - t_start) * 1000
@@ -179,18 +206,30 @@ class MicrokernelEngine:
                     trace_id=tid,
                     error=str(e),
                 ))
+                comp_traces, comp_ok = await self._rollback_saga(
+                    config=config,
+                    executed_nodes=executed_nodes,
+                    inputs=inputs,
+                    context=context,
+                    trace_id=tid,
+                )
+                final_status = (
+                    ExecutionStatus.ROLLED_BACK if (comp_traces and comp_ok)
+                    else (ExecutionStatus.COMPENSATION_FAILED if (comp_traces and not comp_ok) else ExecutionStatus.FAILED)
+                )
                 total_dur = (time.perf_counter() - start_time) * 1000
                 return ExecutionResult(
                     pipeline_id=pipeline_id,
                     trace_id=tid,
                     version=config.version,
                     scenario_code=config.scenario_code,
-                    status=ExecutionStatus.FAILED,
+                    status=final_status,
                     total_duration_ms=round(total_dur, 2),
                     entry_node=config.execution_graph.entry_node,
                     node_traces=traces,
                     final_output=final_output,
                     error_message=f"Node {nid} execution error: {e}",
+                    compensation_traces=comp_traces,
                 )
 
         total_dur = (time.perf_counter() - start_time) * 1000
@@ -204,7 +243,57 @@ class MicrokernelEngine:
             entry_node=config.execution_graph.entry_node,
             node_traces=traces,
             final_output=final_output,
+            compensation_traces=[],
         )
+
+    async def _rollback_saga(
+        self,
+        config: DAGConfig,
+        executed_nodes: list[tuple[str, str]],
+        inputs: dict[str, Any],
+        context: dict[str, Any],
+        trace_id: str,
+    ) -> tuple[list[CompensationTrace], bool]:
+        """Sequentially execute registered compensators in reverse order for all completed nodes."""
+        if not config.enable_saga_compensation or not executed_nodes:
+            return [], True
+
+        traces: list[CompensationTrace] = []
+        all_ok = True
+
+        for nid, handler_name in reversed(executed_nodes):
+            t_start = time.perf_counter()
+            compensator = self.registry.get_compensator(handler_name)
+            if not compensator:
+                # Node has no registered compensator (pure read / idempotent)
+                continue
+
+            try:
+                comp_out = compensator(inputs, context)
+                if asyncio.iscoroutine(comp_out):
+                    comp_out = await comp_out
+                dur = (time.perf_counter() - t_start) * 1000
+                traces.append(CompensationTrace(
+                    node_id=nid,
+                    action_handler=f"{handler_name}_compensate",
+                    status="SUCCESS",
+                    duration_ms=round(dur, 2),
+                    trace_id=trace_id,
+                    output=comp_out if isinstance(comp_out, dict) else {"result": str(comp_out)},
+                ))
+            except Exception as e:
+                all_ok = False
+                dur = (time.perf_counter() - t_start) * 1000
+                traces.append(CompensationTrace(
+                    node_id=nid,
+                    action_handler=f"{handler_name}_compensate",
+                    status="FAILED",
+                    duration_ms=round(dur, 2),
+                    trace_id=trace_id,
+                    error=str(e),
+                ))
+
+        return traces, all_ok
 
 
 microkernel_engine = MicrokernelEngine()

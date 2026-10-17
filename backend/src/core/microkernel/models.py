@@ -43,6 +43,7 @@ class DAGConfig(BaseModel):
     scenario_code: str = "tax.calculate_vat_exemption"
     timestamp: str | None = None
     execution_graph: ExecutionGraph
+    enable_saga_compensation: bool = True
 
 
 class ExecutionStatus(str, Enum):
@@ -50,6 +51,8 @@ class ExecutionStatus(str, Enum):
     FAILED = "FAILED"
     CYCLE_DETECTED = "CYCLE_DETECTED"
     GUARD_REJECTED = "GUARD_REJECTED"
+    ROLLED_BACK = "ROLLED_BACK"
+    COMPENSATION_FAILED = "COMPENSATION_FAILED"
 
 
 class NodeExecutionTrace(BaseModel):
@@ -57,6 +60,16 @@ class NodeExecutionTrace(BaseModel):
     action_handler: str
     type: NodeType
     status: ExecutionStatus
+    duration_ms: float
+    trace_id: str | None = None
+    output: Any = None
+    error: str | None = None
+
+
+class CompensationTrace(BaseModel):
+    node_id: str
+    action_handler: str
+    status: str
     duration_ms: float
     trace_id: str | None = None
     output: Any = None
@@ -74,3 +87,5 @@ class ExecutionResult(BaseModel):
     node_traces: list[NodeExecutionTrace]
     final_output: dict[str, Any]
     error_message: str | None = None
+    compensation_traces: list[CompensationTrace] = Field(default_factory=list)
+
