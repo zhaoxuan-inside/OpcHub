@@ -1160,7 +1160,7 @@
         <div class="section-divider" style="border-top: 1px solid var(--glass-border-subtle); padding-top: 24px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
             <h2 style="font-size: 19px; font-weight: 600; margin: 0;">功能全景地图 (Capability Matrix)</h2>
-            <span id="homePipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_HOME_OVERVIEW_PIPELINE</span>
+            <span id="homePipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">功能空间矩阵</span>
           </div>
           <div class="grid-3" id="homeCapabilityGrid">
             <div class="sitemap-card" onclick="switchView('forum')">
@@ -6411,7 +6411,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             card.className = 'sitemap-card';
             card.onclick = () => switchView(ql.route);
             const numStr = String(idx + 1).padStart(2, '0');
-            const desc = routeDescriptions[ql.route] || '微内核编排业务能力节点。';
+            const desc = ql.description || routeDescriptions[ql.route] || '微内核编排业务能力节点。';
             card.innerHTML = `
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">${numStr} · ${(ql.tag || 'SYSTEM').toUpperCase()}</span>
