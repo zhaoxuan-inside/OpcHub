@@ -170,18 +170,17 @@ gateway:
     - scenario: "perks.publish"
       version: "v1.0.0"
       domain: "perks"
-      description: "提报并上线生态特权福利"
+      description: "微内核DAG编排：提报并上线生态特权福利"
       is_default: true
-      handler: "src.domains.perks.service.perk_service:create_perk"
-      model: "src.domains.perks.models:PerkCreate"
+      handler: "src.core.gateway.adapters:perk_publish_adapter"
 
     - scenario: "perks.claim"
       version: "v1.0.0"
       domain: "perks"
-      description: "领取特权并生成专属兑换凭据"
+      description: "微内核DAG编排：领取特权并生成专属兑换凭据"
       is_default: true
-      handler: "src.domains.perks.service.perk_service:claim_perk"
-      model: "src.domains.perks.models:PerkClaimRequest"
+      handler: "src.core.gateway.adapters:perk_claim_adapter"
+
 
     # --------------------------------------------------------------------------
     # 6. Forum & Brainstorm (头脑风暴社区)

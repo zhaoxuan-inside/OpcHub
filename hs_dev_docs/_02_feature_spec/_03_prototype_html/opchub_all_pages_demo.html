@@ -1701,9 +1701,13 @@
       <div class="glass-box" style="padding: 24px 32px 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">算力与开发者基础设施支持</h1>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <h1 class="page-title" style="font-size: 26px; margin: 0;">算力与开发者基础设施支持</h1>
+              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_PERK_CLAIM_PIPELINE</span>
+            </div>
             <p style="font-size: 13px; color: var(--text-secondary);">已为超级个体接入全球顶尖算力与基础设施专属补贴通道，大幅削减一人公司的启动成本。</p>
           </div>
+
           <button class="btn-liquid" onclick="openPublishPerkModal()" data-tooltip="提报并发布开发者生态特权与算力折扣">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
             <span>提报特权</span>
@@ -4549,25 +4553,26 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // -------------------------------------------------------------
     async function claimPerk(perkName) {
       let code = 'OPC-' + Math.random().toString(36).substring(2, 8).toUpperCase() + '-2026';
-      let perkId = "prk_aliyun_compute_30k";
-      if (perkName.includes("GitHub")) perkId = "prk_github_copilot_ent";
-      if (perkName.includes("PingPong") || perkName.includes("Stripe")) perkId = "prk_pingpong_cross_border_fx";
-      if (perkName.includes("飞书")) perkId = "prk_feishu_pro_license";
+      let perkId = "perk_aliyun_bailian";
+      if (perkName.includes("AWS")) perkId = "perk_aws_activate";
+      if (perkName.includes("Cloudflare") || perkName.includes("Workers")) perkId = "perk_cloudflare_workers";
+      if (perkName.includes("Stripe") || perkName.includes("Atlas") || perkName.includes("PingPong")) perkId = "perk_stripe_atlas";
 
       const gwRes = await dispatchGateway('perks.claim', {
         perk_id: perkId,
         user_id: "usr_2026_opc_9981"
       });
       if (gwRes.ok && gwRes.data) {
-        code = gwRes.data.license_code || code;
+        code = gwRes.data.voucher_code || gwRes.data.license_code || code;
       }
 
       showLiquidNotice(
         `${perkName} 领取成功`,
-        `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n生效状态: 已激活\n说明: 凭据已持久化至后端权益中心，可直接在服务商控制台兑换抵扣。`,
+        `专属特权凭据已发放至您的创客账户！\n\n核销密钥: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n生效状态: 已激活\n说明: 凭据已由 OPC_PERK_CLAIM_PIPELINE 完成配额扣减与持久化。`,
         'SUCCESS'
       );
     }
+
 
     // -------------------------------------------------------------
     // Operational Analytics & Multi-Terminal Controller

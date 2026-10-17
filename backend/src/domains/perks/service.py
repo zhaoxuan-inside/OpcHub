@@ -120,5 +120,24 @@ class PerkService:
         self._claims[key] = claim
         return claim
 
+    def get_perk(self, perk_id: str) -> Optional[PerkResponse]:
+        return self._perks.get(perk_id)
+
+    def delete_perk(self, perk_id: str) -> bool:
+        if perk_id in self._perks:
+            del self._perks[perk_id]
+            return True
+        return False
+
+    def revoke_claim(self, user_id: str, perk_id: str) -> bool:
+        key = (user_id, perk_id)
+        if key in self._claims:
+            del self._claims[key]
+            if perk_id in self._perks:
+                self._perks[perk_id].quota_remaining += 1
+            return True
+        return False
+
 
 perk_service = PerkService()
+

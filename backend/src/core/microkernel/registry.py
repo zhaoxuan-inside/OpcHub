@@ -803,6 +803,140 @@ class AtomicRegistry:
             }
         self.register("demand.telemetry.incr", demand_telemetry_incr, domain="demands", description="需求集市寻源与竞标度量打点算子")
 
+        # Domain 9: Perks & Infrastructure Domain (生态特权与福利领用微内核算子与 Saga 补偿)
+        async def perk_claim_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.perks.service import perk_service
+            perk_id = inputs.get("perk_id", "").strip()
+            user_id = inputs.get("user_id", "usr_maker_2026").strip()
+
+            if not perk_id:
+                raise ValueError("perk_id is required for claiming perk")
+            perk = perk_service.get_perk(perk_id)
+            if not perk:
+                raise KeyError(f"Perk with ID {perk_id} not found")
+            if perk.quota_remaining <= 0:
+                raise ValueError(f"Perk {perk.name} is fully redeemed")
+
+            return {
+                "guard_passed": True,
+                "perk_id": perk_id,
+                "perk_name": perk.name,
+                "provider": perk.provider,
+                "user_id": user_id,
+            }
+        self.register("perk.claim.guard", perk_claim_guard, domain="perks", description="生态特权领用准入与剩余配额校验门禁")
+
+        async def perk_claim_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.perks.service import perk_service
+            from src.domains.perks.models import PerkClaimRequest
+            perk_id = inputs.get("perk_id")
+            user_id = inputs.get("user_id", "usr_maker_2026")
+            claim = perk_service.claim_perk(PerkClaimRequest(user_id=user_id, perk_id=perk_id))
+            return {
+                "claim_id": claim.claim_id,
+                "perk_id": perk_id,
+                "user_id": user_id,
+                "voucher_code": claim.voucher_code,
+                "created_claim": claim.model_dump(),
+                "status": "ACTIVATED",
+            }
+
+        async def perk_claim_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.perks.service import perk_service
+            perk_id = inputs.get("perk_id") or (inputs.get("created_claim", {}).get("perk_id"))
+            user_id = inputs.get("user_id") or (inputs.get("created_claim", {}).get("user_id"))
+            if perk_id and user_id:
+                revoked = perk_service.revoke_claim(user_id, perk_id)
+                return {"perk_id": perk_id, "user_id": user_id, "compensated": revoked, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "Missing perk_id or user_id to rollback"}
+
+        self.register(
+            "perk.claim.persist",
+            perk_claim_persist,
+            domain="perks",
+            description="生态特权抵扣凭据签发与配额原子扣减算子",
+            compensator=perk_claim_persist_compensate,
+        )
+
+        async def perk_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            name = inputs.get("name", "").strip()
+            provider = inputs.get("provider", "").strip()
+            val = float(inputs.get("value_cny", 0.0))
+            summary = inputs.get("summary", "").strip()
+
+            if len(name) < 2:
+                raise ValueError("Perk name must be at least 2 characters long")
+            if len(provider) < 2:
+                raise ValueError("Perk provider must be at least 2 characters long")
+            if val < 0:
+                raise ValueError("Perk value_cny cannot be negative")
+            if len(summary) < 5:
+                raise ValueError("Perk summary must be at least 5 characters long")
+
+            # Moderation check
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            full_text = f"{name} {provider} {summary}"
+            for f in forbidden:
+                if f in full_text:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in perk publish")
+
+            return {
+                "guard_passed": True,
+                "name": name,
+                "provider": provider,
+                "value_cny": val,
+                "category": inputs.get("category", "CLOUD"),
+                "summary": summary,
+                "quota_remaining": int(inputs.get("quota_remaining", 100)),
+            }
+        self.register("perk.publish.guard", perk_publish_guard, domain="perks", description="生态特权提报上线准入与风控审查门禁")
+
+        async def perk_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.perks.service import perk_service
+            from src.domains.perks.models import PerkCreate
+            payload = PerkCreate(
+                name=inputs.get("name", ""),
+                provider=inputs.get("provider", ""),
+                value_cny=float(inputs.get("value_cny", 0.0)),
+                category=inputs.get("category", "CLOUD"),
+                summary=inputs.get("summary", ""),
+                quota_remaining=int(inputs.get("quota_remaining", 100)),
+            )
+            created = perk_service.create_perk(payload)
+            return {
+                "perk_id": created.id,
+                "created_perk": created.model_dump(),
+                "status": "ONLINE",
+            }
+
+        async def perk_publish_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.perks.service import perk_service
+            perk_id = inputs.get("perk_id") or (inputs.get("created_perk", {}).get("id"))
+            if perk_id:
+                deleted = perk_service.delete_perk(perk_id)
+                return {"perk_id": perk_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No perk_id to rollback"}
+
+        self.register(
+            "perk.publish.persist",
+            perk_publish_persist,
+            domain="perks",
+            description="生态特权新权益持久化收录算子",
+            compensator=perk_publish_persist_compensate,
+        )
+
+        async def perk_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in perks pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "perks.pipeline.executed",
+                "perk_id": inputs.get("perk_id", "unknown"),
+                "increment": 1,
+            }
+        self.register("perk.telemetry.incr", perk_telemetry_incr, domain="perks", description="生态特权领用与发布度量打点算子")
+
+
 
 
 

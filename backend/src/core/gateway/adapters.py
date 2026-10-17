@@ -78,6 +78,45 @@ async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
     return res.final_output.get("created_doc") or res.final_output
 
 
+async def perk_claim_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for developer perk redemption."""
+    inputs = dict(p)
+    if "claim_payload" in inputs and isinstance(inputs["claim_payload"], dict):
+        inputs.update(inputs["claim_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_PERK_CLAIM_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Perk claim pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_claim") or res.final_output
+
+
+async def perk_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for ecosystem perk publishing."""
+    inputs = dict(p)
+    if "perk_payload" in inputs and isinstance(inputs["perk_payload"], dict):
+        inputs.update(inputs["perk_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_PERK_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Perk publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_perk") or res.final_output
+
+
+
 
 
 async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
