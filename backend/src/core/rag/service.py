@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from src.core.config import settings
 from src.infrastructure.external_gateway.ai_gateway import siliconflow_gateway
 from .embeddings import get_default_embedding_provider, LocalDeterministicEmbeddingProvider
-from .vector_store import SQLiteVectorStore, VectorDocument, default_vector_store
+from .vector_store import BaseVectorStore, SQLiteVectorStore, VectorDocument, default_vector_store
 
 
 class PolicyRagService:
@@ -13,7 +13,7 @@ class PolicyRagService:
 
     COLLECTION_NAME = "policies"
 
-    def __init__(self, vector_store: Optional[SQLiteVectorStore] = None, embedding_provider=None):
+    def __init__(self, vector_store: Optional[BaseVectorStore] = None, embedding_provider=None):
         self.vector_store = vector_store or default_vector_store
         self.embedding_provider = embedding_provider or get_default_embedding_provider()
         self._ensure_indexed()
@@ -146,7 +146,7 @@ class ForumRagService:
 
     COLLECTION_NAME = "forum_threads"
 
-    def __init__(self, vector_store: Optional[SQLiteVectorStore] = None, embedding_provider=None):
+    def __init__(self, vector_store: Optional[BaseVectorStore] = None, embedding_provider=None):
         self.vector_store = vector_store or default_vector_store
         self.embedding_provider = embedding_provider or get_default_embedding_provider()
         self.ai_gateway = siliconflow_gateway

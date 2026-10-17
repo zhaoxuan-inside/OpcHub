@@ -60,3 +60,15 @@
 - **更新时间**：`2026-10-17T09:28:31Z`
 ---
 
+### 任务简述：TASK-026
+- **标题**：按照ADR-002与ADR-003规范落地PostgreSQL 16与pgvector容器编排及核心业务表异步持久化
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P0
+- **负责人**：agent
+- **核心目标**：严格遵循ADR-002与ADR-003已冻结的技术选型规范，引入PostgreSQL 16与pgvector容器，集成SQLAlchemy 2.0异步引擎(asyncpg)与Alembic迁移，将12大业务域与RAG向量库全面从内存/临时SQLite迁移至PostgreSQL实体关系表
+- **详情索引**：`_02_task_detail/_01_TASK-026/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-026/_00_context_pack.md`
+- **更新时间**：`2026-10-17T10:08:39Z`
+---
+

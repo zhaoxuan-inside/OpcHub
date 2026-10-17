@@ -1,12 +1,36 @@
 # ==============================================================================
 # OpcHub: Production Docker Compose Multi-Container Orchestration
-# One-Person Company (OPC) Plug-and-Play Distribution Stack
+# Platform Stack Serving One-Person Companies (ADR-001, ADR-002, ADR-003)
 # ==============================================================================
 version: "3.8"
 
 services:
   # ----------------------------------------------------------------------------
-  # Core Microkernel Server (FastAPI + Web Console + Unified Gateway + SQLite)
+  # PostgreSQL 16 + pgvector Relational & Vector Storage (ADR-002 & ADR-003)
+  # ----------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: opchub-postgres
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-opchub}
+      POSTGRES_USER: ${POSTGRES_USER:-opc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opchub_secret}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-opc} -d ${POSTGRES_DB:-opchub}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - opchub-net
+
+  # ----------------------------------------------------------------------------
+  # Core Platform Server (FastAPI + Web Console + Unified Gateway + Microkernel)
   # ----------------------------------------------------------------------------
   opchub-server:
     build:
@@ -14,6 +38,9 @@ services:
       dockerfile: Dockerfile
     container_name: opchub-core
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "${OPCHUB_PORT:-8000}:8000"
     environment:
@@ -21,11 +48,12 @@ services:
       - OPCHUB_SERVER_HOST=0.0.0.0
       - OPCHUB_SERVER_PORT=8000
       - OPCHUB_DEBUG=${OPCHUB_DEBUG:-false}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-opc}:${POSTGRES_PASSWORD:-opchub_secret}@postgres:5432/${POSTGRES_DB:-opchub}
       - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY:-}
       - WECHAT_PAY_V3_KEY=${WECHAT_PAY_V3_KEY:-}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
     volumes:
-      # Persistent vector database and local user records
+      # Persistent local storage
       - ./data:/app/data
       # Hot-reloadable route and application configuration
       - ./backend/config:/app/backend/config:ro
@@ -43,3 +71,7 @@ services:
 networks:
   opchub-net:
     driver: bridge
+
+volumes:
+  pgdata:
+    driver: local

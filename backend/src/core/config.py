@@ -41,6 +41,7 @@ _WECHAT_SECTION = _PAYMENT_SECTION.get("wechat", {})
 _STRIPE_SECTION = _PAYMENT_SECTION.get("stripe", {})
 _CRAWLER_SECTION = _EXT_SECTION.get("gov_crawler", {})
 _RAG_SECTION = _EXT_SECTION.get("rag", {})
+_DB_SECTION = _YAML_DATA.get("database", {})
 
 
 class Settings(BaseSettings):
@@ -102,6 +103,12 @@ class Settings(BaseSettings):
     rag_vector_dim: int = int(_RAG_SECTION.get("vector_dim", 128))
     rag_similarity_top_k: int = int(_RAG_SECTION.get("similarity_top_k", 5))
     rag_db_path: str = _RAG_SECTION.get("db_path", "data/rag_vectors.sqlite")
+
+    # PostgreSQL 16 + pgvector Core Relational & Vector Storage (ADR-002 & ADR-003)
+    database_url: str = os.getenv("DATABASE_URL", _DB_SECTION.get("url", "postgresql+asyncpg://opc:opchub_secret@localhost:5432/opchub"))
+    database_echo: bool = bool(_DB_SECTION.get("echo", False))
+    database_pool_size: int = int(_DB_SECTION.get("pool_size", 10))
+    database_max_overflow: int = int(_DB_SECTION.get("max_overflow", 20))
 
     model_config = SettingsConfigDict(env_prefix="OPCHUB_", env_file=".env", extra="ignore")
 

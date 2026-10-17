@@ -6,8 +6,11 @@ from .embeddings import (
     get_default_embedding_provider,
 )
 from .vector_store import (
+    BaseVectorStore,
     VectorDocument,
     SQLiteVectorStore,
+    PGVectorStore,
+    get_vector_store,
     default_vector_store,
 )
 from .service import (
@@ -22,8 +25,11 @@ __all__ = [
     "LocalDeterministicEmbeddingProvider",
     "SiliconFlowEmbeddingProvider",
     "get_default_embedding_provider",
+    "BaseVectorStore",
     "VectorDocument",
     "SQLiteVectorStore",
+    "PGVectorStore",
+    "get_vector_store",
     "default_vector_store",
     "PolicyRagService",
     "ForumRagService",

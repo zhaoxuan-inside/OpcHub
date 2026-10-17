@@ -19,6 +19,13 @@ server:
   port: 8000
   reload: true
 
+# PostgreSQL 16 + pgvector Core Relational & Vector Storage (ADR-002 & ADR-003)
+database:
+  url: "postgresql+asyncpg://opc:opchub_secret@localhost:5432/opchub"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+
 gateway:
   # Inbound Unified Gateway Endpoints
   endpoints:
