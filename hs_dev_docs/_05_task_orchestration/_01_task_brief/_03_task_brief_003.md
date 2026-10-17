@@ -12,3 +12,15 @@
 - **更新时间**：`2026-10-17T08:03:52Z`
 ---
 
+### 任务简述：TASK-022
+- **标题**：真实第三方生态网关接入(SiliconFlow AI算力/微信Stripe支付分账/政府公文爬虫)
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P1
+- **负责人**：agent
+- **核心目标**：在external_gateway/中接入真实SiliconFlow AI模型算力、微信与Stripe双通道合规分账支付及合规政府公开公文爬虫，纯配置驱动并提供离线安全测试降级
+- **详情索引**：`_02_task_detail/_01_TASK-022/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-022/_00_context_pack.md`
+- **更新时间**：`2026-10-17T08:41:03Z`
+---
+

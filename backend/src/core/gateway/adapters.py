@@ -1,4 +1,5 @@
 """Generic adapters for domain services referenced by gateway routes configuration."""
+import time
 from typing import Any, Dict
 from src.domains.demands.service import demand_service
 from src.domains.demands.models import BidCreate
@@ -10,6 +11,11 @@ from src.domains.orchestration.models import (
     ScenarioExecuteRequest,
     FrontendLayoutSaveRequest,
     DAGConfigSaveRequest,
+)
+from src.infrastructure.external_gateway import (
+    siliconflow_gateway,
+    payment_gateway,
+    gov_crawler_gateway,
 )
 
 
@@ -403,3 +409,58 @@ def get_frontend_layout_adapter(p: Dict[str, Any]) -> Any:
 async def async_scenario_executor(payload: Dict[str, Any], context: Dict[str, Any]) -> Any:
     req = ScenarioExecuteRequest(**payload)
     return await orchestration_service.execute_scenario(req)
+
+
+# ==========================================
+# External Ecosystem Outbound Gateway Adapters
+# ==========================================
+async def external_siliconflow_chat_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes SiliconFlow AI chat completion with OpenAI-compatible payload."""
+    messages = p.get("messages", [])
+    if not messages and "prompt" in p:
+        messages = [{"role": "user", "content": p["prompt"]}]
+    model = p.get("model")
+    temp = float(p.get("temperature", 0.3))
+    max_tok = int(p.get("max_tokens", 1024))
+    return await siliconflow_gateway.chat_completion(
+        messages=messages,
+        model=model,
+        temperature=temp,
+        max_tokens=max_tok
+    )
+
+
+async def external_siliconflow_summarize_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes SiliconFlow AI policy white-talk summarization."""
+    title = p.get("title") or p.get("policy_title", "")
+    full_text = p.get("full_text") or p.get("policy_full_text", "")
+    model = p.get("model")
+    return await siliconflow_gateway.summarize_policy(
+        policy_title=title,
+        policy_full_text=full_text,
+        model=model
+    )
+
+
+async def external_payment_split_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes anti-fund-pooling split payment order via WeChat Pay or Stripe."""
+    order_id = p.get("order_id", f"ord_{int(time.time()*1000)}")
+    amount_cny = float(p.get("amount_cny", p.get("amount", 100.0)))
+    merchant_account = p.get("merchant_account", "mch_opchub_platform")
+    maker_account = p.get("maker_account", "maker_licensed_escrow")
+    channel = p.get("channel", "WECHAT")
+    return await payment_gateway.create_split_order(
+        order_id=order_id,
+        amount_cny=amount_cny,
+        merchant_account=merchant_account,
+        maker_account=maker_account,
+        channel=channel
+    )
+
+
+async def external_gov_sat_policy_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Fetches official State Taxation Administration announcement."""
+    year = int(p.get("year", 2023))
+    num = int(p.get("num", 12))
+    return await gov_crawler_gateway.fetch_sat_announcement(year=year, num=num)
+

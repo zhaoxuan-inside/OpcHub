@@ -359,3 +359,35 @@ gateway:
       description: "保存 24 栅格低代码前端可视化布局"
       is_default: true
       handler: "src.core.gateway.adapters:save_layout_adapter"
+
+    # --------------------------------------------------------------------------
+    # 13. External Ecosystem Outbound Gateways (第三方生态集成)
+    # --------------------------------------------------------------------------
+    - scenario: "external.siliconflow.chat"
+      version: "v1.0.0"
+      domain: "external"
+      description: "调用 SiliconFlow 硅基流动 AI 算力大模型进行对话推理与生成"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_siliconflow_chat_adapter"
+
+    - scenario: "external.siliconflow.summarize"
+      version: "v1.0.0"
+      domain: "external"
+      description: "调用 SiliconFlow 硅基流动 AI 算力提炼政策公文大白话要点"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_siliconflow_summarize_adapter"
+
+    - scenario: "external.payment.split"
+      version: "v1.0.0"
+      domain: "external"
+      description: "执行微信支付分账或 Stripe Connect 跨境分账结算 (防资金池合规)"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_payment_split_adapter"
+
+    - scenario: "external.gov.sat_policy"
+      version: "v1.0.0"
+      domain: "external"
+      description: "官方渠道爬取并结构化国家税务总局税费减免公告文件"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_gov_sat_policy_adapter"
+

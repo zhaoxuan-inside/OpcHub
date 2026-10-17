@@ -35,3 +35,37 @@ gateway:
 
   # Path to external scenario routing & version governance configuration
   routes_config_file: "config/gateway_routes.yaml"
+
+# ==============================================================================
+# Outbound External Ecosystem Gateways (Anti-corruption Layer)
+# ==============================================================================
+external_gateway:
+  # SiliconFlow (硅基流动) Large Language Model Gateway
+  siliconflow:
+    base_url: "https://api.siliconflow.cn/v1"
+    api_key_env: "SILICONFLOW_API_KEY"
+    default_model: "deepseek-ai/DeepSeek-V3"
+    timeout_seconds: 30
+    mock_mode: true
+
+  # Licensed Payment Split & Anti-Fund-Pooling Channels
+  payment:
+    wechat:
+      mch_id: "1900000109"
+      base_url: "https://api.mch.weixin.qq.com"
+      api_key_env: "WECHAT_PAY_V3_KEY"
+      profit_sharing_ratio_max: 0.30
+      mock_mode: true
+    stripe:
+      base_url: "https://api.stripe.com"
+      api_key_env: "STRIPE_SECRET_KEY"
+      default_currency: "cny"
+      mock_mode: true
+
+  # Official Government Public Policy Crawler (Strict rate limiting, gov.cn only)
+  gov_crawler:
+    base_url: "https://www.gov.cn"
+    sat_base_url: "https://www.chinatax.gov.cn"
+    rate_limit_per_second: 2.0
+    timeout_seconds: 15
+    mock_mode: true
