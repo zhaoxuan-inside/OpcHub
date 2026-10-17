@@ -3,6 +3,16 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+class PolicyCreate(BaseModel):
+    title: str = Field(..., min_length=2, max_length=255)
+    policy_level: str = Field(default="国家级", description="国家级, 省市级, 园区级")
+    category: str = Field(default="TAX", description="TAX, SUBSIDY, RENT, TALENT")
+    subsidy_amount_max: float = Field(default=0.0, ge=0.0)
+    summary: str = Field(..., min_length=5)
+    eligible_conditions: List[str] = Field(default_factory=list)
+    legal_basis: str = Field(..., min_length=2)
+
+
 class PolicyResponse(BaseModel):
     id: str
     title: str

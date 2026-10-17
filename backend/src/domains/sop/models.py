@@ -19,6 +19,16 @@ class SOPStage(BaseModel):
     description: str
 
 
+class SOPTemplateCreate(BaseModel):
+    stage: int = Field(..., ge=1, le=4)
+    code: str = Field(..., min_length=2, max_length=100)
+    name: str = Field(..., min_length=2, max_length=255)
+    category: str = Field(default="TAX", description="TAX, LEGAL, IP, FINANCE")
+    description: str = Field(..., min_length=5)
+    template_content: str = Field(..., min_length=5)
+    required_fields: List[SOPField] = Field(default_factory=list)
+
+
 class SOPTemplate(BaseModel):
     id: str
     stage: int

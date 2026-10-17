@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional, Tuple
 
 from src.domains.perks.models import (
+    PerkCreate,
     PerkResponse,
     PerkClaimRequest,
     PerkClaimResponse,
@@ -75,6 +76,21 @@ class PerkService:
 
     def list_perks(self) -> List[PerkResponse]:
         return list(self._perks.values())
+
+    def create_perk(self, req: PerkCreate) -> PerkResponse:
+        """Create and publish a new developer perk or subsidy."""
+        pid = f"perk_{uuid.uuid4().hex[:8]}"
+        perk = PerkResponse(
+            id=pid,
+            name=req.name,
+            provider=req.provider,
+            value_cny=req.value_cny,
+            category=req.category,
+            summary=req.summary,
+            quota_remaining=req.quota_remaining,
+        )
+        self._perks[pid] = perk
+        return perk
 
     def claim_perk(self, req: PerkClaimRequest) -> PerkClaimResponse:
         if req.perk_id not in self._perks:

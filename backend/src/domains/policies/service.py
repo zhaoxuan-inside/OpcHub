@@ -3,6 +3,7 @@ import uuid
 from typing import Dict, List, Optional
 
 from src.domains.policies.models import (
+    PolicyCreate,
     PolicyResponse,
     PolicyMatchRequest,
     PolicyMatchResponse,
@@ -68,6 +69,22 @@ class PolicyService:
         if category:
             policies = [p for p in policies if p.category == category]
         return policies
+
+    def create_policy(self, req: PolicyCreate) -> PolicyResponse:
+        """Create and publish a new government policy/subsidy rule."""
+        pid = f"pol_{uuid.uuid4().hex[:8]}"
+        policy = PolicyResponse(
+            id=pid,
+            title=req.title,
+            policy_level=req.policy_level,
+            category=req.category,
+            subsidy_amount_max=req.subsidy_amount_max,
+            summary=req.summary,
+            eligible_conditions=req.eligible_conditions,
+            legal_basis=req.legal_basis,
+        )
+        self._policies[pid] = policy
+        return policy
 
     def match_policies(self, req: PolicyMatchRequest) -> PolicyMatchResponse:
         """Evaluate maker income against policy thresholds and calculate tax savings."""

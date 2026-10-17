@@ -7,6 +7,7 @@ from src.domains.sop.models import (
     SOPStage,
     SOPField,
     SOPTemplate,
+    SOPTemplateCreate,
     SOPTemplatesResponse,
     SOPDocumentCreate,
     SOPDocumentResponse,
@@ -196,6 +197,23 @@ class SOPService:
         if template_id not in self._templates:
             raise KeyError(f"SOP template with ID {template_id} not found")
         return self._templates[template_id]
+
+    def create_template(self, req: SOPTemplateCreate) -> SOPTemplate:
+        """Create and register a new SOP compliance document template."""
+        tid = f"tpl_{uuid.uuid4().hex[:8]}"
+        template = SOPTemplate(
+            id=tid,
+            stage=req.stage,
+            code=req.code,
+            name=req.name,
+            category=req.category,
+            description=req.description,
+            template_content=req.template_content,
+            required_fields=req.required_fields,
+            is_active=True,
+        )
+        self._templates[tid] = template
+        return template
 
     def render_and_save_document(self, payload: SOPDocumentCreate) -> SOPDocumentResponse:
         """Render document template with maker input data and persist instance to backend."""

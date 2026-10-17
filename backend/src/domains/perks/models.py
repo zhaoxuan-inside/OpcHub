@@ -3,6 +3,15 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class PerkCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=255)
+    provider: str = Field(..., min_length=2, max_length=255)
+    value_cny: float = Field(..., ge=0.0)
+    category: str = Field(default="CLOUD", description="CLOUD, AI, FINANCE, INFRA")
+    summary: str = Field(..., min_length=5)
+    quota_remaining: int = Field(default=100, ge=1)
+
+
 class PerkResponse(BaseModel):
     id: str
     name: str

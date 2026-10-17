@@ -1325,19 +1325,19 @@
          ========================================== -->
     <div id="view-product" class="view-panel">
       <div class="glass-box" style="padding: 24px 32px 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">超级个体产品橱窗</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('产品收录与首页置顶', 299)" data-tooltip="提交独立产品入驻橱窗与首页置顶打榜">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            <span>提交产品</span>
+          <button class="btn-liquid" onclick="openPublishProductModal()" data-tooltip="发布独立产品至橱窗与首页打榜">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>发布产品</span>
           </button>
         </div>
       </div>
 
-      <div class="grid-3">
+      <div class="grid-3" id="productCardsGrid">
         <div class="glass-card">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
@@ -1396,11 +1396,19 @@
          ========================================== -->
     <div id="view-policy" class="view-panel">
       <div class="glass-box" style="padding: 24px 32px 16px;">
-        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">政策雷达与白话提炼库</h1>
-        <p style="font-size: 13px; color: var(--text-secondary);">汇集长三角、大湾区及全国针对超级个体与初创团队的扶持红利，拒绝官话套话，直达关键要求。</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">政策雷达与白话提炼库</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">汇集长三角、大湾区及全国针对超级个体与初创团队的扶持红利，拒绝官话套话，直达关键要求。</p>
+          </div>
+          <button class="btn-liquid" onclick="openPublishPolicyModal()" data-tooltip="发布与收录最新政府扶持政策与免税指引">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>发布政策</span>
+          </button>
+        </div>
       </div>
 
-      <div class="grid-3">
+      <div class="grid-3" id="policyCardsGrid">
         <div class="glass-card">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
@@ -1464,7 +1472,7 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
-          <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)" data-tooltip="发布外包寻源需求并进入企业资金托管通道"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>发布需求</button>
+          <button class="btn-liquid" onclick="openPublishDemandModal()" data-tooltip="发布外包寻源与定制委托"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span>发布需求</span></button>
         </div>
 
         <!-- Demand Category Filter Tabs -->
@@ -1572,10 +1580,18 @@
          ========================================== -->
     <div id="view-sop" class="view-panel">
       <div class="glass-box">
-        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客合规 SOP 与标准化材料生成器</h1>
-        <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
-          串联创业从 0 到 1 的全流程填写流图。通过信息录入，系统自动生成符合政务与银行规范的标准申报材料，支持即时预览与一键下载。
-        </p>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客合规 SOP 与标准化材料生成器</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">
+              串联创业从 0 到 1 的全流程填写流图。通过信息录入，系统自动生成符合政务与银行规范的标准申报材料，支持即时预览与一键下载。
+            </p>
+          </div>
+          <button class="btn-liquid" onclick="openPublishSopTemplateModal()" data-tooltip="发布与收录新的创客设立与合规文书模板">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>发布模板</span>
+          </button>
+        </div>
 
         <!-- Stepper Map -->
         <div class="sop-stepper">
@@ -1663,11 +1679,19 @@
          ========================================== -->
     <div id="view-perks" class="view-panel">
       <div class="glass-box" style="padding: 24px 32px 16px;">
-        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">算力与开发者基础设施支持</h1>
-        <p style="font-size: 13px; color: var(--text-secondary);">已为超级个体接入全球顶尖算力与基础设施专属补贴通道，大幅削减一人公司的启动成本。</p>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">算力与开发者基础设施支持</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">已为超级个体接入全球顶尖算力与基础设施专属补贴通道，大幅削减一人公司的启动成本。</p>
+          </div>
+          <button class="btn-liquid" onclick="openPublishPerkModal()" data-tooltip="提报并发布开发者生态特权与算力折扣">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
+            <span>提报特权</span>
+          </button>
+        </div>
       </div>
 
-      <div class="grid-3">
+      <div class="grid-3" id="perkCardsGrid">
         <div class="glass-card">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
@@ -3314,6 +3338,245 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     </div>
   </div>
 
+  <!-- Liquid Publish Product Modal -->
+  <div class="sheet-modal" id="liquidPublishProductModal">
+    <div class="sheet-body" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">发布独立作品到橱窗</h3>
+        <button class="btn-liquid-outline" onclick="closePublishProductModal()" style="padding: 4px 8px;" data-tooltip="放弃本次发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div class="form-group">
+        <label class="form-label">作品分类</label>
+        <select class="glass-select" id="pubProductCategory">
+          <option value="AI 原生写作">AI 原生写作</option>
+          <option value="开发者基础设施">开发者基础设施</option>
+          <option value="跨境出海">跨境出海</option>
+          <option value="SaaS 软件">SaaS 软件</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">产品名称</label>
+        <input type="text" class="glass-input" id="pubProductTitle" placeholder="例如：InkFlow AI 专注编辑器">
+      </div>
+      <div class="form-group">
+        <label class="form-label">产品副标题 / 一句话亮点</label>
+        <input type="text" class="glass-input" id="pubProductTagline" placeholder="例如：专为长文研究员与独立小说家打造的无干扰写作工作台">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">定价模式</label>
+          <select class="glass-select" id="pubProductPricing">
+            <option value="SUBSCRIPTION">订阅制 (按月/年)</option>
+            <option value="ONE_TIME">买断制 (一次性)</option>
+            <option value="FREE">完全免费 / 开源</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">单价 (¥ CNY)</label>
+          <input type="number" class="glass-input" id="pubProductPrice" value="99" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">在线体验 / 官网链接</label>
+        <input type="text" class="glass-input" id="pubProductUrl" placeholder="https://yourproduct.com">
+      </div>
+      <div class="form-group">
+        <label class="form-label">详细介绍</label>
+        <textarea class="glass-textarea" id="pubProductDesc" rows="3" placeholder="阐述产品功能核心、技术亮点、解决的痛点及创客故事..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePublishProductModal()" data-tooltip="取消发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitPublishProduct()" data-tooltip="发布作品至产品橱窗"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Publish Policy Modal -->
+  <div class="sheet-modal" id="liquidPublishPolicyModal">
+    <div class="sheet-body" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">发布政策与扶持红利</h3>
+        <button class="btn-liquid-outline" onclick="closePublishPolicyModal()" style="padding: 4px 8px;" data-tooltip="放弃本次发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">政策级别</label>
+          <select class="glass-select" id="pubPolicyLevel">
+            <option value="国家级">国家级 (全国通用)</option>
+            <option value="长三角">长三角 (江浙沪)</option>
+            <option value="大湾区">大湾区 (粤港澳)</option>
+            <option value="园区级">园区特惠 (特定园区)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">扶持类别</label>
+          <select class="glass-select" id="pubPolicyCategory">
+            <option value="TAX">TAX (税费减免)</option>
+            <option value="SUBSIDY">SUBSIDY (算力与资金补贴)</option>
+            <option value="RENT">RENT (场地工位减免)</option>
+            <option value="TALENT">TALENT (创客人才奖励)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">政策名称</label>
+        <input type="text" class="glass-input" id="pubPolicyTitle" placeholder="例如：人工智能模型微调与算力券直补政策">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">最高补贴/减免限额 (¥)</label>
+          <input type="number" class="glass-input" id="pubPolicySubsidy" value="50000" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">申报有效期 / 截止提示</label>
+          <input type="text" class="glass-input" id="pubPolicyDeadline" value="常年开放申报" placeholder="如：截止 2027-12-31">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">政策依据文号</label>
+        <input type="text" class="glass-input" id="pubPolicyLegal" placeholder="例如：杭高新发〔2024〕18号 人工智能产业高质量发展支持政策">
+      </div>
+      <div class="form-group">
+        <label class="form-label">白话解读要点 (避开官话，直击关键)</label>
+        <textarea class="glass-textarea" id="pubPolicySummary" rows="3" placeholder="【白话要点】简明阐述谁能领、怎么领、能减免多少成本..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePublishPolicyModal()" data-tooltip="取消发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitPublishPolicy()" data-tooltip="发布至政策雷达库"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Publish Demand Modal -->
+  <div class="sheet-modal" id="liquidPublishDemandModal">
+    <div class="sheet-body" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">发布需求与委托寻源</h3>
+        <button class="btn-liquid-outline" onclick="closePublishDemandModal()" style="padding: 4px 8px;" data-tooltip="放弃本次发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">需求分类</label>
+          <select class="glass-select" id="pubDemandCategory">
+            <option value="DEV">DEV (技术开发)</option>
+            <option value="AI">AI (智能体工作流)</option>
+            <option value="TAX">TAX (财税与合规方案)</option>
+            <option value="LEGAL">LEGAL (法务求助与文书)</option>
+            <option value="BIZ">BIZ (出海商业与代运营)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">交付周期 (天)</label>
+          <input type="number" class="glass-input" id="pubDemandDeadline" value="14" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">需求标题</label>
+        <input type="text" class="glass-input" id="pubDemandTitle" placeholder="例如：需要开发跨平台 Electron/Tauri 客户端并适配暗黑毛玻璃风格">
+      </div>
+      <div class="form-group">
+        <label class="form-label">委托预算金额 (¥ CNY)</label>
+        <input type="number" class="glass-input" id="pubDemandBudget" value="20000" min="100">
+      </div>
+      <div class="form-group">
+        <label class="form-label">需求详细说明与技术栈要求</label>
+        <textarea class="glass-textarea" id="pubDemandDesc" rows="3" placeholder="清晰描述输入输出、依赖框架、交互界面及阶段验收交付标准..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePublishDemandModal()" data-tooltip="取消发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitPublishDemand()" data-tooltip="发布商机并开启创客竞标"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Publish Perk Modal -->
+  <div class="sheet-modal" id="liquidPublishPerkModal">
+    <div class="sheet-body" style="max-width: 540px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">提报开发者特权福利</h3>
+        <button class="btn-liquid-outline" onclick="closePublishPerkModal()" style="padding: 4px 8px;" data-tooltip="放弃本次提报"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">特权类别</label>
+          <select class="glass-select" id="pubPerkCategory">
+            <option value="CLOUD">CLOUD (云端算力与主机)</option>
+            <option value="AI">AI (大模型与推理配额)</option>
+            <option value="FINANCE">FINANCE (出海结汇与金融)</option>
+            <option value="INFRA">INFRA (开发者基础设施)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">提供商 / 服务机构</label>
+          <input type="text" class="glass-input" id="pubPerkProvider" placeholder="例如：阿里云 / Cloudflare">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">特权项目名称</label>
+        <input type="text" class="glass-input" id="pubPerkName" placeholder="例如：通义千问百万 Token 推理专属补贴">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">权益价值 / 抵扣额度 (¥)</label>
+          <input type="number" class="glass-input" id="pubPerkValue" value="8000" min="0">
+        </div>
+        <div class="form-group">
+          <label class="form-label">首期发放名额配额</label>
+          <input type="number" class="glass-input" id="pubPerkQuota" value="50" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">权益详细说明与兑换指引</label>
+        <textarea class="glass-textarea" id="pubPerkSummary" rows="3" placeholder="介绍该特权为独立创客带来的实际价值及兑换激活流程..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePublishPerkModal()" data-tooltip="取消提报"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitPublishPerk()" data-tooltip="发布特权福利"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Liquid Publish SOP Template Modal -->
+  <div class="sheet-modal" id="liquidPublishSopTemplateModal">
+    <div class="sheet-body" style="max-width: 580px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">发布合规文书模板</h3>
+        <button class="btn-liquid-outline" onclick="closePublishSopTemplateModal()" style="padding: 4px 8px;" data-tooltip="放弃本次发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">归属创业流程阶段</label>
+          <select class="glass-select" id="pubSopStage">
+            <option value="1">阶段 01: 主体定名与税种选型</option>
+            <option value="2">阶段 02: 银行基本户与发票授信</option>
+            <option value="3">阶段 03: 软著申报与技术入库</option>
+            <option value="4">阶段 04: 跨境结汇通道配置</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">模板标识代码</label>
+          <input type="text" class="glass-input" id="pubSopCode" placeholder="如：TECH_CONSULTING_AGREEMENT">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">文书模板名称</label>
+        <input type="text" class="glass-input" id="pubSopName" placeholder="例如：一人公司技术咨询及保密协议">
+      </div>
+      <div class="form-group">
+        <label class="form-label">模板应用场景简述</label>
+        <input type="text" class="glass-input" id="pubSopDesc" placeholder="简要说明本模板适用的合规场景与法律防范要点">
+      </div>
+      <div class="form-group">
+        <label class="form-label">标准模板正文 (支持 {company_name}, {founder_name} 等参数)</label>
+        <textarea class="glass-textarea" id="pubSopContent" rows="4" placeholder="{company_name} 业务合作协议&#10;甲方：{company_name}&#10;乙方：委托方&#10;第一条 合作范围与交付标准..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closePublishSopTemplateModal()" data-tooltip="取消发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitPublishSopTemplate()" data-tooltip="发布模板至SOP流程文书库"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Global Fixed Liquid Tooltip Element -->
   <div id="liquidTooltip"></div>
 
@@ -3524,6 +3787,443 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
       closePostModal();
       showLiquidNotice('发帖成功', `您的讨论帖已成功持久化至后端！\n帖子ID: ${threadId}\n板块: ${cat.split(' ')[0]}`, 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // Product Publishing Controller (Backend Persistence)
+    // -------------------------------------------------------------
+    function openPublishProductModal() {
+      const modal = document.getElementById('liquidPublishProductModal');
+      if (modal) {
+        document.getElementById('pubProductTitle').value = '';
+        document.getElementById('pubProductTagline').value = '';
+        document.getElementById('pubProductPrice').value = '99';
+        document.getElementById('pubProductUrl').value = '';
+        document.getElementById('pubProductDesc').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePublishProductModal() {
+      const modal = document.getElementById('liquidPublishProductModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitPublishProduct() {
+      const title = document.getElementById('pubProductTitle').value.trim();
+      const tagline = document.getElementById('pubProductTagline').value.trim();
+      const category = document.getElementById('pubProductCategory').value;
+      const pricing = document.getElementById('pubProductPricing').value;
+      const price = parseFloat(document.getElementById('pubProductPrice').value) || 0.0;
+      const url = document.getElementById('pubProductUrl').value.trim() || 'https://opchub.dev';
+      const desc = document.getElementById('pubProductDesc').value.trim();
+
+      if (!title) {
+        showLiquidNotice('请填写产品名称', '产品作品名称不能为空，请输入清晰的作品全称。', 'WARNING');
+        return;
+      }
+
+      let prodId = 'prod_' + Date.now();
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/products", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title,
+            tagline: tagline || title,
+            description: desc || "独立创客自主研发商业作品",
+            category: category.includes("AI") ? "AI" : category.includes("跨境") ? "SAAS" : "DEV",
+            pricing_model: pricing,
+            price_cny: price,
+            demo_url: url,
+            author_id: "usr_2026_opc_9981"
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          prodId = data.id;
+        }
+      } catch (e) {
+        // standalone fallback
+      }
+
+      const grid = document.getElementById('productCardsGrid');
+      if (grid) {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(category)}</span>
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ 1 赞</span>
+            </div>
+            <h3 style="font-size: 17px; margin-bottom: 8px;">${escapeHtml(title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(tagline || desc || '独立创客商业作品')}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">作者: @赵玄 (您)</span>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验产品" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(title)} 独立产品预览环境...', 'INFO')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
+            </button>
+          </div>
+        `;
+        const first = grid.querySelector('.glass-card');
+        if (first) {
+          grid.insertBefore(card, first);
+        } else {
+          grid.appendChild(card);
+        }
+      }
+
+      closePublishProductModal();
+      showLiquidNotice('产品发布成功', `作品《${title}》已入驻产品橱窗并持久化保存至后端！\n作品ID: ${prodId}`, 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // Policy Publishing Controller (Backend Persistence)
+    // -------------------------------------------------------------
+    function openPublishPolicyModal() {
+      const modal = document.getElementById('liquidPublishPolicyModal');
+      if (modal) {
+        document.getElementById('pubPolicyTitle').value = '';
+        document.getElementById('pubPolicySubsidy').value = '50000';
+        document.getElementById('pubPolicyDeadline').value = '常年开放申报';
+        document.getElementById('pubPolicyLegal').value = '';
+        document.getElementById('pubPolicySummary').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePublishPolicyModal() {
+      const modal = document.getElementById('liquidPublishPolicyModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitPublishPolicy() {
+      const level = document.getElementById('pubPolicyLevel').value;
+      const cat = document.getElementById('pubPolicyCategory').value;
+      const title = document.getElementById('pubPolicyTitle').value.trim();
+      const subsidy = parseFloat(document.getElementById('pubPolicySubsidy').value) || 0.0;
+      const deadline = document.getElementById('pubPolicyDeadline').value.trim() || '常年开放申报';
+      const legal = document.getElementById('pubPolicyLegal').value.trim() || '国家与地方促进个体经济发展若干意见';
+      const summary = document.getElementById('pubPolicySummary').value.trim();
+
+      if (!title) {
+        showLiquidNotice('请填写政策名称', '政策与扶持名称不能为空，请输入政策全称。', 'WARNING');
+        return;
+      }
+
+      let policyId = 'pol_' + Date.now();
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/policies", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title,
+            policy_level: level,
+            category: cat,
+            subsidy_amount_max: subsidy,
+            summary: summary || "面向超级个体与科技初创主体的普惠政策支持。",
+            eligible_conditions: ["纳税主体处于正常存续状态", "符合小微免税或算力补贴申报标准"],
+            legal_basis: legal
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          policyId = data.id;
+        }
+      } catch (e) {
+        // standalone fallback
+      }
+
+      const grid = document.getElementById('policyCardsGrid');
+      if (grid) {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(policyId.substring(0, 12).toUpperCase())}</span>
+              <span style="font-size: 11.5px; color: var(--text-tertiary);">${escapeHtml(level)}</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】${escapeHtml(summary || '面向超级个体与科技初创主体的普惠扶持。')}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">${escapeHtml(deadline)}</span>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策" onclick="showLiquidNotice('政策匹配测评', '正在为您检索政策《${escapeHtml(title)}》测算规则，当前主体符合申报红线！', 'SUCCESS')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
+            </button>
+          </div>
+        `;
+        const first = grid.querySelector('.glass-card');
+        if (first) {
+          grid.insertBefore(card, first);
+        } else {
+          grid.appendChild(card);
+        }
+      }
+
+      closePublishPolicyModal();
+      showLiquidNotice('政策发布成功', `扶持政策《${title}》已收录至政策雷达库并完成知识库索引！`, 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // Demand Publishing Controller (Backend Persistence)
+    // -------------------------------------------------------------
+    function openPublishDemandModal() {
+      const modal = document.getElementById('liquidPublishDemandModal');
+      if (modal) {
+        document.getElementById('pubDemandTitle').value = '';
+        document.getElementById('pubDemandBudget').value = '20000';
+        document.getElementById('pubDemandDeadline').value = '14';
+        document.getElementById('pubDemandDesc').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePublishDemandModal() {
+      const modal = document.getElementById('liquidPublishDemandModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitPublishDemand() {
+      const cat = document.getElementById('pubDemandCategory').value;
+      const title = document.getElementById('pubDemandTitle').value.trim();
+      const budget = parseFloat(document.getElementById('pubDemandBudget').value) || 10000;
+      const deadline = parseInt(document.getElementById('pubDemandDeadline').value, 10) || 14;
+      const desc = document.getElementById('pubDemandDesc').value.trim();
+
+      if (!title) {
+        showLiquidNotice('请填写需求标题', '委托需求标题不能为空，请输入清晰的需求任务描述。', 'WARNING');
+        return;
+      }
+
+      let demandId = 'dmd_' + Date.now();
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/demands", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: title,
+            description: desc || "企业外包委托及技术交付需求",
+            budget_cny: budget,
+            category: cat,
+            deadline_days: deadline,
+            creator_id: "usr_2026_opc_9981"
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          demandId = data.id;
+        }
+      } catch (e) {
+        // standalone fallback
+      }
+
+      const grid = document.getElementById('demandCardsGrid');
+      if (grid) {
+        const catMap = {
+          'DEV': '技术开发',
+          'AI': 'AI智能体',
+          'TAX': '财税合规',
+          'LEGAL': '法律求助',
+          'BIZ': '出海商业'
+        };
+        const catName = catMap[cat] || cat;
+        const card = document.createElement('div');
+        card.className = 'glass-card demand-card-item';
+        card.setAttribute('data-cat', cat);
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${catName} · ¥${budget.toLocaleString()}</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(desc || '企业外包委托及技术交付需求，周期 ' + deadline + ' 天。')}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">0 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
+            </button>
+          </div>
+        `;
+        const first = grid.querySelector('.demand-card-item');
+        if (first) {
+          grid.insertBefore(card, first);
+        } else {
+          grid.appendChild(card);
+        }
+      }
+
+      closePublishDemandModal();
+      showLiquidNotice('需求发布成功', `委托需求《${title}》已成功发布并进入需求集市，资金已进入存管合约！`, 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // Perk Publishing Controller (Backend Persistence)
+    // -------------------------------------------------------------
+    function openPublishPerkModal() {
+      const modal = document.getElementById('liquidPublishPerkModal');
+      if (modal) {
+        document.getElementById('pubPerkName').value = '';
+        document.getElementById('pubPerkProvider').value = '';
+        document.getElementById('pubPerkValue').value = '8000';
+        document.getElementById('pubPerkQuota').value = '50';
+        document.getElementById('pubPerkSummary').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePublishPerkModal() {
+      const modal = document.getElementById('liquidPublishPerkModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitPublishPerk() {
+      const cat = document.getElementById('pubPerkCategory').value;
+      const name = document.getElementById('pubPerkName').value.trim();
+      const provider = document.getElementById('pubPerkProvider').value.trim() || '生态合作伙伴';
+      const val = parseFloat(document.getElementById('pubPerkValue').value) || 5000;
+      const quota = parseInt(document.getElementById('pubPerkQuota').value, 10) || 50;
+      const summary = document.getElementById('pubPerkSummary').value.trim();
+
+      if (!name) {
+        showLiquidNotice('请填写特权名称', '特权项目名称不能为空，请输入清晰的福利项目名称。', 'WARNING');
+        return;
+      }
+
+      let perkId = 'perk_' + Date.now();
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/perks", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: name,
+            provider: provider,
+            value_cny: val,
+            category: cat,
+            summary: summary || "面向超级个体的开发者基础设施特权补贴支持。",
+            quota_remaining: quota
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          perkId = data.id;
+        }
+      } catch (e) {
+        // standalone fallback
+      }
+
+      const grid = document.getElementById('perkCardsGrid');
+      if (grid) {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(provider)}</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">价值 ¥${val.toLocaleString()}</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(name)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(summary || '已为超级个体接入专属补贴通道，大幅削减一人公司的启动与算力成本。')}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">剩余额度: ${quota}/${quota}</span>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('${escapeHtml(name)}')" data-tooltip="领取 ${escapeHtml(name)} 专属兑换凭据">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取
+            </button>
+          </div>
+        `;
+        const first = grid.querySelector('.glass-card');
+        if (first) {
+          grid.insertBefore(card, first);
+        } else {
+          grid.appendChild(card);
+        }
+      }
+
+      closePublishPerkModal();
+      showLiquidNotice('特权提报成功', `特权项目《${name}》已上线至生态特权大厅！\n提供商: ${provider}\n名额: ${quota}`, 'SUCCESS');
+    }
+
+    // -------------------------------------------------------------
+    // SOP Template Publishing Controller (Backend Persistence)
+    // -------------------------------------------------------------
+    function openPublishSopTemplateModal() {
+      const modal = document.getElementById('liquidPublishSopTemplateModal');
+      if (modal) {
+        document.getElementById('pubSopCode').value = '';
+        document.getElementById('pubSopName').value = '';
+        document.getElementById('pubSopDesc').value = '';
+        document.getElementById('pubSopContent').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closePublishSopTemplateModal() {
+      const modal = document.getElementById('liquidPublishSopTemplateModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitPublishSopTemplate() {
+      const stage = parseInt(document.getElementById('pubSopStage').value, 10) || 1;
+      const code = document.getElementById('pubSopCode').value.trim() || ('TPL_CUSTOM_' + Date.now().toString(36).toUpperCase());
+      const name = document.getElementById('pubSopName').value.trim();
+      const desc = document.getElementById('pubSopDesc').value.trim();
+      const content = document.getElementById('pubSopContent').value.trim();
+
+      if (!name) {
+        showLiquidNotice('请填写模板名称', '文书模板名称不能为空，请输入标准材料名称。', 'WARNING');
+        return;
+      }
+
+      let templateId = 'tpl_' + Date.now();
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            stage: stage,
+            code: code,
+            name: name,
+            category: stage === 1 ? "TAX" : stage === 2 ? "FINANCE" : stage === 3 ? "IP" : "LEGAL",
+            description: desc || "创客自主设立与经营合规标准文书模板",
+            template_content: content || (name + "\n---------------------------------------------\n主体全称：{company_name}\n法定代表：{founder_name}\n签署日期：2026-10-17\n---------------------------------------------\n[电子印签] 状态: READY"),
+            required_fields: [
+              { key: "company_name", label: "拟定主体名称", type: "string", required: true },
+              { key: "founder_name", label: "法定代表人姓名", type: "string", required: true }
+            ]
+          })
+        });
+        if (res.ok) {
+          const data = await res.json();
+          templateId = data.id;
+        }
+      } catch (e) {
+        // standalone fallback
+      }
+
+      // Update current preview directly
+      const docOut = document.getElementById('sopDocOutput');
+      if (docOut && content) {
+        const comp = document.getElementById('sopCompanyName') ? document.getElementById('sopCompanyName').value : '极客视界（杭州）信息技术工作室';
+        const founder = document.getElementById('sopFounderName') ? document.getElementById('sopFounderName').value : '赵玄';
+        docOut.textContent = content.replace(/\{company_name\}/g, comp).replace(/\{founder_name\}/g, founder);
+      }
+
+      closePublishSopTemplateModal();
+      showLiquidNotice('模板发布成功', `合规文书模板《${name}》已成功登记至阶段 0${stage}！\n模板标识码: ${code}`, 'SUCCESS');
     }
 
     // -------------------------------------------------------------

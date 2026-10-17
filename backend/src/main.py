@@ -33,6 +33,8 @@ from src.domains.forum.models import (
 from src.domains.sop.service import sop_service
 from src.domains.sop.models import (
     SOPTemplatesResponse,
+    SOPTemplate,
+    SOPTemplateCreate,
     SOPDocumentCreate,
     SOPDocumentResponse,
 )
@@ -40,6 +42,7 @@ from src.domains.products.service import product_service
 from src.domains.products.models import ProductCreate, ProductResponse
 from src.domains.policies.service import policy_service
 from src.domains.policies.models import (
+    PolicyCreate,
     PolicyResponse,
     PolicyMatchRequest,
     PolicyMatchResponse,
@@ -53,6 +56,7 @@ from src.domains.demands.models import (
 )
 from src.domains.perks.service import perk_service
 from src.domains.perks.models import (
+    PerkCreate,
     PerkResponse,
     PerkClaimRequest,
     PerkClaimResponse,
@@ -349,6 +353,17 @@ async def get_sop_stages_and_templates():
 
 
 @app.post(
+    f"{settings.api_prefix}/sop/templates",
+    response_model=SOPTemplate,
+    status_code=201,
+    tags=["SOP Workflow"]
+)
+async def create_sop_template(payload: SOPTemplateCreate):
+    """Publish a new SOP compliance document template."""
+    return sop_service.create_template(payload)
+
+
+@app.post(
     f"{settings.api_prefix}/sop/documents",
     response_model=SOPDocumentResponse,
     status_code=201,
@@ -436,6 +451,17 @@ async def list_policies(category: str | None = None):
 
 
 @app.post(
+    f"{settings.api_prefix}/policies",
+    response_model=PolicyResponse,
+    status_code=201,
+    tags=["Policy Radar"]
+)
+async def create_policy(payload: PolicyCreate):
+    """Publish a new government policy or incentive rule."""
+    return policy_service.create_policy(payload)
+
+
+@app.post(
     f"{settings.api_prefix}/policies/match",
     response_model=PolicyMatchResponse,
     tags=["Policy Radar"]
@@ -494,6 +520,17 @@ async def submit_demand_bid(demand_id: str, payload: BidCreate):
 async def list_perks():
     """List available developer credits and platform discounts."""
     return perk_service.list_perks()
+
+
+@app.post(
+    f"{settings.api_prefix}/perks",
+    response_model=PerkResponse,
+    status_code=201,
+    tags=["Perks & Infra"]
+)
+async def create_perk(payload: PerkCreate):
+    """Publish a new developer ecosystem perk or credit."""
+    return perk_service.create_perk(payload)
 
 
 @app.post(
