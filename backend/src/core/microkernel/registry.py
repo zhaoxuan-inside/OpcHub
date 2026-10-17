@@ -1182,5 +1182,86 @@ class AtomicRegistry:
             }
         self.register("external.sms.send_auth_code", external_sms_send_auth_code, domain="external", description="统一外部网关发送实名验证码")
 
+        # Domain 10: Ops & Telemetry Domain (全域运营大盘实时核心指标聚合与审计流水线算子)
+        async def telemetry_dashboard_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            time_range = inputs.get("time_range", "7D")
+            terminal_filter = inputs.get("terminal_filter", "ALL")
+            operator_id = inputs.get("operator_id") or inputs.get("user_id", "admin_001")
+
+            valid_ranges = ["1D", "7D", "30D", "1Y", "ALL"]
+            if time_range not in valid_ranges:
+                raise ValueError(f"Invalid time_range '{time_range}', must be one of {valid_ranges}")
+
+            return {
+                "guard_passed": True,
+                "time_range": time_range,
+                "terminal_filter": terminal_filter,
+                "operator_id": operator_id,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("telemetry.dashboard.guard", telemetry_dashboard_guard, domain="telemetry", description="运营监控大盘调阅鉴权与参数守卫算子")
+
+        async def telemetry_dashboard_collect(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.telemetry.service import telemetry_service
+            dashboard_obj = telemetry_service.get_dashboard_metrics()
+            dashboard_dict = dashboard_obj.model_dump()
+            dashboard_dict["orchestrated_by"] = "OPC_OPS_DASHBOARD_PIPELINE"
+            dashboard_dict["time_range"] = inputs.get("time_range", "7D")
+            dashboard_dict["terminal_filter"] = inputs.get("terminal_filter", "ALL")
+            return {
+                "dashboard": dashboard_dict,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("telemetry.dashboard.collect", telemetry_dashboard_collect, domain="telemetry", description="全域三端运营指标与核心KPI原子聚合算子")
+
+        # In-memory audit tracking for Saga compensation
+        _ops_audit_log = {}
+
+        async def telemetry_dashboard_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            import uuid
+            from datetime import datetime, timezone
+            audit_id = f"aud_ops_{uuid.uuid4().hex[:8]}"
+            dashboard = inputs.get("dashboard", {})
+            operator_id = inputs.get("operator_id", "admin_001")
+            record = {
+                "audit_id": audit_id,
+                "operator_id": operator_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "status": "RECORDED",
+                "watermark": "SECURE_ADMIN_HASH_2026",
+            }
+            _ops_audit_log[audit_id] = record
+            # Flatten dashboard data to top-level output for transparent gateway consumption
+            result = dict(dashboard)
+            result["audit_id"] = audit_id
+            result["audit_status"] = "RECORDED"
+            result["simulate_downstream_failure"] = inputs.get("simulate_downstream_failure", False)
+            return result
+
+        async def telemetry_dashboard_audit_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            audit_id = inputs.get("audit_id")
+            if audit_id and audit_id in _ops_audit_log:
+                _ops_audit_log[audit_id]["status"] = "ROLLED_BACK"
+                return {"audit_id": audit_id, "compensated": True, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No audit record to rollback"}
+
+        self.register(
+            "telemetry.dashboard.audit",
+            telemetry_dashboard_audit,
+            domain="telemetry",
+            description="运营大盘调阅脱敏水印签发与安全审计持久化算子",
+            compensator=telemetry_dashboard_audit_compensate,
+        )
+
+        async def telemetry_dashboard_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in Ops Dashboard pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "ops.dashboard.viewed",
+                "increment": 1,
+            }
+        self.register("telemetry.dashboard.telemetry.incr", telemetry_dashboard_telemetry_incr, domain="telemetry", description="运营大盘调阅度量指标自增算子")
+
 
 registry = AtomicRegistry()

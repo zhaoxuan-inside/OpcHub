@@ -173,8 +173,23 @@ async def moderation_restore_adapter(p: Dict[str, Any], c: Dict[str, Any] = None
     return res.final_output
 
 
+async def ops_dashboard_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for Ops Dashboard telemetry aggregation."""
+    inputs = dict(p or {})
+    if "dashboard_payload" in inputs and isinstance(inputs["dashboard_payload"], dict):
+        inputs.update(inputs["dashboard_payload"])
 
-
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_OPS_DASHBOARD_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Ops dashboard pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
 
 
 async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:

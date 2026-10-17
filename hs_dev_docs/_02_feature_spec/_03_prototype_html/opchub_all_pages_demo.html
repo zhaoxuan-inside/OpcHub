@@ -2295,6 +2295,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <div>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
               <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ADMIN TELEMETRY & MULTI-DEVICE PORTAL</span>
+              <span id="opsPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_OPS_DASHBOARD_PIPELINE</span>
               <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">● 实时流式指标监听中</span>
             </div>
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">全域运营监控大盘与三端视口</h1>
@@ -4637,6 +4638,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         uv = data.uv ? data.uv.value : uv;
         pv = data.pv ? data.pv.value : pv;
         latency = data.api_throughput ? data.api_throughput.sub_text : latency;
+        const pipeBadge = document.getElementById('opsPipelineBadge');
+        if (pipeBadge && data.orchestrated_by) {
+          pipeBadge.textContent = `DAG: ${data.orchestrated_by}`;
+        }
       } else {
         dau = '14,' + Math.floor(820 + Math.random() * 80);
         uv = '89,' + Math.floor(540 + Math.random() * 90);

@@ -459,6 +459,32 @@ class OrchestrationService:
             )
         )
 
+        # 18. Ops Dashboard DAG Pipeline: OPC_OPS_DASHBOARD_PIPELINE
+        topo_ops_dashboard = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "telemetry.dashboard.guard", "type": "GUARD"},
+                {"id": "step_collect", "action_handler": "telemetry.dashboard.collect", "type": "BIZ"},
+                {"id": "step_audit", "action_handler": "telemetry.dashboard.audit", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "telemetry.dashboard.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_collect"},
+                {"from": "step_collect", "to": "step_audit"},
+                {"from": "step_audit", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_OPS_DASHBOARD_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_ops_dashboard,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(

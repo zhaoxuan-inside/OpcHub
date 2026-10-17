@@ -84,3 +84,15 @@
 - **更新时间**：`2026-10-17T06:39:22Z`
 ---
 
+### 任务简述：TASK-018
+- **标题**：P10运营大盘微内核DAG编排流水线与三端实时遥测
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P1
+- **负责人**：agent
+- **核心目标**：实现P10运营大盘控制台底层微内核DAG流水线驱动(OPC_OPS_DASHBOARD_PIPELINE)与Saga逆向补偿
+- **详情索引**：`_02_task_detail/_01_TASK-018/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-018/_00_context_pack.md`
+- **更新时间**：`2026-10-17T06:44:49Z`
+---
+
