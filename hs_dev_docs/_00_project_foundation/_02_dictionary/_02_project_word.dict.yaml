@@ -113,6 +113,16 @@ terms:
     description: "需求集市中专为独立创客设立的法务咨询、资质代办与合规审查委托类别"
     forbidden_alias: ["lawyer_post", "court_ask"]
 
+  - term: "双模调度器"
+    en_name: "DualModeDispatcher"
+    description: "微内核调度执行器，支持单体进程内直接方法调用与微服务远程HTTP请求双模适配"
+    forbidden_alias: ["rpc_switch", "call_hub"]
+
+  - term: "低代码服务组合"
+    en_name: "LowCodeServiceComposition"
+    description: "通过低代码平台将各模块原子算子自由编排组装为业务场景DAG流水线"
+    forbidden_alias: ["script_merge", "hardcode_chain"]
+
 lifecycle_terms:
   - concept: "DAG Pipeline Lifecycle"
     command: "execute_pipeline"

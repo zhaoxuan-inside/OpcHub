@@ -1,16 +1,31 @@
-"""Service for saving and loading versioned DAG configs and frontend visual layouts."""
+"""Service for saving and loading versioned DAG configs, frontend visual layouts, and executing composable scenarios."""
 import uuid
 import hashlib
 import json
+import time
 from datetime import datetime, timezone
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, Any
 
 from src.domains.orchestration.models import (
     DAGConfigSaveRequest,
     DAGConfigRecord,
     FrontendLayoutSaveRequest,
     FrontendLayoutRecord,
+    OperatorDescriptor,
+    OperatorModeUpdateRequest,
+    ScenarioExecuteRequest,
+    ScenarioExecuteResponse,
 )
+from src.core.microkernel.dispatcher import dispatcher, DispatchMode
+from src.core.microkernel.engine import microkernel_engine
+from src.core.microkernel.models import (
+    DAGConfig,
+    ExecutionGraph,
+    NodeDef,
+    EdgeDef,
+    NodeType,
+)
+from src.core.telemetry import get_current_trace_id
 
 
 def utc_now_iso() -> str:
@@ -18,7 +33,7 @@ def utc_now_iso() -> str:
 
 
 class OrchestrationService:
-    """Manages versioned DAG configs and frontend layouts."""
+    """Manages versioned DAG configs, frontend layouts, and executes composable scenarios."""
 
     def __init__(self):
         # Key: (scenario_code, version)
@@ -28,8 +43,8 @@ class OrchestrationService:
         self._seed_default_configs()
 
     def _seed_default_configs(self):
-        # Default DAG config
-        topo = {
+        # 1. Default VAT exemption DAG
+        topo_vat = {
             "topology": "DAG",
             "entry_node": "dnode-1",
             "nodes": [
@@ -48,7 +63,61 @@ class OrchestrationService:
             DAGConfigSaveRequest(
                 scenario_code="tax.calculate_vat_exemption",
                 version="v1.0.4-draft",
-                topology_graph=topo,
+                topology_graph=topo_vat,
+                status="ACTIVE",
+            )
+        )
+
+        # 2. Composable Startup Compliance Pipeline: OPC_COMPLIANCE_STARTUP_FLOW
+        topo_startup = {
+            "topology": "DAG",
+            "entry_node": "step_auth",
+            "nodes": [
+                {"id": "step_auth", "action_handler": "auth_guard", "type": "GUARD"},
+                {"id": "step_tax_calc", "action_handler": "policy.calculate_tax", "type": "BIZ"},
+                {"id": "step_ai_charter", "action_handler": "external.ai.generate_charter", "type": "BIZ"},
+                {"id": "step_render_sop", "action_handler": "sop.render_document", "type": "STORAGE"},
+                {"id": "step_compliance", "action_handler": "compliance.evaluate_audit", "type": "GUARD"},
+            ],
+            "edges": [
+                {"from": "step_auth", "to": "step_tax_calc"},
+                {"from": "step_tax_calc", "to": "step_ai_charter"},
+                {"from": "step_ai_charter", "to": "step_render_sop"},
+                {"from": "step_render_sop", "to": "step_compliance"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_COMPLIANCE_STARTUP_FLOW",
+                version="v1.0.0",
+                topology_graph=topo_startup,
+                status="ACTIVE",
+            )
+        )
+
+        # 3. Composable Policy Tax & AI Match Pipeline: OPC_POLICY_TAX_AI_MATCH
+        topo_policy = {
+            "topology": "DAG",
+            "entry_node": "step_ingress",
+            "nodes": [
+                {"id": "step_ingress", "action_handler": "gateway_ingress", "type": "GATEWAY"},
+                {"id": "step_auth", "action_handler": "auth_guard", "type": "GUARD"},
+                {"id": "step_tax_calc", "action_handler": "invoice_tax_calc", "type": "BIZ"},
+                {"id": "step_subsidies", "action_handler": "policy.match_subsidies", "type": "BIZ"},
+                {"id": "step_audit", "action_handler": "es_audit_sync", "type": "STORAGE"},
+            ],
+            "edges": [
+                {"from": "step_ingress", "to": "step_auth"},
+                {"from": "step_auth", "to": "step_tax_calc"},
+                {"from": "step_tax_calc", "to": "step_subsidies"},
+                {"from": "step_subsidies", "to": "step_audit"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_POLICY_TAX_AI_MATCH",
+                version="v1.0.0",
+                topology_graph=topo_policy,
                 status="ACTIVE",
             )
         )
@@ -97,6 +166,94 @@ class OrchestrationService:
         if scenario_code:
             configs = [c for c in configs if c.scenario_code == scenario_code]
         return configs
+
+    def list_operators(self) -> List[OperatorDescriptor]:
+        """List all registered atomic operator descriptors across all domains."""
+        return dispatcher.list_descriptors()
+
+    def update_operator_mode(self, req: OperatorModeUpdateRequest) -> OperatorDescriptor:
+        """Update dispatch mode (IN_PROCESS vs HTTP_REMOTE) for an operator."""
+        dispatcher.set_operator_mode(req.name, req.mode, req.remote_endpoint)
+        mode, endpoint = dispatcher.get_operator_mode(req.name)
+        return OperatorDescriptor(
+            name=req.name,
+            domain="custom",
+            description=f"Operator: {req.name}",
+            mode=mode,
+            remote_endpoint=endpoint,
+        )
+
+    async def execute_scenario(
+        self,
+        req: ScenarioExecuteRequest,
+        trace_id: Optional[str] = None,
+    ) -> ScenarioExecuteResponse:
+        """Execute a composable scenario DAG pipeline."""
+        tid = trace_id or get_current_trace_id()
+        # Find latest active DAG config for the scenario
+        candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code and c.status == "ACTIVE"]
+        if not candidates:
+            # Fallback to any version
+            candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code]
+
+        if not candidates:
+            raise KeyError(f"Scenario code '{req.scenario_code}' has no configured DAG pipeline")
+
+        config_record = candidates[-1]
+        topo = config_record.topology_graph
+
+        # Convert topology dictionary to DAGConfig
+        nodes = []
+        for n in topo.get("nodes", []):
+            ntype = NodeType[n.get("type", "BIZ")] if n.get("type") in NodeType.__members__ else NodeType.BIZ
+            nodes.append(
+                NodeDef(
+                    id=n["id"],
+                    action_handler=n["action_handler"],
+                    type=ntype,
+                    timeout_ms=n.get("timeout_ms", 3000),
+                )
+            )
+
+        edges = []
+        for e in topo.get("edges", []):
+            edges.append(
+                EdgeDef(
+                    from_node=e.get("from") or e.get("from_node"),
+                    to_node=e.get("to") or e.get("to_node"),
+                )
+            )
+
+        dag_config = DAGConfig(
+            version=config_record.version,
+            scenario_code=config_record.scenario_code,
+            execution_graph=ExecutionGraph(
+                topology=topo.get("topology", "DAG"),
+                entry_node=topo.get("entry_node", nodes[0].id if nodes else ""),
+                nodes=nodes,
+                edges=edges,
+            ),
+        )
+
+        res = await microkernel_engine.execute_dag(
+            config=dag_config,
+            initial_inputs=req.inputs,
+            trace_id=tid,
+            override_dispatch_mode=req.override_dispatch_mode,
+        )
+
+        effective_mode = req.override_dispatch_mode.value if req.override_dispatch_mode else dispatcher.default_mode.value
+
+        return ScenarioExecuteResponse(
+            scenario_code=req.scenario_code,
+            status=res.status.value,
+            execution_time_ms=res.total_duration_ms,
+            trace_id=res.trace_id,
+            effective_dispatch_mode=effective_mode,
+            node_traces=[t.model_dump() for t in res.node_traces],
+            final_output=res.final_output,
+            error_message=res.error_message,
+        )
 
     def save_frontend_layout(self, req: FrontendLayoutSaveRequest) -> FrontendLayoutRecord:
         record_id = str(uuid.uuid4())

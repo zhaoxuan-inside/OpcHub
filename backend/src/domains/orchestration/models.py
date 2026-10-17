@@ -1,6 +1,7 @@
-"""Data models for DAG Pipeline Configs and Frontend Layouts."""
+"""Data models for DAG Pipeline Configs, Frontend Layouts, and Scenario Execution."""
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
+from src.core.microkernel.dispatcher import DispatchMode, OperatorDescriptor
 
 
 class DAGConfigSaveRequest(BaseModel):
@@ -36,3 +37,26 @@ class FrontendLayoutRecord(BaseModel):
     grid_schema: Dict[str, Any]
     widgets: List[Dict[str, Any]]
     updated_at: str
+
+
+class OperatorModeUpdateRequest(BaseModel):
+    name: str
+    mode: DispatchMode
+    remote_endpoint: Optional[str] = None
+
+
+class ScenarioExecuteRequest(BaseModel):
+    scenario_code: str
+    inputs: Dict[str, Any] = Field(default_factory=dict)
+    override_dispatch_mode: Optional[DispatchMode] = None
+
+
+class ScenarioExecuteResponse(BaseModel):
+    scenario_code: str
+    status: str
+    execution_time_ms: float
+    trace_id: str
+    effective_dispatch_mode: str
+    node_traces: List[Dict[str, Any]]
+    final_output: Dict[str, Any]
+    error_message: Optional[str] = None

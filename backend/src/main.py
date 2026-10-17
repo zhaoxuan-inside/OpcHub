@@ -69,6 +69,10 @@ from src.domains.orchestration.models import (
     DAGConfigRecord,
     FrontendLayoutSaveRequest,
     FrontendLayoutRecord,
+    OperatorDescriptor,
+    OperatorModeUpdateRequest,
+    ScenarioExecuteRequest,
+    ScenarioExecuteResponse,
 )
 from src.domains.moderation.service import moderation_service
 from src.domains.moderation.models import (
@@ -579,6 +583,41 @@ async def get_frontend_layout(layout_name: str = "main_console_layout"):
         return orchestration_service.get_frontend_layout(layout_name)
     except KeyError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get(
+    f"{settings.api_prefix}/orchestration/operators",
+    response_model=list[OperatorDescriptor],
+    tags=["Low-Code Composition & Microkernel Orchestration"]
+)
+async def list_registered_operators():
+    """List all registered atomic domain operators and external gateway proxies."""
+    return orchestration_service.list_operators()
+
+
+@app.post(
+    f"{settings.api_prefix}/orchestration/operators/mode",
+    response_model=OperatorDescriptor,
+    tags=["Low-Code Composition & Microkernel Orchestration"]
+)
+async def update_operator_dispatch_mode(payload: OperatorModeUpdateRequest):
+    """Toggle operator execution mode between IN_PROCESS and HTTP_REMOTE."""
+    return orchestration_service.update_operator_mode(payload)
+
+
+@app.post(
+    f"{settings.api_prefix}/orchestration/scenarios/execute",
+    response_model=ScenarioExecuteResponse,
+    tags=["Low-Code Composition & Microkernel Orchestration"]
+)
+async def execute_composable_scenario(payload: ScenarioExecuteRequest):
+    """Execute a composable scenario DAG pipeline across domain modules and external gateways."""
+    try:
+        return await orchestration_service.execute_scenario(payload)
+    except KeyError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ==========================================

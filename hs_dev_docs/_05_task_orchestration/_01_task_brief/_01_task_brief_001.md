@@ -70,6 +70,16 @@
 - **详情索引**：`_02_task_detail/_01_TASK-006/_00_task_detail.md`
 - **上下文包**：`_03_task_context_pack/_01_TASK-006/_00_context_pack.md`
 - **更新时间**：`2026-10-17T01:50:00Z`
+### 任务简述：TASK-007
+- **标题**：低代码可组合微内核双模调度器与全域领域算子聚合流水线
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P0
+- **负责人**：hardstone
+- **核心目标**：实现微内核双模调度器(单体直接调用 vs 微服务HTTP派发)、全域领域算子自动装配与低代码场景组合流水线执行
+- **详情索引**：`_02_task_detail/_01_TASK-007/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-007/_00_context_pack.md`
+- **更新时间**：`2026-10-17T02:20:00Z`
 ---
 
 
