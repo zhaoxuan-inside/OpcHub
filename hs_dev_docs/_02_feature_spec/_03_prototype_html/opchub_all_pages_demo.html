@@ -5292,6 +5292,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (showNotice) {
         showLiquidNotice('文书已生成', '申报文书已根据填报关键字段完成合规排版！', 'SUCCESS');
       }
+    }
+
     async function generateCharterWithAI() {
       const company = document.getElementById('sopCompanyName').value || '拟定一人有限公司';
       const scope = document.getElementById('sopBizScope').value || '技术研发与人工智能应用';
