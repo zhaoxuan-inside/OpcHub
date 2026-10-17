@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     api_prefix: str = _APP_SECTION.get("api_prefix", "/api/v1")
     docs_url: Optional[str] = _APP_SECTION.get("docs_url", "/docs")
     redoc_url: Optional[str] = _APP_SECTION.get("redoc_url", "/redoc")
+    console_html_path: str = _APP_SECTION.get(
+        "console_html_path",
+        "hs_dev_docs/_02_feature_spec/_03_prototype_html/opchub_all_pages_demo.html"
+    )
     cors_origins: List[str] = _APP_SECTION.get("cors_origins", ["*"])
 
     server_host: str = _SERVER_SECTION.get("host", "0.0.0.0")

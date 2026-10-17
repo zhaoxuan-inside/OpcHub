@@ -1,9 +1,11 @@
 import os
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 
 from src.core.config import settings
@@ -121,6 +123,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(TracePropagationMiddleware)
+
+
+@app.get("/", response_class=HTMLResponse, tags=["Web Console"])
+@app.get("/app", response_class=HTMLResponse, tags=["Web Console"])
+async def serve_web_console():
+    """Serve the complete 12-page OpcHub interactive visual console."""
+    candidates = [
+        Path(settings.console_html_path),
+        Path(__file__).resolve().parents[2] / settings.console_html_path,
+        Path(__file__).resolve().parents[1] / settings.console_html_path,
+    ]
+    for c in candidates:
+        if c.is_file():
+            return FileResponse(c, media_type="text/html; charset=utf-8")
+    return HTMLResponse("<h1>OpcHub Console</h1><p>Demo prototype file not found.</p>", status_code=200)
 
 
 class ScriptValidationRequest(BaseModel):

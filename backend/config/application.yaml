@@ -10,6 +10,7 @@ app:
   api_prefix: "/api/v1"
   docs_url: "/docs"
   redoc_url: "/redoc"
+  console_html_path: "hs_dev_docs/_02_feature_spec/_03_prototype_html/opchub_all_pages_demo.html"
   cors_origins:
     - "*"
 

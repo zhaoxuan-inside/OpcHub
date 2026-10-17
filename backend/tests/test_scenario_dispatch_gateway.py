@@ -284,3 +284,16 @@ def test_legacy_version_deprecation_warning():
     assert "warning" in data["message"]
     assert "v0.9.0 即将终止服务" in data["message"]
 
+
+def test_serve_web_console():
+    """Verify that root GET / and /app serve the OpcHub visual console HTML."""
+    resp_root = client.get("/")
+    assert resp_root.status_code == 200
+    assert "text/html" in resp_root.headers.get("content-type", "")
+    assert "OpcHub" in resp_root.text
+
+    resp_app = client.get("/app")
+    assert resp_app.status_code == 200
+    assert "text/html" in resp_app.headers.get("content-type", "")
+    assert "OpcHub" in resp_app.text
+
