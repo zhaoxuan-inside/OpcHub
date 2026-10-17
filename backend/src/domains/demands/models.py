@@ -7,7 +7,7 @@ class DemandCreate(BaseModel):
     title: str = Field(..., min_length=2, max_length=255)
     description: str = Field(..., min_length=5)
     budget_cny: float = Field(..., ge=0.0)
-    category: str = Field(default="DEV", description="DEV, BIZ, TAX, AI")
+    category: str = Field(default="DEV", description="DEV, BIZ, TAX, AI, LEGAL")
     deadline_days: int = Field(default=14, ge=1)
     creator_id: str
 

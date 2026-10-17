@@ -77,6 +77,14 @@ from src.domains.moderation.models import (
     RestoreRequest,
     ModerationActionResponse,
 )
+from src.domains.compliance.service import compliance_service
+from src.domains.compliance.models import (
+    ComplianceDimension,
+    ComplianceCase,
+    AuditCheckItem,
+    AuditEvaluateRequest,
+    AuditReportResponse,
+)
 
 
 app = FastAPI(
@@ -317,6 +325,7 @@ async def get_home_overview():
             {"name": "政策雷达", "route": "policy", "count_desc": "30万增值税免征"},
             {"name": "需求集市", "route": "demand", "count_desc": "89 笔进行中委托"},
             {"name": "生态特权", "route": "perks", "count_desc": "最高 $5,000 算力券"},
+            {"name": "合规指南", "route": "compliance", "count_desc": "6大防线自检雷达"},
             {"name": "后端编排", "route": "backend-orch", "count_desc": "微内核 DAG 引擎"},
         ],
     }
@@ -603,6 +612,50 @@ async def takedown_content(payload: TakedownRequest):
 async def restore_content(payload: RestoreRequest):
     """Restore mistakenly flagged content item."""
     return moderation_service.restore(payload)
+
+
+# ==========================================
+# Product Compliance & Self-Audit Endpoints
+# ==========================================
+@app.get(
+    f"{settings.api_prefix}/compliance/dimensions",
+    response_model=list[ComplianceDimension],
+    tags=["Product Compliance"]
+)
+async def get_compliance_dimensions():
+    """Retrieve six-dimensional product compliance guidelines and legal rules."""
+    return compliance_service.get_dimensions()
+
+
+@app.get(
+    f"{settings.api_prefix}/compliance/cases",
+    response_model=list[ComplianceCase],
+    tags=["Product Compliance"]
+)
+async def get_compliance_cases():
+    """Retrieve real-world regulatory pitfall cases and penalties."""
+    return compliance_service.get_cases()
+
+
+@app.get(
+    f"{settings.api_prefix}/compliance/checkpoints",
+    response_model=list[AuditCheckItem],
+    tags=["Product Compliance"]
+)
+async def get_compliance_checkpoints():
+    """Retrieve 10-point standard pre-launch compliance self-audit checklist."""
+    return compliance_service.get_checkpoints()
+
+
+@app.post(
+    f"{settings.api_prefix}/compliance/audit",
+    response_model=AuditReportResponse,
+    tags=["Product Compliance"]
+)
+async def evaluate_compliance_audit(payload: AuditEvaluateRequest):
+    """Evaluate developer's self-audit submission and generate a compliance score report."""
+    return compliance_service.evaluate_audit(payload)
+
 
 
 

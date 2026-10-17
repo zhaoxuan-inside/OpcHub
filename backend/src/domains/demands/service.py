@@ -50,6 +50,22 @@ class DemandService:
                 3,
                 "usr_client_corp_103",
             ),
+            (
+                "出海独立 SaaS 平台隐私协议与 GDPR 合规审查求助",
+                "寻求资深涉外法务或合规律师，起草符合欧盟 GDPR 与美区 CCPA 标准的隐私政策、服务条款及用户数据出境评估报告。",
+                12000.0,
+                "LEGAL",
+                5,
+                "usr_client_corp_104",
+            ),
+            (
+                "生成式 AI 算法备案与大模型境内上线合规辅导",
+                "针对平台接入的 LLM 智能体及文书生成服务，辅导完成网信办生成式人工智能服务上线备案与算法安全自评估报告。",
+                18000.0,
+                "LEGAL",
+                10,
+                "usr_client_corp_105",
+            ),
         ]
         for title, desc, budget, cat, days, creator in items:
             did = str(uuid.uuid4())

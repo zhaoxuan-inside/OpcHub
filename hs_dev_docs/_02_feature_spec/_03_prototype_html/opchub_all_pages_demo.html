@@ -1058,6 +1058,7 @@
         <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
         <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
         <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
+        <button class="nav-tab-btn tab-user-only" onclick="switchView('compliance', this)" data-tooltip="产品开发合规全景指南、典型避坑案例库与上线前自检清单">合规指南</button>
 
         <!-- Administrator Only Tabs (普通用户不可见，且不能与其他页面同时存在) -->
         <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台" style="display: none;">后端编排</button>
@@ -1153,6 +1154,11 @@
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">06 · INFRASTRUCTURE</div>
               <h3 style="font-size: 16px; margin: 8px 0 6px;">支持与基础设施</h3>
               <p style="font-size: 13px; color: var(--text-secondary);">云厂商激活特权、Token 优惠券、Stripe 结汇通道及工具折扣。</p>
+            </div>
+            <div class="sitemap-card" onclick="switchView('compliance')">
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">07 · COMPLIANCE</div>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">产品合规指南</h3>
+              <p style="font-size: 13px; color: var(--text-secondary);">六维合规防线、典型避坑案例库与上线前自检雷达。</p>
             </div>
             <div class="sitemap-card" onclick="switchView('user')">
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">07 · ENTITLEMENT</div>
@@ -1396,20 +1402,29 @@
          ========================================== -->
     <div id="view-demand" class="view-panel">
       <div class="glass-box" style="padding: 24px 32px 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
           <button class="btn-liquid" onclick="openEntitlementModal('发布企业外包寻源', 199)" data-tooltip="发布外包寻源需求并进入企业资金托管通道"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>发布需求</button>
         </div>
+
+        <!-- Demand Category Filter Tabs -->
+        <div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; flex-wrap: wrap;">
+          <button class="btn-liquid-outline demand-filter-btn active" id="demandFilterAll" onclick="filterDemandCat('ALL', this)" style="padding: 4px 12px; font-size: 12px;">全部商机</button>
+          <button class="btn-liquid-outline demand-filter-btn" onclick="filterDemandCat('DEV', this)" style="padding: 4px 12px; font-size: 12px;">技术开发</button>
+          <button class="btn-liquid-outline demand-filter-btn" onclick="filterDemandCat('AI', this)" style="padding: 4px 12px; font-size: 12px;">AI智能体</button>
+          <button class="btn-liquid-outline demand-filter-btn" onclick="filterDemandCat('TAX', this)" style="padding: 4px 12px; font-size: 12px;">财税合规</button>
+          <button class="btn-liquid-outline demand-filter-btn" id="demandFilterLegal" onclick="filterDemandCat('LEGAL', this)" style="padding: 4px 12px; font-size: 12px; color: #FF9500; border-color: rgba(255,149,0,0.3);">法律求助</button>
+        </div>
       </div>
 
-      <div class="grid-3">
-        <div class="glass-card">
+      <div class="grid-3" id="demandCardsGrid">
+        <div class="glass-card demand-card-item" data-cat="AI">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-              <span class="mono-tag">预算 ¥35,000</span>
+              <span class="mono-tag">AI智能体 · ¥35,000</span>
               <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
             </div>
             <h3 style="font-size: 16px; margin-bottom: 8px;">外贸 CRM 系统的垂直行业 Agent 工作流搭建</h3>
@@ -1423,10 +1438,10 @@
           </div>
         </div>
 
-        <div class="glass-card">
+        <div class="glass-card demand-card-item" data-cat="DEV">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-              <span class="mono-tag">预算 ¥18,000</span>
+              <span class="mono-tag">技术开发 · ¥18,000</span>
               <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
             </div>
             <h3 style="font-size: 16px; margin-bottom: 8px;">跨端桌面工具 (Electron / Tauri) 界面重构与性能调优</h3>
@@ -1440,10 +1455,10 @@
           </div>
         </div>
 
-        <div class="glass-card">
+        <div class="glass-card demand-card-item" data-cat="DEV">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-              <span class="mono-tag">年费项目 ¥60,000</span>
+              <span class="mono-tag">技术顾问 · ¥60,000</span>
               <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
             </div>
             <h3 style="font-size: 16px; margin-bottom: 8px;">出海 SaaS 平台长期兼职 DevOps 与合规架构顾问</h3>
@@ -1454,6 +1469,42 @@
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">5 人已竞标</span>
             <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+          </div>
+        </div>
+
+        <!-- Demand 4: Legal Help 1 (GDPR & Overseas Privacy) -->
+        <div class="glass-card demand-card-item" data-cat="LEGAL">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500;">法律求助 · ¥12,000</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">出海独立 SaaS 平台隐私协议与 GDPR 合规审查求助</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              寻求资深涉外法务或合规律师，起草符合欧盟 GDPR 与美区 CCPA 标准的隐私政策、服务条款及用户数据出境评估报告。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">2 位律所已投标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交专业法务顾问资质与方案竞标" onclick="showLiquidNotice('法律求助竞标', '您的法务执业机构资质核验通过，竞标方案与服务排期已送达需求发起人！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+          </div>
+        </div>
+
+        <!-- Demand 5: Legal Help 2 (AI Algorithm Filing) -->
+        <div class="glass-card demand-card-item" data-cat="LEGAL">
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500;">法律求助 · ¥18,000</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 8px;">生成式 AI 算法备案与大模型境内上线合规辅导</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              针对平台接入的 LLM 智能体及文书生成服务，辅导完成网信办生成式人工智能服务上线备案与算法安全自评估报告。
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">4 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交算法合规辅导资质与履约方案" onclick="showLiquidNotice('法律求助竞标', '算法备案辅导资质核验通过，竞标意向书已提交委托方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
       </div>
@@ -2775,6 +2826,257 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         </div>
       </div>
     </div>
+
+    <!-- ==========================================
+         VIEW 13: 产品开发合规指南与风险自检引擎 (Compliance Guide & Self-Audit)
+         ========================================== -->
+    <div id="view-compliance" class="view-panel">
+      <div class="glass-box" style="padding: 24px 32px 18px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+          <div>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">产品开发合规指南</h1>
+            <p style="font-size: 13px; color: var(--text-secondary);">六维合规防线体系 · 典型避坑案例剖析 · 上线前合规自检雷达</p>
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn-liquid-outline" onclick="switchComplianceTab('radar')" data-tooltip="快速打开上线前合规体检雷达">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a10 10 0 0 1 10 10"/></svg>
+              <span>自检雷达</span>
+            </button>
+            <button class="btn-liquid" onclick="quickJumpToLegalDemand()" data-tooltip="直通需求集市发布法律咨询与合规委托求助">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+              <span>法律求助</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Compliance Segment Tabs -->
+        <div style="display: flex; gap: 8px; margin-top: 16px; border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; flex-wrap: wrap;">
+          <button class="btn-liquid-outline compliance-tab-btn active" id="btnCompTabDimensions" onclick="switchComplianceTab('dimensions')" style="padding: 5px 14px; font-size: 12.5px;">六维防线</button>
+          <button class="btn-liquid-outline compliance-tab-btn" id="btnCompTabCases" onclick="switchComplianceTab('cases')" style="padding: 5px 14px; font-size: 12.5px;">避坑案例</button>
+          <button class="btn-liquid-outline compliance-tab-btn" id="btnCompTabRadar" onclick="switchComplianceTab('radar')" style="padding: 5px 14px; font-size: 12.5px; color: var(--accent); border-color: rgba(0,113,227,0.3);">自检雷达</button>
+        </div>
+      </div>
+
+      <!-- Tab 1: Dimensions Grid -->
+      <div id="compPanelDimensions" class="compliance-panel">
+        <div class="grid-3" style="margin-top: 18px;">
+          <!-- Dim 1: Privacy -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent);">个人隐私安全</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-01</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">最小必要授权与账号注销</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                禁止静默读取剪贴板与设备相册；注册页《隐私政策》禁止默认勾选；必须提供可自主操作的注销通道与脱敏销毁。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 最高五千万元或上一年度营收 5% 罚款，通报下架。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              法条: 《个人信息保护法》第13条、第47条
+            </div>
+          </div>
+
+          <!-- Dim 2: Payment Escrow -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(239,68,68,0.15); color: #ef4444;">资金防二清</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-02</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">严禁设立自建平台资金池</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                平台作为信息中介绝对不能碰钱。创客报酬与撮合资金必须全量接入微信支付分账、支付宝直付通或持牌银行存管通道。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 涉嫌非法吸收公众存款罪或非法经营罪，追究刑事责任。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              规约: 央行《非银行支付机构客户备付金存管办法》
+            </div>
+          </div>
+
+          <!-- Dim 3: Filing & License -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(52,199,89,0.15); color: #34C759;">资质与上线备案</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-03</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">ICP备案/网安/算法备案</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                境内上线必须完成管局 ICP 备案并在 30 日内完成公安联网备案；面向公众提供生成式 AI 生成须完成网信办算法自评估备案。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #eab308; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 域名 DNS 阻断、机房下线整改、最高一百万元罚款。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              法条: 《生成式AI服务管理暂行办法》第17条
+            </div>
+          </div>
+
+          <!-- Dim 4: IP & Open Source -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(175,82,222,0.15); color: #AF52DE;">知识产权与开源</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-04</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">防范 GPL/AGPL 传染风险</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                商业闭源项目严格排查强传染开源协议，避免全套商业代码被司法判令强制开源；核心字体与素材确保取得合法授权书。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 侵权赔偿最高五百万元，强制开源全部私有商业代码。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              法条: 《中华人民共和国著作权法》第49条
+            </div>
+          </div>
+
+          <!-- Dim 5: Cross-Border -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(255,149,0,0.15); color: #FF9500;">数据出境与海外</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-05</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">出海 GDPR 与阳光结汇</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                面向欧美市场的出海 SaaS 必须设立 DPO 角色并遵循欧盟 GDPR 隐私标准；境外收入回流需通过持牌结汇机构合法申报。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 欧盟 GDPR 最高 2,000 万欧元或全球营业额 4% 重罚。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              法条: 欧盟 GDPR 条例、《数据出境安全评估办法》
+            </div>
+          </div>
+
+          <!-- Dim 6: UGC & Moderation -->
+          <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <span class="mono-tag" style="background: rgba(90,200,250,0.15); color: #5AC8FA;">内容安全与防线</span>
+                <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-06</span>
+              </div>
+              <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">IP属地/敏感词/180天日志</h3>
+              <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 12px;">
+                前台社区强制展示发帖人 IP 属地标签；后端网关前置拦截一级涉黄暴恐敏感词；系统审计与网络访问日志必须加密留存至少 180 天。
+              </p>
+              <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                ⚠️ 违规罚则: 责令停机整顿，吊销增值电信业务经营许可。
+              </div>
+            </div>
+            <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+              法条: 《网络安全法》第21条、《账号管理规定》第12条
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 2: Pitfall Cases -->
+      <div id="compPanelCases" class="compliance-panel" style="display: none; margin-top: 18px;">
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Case 1 -->
+          <div class="glass-card" style="border-left: 4px solid #ef4444; padding: 20px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+              <span class="mono-tag" style="background: rgba(239,68,68,0.15); color: #ef4444; font-weight: 600;">二清违规冻结 · 涉案 68 万元</span>
+              <span style="font-size: 12px; color: var(--text-tertiary);">微支付 / 工具聚合行业</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 6px;">某知名独立开发者工具因内嵌资金池涉二清被微信支付永久封号</h3>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
+              <strong>【案情背景】</strong> 某独立开发者搭建团队任务众包工具，在前端为用户提供充值钱包，开发者个人银行卡作为出纳资金池中转结算，每周人工给创客分账打款。
+              <br><strong>【监管处罚】</strong> 触发央行反洗钱备付金监控模型，商户号被微信支付风控永久冻结，冻结账户余额 68 万元并移交金融办排查。
+            </div>
+            <div style="background: var(--glass-surface-subtle); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--accent);">
+              💡 <strong>避坑经验：</strong> 平台绝不触碰资金！全量接入持牌机构商户分账（如微信分账、支付宝直付通），交易款项由牌照机构在底层完成结算拆分。
+            </div>
+          </div>
+
+          <!-- Case 2 -->
+          <div class="glass-card" style="border-left: 4px solid #f97316; padding: 20px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+              <span class="mono-tag" style="background: rgba(249,115,22,0.15); color: #f97316; font-weight: 600;">GDPR 隐私罚单 · 处罚 12 万欧元</span>
+              <span style="font-size: 12px; color: var(--text-tertiary);">海外出海工具行业</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 6px;">某海外出海 SaaS 因未提供数据注销与遗忘通道被欧盟重罚</h3>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
+              <strong>【案情背景】</strong> 一款出海 AI 笔记软件仅在个人中心提供退出登录，用户多次发送邮件申请彻底注销账号并删除云端私人笔记，均被客服以“系统暂不支持”为由拒绝。
+              <br><strong>【监管处罚】</strong> 欧盟数据保护委员会（EDPB）认定其严重违反 GDPR “被遗忘权”，依法对其处以 12 万欧元行政罚款并限制在部分成员国 App Store 展业。
+            </div>
+            <div style="background: var(--glass-surface-subtle); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--accent);">
+              💡 <strong>避坑经验：</strong> 产品开发前置落地“账号安全注销通道”，用户确认后必须在后端完成个人敏感信息的不可逆脱敏或物理清除。
+            </div>
+          </div>
+
+          <!-- Case 3 -->
+          <div class="glass-card" style="border-left: 4px solid #eab308; padding: 20px 24px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+              <span class="mono-tag" style="background: rgba(234,179,8,0.15); color: #eab308; font-weight: 600;">开源传染诉讼 · 强制开源核心代码</span>
+              <span style="font-size: 12px; color: var(--text-tertiary);">企业级 SaaS 行业</span>
+            </div>
+            <h3 style="font-size: 16px; margin-bottom: 6px;">某商业闭源项目误引 AGPL-3.0 模块被法院判决限期开源商业代码</h3>
+            <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
+              <strong>【案情背景】</strong> 某商业 SaaS 平台在核心业务逻辑微服务中，静态链接引入了某开源项目 AGPL-3.0 协议分析代码，未依开源协议向网络服务用户开放全部源码。
+              <br><strong>【监管处罚】</strong> 原开源作者发起知识产权诉讼，法院裁定该闭源商业组件构成 AGPL 衍生作品，判令其履行开源许可义务，公开核心闭源业务代码。
+            </div>
+            <div style="background: var(--glass-surface-subtle); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--accent);">
+              💡 <strong>避坑经验：</strong> 建立 CI/CD 开源许可证扫描门禁，商业闭源模块严格选用 MIT、Apache-2.0 许可证组件，杜绝 GPL/AGPL 强传染性风险。
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Interactive Self-Audit Radar -->
+      <div id="compPanelRadar" class="compliance-panel" style="display: none; margin-top: 18px;">
+        <div class="glass-card" style="padding: 24px 28px; margin-bottom: 18px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 16px;">
+            <div>
+              <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 4px;">COMPLIANCE SAFETY SCORE</div>
+              <div style="display: flex; align-items: baseline; gap: 8px;">
+                <span id="auditScoreVal" style="font-size: 42px; font-weight: 700; font-family: var(--font-display); letter-spacing: -0.03em; color: var(--accent);">100</span>
+                <span style="font-size: 15px; color: var(--text-tertiary);">/ 100 分</span>
+                <span id="auditGradeBadge" class="mono-tag" style="background: rgba(52,199,89,0.15); color: #34C759; margin-left: 6px;">极佳合规</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+              <button class="btn-liquid-outline" onclick="resetSelfAudit()" style="padding: 6px 14px; font-size: 12px;" data-tooltip="重置体检复选框重新评估">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                <span>重新自测</span>
+              </button>
+              <button class="btn-liquid" onclick="quickJumpToLegalDemand()" style="padding: 6px 14px; font-size: 12px;" data-tooltip="针对自测短板项前往集市发布法务合规委托">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                <span>发布求助</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Progress Bar -->
+          <div style="height: 8px; background: var(--glass-surface-subtle); border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
+            <div id="auditProgressBar" style="width: 100%; height: 100%; background: #34C759; border-radius: 4px; transition: width 0.4s ease, background 0.4s ease;"></div>
+          </div>
+          <div id="auditSummaryText" style="font-size: 12.5px; color: var(--text-secondary);">
+            ✅ 恭喜！当前 10 项核心合规检查点全部达标，您的产品已满足境内上线与合规展业标准。
+          </div>
+        </div>
+
+        <!-- 10 Checkpoints List -->
+        <div class="glass-box" style="padding: 20px 24px;">
+          <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 14px;">创客产品上线前 10 项标准化合规自检清单</h3>
+          <div id="auditCheckpointsList" style="display: flex; flex-direction: column; gap: 12px;">
+            <!-- Generated dynamically via JS -->
+          </div>
+        </div>
+      </div>
+    </div>
   </main>
 
   <!-- Reusable Entitlement & Payment Modal Sheet -->
@@ -3210,7 +3512,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     function switchView(viewName, btnElement) {
       // Role-based Access Guard
       const adminOnlyViews = ['backend-orch', 'frontend-orch', 'ops', 'moderation'];
-      const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks'];
+      const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks', 'compliance'];
 
       if (currentUserRole === 'ADMIN' && userOnlyViews.includes(viewName)) {
         viewName = 'ops';
@@ -3327,7 +3629,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         // Check active view: if current view is a user-only view, redirect to 'ops'
         const currentActivePanel = document.querySelector('.view-panel.active');
         const activeId = currentActivePanel ? currentActivePanel.id.replace('view-', '') : '';
-        const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks'];
+        const userOnlyViews = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks', 'compliance'];
         if (userOnlyViews.includes(activeId)) {
           switchView('ops');
         }
@@ -3363,7 +3665,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (currentUserRole === 'ADMIN') {
         showLiquidNotice('工作区切换', '已切换至【管理视角】！\n工作区仅展示：后端编排、前端编排、运营大盘、内容治理。\n普通创客业务页面已物理隔离并完全隐藏。', 'SUCCESS');
       } else {
-        showLiquidNotice('工作区切换', '已切换至【创客视角】！\n工作区仅展示：首页、头脑风暴、产品、政策、需求、文书与特权。\n管理端编排及治理页面已物理隔离并完全隐藏。', 'SUCCESS');
+        showLiquidNotice('工作区切换', '已切换至【创客视角】！\n工作区仅展示：首页、头脑风暴、产品、政策、需求、文书、特权、合规。\n管理端编排及治理页面已物理隔离并完全隐藏。', 'SUCCESS');
       }
     }
 
@@ -4098,6 +4400,155 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
     }
 
+    // -------------------------------------------------------------
+    // Product Compliance & Risk Shield Controller
+    // -------------------------------------------------------------
+    const complianceCheckpoints = [
+      { id: "chk_01", title: "用户注册/登录是否明确展示《隐私政策》且禁止默认勾选？", weight: 12, advice: "在注册表单移除默认 checked 属性，未主动勾选时点击注册弹出温和确认框。" },
+      { id: "chk_02", title: "用户中心是否提供明确、可随时操作的【注销账号】通道？", weight: 10, advice: "在个人设置中心挂载注销通道，注销前核实身份，注销后不可逆匿名化脱敏。" },
+      { id: "chk_03", title: "平台资金是否由持牌支付机构托管，绝无自建资金池？", weight: 15, advice: "全面对接微信分账、支付宝直付通或银行托管，严禁资金沉淀个人卡或变相二清。" },
+      { id: "chk_04", title: "境内上线的服务是否已完成工信部 ICP 与公安网安备案？", weight: 10, advice: "完成管局 ICP 审核后，在全国公安互联网站安全管理平台登记备案并在页脚悬挂号牌。" },
+      { id: "chk_05", title: "面向公众提供的 AI 生成式功能是否完成了网信办算法备案？", weight: 10, advice: "自研或微调面向公众的生成式模型，必须在网信办算法备案系统填报。" },
+      { id: "chk_06", title: "项目代码库是否排查过 GPL / AGPL 强传染开源协议？", weight: 12, advice: "商业闭源项目严格选用 MIT、Apache-2.0 许可证，杜绝私有代码被法院强制开源。" },
+      { id: "chk_07", title: "社区发帖与评论是否强制公开展示发帖人 IP 属地？", weight: 8, advice: "服务端接收请求提取来源 IP 并解析省份，固化在帖子和评论模型中强制展示。" },
+      { id: "chk_08", title: "发帖与交互前置是否集成了敏感词过滤与一键举报闭环？", weight: 10, advice: "在服务端网关接入 Trie 树敏感词过滤中间件，前台提供直通治理控制台的举报按钮。" },
+      { id: "chk_09", title: "用户访问、发帖操作审计日志是否落实加密保存 180 天？", weight: 5, advice: "数据库或归档对象存储配置冷热备份策略，日志保留策略设置为不少于 180 天。" },
+      { id: "chk_10", title: "出海面向境外用户的产品是否完成了 GDPR / CCPA 隐私合规梳理？", weight: 8, advice: "起草多语言隐私条款，配置境外 CDN 节点隔离存储，并在需求集市对接资深法务顾问。" }
+    ];
+
+    let auditState = {
+      passed: new Set(["chk_01", "chk_02", "chk_03", "chk_04", "chk_05", "chk_06", "chk_07", "chk_08", "chk_09", "chk_10"])
+    };
+
+    function switchComplianceTab(tabName) {
+      document.querySelectorAll('.compliance-panel').forEach(p => p.style.display = 'none');
+      document.querySelectorAll('.compliance-tab-btn').forEach(b => {
+        b.classList.remove('active');
+        b.style.borderColor = 'var(--glass-border)';
+      });
+
+      if (tabName === 'dimensions') {
+        const el = document.getElementById('compPanelDimensions');
+        if (el) el.style.display = 'block';
+        const btn = document.getElementById('btnCompTabDimensions');
+        if (btn) btn.classList.add('active');
+      } else if (tabName === 'cases') {
+        const el = document.getElementById('compPanelCases');
+        if (el) el.style.display = 'block';
+        const btn = document.getElementById('btnCompTabCases');
+        if (btn) btn.classList.add('active');
+      } else if (tabName === 'radar') {
+        const el = document.getElementById('compPanelRadar');
+        if (el) el.style.display = 'block';
+        const btn = document.getElementById('btnCompTabRadar');
+        if (btn) {
+          btn.classList.add('active');
+          btn.style.borderColor = 'var(--accent)';
+        }
+      }
+    }
+
+    function initSelfAuditChecklist() {
+      const container = document.getElementById('auditCheckpointsList');
+      if (!container) return;
+      container.innerHTML = complianceCheckpoints.map((item, idx) => `
+        <div class="glass-card" style="padding: 14px 18px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer;" onclick="toggleAuditItem('${item.id}')">
+          <input type="checkbox" id="chkInput-${item.id}" ${auditState.passed.has(item.id) ? 'checked' : ''} style="margin-top: 3px; cursor: pointer; accent-color: var(--accent);" onclick="event.stopPropagation(); toggleAuditItem('${item.id}')">
+          <div style="flex: 1;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; flex-wrap: wrap; gap: 6px;">
+              <span style="font-size: 13.5px; font-weight: 600;">${idx + 1}. ${item.title}</span>
+              <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-tertiary);">权重 ${item.weight}分</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5;">${item.advice}</div>
+          </div>
+        </div>
+      `).join('');
+      evaluateSelfAudit();
+    }
+
+    function toggleAuditItem(id) {
+      if (auditState.passed.has(id)) {
+        auditState.passed.delete(id);
+      } else {
+        auditState.passed.add(id);
+      }
+      const chk = document.getElementById(`chkInput-${id}`);
+      if (chk) chk.checked = auditState.passed.has(id);
+      evaluateSelfAudit();
+    }
+
+    function resetSelfAudit() {
+      auditState.passed = new Set(complianceCheckpoints.map(c => c.id));
+      initSelfAuditChecklist();
+      showLiquidNotice('自检重置', '合规自检雷达所有检查项已重置为初始达标状态！', 'INFO');
+    }
+
+    function evaluateSelfAudit() {
+      const totalWeight = complianceCheckpoints.reduce((sum, c) => sum + c.weight, 0);
+      const earnedWeight = complianceCheckpoints.filter(c => auditState.passed.has(c.id)).reduce((sum, c) => sum + c.weight, 0);
+      const score = Math.round((earnedWeight / totalWeight) * 100);
+
+      const scoreValEl = document.getElementById('auditScoreVal');
+      const gradeBadgeEl = document.getElementById('auditGradeBadge');
+      const progressBarEl = document.getElementById('auditProgressBar');
+      const summaryTextEl = document.getElementById('auditSummaryText');
+
+      if (scoreValEl) scoreValEl.textContent = score;
+      if (progressBarEl) {
+        progressBarEl.style.width = `${score}%`;
+        if (score >= 90) progressBarEl.style.background = '#34C759';
+        else if (score >= 70) progressBarEl.style.background = '#FF9500';
+        else progressBarEl.style.background = '#ef4444';
+      }
+
+      const failedCount = complianceCheckpoints.length - auditState.passed.size;
+      if (gradeBadgeEl) {
+        if (score >= 90) {
+          gradeBadgeEl.textContent = '极佳合规';
+          gradeBadgeEl.style.color = '#34C759';
+          gradeBadgeEl.style.background = 'rgba(52,199,89,0.15)';
+        } else if (score >= 70) {
+          gradeBadgeEl.textContent = '基本合格';
+          gradeBadgeEl.style.color = '#FF9500';
+          gradeBadgeEl.style.background = 'rgba(255,149,0,0.15)';
+        } else {
+          gradeBadgeEl.textContent = '严重风险';
+          gradeBadgeEl.style.color = '#ef4444';
+          gradeBadgeEl.style.background = 'rgba(239,68,68,0.15)';
+        }
+      }
+
+      if (summaryTextEl) {
+        if (failedCount === 0) {
+          summaryTextEl.innerHTML = '✅ 恭喜！当前 10 项核心合规检查点全部达标，您的产品已满足境内上线与合规展业标准。';
+        } else {
+          summaryTextEl.innerHTML = `⚠️ 警告：检测到 <strong>${failedCount}</strong> 项未达标风险点！可能面临通报整改或行政处罚，建议点击下方【发布求助】对接涉外律所与专业法务顾问。`;
+        }
+      }
+    }
+
+    function quickJumpToLegalDemand() {
+      switchView('demand');
+      const legalBtn = document.getElementById('demandFilterLegal');
+      if (legalBtn) filterDemandCat('LEGAL', legalBtn);
+      showLiquidNotice('已直通法律求助', '已定位至【需求集市 · 法律合规求助】专区！\n您可在此浏览或发布 GDPR 合规协议起草、算法备案辅导、开源许可证排查等法律委托。', 'INFO');
+    }
+
+    function filterDemandCat(cat, btn) {
+      document.querySelectorAll('.demand-filter-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+
+      const items = document.querySelectorAll('.demand-card-item');
+      items.forEach(card => {
+        const itemCat = card.getAttribute('data-cat');
+        if (cat === 'ALL' || itemCat === cat) {
+          card.style.display = 'block';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
     window.addEventListener("DOMContentLoaded", () => {
       initDagDraggables();
       selectDagNode("dnode-3");
@@ -4105,6 +4556,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       initLiquidTooltips();
       updateUserRoleUI(true);
       updateModerationStats();
+      initSelfAuditChecklist();
     });
     window.addEventListener("resize", renderDagEdges);
   </script>

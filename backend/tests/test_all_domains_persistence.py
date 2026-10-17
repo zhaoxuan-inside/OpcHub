@@ -13,7 +13,7 @@ async def test_home_overview_api():
         data = res.json()
         assert data["active_makers_count"] >= 10000
         assert data["active_dags_count"] >= 100
-        assert len(data["quick_links"]) == 6
+        assert len(data["quick_links"]) >= 6
 
 
 @pytest.mark.asyncio

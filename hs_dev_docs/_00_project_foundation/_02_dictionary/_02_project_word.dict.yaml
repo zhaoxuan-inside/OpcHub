@@ -103,6 +103,16 @@ terms:
     description: "根据网络安全法规定对用户访问记录、发帖历史与操作行为加密留存不少于180天的法定机制"
     forbidden_alias: ["save_log", "log_dump"]
 
+  - term: "合规指南"
+    en_name: "ComplianceGuide"
+    description: "系统呈现的产品开发六维合规防线、典型避坑案例与上线前自检清单专区"
+    forbidden_alias: ["legal_doc_page", "rules_page"]
+
+  - term: "法律求助"
+    en_name: "LegalHelpDemand"
+    description: "需求集市中专为独立创客设立的法务咨询、资质代办与合规审查委托类别"
+    forbidden_alias: ["lawyer_post", "court_ask"]
+
 lifecycle_terms:
   - concept: "DAG Pipeline Lifecycle"
     command: "execute_pipeline"
