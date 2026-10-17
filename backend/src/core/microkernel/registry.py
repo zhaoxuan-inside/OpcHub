@@ -265,6 +265,143 @@ class AtomicRegistry:
             }
         self.register("home.overview.aggregator", home_overview_aggregator, domain="home", description="首页综合全景大盘最终聚合算子")
 
+        # Domain 6: Forum Domain (头脑风暴社区微内核算子与 Saga 补偿)
+        async def forum_thread_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            title = inputs.get("title", "").strip()
+            content = inputs.get("content", "").strip()
+            category = inputs.get("category_code", "GENERAL")
+            if len(title) < 5:
+                raise ValueError("Forum thread title must be at least 5 characters long")
+            if len(content) < 10:
+                raise ValueError("Forum thread content must be at least 10 characters long")
+            
+            # Content moderation check
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            for f in forbidden:
+                if f in title or f in content:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in forum thread")
+            
+            return {
+                "guard_passed": True,
+                "title": title,
+                "content": content,
+                "category_code": category,
+                "author_id": inputs.get("author_id", "usr_maker_nomad"),
+            }
+        self.register("forum.thread.validate_guard", forum_thread_validate_guard, domain="forum", description="头脑风暴发帖准入校验与敏感词审查门禁")
+
+        async def forum_thread_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            from src.domains.forum.models import ForumThreadCreate
+            payload = ForumThreadCreate(
+                category_code=inputs.get("category_code", "GENERAL"),
+                author_id=inputs.get("author_id", "usr_maker_nomad"),
+                title=inputs.get("title", ""),
+                content=inputs.get("content", ""),
+            )
+            created = forum_service.create_thread(payload)
+            return {
+                "thread_id": created.id,
+                "created_thread": created.model_dump(),
+                "status": "PUBLISHED",
+            }
+
+        async def forum_thread_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            thread_id = inputs.get("thread_id") or (inputs.get("created_thread", {}).get("id"))
+            if thread_id:
+                deleted = forum_service.delete_thread(thread_id)
+                return {"thread_id": thread_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No thread_id to rollback"}
+
+        self.register(
+            "forum.thread.persist",
+            forum_thread_persist,
+            domain="forum",
+            description="头脑风暴社区讨论帖持久化存储算子",
+            compensator=forum_thread_persist_compensate,
+        )
+
+        async def forum_comment_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            thread_id = inputs.get("thread_id", "")
+            content = inputs.get("content", "").strip()
+            parent_id = inputs.get("parent_id")
+            if not thread_id:
+                raise ValueError("thread_id is required for forum comment")
+            if not content:
+                raise ValueError("Forum comment content cannot be empty")
+            if thread_id not in forum_service._threads:
+                raise KeyError(f"Forum thread with ID {thread_id} not found")
+            if parent_id and parent_id not in forum_service._comments:
+                raise KeyError(f"Parent comment with ID {parent_id} not found")
+            
+            # Content moderation check
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            for f in forbidden:
+                if f in content:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in forum comment")
+            
+            return {
+                "guard_passed": True,
+                "thread_id": thread_id,
+                "content": content,
+                "parent_id": parent_id,
+                "author_id": inputs.get("author_id", "usr_maker_solodev"),
+                "reply_to_user_id": inputs.get("reply_to_user_id"),
+            }
+        self.register("forum.comment.validate_guard", forum_comment_validate_guard, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
+
+        async def forum_comment_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            from src.domains.forum.models import ForumCommentCreate
+            thread_id = inputs.get("thread_id", "")
+            payload = ForumCommentCreate(
+                author_id=inputs.get("author_id", "usr_maker_solodev"),
+                content=inputs.get("content", ""),
+                parent_id=inputs.get("parent_id"),
+                reply_to_user_id=inputs.get("reply_to_user_id"),
+            )
+            created = forum_service.create_comment(thread_id, payload)
+            return {
+                "comment_id": created.id,
+                "thread_id": thread_id,
+                "materialized_path": created.materialized_path,
+                "depth": created.depth,
+                "created_comment": created.model_dump(),
+                "status": "ACTIVE",
+            }
+
+        async def forum_comment_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            comment_id = inputs.get("comment_id") or (inputs.get("created_comment", {}).get("id"))
+            if comment_id:
+                deleted = forum_service.delete_comment(comment_id)
+                return {"comment_id": comment_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No comment_id to rollback"}
+
+        self.register(
+            "forum.comment.persist",
+            forum_comment_persist,
+            domain="forum",
+            description="头脑风暴物化路径评论持久化存储算子",
+            compensator=forum_comment_persist_compensate,
+        )
+
+        async def forum_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            # Trigger downstream failure for Saga rollback verification if requested
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure to trigger Saga rollback")
+            target_id = inputs.get("thread_id") or inputs.get("comment_id", "unknown")
+            return {
+                "telemetry_recorded": True,
+                "metric": "community.interaction.count",
+                "target_id": target_id,
+                "increment": 1,
+            }
+        self.register("forum.telemetry.incr", forum_telemetry_incr, domain="forum", description="头脑风暴社区互动度量指标递增算子")
+
+
 
     def _register_external_gateway_handlers(self):
         """Auto-register outbound gateway proxies as microkernel operators."""

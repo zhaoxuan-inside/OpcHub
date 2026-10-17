@@ -200,17 +200,16 @@ gateway:
     - scenario: "forum.threads.publish"
       version: "v1.0.0"
       domain: "forum"
-      description: "发布新创客讨论帖与踩坑复盘"
+      description: "发布新创客讨论帖与踩坑复盘 (微内核 DAG 编排驱动)"
       is_default: true
-      handler: "src.domains.forum.service.forum_service:create_thread"
-      model: "src.domains.forum.models:ForumThreadCreate"
+      handler: "src.core.gateway.adapters:forum_thread_publish_adapter"
 
     - scenario: "forum.threads.get"
       version: "v1.0.0"
       domain: "forum"
-      description: "获取讨论帖详情与正文"
+      description: "获取讨论帖详情与物化路径评论树"
       is_default: true
-      handler: "src.domains.forum.service.forum_service:get_thread"
+      handler: "src.domains.forum.service.forum_service:get_thread_detail"
       args_type: "key"
       key_name: "thread_id"
 

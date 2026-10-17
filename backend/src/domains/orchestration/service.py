@@ -145,6 +145,54 @@ class OrchestrationService:
             )
         )
 
+        # 5. Forum Thread Publish DAG Pipeline: OPC_FORUM_THREAD_PUBLISH
+        topo_forum_thread = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.thread.validate_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.thread.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_THREAD_PUBLISH",
+                version="v1.0.0",
+                topology_graph=topo_forum_thread,
+                status="ACTIVE",
+            )
+        )
+
+        # 6. Forum Comment Publish DAG Pipeline: OPC_FORUM_COMMENT_PUBLISH
+        topo_forum_comment = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.comment.validate_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.comment.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_COMMENT_PUBLISH",
+                version="v1.0.0",
+                topology_graph=topo_forum_comment,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(
@@ -250,6 +298,7 @@ class OrchestrationService:
         dag_config = DAGConfig(
             version=config_record.version,
             scenario_code=config_record.scenario_code,
+            enable_saga_compensation=topo.get("enable_saga_compensation", True),
             execution_graph=ExecutionGraph(
                 topology=topo.get("topology", "DAG"),
                 entry_node=topo.get("entry_node", nodes[0].id if nodes else ""),
@@ -276,6 +325,7 @@ class OrchestrationService:
             node_traces=[t.model_dump() for t in res.node_traces],
             final_output=res.final_output,
             error_message=res.error_message,
+            compensation_traces=[c.model_dump() for c in res.compensation_traces],
         )
 
     def save_frontend_layout(self, req: FrontendLayoutSaveRequest) -> FrontendLayoutRecord:

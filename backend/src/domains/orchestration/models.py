@@ -60,3 +60,4 @@ class ScenarioExecuteResponse(BaseModel):
     node_traces: List[Dict[str, Any]]
     final_output: Dict[str, Any]
     error_message: Optional[str] = None
+    compensation_traces: List[Dict[str, Any]] = Field(default_factory=list)

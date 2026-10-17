@@ -20,11 +20,42 @@ def demands_bid_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
     )
 
 
-def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
-    return forum_service.create_comment(
-        thread_id=p.get("thread_id"),
-        payload=ForumCommentCreate(**p.get("comment_payload", p)),
+async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for forum thread publishing."""
+    inputs = dict(p)
+    if "thread_payload" in inputs and isinstance(inputs["thread_payload"], dict):
+        inputs.update(inputs["thread_payload"])
+    
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_THREAD_PUBLISH",
+            version="v1.0.0",
+            inputs=inputs,
+        )
     )
+    if res.status != "SUCCESS":
+        error_msg = res.error or "Forum thread publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_thread") or res.final_output
+
+
+async def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for forum comment publishing."""
+    inputs = dict(p)
+    if "comment_payload" in inputs and isinstance(inputs["comment_payload"], dict):
+        inputs.update(inputs["comment_payload"])
+    
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_COMMENT_PUBLISH",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error or "Forum comment publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_comment") or res.final_output
 
 
 async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:

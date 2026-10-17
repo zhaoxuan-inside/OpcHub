@@ -1255,10 +1255,13 @@
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">头脑风暴</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">超级个体灵感碰撞 · 独立出海答疑 · 经验踩坑互助</p>
           </div>
-          <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在头脑风暴发起新实战经验与商业讨论帖">
-            <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-            <span>发帖</span>
-          </button>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span id="forumThreadPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_FORUM_THREAD_PUBLISH</span>
+            <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在头脑风暴发起新实战经验与商业讨论帖">
+              <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+              <span>发帖</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -3341,6 +3344,52 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     </div>
   </div>
 
+  <!-- Liquid Forum Thread & Nested Comment Tree Modal -->
+  <div class="sheet-modal" id="liquidThreadDetailModal">
+    <div class="sheet-body" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_FORUM_COMMENT_PUBLISH</span>
+          <span id="detailThreadCategory" class="mono-tag">DEV</span>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeThreadDetailModal()" style="padding: 4px 8px;" data-tooltip="关闭详情"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <div id="threadDetailContentArea">
+        <h2 id="detailThreadTitle" style="font-size: 19px; font-weight: 600; margin-bottom: 10px;"></h2>
+        <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-bottom: 14px;">
+          <span id="detailThreadAuthor">作者: </span>
+          <span id="detailThreadViews">浏览: 0</span>
+          <span id="detailThreadUpvotes">赞: 0</span>
+        </div>
+        <div id="detailThreadBody" style="font-size: 14px; line-height: 1.6; color: var(--text-secondary); background: var(--glass-surface-solid); padding: 16px; border-radius: var(--radius-md); border: 1px solid var(--glass-border); margin-bottom: 20px;"></div>
+      </div>
+
+      <!-- Nested Comment Tree -->
+      <div style="margin-top: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <h3 style="font-size: 16px; font-weight: 600; margin: 0;">多级嵌套问答 (<span id="detailCommentCount">0</span>)</h3>
+          <span style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">物化路径树 Materialized Path</span>
+        </div>
+        <div id="threadCommentsTreeContainer" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
+          <!-- Rendered dynamically -->
+        </div>
+
+        <!-- Post Comment Form -->
+        <div style="background: var(--glass-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-md); padding: 14px;">
+          <div id="replyingToBanner" style="display: none; justify-content: space-between; align-items: center; font-size: 12px; color: var(--accent); margin-bottom: 8px;">
+            <span>正在回复评论: <b id="replyingToTargetId"></b></span>
+            <button class="btn-liquid-outline" style="padding: 2px 6px; font-size: 11px;" onclick="cancelReplyTo()">取消</button>
+          </div>
+          <textarea class="glass-textarea" id="newCommentInput" rows="2" placeholder="发表实战见解或追问细节..."></textarea>
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+            <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">微内核自动执行敏感词防御与入库</span>
+            <button class="btn-liquid" onclick="submitCommentFromModal()" data-tooltip="发表评论"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>回复</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Liquid Publish Product Modal -->
   <div class="sheet-modal" id="liquidPublishProductModal">
     <div class="sheet-body" style="max-width: 540px;">
@@ -3799,57 +3848,204 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         .replace(/'/g, "&#039;");
     }
 
+    let currentActiveThreadId = null;
+    let currentReplyingParentId = null;
+
     async function submitNewPost() {
       const cat = document.getElementById('newPostCategory').value;
       const title = document.getElementById('newPostTitle').value.trim();
       const content = document.getElementById('newPostContent').value.trim();
       
-      if (!title) {
-        showLiquidNotice('请填写主题', '讨论帖主题不能为空，请输入清晰的主题以便其他创客理解交流。', 'WARNING');
+      if (!title || title.length < 5) {
+        showLiquidNotice('主题过短', '讨论帖主题至少需要 5 个字，请输入清晰的主题以便其他创客交流。', 'WARNING');
+        return;
+      }
+      if (!content || content.length < 10) {
+        showLiquidNotice('内容过短', '正文内容至少需要 10 个字，请详述您的实战经验或业务困惑。', 'WARNING');
         return;
       }
 
-      let threadId = 'th_' + Date.now();
+      let catCode = "DEV";
+      if (cat.includes("DEV")) catCode = "DEV";
+      else if (cat.includes("BIZ")) catCode = "BIZ";
+      else if (cat.includes("TAX")) catCode = "TAX";
+
       const gwRes = await dispatchGateway('forum.threads.publish', {
         title: title,
-        content: content || "（暂无详细正文内容）",
-        category: cat.split(' ')[0],
-        author_id: "usr_2026_opc_9981",
-        author_name: "赵玄"
+        content: content,
+        category_code: catCode,
+        author_id: "usr_2026_opc_9981"
       });
-      if (gwRes.ok && gwRes.data) {
-        threadId = gwRes.data.id || threadId;
+
+      if (!gwRes.ok) {
+        showLiquidNotice('发帖受阻', `编排流水线拦截: ${gwRes.error || '合规审查或校验未通过'}`, 'CRITICAL');
+        return;
       }
 
-      const container = document.getElementById('forumPostsContainer') || document.querySelector('.forum-container .glass-box:last-child');
-      if (container) {
-        const postCard = document.createElement('div');
-        postCard.className = 'post-card';
-        postCard.innerHTML = `
-          <div class="post-title">
-            <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">${escapeHtml(cat.split(' ')[0])}</span>
-            <span>${escapeHtml(title)}</span>
-          </div>
-          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
-            ${escapeHtml(content || '（暂无详细正文内容）')}
-          </p>
-          <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
-            <span>作者: 赵玄 (您)</span>
-            <span>帖子ID: ${threadId}</span>
-            <span>刚刚发布</span>
-          </div>
-        `;
-        const firstPost = container.querySelector('.post-card');
-        if (firstPost) {
-          container.insertBefore(postCard, firstPost);
-        } else {
-          container.appendChild(postCard);
-        }
-      }
+      const created = gwRes.data || {};
+      const threadId = created.id || ('th_' + Date.now());
 
       closePostModal();
-      showLiquidNotice('发帖成功', `您的讨论帖已成功持久化至后端！\n帖子ID: ${threadId}\n板块: ${cat.split(' ')[0]}`, 'SUCCESS');
+      showLiquidNotice('发帖成功', `微内核 DAG OPC_FORUM_THREAD_PUBLISH 编排执行完成！\n帖子ID: ${threadId}\n板块: ${catCode}`, 'SUCCESS');
+      
+      // Refresh forum threads from backend
+      fetchForumThreads();
     }
+
+    async function openThreadDetailModal(threadId) {
+      currentActiveThreadId = threadId;
+      currentReplyingParentId = null;
+      cancelReplyTo();
+
+      const modal = document.getElementById('liquidThreadDetailModal');
+      if (!modal) return;
+      modal.classList.add('active');
+
+      const titleElem = document.getElementById('detailThreadTitle');
+      const authorElem = document.getElementById('detailThreadAuthor');
+      const viewsElem = document.getElementById('detailThreadViews');
+      const upvotesElem = document.getElementById('detailThreadUpvotes');
+      const bodyElem = document.getElementById('detailThreadBody');
+      const catElem = document.getElementById('detailThreadCategory');
+      const countElem = document.getElementById('detailCommentCount');
+      const treeContainer = document.getElementById('threadCommentsTreeContainer');
+
+      titleElem.textContent = '加载中...';
+      bodyElem.textContent = '正在由微内核网关调度检索讨论帖与物化评论拓扑...';
+      treeContainer.innerHTML = '<div style="font-size: 13px; color: var(--text-tertiary); padding: 12px;">加载多级嵌套问答树...</div>';
+
+      const gwRes = await dispatchGateway('forum.threads.get', { thread_id: threadId });
+      if (!gwRes.ok || !gwRes.data) {
+        titleElem.textContent = '无法加载讨论帖';
+        bodyElem.textContent = gwRes.error || '帖子不存在或已删除。';
+        return;
+      }
+
+      const detail = gwRes.data;
+      const t = detail.thread || detail;
+      const comments = detail.comments || [];
+
+      titleElem.textContent = t.title || '';
+      catElem.textContent = t.category_code || 'COMMUNITY';
+      authorElem.textContent = `作者: ${t.author_id || '独立创客'}`;
+      viewsElem.textContent = `浏览: ${t.view_count || 0}`;
+      upvotesElem.textContent = `赞: ${t.upvote_count || 0}`;
+      bodyElem.textContent = t.content || '';
+      countElem.textContent = t.comment_count || comments.length || 0;
+
+      renderCommentTreeNodes(comments, treeContainer);
+    }
+
+    function renderCommentTreeNodes(nodes, container) {
+      container.innerHTML = '';
+      if (!nodes || nodes.length === 0) {
+        container.innerHTML = '<div style="font-size: 13px; color: var(--text-tertiary); padding: 16px; text-align: center;">暂无回答，欢迎在此发表第一条实战见解！</div>';
+        return;
+      }
+
+      function buildNodeHtml(node) {
+        const indentPx = Math.min(node.depth * 24, 72);
+        const hasChildren = node.children && node.children.length > 0;
+        let childrenHtml = '';
+        if (hasChildren) {
+          childrenHtml = node.children.map(c => buildNodeHtml(c)).join('');
+        }
+
+        return `
+          <div style="margin-left: ${indentPx}px; border-left: ${node.depth > 0 ? '2px solid var(--glass-border-hover)' : 'none'}; padding-left: ${node.depth > 0 ? '12px' : '0'}; margin-top: 8px;">
+            <div style="background: var(--glass-surface-solid); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 12px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">${escapeHtml(node.author_id.substring(0, 14))}</span>
+                  <span class="mono-tag" style="font-size: 9.5px; padding: 1px 5px;">L${node.depth}</span>
+                  ${node.reply_to_user_id ? `<span style="font-size: 11px; color: var(--text-tertiary);">回复 @${escapeHtml(node.reply_to_user_id.substring(0, 10))}</span>` : ''}
+                </div>
+                <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">${escapeHtml((node.created_at || '').substring(11, 16))}</div>
+              </div>
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px;">
+                ${escapeHtml(node.content)}
+              </div>
+              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-family: var(--font-mono); color: var(--text-tertiary);">
+                <span>物化路径: ${escapeHtml(node.materialized_path || '')}</span>
+                <button class="btn-liquid-outline" style="padding: 2px 8px; font-size: 11px;" onclick="replyToComment('${node.id}', '${escapeHtml(node.author_id)}')">
+                  回复
+                </button>
+              </div>
+            </div>
+            ${childrenHtml}
+          </div>
+        `;
+      }
+
+      nodes.forEach(rootNode => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = buildNodeHtml(rootNode);
+        container.appendChild(wrapper.firstElementChild);
+      });
+    }
+
+    function replyToComment(commentId, authorName) {
+      currentReplyingParentId = commentId;
+      const banner = document.getElementById('replyingToBanner');
+      const targetLabel = document.getElementById('replyingToTargetId');
+      if (banner && targetLabel) {
+        targetLabel.textContent = `@${authorName.substring(0, 12)} (${commentId.substring(0, 8)})`;
+        banner.style.display = 'flex';
+      }
+      const input = document.getElementById('newCommentInput');
+      if (input) {
+        input.focus();
+        input.placeholder = `回复 @${authorName.substring(0, 12)}: `;
+      }
+    }
+
+    function cancelReplyTo() {
+      currentReplyingParentId = null;
+      const banner = document.getElementById('replyingToBanner');
+      if (banner) banner.style.display = 'none';
+      const input = document.getElementById('newCommentInput');
+      if (input) {
+        input.placeholder = '发表实战见解或追问细节...';
+      }
+    }
+
+    async function submitCommentFromModal() {
+      if (!currentActiveThreadId) return;
+      const input = document.getElementById('newCommentInput');
+      const content = input ? input.value.trim() : '';
+      if (!content) {
+        showLiquidNotice('评论为空', '请输入回答或回复内容后再提报。', 'WARNING');
+        return;
+      }
+
+      const payload = {
+        thread_id: currentActiveThreadId,
+        content: content,
+        author_id: "usr_2026_opc_9981",
+        parent_id: currentReplyingParentId || null
+      };
+
+      const gwRes = await dispatchGateway('forum.comments.create', payload);
+      if (!gwRes.ok) {
+        showLiquidNotice('回复受阻', `编排流水线拦截: ${gwRes.error || '敏感词或合规校验未通过'}`, 'CRITICAL');
+        return;
+      }
+
+      if (input) input.value = '';
+      cancelReplyTo();
+      showLiquidNotice('回复成功', '微内核 DAG OPC_FORUM_COMMENT_PUBLISH 编排已成功持久化并挂载至物化路径树！', 'SUCCESS');
+
+      // Reload thread comments
+      openThreadDetailModal(currentActiveThreadId);
+    }
+
+    function closeThreadDetailModal() {
+      const modal = document.getElementById('liquidThreadDetailModal');
+      if (modal) modal.classList.remove('active');
+      currentActiveThreadId = null;
+      currentReplyingParentId = null;
+    }
+
 
     // -------------------------------------------------------------
     // Product Publishing Controller (Backend Persistence)
@@ -5594,6 +5790,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       threads.forEach(t => {
         const card = document.createElement('div');
         card.className = 'post-card';
+        card.style.cursor = 'pointer';
+        card.onclick = () => openThreadDetailModal(t.id);
         const pinBadge = t.is_pinned ? '<span class="post-pinned">置顶</span>' : '';
         card.innerHTML = `
           <div class="post-title">
@@ -5604,11 +5802,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
             ${escapeHtml(t.content)}
           </p>
-          <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
-            <span>作者: ${escapeHtml(t.author_id.substring(0, 10))}</span>
-            <span>点赞: ${t.upvote_count || 0}</span>
-            <span>回复: ${t.comment_count || 0}</span>
-            <span>更新: ${escapeHtml((t.created_at || '').substring(0, 10))}</span>
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            <div style="display: flex; gap: 16px;">
+              <span>作者: ${escapeHtml(t.author_id.substring(0, 10))}</span>
+              <span>赞: ${t.upvote_count || 0}</span>
+              <span>回复: ${t.comment_count || 0}</span>
+              <span>更新: ${escapeHtml((t.created_at || '').substring(0, 10))}</span>
+            </div>
+            <span style="color: var(--accent); font-size: 11.5px;">展开问答 &gt;</span>
           </div>
         `;
         container.appendChild(card);

@@ -272,5 +272,28 @@ class ForumService:
         )
 
 
+    def delete_thread(self, thread_id: str) -> bool:
+        """Physically delete thread and its associated comments for Saga compensation."""
+        if thread_id in self._threads:
+            del self._threads[thread_id]
+            # Cascade delete associated comments
+            to_delete = [cid for cid, c in self._comments.items() if c.thread_id == thread_id]
+            for cid in to_delete:
+                del self._comments[cid]
+            return True
+        return False
+
+    def delete_comment(self, comment_id: str) -> bool:
+        """Physically delete comment and decrement thread comment count for Saga compensation."""
+        if comment_id in self._comments:
+            comment = self._comments[comment_id]
+            thread_id = comment.thread_id
+            del self._comments[comment_id]
+            if thread_id in self._threads:
+                self._threads[thread_id].comment_count = max(0, self._threads[thread_id].comment_count - 1)
+            return True
+        return False
+
+
 # Global singleton instance
 forum_service = ForumService()
