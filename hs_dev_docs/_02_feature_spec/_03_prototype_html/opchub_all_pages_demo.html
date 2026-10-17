@@ -1234,7 +1234,7 @@
             <p style="font-size: 13px; color: var(--text-secondary);">超级个体灵感碰撞 · 独立出海答疑 · 经验踩坑互助</p>
           </div>
           <div style="display: flex; align-items: center; gap: 12px;">
-            <span id="forumThreadPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_FORUM_THREAD_PUBLISH</span>
+            <span id="forumThreadPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">实战交流讨论区</span>
             <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在头脑风暴发起新实战经验与商业讨论帖">
               <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
               <span>发帖</span>
@@ -1338,7 +1338,7 @@
             <p style="font-size: 13px; color: var(--text-secondary);">展示独立创客的卓越商业作品 · 创客 Upvote 打榜 · 真实业务收录</p>
           </div>
           <div style="display: flex; align-items: center; gap: 12px;">
-            <span id="productPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">DAG: OPC_PRODUCT_PUBLISH_PIPELINE</span>
+            <span id="productPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">创客商用作品库</span>
             <button class="btn-liquid" onclick="openPublishProductModal()" data-tooltip="发布独立产品至橱窗与首页打榜">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
               <span>发布</span>
@@ -1803,16 +1803,16 @@
           <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
             <!-- Avatar & Identity Pill -->
             <div style="display: flex; align-items: center; gap: 14px; margin-bottom: 20px; padding: 14px 16px; background: var(--glass-surface); border-radius: var(--radius-md); border: 1px solid var(--glass-border);">
-              <div style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, var(--accent), #5856D6); display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: #fff; position: relative; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35);">
+              <div id="userAvatarLetter" style="width: 52px; height: 52px; border-radius: var(--radius-full); background: linear-gradient(135deg, var(--accent), #5856D6); display: flex; align-items: center; justify-content: center; font-size: 19px; font-weight: 700; color: #fff; position: relative; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.35);">
                 ZX
                 <span style="position: absolute; bottom: 0; right: 0; width: 13px; height: 13px; border-radius: 50%; background: #34C759; border: 2.5px solid var(--bg-canvas);"></span>
               </div>
               <div style="flex: 1; min-width: 0;">
                 <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                  <span style="font-size: 15.5px; font-weight: 600;">赵玄 (Zhao Xuan)</span>
+                  <span id="userDisplayName" style="font-size: 15.5px; font-weight: 600;">赵玄 (Zhao Xuan)</span>
                   <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759;">已认证主体</span>
                 </div>
-                <div style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px;">UID: usr_2026_opc_9981 · 黑钻创客</div>
+                <div id="userUidAndTier" style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 2px;">UID: usr_2026_opc_9981 · 黑钻创客</div>
               </div>
               <button class="btn-liquid-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="showLiquidNotice('头像更新', '创客专属液态毛玻璃头像已同步更新！', 'SUCCESS')" data-tooltip="更新创客个人头像"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>更换头像</button>
             </div>
@@ -1833,33 +1833,33 @@
 
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
               <h3 style="font-size: 15px; font-weight: 600;">创客基本信息与主体档案</h3>
-              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: SUPER INDIVIDUAL</span>
+              <span id="userRoleBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ROLE: SUPER INDIVIDUAL</span>
             </div>
 
             <div class="grid-2" style="gap: 12px; margin-bottom: 0;">
               <div class="form-group">
                 <label class="form-label">创客真实姓名</label>
-                <input type="text" class="glass-input" value="赵玄">
+                <input type="text" id="userRealName" class="glass-input" value="赵玄">
               </div>
               <div class="form-group">
                 <label class="form-label">绑定联系手机</label>
-                <input type="text" class="glass-input" value="138-0010-8888">
+                <input type="text" id="userPhone" class="glass-input" value="138-0010-8888">
               </div>
             </div>
 
             <div class="form-group">
               <label class="form-label">创客电子邮箱 (已完成安全认证)</label>
-              <input type="text" class="glass-input" value="zhaoxuan@opchub.com">
+              <input type="text" id="userEmail" class="glass-input" value="zhaoxuan@opchub.com">
             </div>
 
             <div class="form-group">
               <label class="form-label">绑定统一社会信用代码</label>
-              <input type="text" class="glass-input" value="92330106MA2XXXXXX">
+              <input type="text" id="userCreditCode" class="glass-input" value="92330106MA2XXXXXX">
             </div>
 
             <div class="form-group">
               <label class="form-label">经营主体全称</label>
-              <input type="text" class="glass-input" value="极客视界（杭州）信息技术工作室">
+              <input type="text" id="userCompanyName" class="glass-input" value="极客视界（杭州）信息技术工作室">
             </div>
 
             <div style="display: flex; gap: 10px; margin-top: 14px;">
@@ -1872,40 +1872,42 @@
           <div style="background: var(--glass-surface-subtle); padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
               <h3 style="font-size: 15px; font-weight: 600;">收费权益与专属功能开关</h3>
-              <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">VIP ACTIVE</span>
+              <span id="userEntitlementsStatusTag" class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">VIP ACTIVE</span>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-              <div>
-                <div style="font-weight: 600; font-size: 13.5px;">政策雷达全量深度内参 (ENT_POL_VIP)</div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">包含政策原文对照、长三角直通车辅导</div>
+            <div id="userEntitlementsList">
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                <div>
+                  <div style="font-weight: 600; font-size: 13.5px;">微内核高并发编排算力通道 (ent_microkernel_pipeline)</div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">基础微内核 DAG 串联与沙箱执行能力 · 配额: 10,000 次/日</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" checked onchange="toggleFeature(this, 'ent_microkernel_pipeline')">
+                  <span class="slider"></span>
+                </label>
               </div>
-              <label class="switch-toggle">
-                <input type="checkbox" checked onchange="toggleFeature(this, 'ENT_POL_VIP')">
-                <span class="slider"></span>
-              </label>
-            </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-              <div>
-                <div style="font-weight: 600; font-size: 13.5px;">高级商机线索与需求竞标 (ENT_BIZ_LEADS)</div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">解锁外包集市客户直连电话与资金托管通道</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                <div>
+                  <div style="font-weight: 600; font-size: 13.5px;">全国与地方政策雷达白话提炼 (ent_policy_radar_basic)</div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">免费查阅与匹配国家级增值税与小微企业免税政策 · 配额: 实时全量</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" checked onchange="toggleFeature(this, 'ent_policy_radar_basic')">
+                  <span class="slider"></span>
+                </label>
               </div>
-              <label class="switch-toggle">
-                <input type="checkbox" onchange="toggleFeature(this, 'ENT_BIZ_LEADS')">
-                <span class="slider"></span>
-              </label>
-            </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
-              <div>
-                <div style="font-weight: 600; font-size: 13.5px;">出海 Stripe 0.4% 超级费率特权 (ENT_STRIPE_PERK)</div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">每年节省超 1.2 万元跨境结汇手续费</div>
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                <div>
+                  <div style="font-weight: 600; font-size: 13.5px;">AI 政策智能测算与申报材料极速出具 (ent_ai_tax_assistant)</div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">解锁一键生成符合政务标准的设立登记、软著申报全套文书 · 配额: 无限次导出</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" onchange="toggleFeature(this, 'ent_ai_tax_assistant')">
+                  <span class="slider"></span>
+                </label>
               </div>
-              <label class="switch-toggle">
-                <input type="checkbox" onchange="toggleFeature(this, 'ENT_STRIPE_PERK')">
-                <span class="slider"></span>
-              </label>
             </div>
 
             <!-- API Credentials Box -->
@@ -1941,7 +1943,7 @@
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 26px; margin: 0;">后端微内核流程图可视化编排 · DAG Orchestrator</h1>
-              <span id="orchConsolePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_ORCHESTRATION_CONTROL_PIPELINE</span>
+              <span id="orchConsolePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">微内核编排引擎</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary);">
               低代码业务组合驱动：各领域原子算子与外部代理网关自由拼装组合为场景流水线，支持单体直接调用与微服务无缝双模调度。
@@ -1977,12 +1979,13 @@
           <div style="background: var(--glass-surface-subtle); padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--glass-border-subtle); display: flex; flex-direction: column; gap: 8px; max-height: 580px; overflow-y: auto;">
             <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary); letter-spacing: 0.08em; display: flex; justify-content: space-between;">
               <span>DOMAIN OPERATORS</span>
-              <span style="color: var(--accent);">11 算子就绪</span>
+              <span id="domainOperatorsCountText" style="color: var(--accent);">算子库已同步</span>
             </div>
             <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.35;">
               微服务边界领域算子与统一外部网关代理，支持自由组合入编排画布：
             </div>
 
+            <div id="domainOperatorsPalette" style="display: flex; flex-direction: column; gap: 8px;">
             <!-- Group 1: Auth & Gateway -->
             <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 2px;">1. 门禁与协议解析</div>
             <div class="sitemap-card" style="padding: 8px 10px;" onclick="addDagNodeToCanvas('auth_guard', '门禁拦截: 402鉴权', 'GUARD')">
@@ -2076,6 +2079,7 @@
                 <span class="mono-tag" style="font-size: 9.5px; padding: 1px 4px;">storage</span>
               </div>
               <div style="font-size: 10px; color: var(--text-tertiary);">执行快照加密留痕不少于180天</div>
+            </div>
             </div>
           </div>
 
@@ -2317,7 +2321,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <div>
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
               <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">ADMIN TELEMETRY & MULTI-DEVICE PORTAL</span>
-              <span id="opsPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_OPS_DASHBOARD_PIPELINE</span>
+              <span id="opsPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">运营监控大盘</span>
               <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">● 实时流式指标监听中</span>
             </div>
             <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">全域运营监控大盘与三端视口</h1>
@@ -2859,7 +2863,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             </div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.02em;">内容治理控制台</h1>
-              <span id="moderationPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_MODERATION_TAKEDOWN_PIPELINE</span>
+              <span id="moderationPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">全域内容风控</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary); max-width: 680px; line-height: 1.5; margin: 0;">
               统一维护全网创客社区交流秩序，对涉嫌违规、侵权或违法的言论执行下架与合规审计。
@@ -3047,7 +3051,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           <div>
             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
               <h1 class="page-title" style="font-size: 26px; margin: 0;">产品开发合规指南</h1>
-              <span id="compliancePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_COMPLIANCE_AUDIT_PIPELINE</span>
+              <span id="compliancePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">六维合规防线体系</span>
             </div>
             <p style="font-size: 13px; color: var(--text-secondary);">六维合规防线体系 · 典型避坑案例剖析 · 上线前合规自检雷达</p>
           </div>
@@ -6557,6 +6561,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       };
       demands.forEach(d => {
         const card = document.createElement('div');
+        card.id = d.id;
         card.className = 'glass-card demand-card-item';
         card.setAttribute('data-cat', d.category);
         const catName = catMap[d.category] || d.category;
@@ -6572,8 +6577,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             </p>
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">${d.bidders_count || 0} 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
+            <span class="bid-count-label" style="color: var(--text-tertiary);">${d.bidders_count || 0} 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="openBidDemandModal('${d.id}', '${escapeHtml(d.title)}')">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
             </button>
           </div>
@@ -6652,19 +6657,137 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         if (compElem && profile.company_name) {
           compElem.textContent = `${profile.company_name} · 创客空间`;
         }
-        const tierTag = document.querySelector('#view-user .mono-tag');
-        if (tierTag && profile.tier) {
-          tierTag.textContent = `MAKER TIER: ${profile.tier} · 增值税减免已享 ¥${(profile.vat_savings_ytd || 0).toLocaleString()}`;
+        const tierTag = document.getElementById('userRoleBadge');
+        if (tierTag && profile.role) {
+          tierTag.textContent = `ROLE: ${profile.role}`;
+        }
+        const statusTag = document.getElementById('userEntitlementsStatusTag');
+        if (statusTag && profile.tier_name) {
+          statusTag.textContent = profile.tier_name.toUpperCase();
+        }
+
+        // Form Inputs
+        const nameInput = document.getElementById('userRealName');
+        if (nameInput) nameInput.value = profile.nickname || '';
+        const phoneInput = document.getElementById('userPhone');
+        if (phoneInput) phoneInput.value = profile.phone || (currentUserSession ? currentUserSession.phone : '') || '138-0010-8888';
+        const emailInput = document.getElementById('userEmail');
+        if (emailInput) emailInput.value = (currentUserSession ? currentUserSession.email : '') || profile.email || 'maker@opchub.com';
+        const creditInput = document.getElementById('userCreditCode');
+        if (creditInput) creditInput.value = profile.credit_code || '';
+        const companyInput = document.getElementById('userCompanyName');
+        if (companyInput) companyInput.value = profile.company_name || '';
+
+        // Avatar Letter & Profile Header
+        const avatarEl = document.getElementById('userAvatarLetter');
+        if (avatarEl) {
+          const letter = (profile.nickname || (currentUserSession ? currentUserSession.email : 'ZX')).slice(0, 2).toUpperCase();
+          avatarEl.childNodes[0].nodeValue = letter + '\n                ';
+        }
+        const nameDisplay = document.getElementById('userDisplayName');
+        if (nameDisplay) {
+          nameDisplay.textContent = profile.nickname || (currentUserSession ? currentUserSession.email : '创客');
+        }
+        const uidTierDisplay = document.getElementById('userUidAndTier');
+        if (uidTierDisplay) {
+          uidTierDisplay.textContent = `UID: ${profile.uid} · ${profile.tier_name || '认证创客'}`;
+        }
+
+        // Dynamic Entitlements List
+        if (Array.isArray(profile.entitlements) && profile.entitlements.length > 0) {
+          const entListEl = document.getElementById('userEntitlementsList');
+          if (entListEl) {
+            entListEl.innerHTML = profile.entitlements.map(ent => `
+              <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
+                <div>
+                  <div style="font-weight: 600; font-size: 13.5px;">${escapeHtml(ent.name)} (${escapeHtml(ent.id)})</div>
+                  <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">${escapeHtml(ent.description)} · 配额: ${escapeHtml(ent.quota_desc || '实时全量')}</div>
+                </div>
+                <label class="switch-toggle">
+                  <input type="checkbox" ${ent.is_active ? 'checked' : ''} onchange="toggleFeature(this, '${escapeHtml(ent.id)}')">
+                  <span class="slider"></span>
+                </label>
+              </div>
+            `).join('');
+          }
         }
       }
     }
 
     async function fetchBackendOrchData() {
-      await dispatchGateway("orchestration.operators.list");
+      const gwRes = await dispatchGateway("orchestration.operators.list");
+      if (gwRes.ok && Array.isArray(gwRes.data) && gwRes.data.length > 0) {
+        const palette = document.getElementById('domainOperatorsPalette');
+        const countText = document.getElementById('domainOperatorsCountText');
+        if (countText) countText.textContent = `${gwRes.data.length} 算子就绪`;
+        if (palette) {
+          palette.innerHTML = '';
+          const domainGroups = {};
+          gwRes.data.forEach(op => {
+            const dom = op.domain || 'general';
+            if (!domainGroups[dom]) domainGroups[dom] = [];
+            domainGroups[dom].push(op);
+          });
+          Object.keys(domainGroups).forEach((domainKey, gIdx) => {
+            const groupHeader = document.createElement('div');
+            groupHeader.style.cssText = 'font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;';
+            groupHeader.textContent = `${gIdx + 1}. 领域: ${domainKey.toUpperCase()}`;
+            palette.appendChild(groupHeader);
+
+            domainGroups[domainKey].forEach(op => {
+              const card = document.createElement('div');
+              card.className = 'sitemap-card';
+              card.style.padding = '8px 10px';
+              card.onclick = () => addDagNodeToCanvas(op.name, op.description.slice(0, 16), op.domain.toUpperCase());
+              card.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-weight: 600; font-size: 12px;">${escapeHtml(op.name)}</span>
+                  <span class="mono-tag" style="font-size: 9.5px; padding: 1px 4px;">${escapeHtml(op.domain)}</span>
+                </div>
+                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">${escapeHtml(op.description)}</div>
+              `;
+              palette.appendChild(card);
+            });
+          });
+        }
+      }
     }
 
     async function fetchFrontendLayoutData() {
-      await dispatchGateway("frontend.layouts.get");
+      const gwRes = await dispatchGateway("frontend.layouts.get");
+      if (gwRes.ok && gwRes.data && Array.isArray(gwRes.data.widgets)) {
+        const canvas = document.getElementById('mainCanvas');
+        if (canvas) {
+          canvas.innerHTML = '';
+          gwRes.data.widgets.forEach(w => {
+            const widget = document.createElement('div');
+            widget.className = 'canvas-widget';
+            widget.style.gridColumn = `span ${w.span || 6}`;
+            if (w.type === 'stat') {
+              widget.innerHTML = `
+                <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">${escapeHtml(w.id.toUpperCase())} · STAT_CARD</div>
+                <div style="font-size: 22px; font-weight: 600; margin: 4px 0;">${escapeHtml(w.value || '0')}</div>
+                <div style="font-size: 12px; color: var(--text-tertiary);">${escapeHtml(w.title)}</div>
+              `;
+            } else if (w.type === 'form') {
+              widget.innerHTML = `
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">${escapeHtml(w.id.toUpperCase())} · FORM_WIDGET</span>
+                  <span class="mono-tag">${escapeHtml(w.title)}</span>
+                </div>
+                <div style="margin-top: 6px;"><input type="text" class="glass-input" placeholder="${escapeHtml(w.title)}..." readonly></div>
+              `;
+            } else {
+              widget.innerHTML = `
+                <div style="font-size: 11px; font-family: var(--font-mono); color: var(--accent);">${escapeHtml(w.id.toUpperCase())} · WIDGET</div>
+                <div style="font-size: 15px; font-weight: 600; margin: 4px 0;">${escapeHtml(w.title)}</div>
+              `;
+            }
+            canvas.appendChild(widget);
+          });
+          initMouseLighting();
+        }
+      }
     }
 
     async function fetchComplianceData() {
@@ -6673,10 +6796,67 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         dispatchGateway("compliance.dimensions"),
         dispatchGateway("compliance.cases")
       ]);
-      if (resChecks && resChecks.ok && resChecks.data) {
+      if (resChecks && resChecks.ok && Array.isArray(resChecks.data) && resChecks.data.length > 0) {
+        complianceCheckpoints.length = 0;
+        complianceCheckpoints.push(...resChecks.data);
+        auditState.passed = new Set(complianceCheckpoints.map(c => c.id));
+        initSelfAuditChecklist();
         const compBadge = document.getElementById('compliancePipelineBadge');
         if (compBadge) {
-          compBadge.textContent = `六维合规防线已就绪`;
+          compBadge.textContent = `六维合规防线体系 (${complianceCheckpoints.length}项自检)`;
+        }
+      }
+
+      if (resDims && resDims.ok && Array.isArray(resDims.data) && resDims.data.length > 0) {
+        const dimGrid = document.querySelector('#compPanelDimensions .grid-3');
+        if (dimGrid) {
+          dimGrid.innerHTML = resDims.data.map((dim, idx) => {
+            const numStr = String(idx + 1).padStart(2, '0');
+            const rulesHtml = Array.isArray(dim.core_rules) ? dim.core_rules.map(r => `• ${escapeHtml(r)}`).join('<br>') : '';
+            return `
+              <div class="glass-card" style="display: flex; flex-direction: column; justify-content: space-between;">
+                <div>
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <span class="mono-tag" style="background: rgba(0,113,227,0.15); color: var(--accent);">${escapeHtml(dim.title)}</span>
+                    <span style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">DIM-${numStr}</span>
+                  </div>
+                  <h3 style="font-size: 16px; font-weight: 600; margin-bottom: 6px;">${escapeHtml(dim.title)}</h3>
+                  <p style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px;">
+                    ${escapeHtml(dim.summary)}
+                  </p>
+                  ${rulesHtml ? `<div style="font-size: 11.5px; color: var(--text-tertiary); line-height: 1.5; margin-bottom: 10px;">${rulesHtml}</div>` : ''}
+                  <div style="background: var(--glass-surface-subtle); padding: 8px 10px; border-radius: var(--radius-sm); font-size: 11.5px; color: #ef4444; margin-bottom: 12px;">
+                    ⚠️ 违规罚则: ${escapeHtml(dim.penalties)}
+                  </div>
+                </div>
+                <div style="font-size: 11.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 10px;">
+                  法条: ${escapeHtml(dim.law_ref)}
+                </div>
+              </div>
+            `;
+          }).join('');
+        }
+      }
+
+      if (resCases && resCases.ok && Array.isArray(resCases.data) && resCases.data.length > 0) {
+        const casesList = document.querySelector('#compPanelCases > div');
+        if (casesList) {
+          casesList.innerHTML = resCases.data.map(c => `
+            <div class="glass-card" style="border-left: 4px solid ${c.badge_color || '#ef4444'}; padding: 20px 24px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                <span class="mono-tag" style="background: rgba(239,68,68,0.15); color: ${c.badge_color || '#ef4444'}; font-weight: 600;">${escapeHtml(c.consequence.slice(0, 24))}...</span>
+                <span style="font-size: 12px; color: var(--text-tertiary);">${escapeHtml(c.industry)}</span>
+              </div>
+              <h3 style="font-size: 16px; margin-bottom: 6px;">${escapeHtml(c.title)}</h3>
+              <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 10px;">
+                <strong>【案情背景】</strong> ${escapeHtml(c.violation)}
+                <br><strong>【监管处罚】</strong> ${escapeHtml(c.consequence)}
+              </div>
+              <div style="background: var(--glass-surface-subtle); padding: 10px 14px; border-radius: var(--radius-sm); font-size: 12.5px; color: var(--accent);">
+                💡 <strong>避坑经验：</strong> ${escapeHtml(c.lesson)}
+              </div>
+            </div>
+          `).join('');
         }
       }
     }
@@ -6729,7 +6909,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       // Prioritize active view (home overview) for instant zero-jank initial paint
       fetchHomeOverview();
 
-      // Non-blocking idle prefetch for adjacent modules without saturating browser network
+      // Non-blocking idle prefetch for all application modules without saturating browser network
       const prefetchIdle = () => {
         fetchForumThreads();
         fetchProducts();
@@ -6737,6 +6917,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         fetchDemands();
         fetchSopTemplates();
         fetchPerks();
+        fetchUserProfile();
+        fetchComplianceData();
       };
 
       if ('requestIdleCallback' in window) {
