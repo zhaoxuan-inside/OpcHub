@@ -2581,171 +2581,185 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
          VIEW 12: 网页违规内容处理与言论下架控制台 (Content Moderation & Speech Takedown)
          ========================================== -->
     <div id="view-moderation" class="view-panel">
-      <!-- Top Title & Global Controls -->
-      <div class="glass-box" style="padding: 24px 32px 18px; margin-bottom: 20px;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;">
+      <!-- Header & Clean Summary -->
+      <div class="glass-box" style="padding: 24px 32px 20px; margin-bottom: 20px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 16px;">
           <div>
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-              <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">ADMIN CONTENT GOVERNANCE</span>
-              <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">POLICY ENGINE: ACTIVE</span>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary); font-size: 11px;">ADMIN · GOVERNANCE</span>
+              <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">社区合规与内容治理</span>
             </div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">网页违规内容处理与言论下架控制台</h1>
-            <p style="font-size: 13px; color: var(--text-secondary); max-width: 780px;">
-              专供平台管理员监控与处置全网创客贴吧、需求集市与评论交流区。对涉嫌违法违规、侵犯商业秘密、虚假偷逃税宣传或恶意灰产引流的言论执行一键全网下架及作者封禁。
+            <h1 class="page-title" style="font-size: 24px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.02em;">内容治理控制台</h1>
+            <p style="font-size: 13px; color: var(--text-secondary); max-width: 680px; line-height: 1.5; margin: 0;">
+              统一维护全网创客社区交流秩序，对涉嫌违规、侵权或违法的言论执行下架与合规审计。
             </p>
           </div>
 
-          <div style="display: flex; gap: 10px; align-items: center;">
-            <button class="btn-liquid" onclick="refreshModerationList()" data-tooltip="刷新最新违规言论待审队列">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <button class="btn-liquid-outline" onclick="refreshModerationList()" data-tooltip="刷新最新违规言论待审队列">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
               <span>刷新清单</span>
             </button>
           </div>
         </div>
 
-        <!-- KPI Summary Cards -->
-        <div class="grid-4" style="margin-top: 20px; gap: 16px;">
-          <div class="glass-card" style="padding: 16px 20px;">
-            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">待处置违规言论</div>
-            <div style="font-size: 24px; font-weight: 700; color: #FF9500; margin: 4px 0;" id="modCountFlagged">2 条</div>
-            <div style="font-size: 11px; color: var(--text-tertiary);">需人工管理员介入核验</div>
+        <!-- Refined Minimal Metrics Strip -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--glass-border-subtle);">
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 11.5px; color: var(--text-tertiary);">待审违规言论</span>
+            <span style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-top: 2px;" id="modCountFlagged">2 条</span>
           </div>
-          <div class="glass-card" style="padding: 16px 20px;">
-            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">今日已执行下架</div>
-            <div style="font-size: 24px; font-weight: 700; color: #FF3B30; margin: 4px 0;" id="modCountTakenDown">2 条</div>
-            <div style="font-size: 11px; color: #34C759;">已全网屏蔽并留痕审计</div>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 11.5px; color: var(--text-tertiary);">累计已下架</span>
+            <span style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-top: 2px;" id="modCountTakenDown">2 条</span>
           </div>
-          <div class="glass-card" style="padding: 16px 20px;">
-            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">违规内容拦截率</div>
-            <div style="font-size: 24px; font-weight: 700; color: #34C759; margin: 4px 0;">99.2%</div>
-            <div style="font-size: 11px; color: var(--text-tertiary);">包含微内核关键词过滤</div>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 11.5px; color: var(--text-tertiary);">合规拦截率</span>
+            <span style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">99.2%</span>
           </div>
-          <div class="glass-card" style="padding: 16px 20px;">
-            <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">平均处置响应时延</div>
-            <div style="font-size: 24px; font-weight: 700; color: var(--accent); margin: 4px 0;">1.8 分钟</div>
-            <div style="font-size: 11px; color: var(--text-tertiary);">自动化哨兵与即时审核</div>
+          <div style="display: flex; flex-direction: column;">
+            <span style="font-size: 11.5px; color: var(--text-tertiary);">平均响应时效</span>
+            <span style="font-size: 20px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">1.8 分钟</span>
           </div>
         </div>
       </div>
 
       <!-- Moderation Filter Tabs & Item List -->
       <div class="glass-box" style="padding: 24px 32px;">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
-          <div style="display: flex; gap: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+          <div style="display: flex; gap: 6px;">
             <button class="nav-tab-btn active" id="modTabAll" onclick="filterModerationItems('ALL', this)" data-tooltip="显示全部言论">全部言论</button>
-            <button class="nav-tab-btn" id="modTabFlagged" onclick="filterModerationItems('FLAGGED', this)" data-tooltip="仅看待下架审核言论">待审言论</button>
+            <button class="nav-tab-btn" id="modTabFlagged" onclick="filterModerationItems('FLAGGED', this)" data-tooltip="仅看待审核言论">待审言论</button>
             <button class="nav-tab-btn" id="modTabTakenDown" onclick="filterModerationItems('TAKEN_DOWN', this)" data-tooltip="仅看已下架屏蔽言论">已下架</button>
           </div>
-          <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">AUDIT LOG RECORDED · 违规言论即刻全网屏蔽</span>
+          <span style="font-size: 11.5px; font-family: var(--font-mono); color: var(--text-tertiary);">违规处置实时向全网生效</span>
         </div>
 
-        <div id="moderationListContainer" style="display: flex; flex-direction: column; gap: 16px;">
+        <div id="moderationListContainer" style="display: flex; flex-direction: column; gap: 14px;">
           <!-- Item 1: FLAGGED -->
-          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-101" style="padding: 20px; border-left: 4px solid #FF9500;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">商业机密泄露</span>
-                <span class="mono-tag" style="background: var(--glass-surface-subtle);">创客贴吧 · 帖子</span>
-                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-101 · 目标: th_viol_01</span>
+          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-101" style="padding: 18px 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-tertiary);">
+                <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary);">贴吧帖子</span>
+                <span>作者: 匿名外包工作室</span>
+                <span>·</span>
+                <span>12分钟前</span>
               </div>
-              <span class="mono-tag" id="modStatus-mod-101" style="background: rgba(255, 149, 0, 0.2); color: #FF9500; font-weight: 600;">● 待下架 (FLAGGED)</span>
+              <span class="mono-tag" id="modStatus-mod-101" style="background: var(--glass-surface-subtle); color: var(--text-secondary); border: 1px solid var(--glass-border-subtle); font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #eab308; display: inline-block;"></span>
+                <span>待审核</span>
+              </span>
             </div>
 
-            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px;">
+            <div id="modText-mod-101" style="font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--text-primary); margin-bottom: 8px;">
               出售未经脱敏的某大厂内网 API 鉴权私钥及爬虫套件，支持大批量导出企业画像数据...
             </div>
 
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-              涉嫌原因: 涉嫌商业机密泄露与非法倒卖 API 鉴权私钥 · 举报人: 社区安全哨兵系统
-            </p>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
-              <span style="color: var(--text-tertiary);">作者: 匿名外包工作室 (usr_leak_0821) · 举报时间: 12分钟前</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--glass-border-subtle); font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">涉嫌原因: 商业机密泄露与非法倒卖 API 鉴权私钥 · 来源哨兵拦截</span>
               <div style="display: flex; gap: 8px;" id="modActions-mod-101">
-                <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-101', '泄露商业机密与非法倒卖API私钥')" data-tooltip="下架该违规言论并向全网隐藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>下架言论</button>
-                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-101', '恶意泄露商业秘密，封禁作者', true)" data-tooltip="封禁该违规作者发帖权限"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>封禁作者</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px; color: #ef4444;" onclick="takedownModerationItem('mod-101', '泄露商业机密与非法倒卖API私钥')" data-tooltip="下架违规言论并向全网隐藏">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>下架言论</span>
+                </button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-101', '恶意泄露商业秘密，封禁作者', true)" data-tooltip="封禁该违规作者发帖权限">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                  <span>封禁作者</span>
+                </button>
               </div>
             </div>
           </div>
 
           <!-- Item 2: TAKEN_DOWN -->
-          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-102" style="padding: 20px; border-left: 4px solid #FF3B30;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">涉税违法欺诈</span>
-                <span class="mono-tag" style="background: var(--glass-surface-subtle);">政策雷达 · 评论</span>
-                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-102 · 目标: cm_viol_02</span>
+          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-102" style="padding: 18px 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-tertiary);">
+                <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary);">政策评论</span>
+                <span>作者: 财税黑中介</span>
+                <span>·</span>
+                <span>今日 07:00</span>
               </div>
-              <span class="mono-tag" id="modStatus-mod-102" style="background: rgba(255, 59, 48, 0.2); color: #FF3B30; font-weight: 600;">● 已下架 (TAKEN_DOWN)</span>
+              <span class="mono-tag" id="modStatus-mod-102" style="background: var(--glass-surface-subtle); color: var(--text-tertiary); border: 1px solid var(--glass-border-subtle); font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); display: inline-block;"></span>
+                <span>已下架</span>
+              </span>
             </div>
 
-            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px; text-decoration: line-through; opacity: 0.85;">
+            <div id="modText-mod-102" style="font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--text-secondary); margin-bottom: 8px;">
               保证月入十万！加 V 信 138XXXX 一对一包过工商免征偷逃税，买发票冲抵进项全套服务...
             </div>
 
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-              涉嫌原因: 虚假违规宣传与涉税违法黑产引流 · 执行人: admin_001
-            </p>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
-              <span style="color: var(--text-tertiary);">作者: 财税黑中介 (usr_tax_fake_33) · 下架时间: 今日 07:00</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--glass-border-subtle); font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">涉嫌原因: 虚假违规宣传与涉税违法黑产引流 · 已执行下架</span>
               <div style="display: flex; gap: 8px;" id="modActions-mod-102">
-                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-102')" data-tooltip="撤销处罚并恢复言论正常展示"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>恢复展示</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-102')" data-tooltip="撤销处罚并恢复言论展示">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                  <span>恢复展示</span>
+                </button>
               </div>
             </div>
           </div>
 
           <!-- Item 3: TAKEN_DOWN -->
-          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-103" style="padding: 20px; border-left: 4px solid #FF3B30;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="mono-tag" style="background: rgba(255, 59, 48, 0.15); color: #FF3B30;">外汇违法洗钱</span>
-                <span class="mono-tag" style="background: var(--glass-surface-subtle);">生态特权 · 评论</span>
-                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-103 · 目标: cm_viol_03</span>
+          <div class="glass-card mod-item-card" data-status="TAKEN_DOWN" id="modCard-mod-103" style="padding: 18px 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-tertiary);">
+                <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary);">特权评论</span>
+                <span>作者: 离岸黑产号</span>
+                <span>·</span>
+                <span>今日 05:35</span>
               </div>
-              <span class="mono-tag" id="modStatus-mod-103" style="background: rgba(255, 59, 48, 0.2); color: #FF3B30; font-weight: 600;">● 已下架 (TAKEN_DOWN)</span>
+              <span class="mono-tag" id="modStatus-mod-103" style="background: var(--glass-surface-subtle); color: var(--text-tertiary); border: 1px solid var(--glass-border-subtle); font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); display: inline-block;"></span>
+                <span>已下架</span>
+              </span>
             </div>
 
-            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px; text-decoration: line-through; opacity: 0.85;">
+            <div id="modText-mod-103" style="font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--text-secondary); margin-bottom: 8px;">
               跨境洗钱与地下钱庄结汇免审查通道，支持高频 USDT 变现直达境内个人卡...
             </div>
 
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-              涉嫌原因: 外汇违法及地下钱庄非法结汇 · 执行人: admin_001
-            </p>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
-              <span style="color: var(--text-tertiary);">作者: 离岸黑产号 (usr_wash_9912) · 下架时间: 今日 05:35</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--glass-border-subtle); font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">涉嫌原因: 外汇违法及地下钱庄非法结汇 · 已执行下架</span>
               <div style="display: flex; gap: 8px;" id="modActions-mod-103">
-                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-103')" data-tooltip="撤销处罚并恢复言论正常展示"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>恢复展示</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('mod-103')" data-tooltip="撤销处罚并恢复言论展示">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                  <span>恢复展示</span>
+                </button>
               </div>
             </div>
           </div>
 
           <!-- Item 4: FLAGGED -->
-          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-104" style="padding: 20px; border-left: 4px solid #FF9500;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="mono-tag" style="background: rgba(255, 149, 0, 0.15); color: #FF9500;">作弊刷量灌水</span>
-                <span class="mono-tag" style="background: var(--glass-surface-subtle);">产品橱窗 · 评价</span>
-                <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">ID: mod-104 · 目标: pr_viol_04</span>
+          <div class="glass-card mod-item-card" data-status="FLAGGED" id="modCard-mod-104" style="padding: 18px 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-tertiary);">
+                <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary);">橱窗评价</span>
+                <span>作者: 黑灰脚本号</span>
+                <span>·</span>
+                <span>25分钟前</span>
               </div>
-              <span class="mono-tag" id="modStatus-mod-104" style="background: rgba(255, 149, 0, 0.2); color: #FF9500; font-weight: 600;">● 待下架 (FLAGGED)</span>
+              <span class="mono-tag" id="modStatus-mod-104" style="background: var(--glass-surface-subtle); color: var(--text-secondary); border: 1px solid var(--glass-border-subtle); font-size: 11.5px; display: inline-flex; align-items: center; gap: 5px;">
+                <span style="width: 6px; height: 6px; border-radius: 50%; background: #eab308; display: inline-block;"></span>
+                <span>待审核</span>
+              </span>
             </div>
 
-            <div style="font-size: 14.5px; font-weight: 600; line-height: 1.5; margin-bottom: 8px;">
+            <div id="modText-mod-104" style="font-size: 14px; font-weight: 500; line-height: 1.6; color: var(--text-primary); margin-bottom: 8px;">
               低价承接贴吧热帖批量刷赞、虚假点赞刷量与竞标霸榜脚本，秒杀同行...
             </div>
 
-            <p style="font-size: 12.5px; color: var(--text-secondary); margin-bottom: 12px; line-height: 1.5;">
-              涉嫌原因: 作弊刷量与恶意竞争垃圾灌水 · 举报人: 创客自律委员会
-            </p>
-
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--glass-border-subtle); padding-top: 12px; font-size: 12px; flex-wrap: wrap; gap: 8px;">
-              <span style="color: var(--text-tertiary);">作者: 黑灰脚本号 (usr_bot_4490) · 举报时间: 25分钟前</span>
+            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--glass-border-subtle); font-size: 12px; flex-wrap: wrap; gap: 8px;">
+              <span style="color: var(--text-tertiary);">涉嫌原因: 作弊刷量与恶意竞争垃圾灌水 · 创客自律委员会举报</span>
               <div style="display: flex; gap: 8px;" id="modActions-mod-104">
-                <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-104', '作弊刷量恶意灌水')" data-tooltip="下架该违规言论并向全网隐藏"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>下架言论</button>
-                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-104', '恶意刷量，封禁账号', true)" data-tooltip="封禁该违规作者发帖权限"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>封禁作者</button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px; color: #ef4444;" onclick="takedownModerationItem('mod-104', '作弊刷量恶意灌水')" data-tooltip="下架违规言论并向全网隐藏">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  <span>下架言论</span>
+                </button>
+                <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('mod-104', '恶意刷量，封禁账号', true)" data-tooltip="封禁该违规作者发帖权限">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                  <span>封禁作者</span>
+                </button>
               </div>
             </div>
           </div>
@@ -3485,35 +3499,34 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const card = document.getElementById(`modCard-${id}`);
       const statusEl = document.getElementById(`modStatus-${id}`);
       const actionsEl = document.getElementById(`modActions-${id}`);
+      const textEl = document.getElementById(`modText-${id}`);
       if (!card || !statusEl || !actionsEl) return;
 
       card.setAttribute('data-status', item.status);
 
       if (item.status === 'TAKEN_DOWN') {
-        card.style.borderLeft = '4px solid #FF3B30';
-        statusEl.style.background = 'rgba(255, 59, 48, 0.2)';
-        statusEl.style.color = '#FF3B30';
-        statusEl.textContent = '● 已下架 (TAKEN_DOWN)';
+        statusEl.innerHTML = '<span style="width: 6px; height: 6px; border-radius: 50%; background: var(--text-tertiary); display: inline-block;"></span><span>已下架</span>';
+        statusEl.style.color = 'var(--text-tertiary)';
+        if (textEl) textEl.style.color = 'var(--text-secondary)';
         
         actionsEl.innerHTML = `
-          <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('${id}')" data-tooltip="撤销处罚并恢复言论正常展示">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+          <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="restoreModerationItem('${id}')" data-tooltip="撤销处罚并恢复言论展示">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
             <span>恢复展示</span>
           </button>
         `;
       } else {
-        card.style.borderLeft = '4px solid #FF9500';
-        statusEl.style.background = 'rgba(255, 149, 0, 0.2)';
-        statusEl.style.color = '#FF9500';
-        statusEl.textContent = '● 待下架 (FLAGGED)';
+        statusEl.innerHTML = '<span style="width: 6px; height: 6px; border-radius: 50%; background: #eab308; display: inline-block;"></span><span>待审核</span>';
+        statusEl.style.color = 'var(--text-secondary)';
+        if (textEl) textEl.style.color = 'var(--text-primary)';
 
         actionsEl.innerHTML = `
-          <button class="btn-liquid" style="background: #FF3B30; color: #fff; padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('${id}', '${item.reason}')" data-tooltip="下架该违规言论并向全网隐藏">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px; color: #ef4444;" onclick="takedownModerationItem('${id}', '${item.reason}')" data-tooltip="下架违规言论并向全网隐藏">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
             <span>下架言论</span>
           </button>
           <button class="btn-liquid-outline" style="padding: 5px 12px; font-size: 12px;" onclick="takedownModerationItem('${id}', '${item.reason}，封禁作者', true)" data-tooltip="封禁该违规作者发帖权限">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
             <span>封禁作者</span>
           </button>
         `;
