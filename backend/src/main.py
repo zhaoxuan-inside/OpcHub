@@ -136,7 +136,15 @@ async def serve_web_console():
     ]
     for c in candidates:
         if c.is_file():
-            return FileResponse(c, media_type="text/html; charset=utf-8")
+            return FileResponse(
+                c,
+                media_type="text/html; charset=utf-8",
+                headers={
+                    "Cache-Control": "no-cache, no-store, must-revalidate",
+                    "Pragma": "no-cache",
+                    "Expires": "0",
+                },
+            )
     return HTMLResponse("<h1>OpcHub Console</h1><p>Demo prototype file not found.</p>", status_code=200)
 
 
