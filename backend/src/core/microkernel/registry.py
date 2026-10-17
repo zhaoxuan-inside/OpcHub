@@ -253,33 +253,97 @@ class AtomicRegistry:
         )
 
 
-        # Domain 2: SOP Document Domain
-        async def sop_render_document(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        # Domain 2: SOP Document Domain (商事登记与合规文书生成微内核算子与 Saga 补偿)
+        async def sop_document_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+            template_id = inputs.get("template_id", "tpl_individual_biz_reg")
+            if not template_id:
+                raise ValueError("template_id is required for document rendering")
+            try:
+                template = sop_service.get_template(template_id)
+            except KeyError:
+                raise KeyError(f"SOP template with ID {template_id} not found")
+
+            form_data = inputs.get("form_data") or {}
+            if not isinstance(form_data, dict):
+                form_data = {}
+
+            # Content moderation check on form data
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            full_text = " ".join(str(v) for v in form_data.values())
+            for f in forbidden:
+                if f in full_text:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in SOP document form data")
+
+            return {
+                "guard_passed": True,
+                "template_id": template_id,
+                "template_name": template.name,
+                "user_id": inputs.get("user_id", "usr_maker_2026"),
+                "form_data": form_data,
+            }
+        self.register("sop.document.validate_guard", sop_document_validate_guard, domain="sop", description="合规文书模版准入与表单合规风控门禁")
+
+        async def sop_document_render_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.sop.service import sop_service
             from src.domains.sop.models import SOPDocumentCreate
             template_id = inputs.get("template_id", "tpl_individual_biz_reg")
-            maker_name = inputs.get("owner_name") or inputs.get("maker_name", "张创客")
-            company_name = inputs.get("company_name", "杭州极速智能科技有限公司")
-            field_data = {
-                "maker_name": maker_name,
-                "company_name": company_name,
-                "biz_scope": inputs.get("biz_scope", "软件开发与人工智能应用研发"),
-            }
+            user_id = inputs.get("user_id", "usr_maker_2026")
+            form_data = inputs.get("form_data", {})
             doc = sop_service.render_and_save_document(
                 SOPDocumentCreate(
                     template_id=template_id,
-                    user_id=inputs.get("user_id", "usr_maker_01"),
-                    form_data=field_data,
+                    user_id=user_id,
+                    form_data=form_data,
                 )
             )
             return {
                 "sop_document_id": doc.id,
+                "doc_id": doc.id,
                 "document_title": doc.document_title,
                 "generated_text": doc.rendered_content,
+                "rendered_content": doc.rendered_content,
                 "compliance_passed": doc.compliance_passed,
+                "status": "READY",
                 "created_at": doc.created_at,
+                "created_doc": doc.model_dump(),
             }
-        self.register("sop.render_document", sop_render_document, domain="sop", description="企业商事登记公文组装与流水号签发算子")
+
+        async def sop_document_render_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+            doc_id = inputs.get("sop_document_id") or inputs.get("doc_id") or (inputs.get("created_doc", {}).get("id"))
+            if doc_id:
+                deleted = sop_service.delete_document(doc_id)
+                return {"doc_id": doc_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No doc_id to rollback"}
+
+        self.register(
+            "sop.document.render_persist",
+            sop_document_render_persist,
+            domain="sop",
+            description="合规文书根据表单插值渲染并持久化存储算子",
+            compensator=sop_document_render_compensate,
+        )
+        # Register legacy handler alias
+        self.register(
+            "sop.render_document",
+            sop_document_render_persist,
+            domain="sop",
+            description="企业商事登记公文组装与流水号签发算子",
+            compensator=sop_document_render_compensate,
+        )
+
+        async def sop_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in SOP document pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "sop.document.generated",
+                "doc_id": inputs.get("doc_id") or inputs.get("sop_document_id", "unknown"),
+                "increment": 1,
+            }
+        self.register("sop.telemetry.incr", sop_telemetry_incr, domain="sop", description="合规文书生成与流水号防伪签发度量打点算子")
+
 
         # Domain 3: Compliance Domain
         async def compliance_evaluate_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

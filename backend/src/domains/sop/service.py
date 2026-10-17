@@ -272,5 +272,13 @@ class SOPService:
         docs.sort(key=lambda d: d.created_at, reverse=True)
         return docs
 
+    def delete_document(self, doc_id: str) -> bool:
+        """Physically delete persisted document by ID for Saga rollback."""
+        if doc_id in self._documents:
+            del self._documents[doc_id]
+            return True
+        return False
+
 
 sop_service = SOPService()
+

@@ -59,6 +59,26 @@ def demands_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     )
 
 
+async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for SOP document generation and persistence."""
+    inputs = dict(p)
+    if "doc_payload" in inputs and isinstance(inputs["doc_payload"], dict):
+        inputs.update(inputs["doc_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_SOP_DOCUMENT_RENDER_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "SOP document render pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_doc") or res.final_output
+
+
+
 
 async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for forum thread publishing."""

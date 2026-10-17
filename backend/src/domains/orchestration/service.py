@@ -315,6 +315,31 @@ class OrchestrationService:
             )
         )
 
+        # 12. SOP Document Render DAG Pipeline: OPC_SOP_DOCUMENT_RENDER_PIPELINE
+        topo_sop_render = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "sop.document.validate_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "sop.document.render_persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "sop.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_SOP_DOCUMENT_RENDER_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_sop_render,
+                status="ACTIVE",
+            )
+        )
+
+
 
 
 

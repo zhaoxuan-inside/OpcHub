@@ -135,10 +135,10 @@ gateway:
     - scenario: "sop.document.render"
       version: "v1.0.0"
       domain: "sop"
-      description: "根据用户输入渲染并持久化合规文书"
+      description: "微内核DAG编排：根据用户输入渲染并持久化合规文书"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:render_and_save_document"
-      model: "src.domains.sop.models:SOPDocumentCreate"
+      handler: "src.core.gateway.adapters:sop_document_render_adapter"
+
 
     - scenario: "sop.document.get"
       version: "v1.0.0"
