@@ -1067,7 +1067,7 @@
   <header>
     <div class="nav-glass-bar">
       <!-- 1. Left VisionOS Island Layer: OpcHub OS 2.0 (独立图层，永不换行) -->
-      <div class="brand-island" id="brandIsland" onclick="switchView(currentUserRole === 'ADMIN' ? 'ops' : 'home')" data-tooltip="OpcHub OS 2.0 空间地图与工作区">
+      <div class="brand-island" id="brandIsland" onclick="switchView(currentUserRole === 'ADMIN' ? 'ops' : 'home')">
         <div class="brand-mark"></div>
         <span class="brand-name">OpcHub</span>
         <div class="brand-island-divider"></div>
@@ -1078,45 +1078,45 @@
       <div class="nav-tabs-wrapper">
         <nav class="nav-tabs" id="mainNavTabs">
           <!-- Maker / User Only Tabs (管理员不可见) -->
-          <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)" data-tooltip="平台全景功能地图与快捷入口">首页地图</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)" data-tooltip="创客灵感碰撞、实战经验与商业头脑风暴">头脑风暴</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)" data-tooltip="超级个体独立产品展示与商机橱窗">产品橱窗</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)" data-tooltip="全国与地方扶持政策白话提炼库">政策雷达</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)" data-tooltip="企业付费委托与技术外包寻源集市">需求集市</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)" data-tooltip="创业从0到1填写流图与文书生成">流程文书</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)" data-tooltip="云服务抵扣券与出海基础设施特权">生态特权</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('compliance', this)" data-tooltip="产品开发合规全景指南、典型避坑案例库与上线前自检清单">合规指南</button>
+          <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)">首页地图</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)">头脑风暴</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)">产品橱窗</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)">政策雷达</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)">需求集市</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)">流程文书</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)">生态特权</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('compliance', this)">合规指南</button>
 
           <!-- Administrator Only Tabs (普通用户不可见，且不能与其他页面同时存在) -->
-          <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" data-tooltip="微内核 DAG 流程图可视化编排工作台" style="display: none;">后端编排</button>
-          <button class="nav-tab-btn tab-admin-only" onclick="switchView('frontend-orch', this)" data-tooltip="24 栅格响应式前端页面低代码构建器" style="display: none;">前端编排</button>
-          <button class="nav-tab-btn tab-admin-only" onclick="switchView('ops', this)" data-tooltip="全域运营数据大盘(DAU/UV/PV)与三端展示" style="display: none;">运营大盘</button>
-          <button class="nav-tab-btn tab-admin-only" onclick="switchView('moderation', this)" data-tooltip="违规违法言论监控、审核与全网下架" style="display: none;">内容治理</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('backend-orch', this)" style="display: none;">后端编排</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('frontend-orch', this)" style="display: none;">前端编排</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('ops', this)" style="display: none;">运营大盘</button>
+          <button class="nav-tab-btn tab-admin-only" onclick="switchView('moderation', this)" style="display: none;">内容治理</button>
         </nav>
       </div>
 
       <div class="nav-right-actions">
         <!-- 0. Dynamic Auth Bar (Login / Register / Session Profile) -->
         <div id="navAuthBar" style="display: inline-flex; align-items: center; gap: 8px;">
-          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="登录已有创客账号">登录</button>
-          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="注册新创客账号 (支持邮箱)">注册</button>
+          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;">登录</button>
+          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;">注册</button>
         </div>
 
         <!-- Unified VisionOS Frosted Island Layer (同一个图层：视角切换、暗黑模式、用户信息三合一) -->
         <div class="nav-actions-island" id="navActionsIsland">
           <!-- 1. Perspective / Role Switcher Icon Button -->
-          <button class="nav-icon-btn" id="roleToggleBtn" onclick="toggleUserRole()" data-tooltip="创客视角 (点击切换为管理视角)">
+          <button class="nav-icon-btn" id="roleToggleBtn" onclick="toggleUserRole()">
             <!-- Maker View: 3D Stack / Maker Layer Cube -->
             <svg id="roleIconMaker" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
             <!-- Admin View: Security Governance Shield -->
             <svg id="roleIconAdmin" viewBox="0 0 24 24" style="display: none;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-            <span class="nav-role-dot" id="roleDot" title="当前角色状态"></span>
+            <span class="nav-role-dot" id="roleDot"></span>
           </button>
 
           <div class="nav-island-divider"></div>
 
           <!-- 2. Dark / Light Theme Icon Toggle -->
-          <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" data-tooltip="切换视觉风格 (深色 / 浅色)">
+          <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()">
             <svg id="themeIconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
             <svg id="themeIconSun" viewBox="0 0 24 24" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
           </button>
@@ -1124,9 +1124,9 @@
           <div class="nav-island-divider"></div>
 
           <!-- 3. User Profile & Entitlements Icon Button -->
-          <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)" data-tooltip="创客档案与权益中心 (管理用户信息)">
+          <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)">
             <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-            <span class="nav-user-badge" title="企业创客已认证"></span>
+            <span class="nav-user-badge"></span>
           </button>
         </div>
       </div>
@@ -3891,6 +3891,12 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       document.body.addEventListener('mouseover', (e) => {
+        // If hovering inside header or nav bar, never show any floating tooltip
+        if (e.target.closest('header') || e.target.closest('.nav-glass-bar')) {
+          tooltip.classList.remove('visible');
+          return;
+        }
+
         const trigger = e.target.closest('[data-tooltip]');
         if (!trigger) return;
         const text = trigger.getAttribute('data-tooltip');
@@ -5575,16 +5581,16 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         const tier = currentUserSession.tier_name || '标准创客';
         bar.innerHTML = `
           <div style="display: inline-flex; align-items: center; gap: 7px; background: var(--glass-surface); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 3px 10px 3px 5px; box-shadow: var(--glass-specular);">
-            <div style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #5856D6); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="switchView('user')" title="进入创客中心">${initial}</div>
-            <span style="font-size: 12.5px; font-weight: 600; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" onclick="switchView('user')" title="${currentUserSession.email}">${displayLabel}</span>
+            <div style="width: 24px; height: 24px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), #5856D6); color: #fff; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="switchView('user')">${initial}</div>
+            <span style="font-size: 12.5px; font-weight: 600; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer;" onclick="switchView('user')">${displayLabel}</span>
             <span class="mono-tag" style="font-size: 9.5px; padding: 1px 5px; background: var(--accent-glass); color: var(--accent); border-radius: 4px;">${tier}</span>
-            <button onclick="handleLogout()" class="btn-liquid-outline" style="padding: 2px 7px; font-size: 11px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer;" title="安全退出">退出</button>
+            <button onclick="handleLogout()" class="btn-liquid-outline" style="padding: 2px 7px; font-size: 11px; border: none; background: transparent; color: var(--text-tertiary); cursor: pointer;">退出</button>
           </div>
         `;
       } else {
         bar.innerHTML = `
-          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="登录已有创客账号">登录</button>
-          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;" data-tooltip="注册新创客账号 (支持邮箱)">注册</button>
+          <button class="btn-liquid-outline" onclick="openLoginModal()" style="padding: 5px 12px; font-size: 12px;">登录</button>
+          <button class="btn-liquid" onclick="openRegisterModal()" style="padding: 5px 12px; font-size: 12px;">注册</button>
         `;
       }
     }
