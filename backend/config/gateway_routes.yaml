@@ -102,17 +102,17 @@ gateway:
     - scenario: "demands.publish"
       version: "v1.0.0"
       domain: "demands"
-      description: "发布企业外包委托与法律求助"
+      description: "微内核DAG编排：发布企业外包委托与法律求助"
       is_default: true
-      handler: "src.domains.demands.service.demand_service:create_demand"
-      model: "src.domains.demands.models:DemandCreate"
+      handler: "src.core.gateway.adapters:demand_publish_adapter"
 
     - scenario: "demands.bid"
       version: "v1.0.0"
       domain: "demands"
-      description: "提交创客竞标方案"
+      description: "微内核DAG编排：提交创客竞标方案与撮合"
       is_default: true
-      handler: "src.core.gateway.adapters:demands_bid_adapter"
+      handler: "src.core.gateway.adapters:demand_bid_adapter"
+
 
     # --------------------------------------------------------------------------
     # 4. SOP & Compliance Documents (合规文书与流程模板)

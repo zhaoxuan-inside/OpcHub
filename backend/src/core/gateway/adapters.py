@@ -13,11 +13,51 @@ from src.domains.orchestration.models import (
 )
 
 
-def demands_bid_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
+async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for enterprise outsourcing demand publishing."""
+    inputs = dict(p)
+    if "demand_payload" in inputs and isinstance(inputs["demand_payload"], dict):
+        inputs.update(inputs["demand_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_DEMAND_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Demand publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_demand") or res.final_output
+
+
+async def demand_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for maker demand bidding."""
+    inputs = dict(p)
+    if "bid_payload" in inputs and isinstance(inputs["bid_payload"], dict):
+        inputs.update(inputs["bid_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_DEMAND_BID_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Demand bidding pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_bid") or res.final_output
+
+
+def demands_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Legacy alias redirecting to demand_service directly or adapter."""
     return demand_service.submit_bid(
         demand_id=p.get("demand_id"),
         payload=BidCreate(**p.get("bid_payload", p)),
     )
+
 
 
 async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:

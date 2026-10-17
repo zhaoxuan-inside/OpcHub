@@ -134,5 +134,26 @@ class DemandService:
         demand.bidders_count += 1
         return bid
 
+    def get_demand(self, demand_id: str) -> Optional[DemandResponse]:
+        return self._demands.get(demand_id)
+
+    def delete_demand(self, demand_id: str) -> bool:
+        if demand_id in self._demands:
+            del self._demands[demand_id]
+            self._bids.pop(demand_id, None)
+            return True
+        return False
+
+    def delete_bid(self, demand_id: str, bid_id: str) -> bool:
+        if demand_id in self._demands and demand_id in self._bids:
+            original_len = len(self._bids[demand_id])
+            self._bids[demand_id] = [b for b in self._bids[demand_id] if b.id != bid_id]
+            if len(self._bids[demand_id]) < original_len:
+                if self._demands[demand_id].bidders_count > 0:
+                    self._demands[demand_id].bidders_count -= 1
+                return True
+        return False
+
 
 demand_service = DemandService()
+

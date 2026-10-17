@@ -1481,7 +1481,10 @@
       <div class="glass-box" style="padding: 24px 32px 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">需求外包与商机集市</h1>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <h1 class="page-title" style="font-size: 26px; margin: 0;">需求外包与商机集市</h1>
+              <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_DEMAND_PUBLISH_PIPELINE & OPC_DEMAND_BID_PIPELINE</span>
+            </div>
             <p style="font-size: 13px; color: var(--text-secondary);">真实企业付费委托 · 托管资金保障 · 专为超级个体与技术顾问打造</p>
           </div>
           <button class="btn-liquid" onclick="openPublishDemandModal()" data-tooltip="发布外包寻源与定制委托"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg><span>发布需求</span></button>
@@ -1498,7 +1501,7 @@
       </div>
 
       <div class="grid-3" id="demandCardsGrid">
-        <div class="glass-card demand-card-item" data-cat="AI">
+        <div class="glass-card demand-card-item" data-cat="AI" id="card_dmd_ai_crm">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
               <span class="mono-tag">AI智能体 · ¥35,000</span>
@@ -1510,12 +1513,12 @@
             </p>
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">3 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <span style="color: var(--text-tertiary);" class="bid-count-label">3 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="openBidDemandModal('card_dmd_ai_crm', '外贸 CRM 系统的垂直行业 Agent 工作流搭建')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
-        <div class="glass-card demand-card-item" data-cat="DEV">
+        <div class="glass-card demand-card-item" data-cat="DEV" id="card_dmd_dev_electron">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
               <span class="mono-tag">技术开发 · ¥18,000</span>
@@ -1527,12 +1530,12 @@
             </p>
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">1 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <span style="color: var(--text-tertiary);" class="bid-count-label">1 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="openBidDemandModal('card_dmd_dev_electron', '跨端桌面工具 (Electron / Tauri) 界面重构与性能调优')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
 
-        <div class="glass-card demand-card-item" data-cat="DEV">
+        <div class="glass-card demand-card-item" data-cat="DEV" id="card_dmd_dev_devops">
           <div>
             <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
               <span class="mono-tag">技术顾问 · ¥60,000</span>
@@ -1544,10 +1547,11 @@
             </p>
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">5 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
+            <span style="color: var(--text-tertiary);" class="bid-count-label">5 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="openBidDemandModal('card_dmd_dev_devops', '出海 SaaS 平台长期兼职 DevOps 与合规架构顾问')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标</button>
           </div>
         </div>
+
 
         <!-- Demand 4: Legal Help 1 (GDPR & Overseas Privacy) -->
         <div class="glass-card demand-card-item" data-cat="LEGAL">
@@ -3547,6 +3551,39 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     </div>
   </div>
 
+  <!-- Liquid Bid Demand Modal -->
+  <div class="sheet-modal" id="liquidBidDemandModal">
+    <div class="sheet-body" style="max-width: 500px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h3 style="font-size: 18px; font-weight: 600;">提交方案与竞标</h3>
+        <button class="btn-liquid-outline" onclick="closeBidDemandModal()" style="padding: 4px 8px;" data-tooltip="放弃本次竞标"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+      <input type="hidden" id="bidTargetDemandId">
+      <div class="form-group">
+        <label class="form-label">竞标标的</label>
+        <input type="text" class="glass-input" id="bidTargetDemandTitle" readonly style="opacity: 0.85; background: rgba(0,0,0,0.1);">
+      </div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <div class="form-group">
+          <label class="form-label">商务报价 (¥ CNY)</label>
+          <input type="number" class="glass-input" id="bidAmountCny" value="15000" min="100">
+        </div>
+        <div class="form-group">
+          <label class="form-label">承诺周期 (天)</label>
+          <input type="number" class="glass-input" id="bidDeliveryDays" value="7" min="1">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">交付方案与经验简述</label>
+        <textarea class="glass-textarea" id="bidProposalText" rows="3" placeholder="清晰阐述技术选型、过往交付作品案例、交付里程碑及售后支持..."></textarea>
+      </div>
+      <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
+        <button class="btn-liquid-outline" onclick="closeBidDemandModal()" data-tooltip="取消竞标"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
+        <button class="btn-liquid" onclick="submitDemandBid()" data-tooltip="提交方案参与竞标"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>确认竞标</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Liquid Publish Perk Modal -->
   <div class="sheet-modal" id="liquidPublishPerkModal">
     <div class="sheet-body" style="max-width: 540px;">
@@ -4284,8 +4321,8 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             </p>
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-            <span style="color: var(--text-tertiary);">0 人已竞标</span>
-            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
+            <span style="color: var(--text-tertiary);" class="bid-count-label">0 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="openBidDemandModal('${demandId}', '${escapeHtml(title)}')">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
             </button>
           </div>
@@ -4299,8 +4336,69 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       closePublishDemandModal();
-      showLiquidNotice('需求发布成功', `委托需求《${title}》已成功发布并进入需求集市，资金已进入存管合约！`, 'SUCCESS');
+      showLiquidNotice('需求发布成功', `委托需求《${title}》已成功通过 OPC_DEMAND_PUBLISH_PIPELINE 发布！`, 'SUCCESS');
     }
+
+    // -------------------------------------------------------------
+    // Demand Bidding Controller (DAG: OPC_DEMAND_BID_PIPELINE)
+    // -------------------------------------------------------------
+    function openBidDemandModal(demandId, title) {
+      const modal = document.getElementById('liquidBidDemandModal');
+      if (modal) {
+        document.getElementById('bidTargetDemandId').value = demandId;
+        document.getElementById('bidTargetDemandTitle').value = title || '外包寻源委托需求';
+        document.getElementById('bidAmountCny').value = '15000';
+        document.getElementById('bidDeliveryDays').value = '7';
+        document.getElementById('bidProposalText').value = '';
+        modal.classList.add('active');
+      }
+    }
+
+    function closeBidDemandModal() {
+      const modal = document.getElementById('liquidBidDemandModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    async function submitDemandBid() {
+      const demandId = document.getElementById('bidTargetDemandId').value;
+      const title = document.getElementById('bidTargetDemandTitle').value;
+      const amount = parseFloat(document.getElementById('bidAmountCny').value) || 1000;
+      const days = parseInt(document.getElementById('bidDeliveryDays').value, 10) || 7;
+      const proposal = document.getElementById('bidProposalText').value.trim();
+
+      if (!proposal) {
+        showLiquidNotice('请填写交付方案', '竞标方案说明不能为空，请简要阐明您的实施方案与交付能力。', 'WARNING');
+        return;
+      }
+
+      const gwRes = await dispatchGateway('demands.bid', {
+        demand_id: demandId,
+        bidder_id: 'usr_2026_opc_9981',
+        bid_amount_cny: amount,
+        delivery_days: days,
+        proposal_text: proposal
+      });
+
+      if (!gwRes.ok && gwRes.code !== 200) {
+        showLiquidNotice('竞标提交失败', gwRes.error || '方案未能通过准入校验与内容风控', 'WARNING');
+        return;
+      }
+
+      // Update card UI
+      const card = document.getElementById(demandId);
+      if (card) {
+        const countSpan = card.querySelector('.bid-count-label');
+        if (countSpan) {
+          const m = countSpan.innerText.match(/\d+/);
+          const cur = m ? parseInt(m[0], 10) : 0;
+          countSpan.innerText = `${cur + 1} 人已竞标`;
+        }
+      }
+
+      closeBidDemandModal();
+      showLiquidNotice('竞标方案已提交', `针对《${title}》的商务竞标方案（报价 ¥${amount.toLocaleString()}，${days} 天）已通过 OPC_DEMAND_BID_PIPELINE 编排成功送达委托方！`, 'SUCCESS');
+    }
+
 
     // -------------------------------------------------------------
     // Perk Publishing Controller (Backend Persistence)

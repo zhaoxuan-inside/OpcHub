@@ -582,6 +582,164 @@ class AtomicRegistry:
             }
         self.register("product.telemetry.incr", product_telemetry_incr, domain="product", description="产品橱窗作品收录与度量打点算子")
 
+        # Domain 8: Demands & Bidding Market Domain (需求集市与创客竞标微内核算子与 Saga 补偿)
+        async def demand_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            title = inputs.get("title", "").strip()
+            desc = inputs.get("description", "").strip()
+            budget = float(inputs.get("budget_cny", 0.0))
+            category = inputs.get("category", "DEV").upper()
+            deadline_days = int(inputs.get("deadline_days", 14))
+            creator_id = inputs.get("creator_id", "usr_client_corp_default")
+
+            if len(title) < 2:
+                raise ValueError("Demand title must be at least 2 characters long")
+            if len(desc) < 5:
+                raise ValueError("Demand description must be at least 5 characters long")
+            if budget < 0:
+                raise ValueError("Demand budget cannot be negative")
+            valid_cats = {"DEV", "AI", "TAX", "LEGAL", "BIZ"}
+            if category not in valid_cats:
+                category = "DEV"
+            if deadline_days < 1:
+                deadline_days = 14
+
+            # Moderation check
+            full_text = f"{title} {desc}"
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            for f in forbidden:
+                if f in full_text:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in demand publish")
+
+            return {
+                "guard_passed": True,
+                "title": title,
+                "description": desc,
+                "budget_cny": budget,
+                "category": category,
+                "deadline_days": deadline_days,
+                "creator_id": creator_id,
+            }
+        self.register("demand.publish.guard", demand_publish_guard, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
+
+        async def demand_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.demands.service import demand_service
+            from src.domains.demands.models import DemandCreate
+            payload = DemandCreate(
+                title=inputs.get("title", ""),
+                description=inputs.get("description", ""),
+                budget_cny=float(inputs.get("budget_cny", 0.0)),
+                category=inputs.get("category", "DEV"),
+                deadline_days=int(inputs.get("deadline_days", 14)),
+                creator_id=inputs.get("creator_id", "usr_client_corp_default"),
+            )
+            created = demand_service.create_demand(payload)
+            return {
+                "demand_id": created.id,
+                "created_demand": created.model_dump(),
+                "status": "OPEN",
+            }
+
+        async def demand_publish_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.demands.service import demand_service
+            demand_id = inputs.get("demand_id") or (inputs.get("created_demand", {}).get("id"))
+            if demand_id:
+                deleted = demand_service.delete_demand(demand_id)
+                return {"demand_id": demand_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No demand_id to rollback"}
+
+        self.register(
+            "demand.publish.persist",
+            demand_publish_persist,
+            domain="demands",
+            description="需求集市企业委托寻源需求持久化存储算子",
+            compensator=demand_publish_persist_compensate,
+        )
+
+        async def demand_bid_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.demands.service import demand_service
+            demand_id = inputs.get("demand_id", "").strip()
+            bidder_id = inputs.get("bidder_id", "usr_maker_2026").strip()
+            amount = float(inputs.get("bid_amount_cny", 0.0))
+            delivery_days = int(inputs.get("delivery_days", 7))
+            proposal = inputs.get("proposal_text", "").strip()
+
+            if not demand_id:
+                raise ValueError("demand_id is required for bidding")
+            demand = demand_service.get_demand(demand_id)
+            if not demand:
+                raise KeyError(f"Demand with ID {demand_id} not found")
+            if demand.status != "OPEN":
+                raise ValueError(f"Demand {demand_id} is not open for bidding (status: {demand.status})")
+            if amount < 0:
+                raise ValueError("bid_amount_cny cannot be negative")
+            if delivery_days < 1:
+                raise ValueError("delivery_days must be at least 1")
+            if len(proposal) < 5:
+                raise ValueError("proposal_text must be at least 5 characters long")
+
+            # Moderation check
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            for f in forbidden:
+                if f in proposal:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in demand bid proposal")
+
+            return {
+                "guard_passed": True,
+                "demand_id": demand_id,
+                "bidder_id": bidder_id,
+                "bid_amount_cny": amount,
+                "delivery_days": delivery_days,
+                "proposal_text": proposal,
+            }
+        self.register("demand.bid.guard", demand_bid_guard, domain="demands", description="需求集市创客竞标方案准入审查门禁")
+
+        async def demand_bid_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.demands.service import demand_service
+            from src.domains.demands.models import BidCreate
+            demand_id = inputs.get("demand_id")
+            payload = BidCreate(
+                bidder_id=inputs.get("bidder_id", "usr_maker_2026"),
+                bid_amount_cny=float(inputs.get("bid_amount_cny", 0.0)),
+                delivery_days=int(inputs.get("delivery_days", 7)),
+                proposal_text=inputs.get("proposal_text", ""),
+            )
+            created = demand_service.submit_bid(demand_id, payload)
+            return {
+                "bid_id": created.id,
+                "demand_id": demand_id,
+                "created_bid": created.model_dump(),
+                "status": "SUBMITTED",
+            }
+
+        async def demand_bid_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.demands.service import demand_service
+            demand_id = inputs.get("demand_id")
+            bid_id = inputs.get("bid_id") or (inputs.get("created_bid", {}).get("id"))
+            if demand_id and bid_id:
+                deleted = demand_service.delete_bid(demand_id, bid_id)
+                return {"demand_id": demand_id, "bid_id": bid_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "Missing demand_id or bid_id to rollback"}
+
+        self.register(
+            "demand.bid.persist",
+            demand_bid_persist,
+            domain="demands",
+            description="需求集市创客竞标方案持久化与指标自增算子",
+            compensator=demand_bid_persist_compensate,
+        )
+
+        async def demand_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in demands pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "demands.pipeline.executed",
+                "demand_id": inputs.get("demand_id", "unknown"),
+                "increment": 1,
+            }
+        self.register("demand.telemetry.incr", demand_telemetry_incr, domain="demands", description="需求集市寻源与竞标度量打点算子")
+
+
 
 
 
