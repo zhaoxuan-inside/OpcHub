@@ -253,23 +253,42 @@
     .nav-right-actions {
       display: flex;
       align-items: center;
-      gap: 8px;
+    }
+
+    /* Unified VisionOS Glass Toolbar Island (同一图层) */
+    .nav-actions-island {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 4px;
+      background: var(--glass-surface);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-full);
+      backdrop-filter: var(--blur-strength);
+      -webkit-backdrop-filter: var(--blur-strength);
+      box-shadow: var(--glass-specular);
+      gap: 3px;
+    }
+
+    .nav-island-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--glass-border-subtle);
+      margin: 0 1px;
+      flex-shrink: 0;
     }
 
     .nav-icon-btn {
-      width: 36px;
-      height: 36px;
+      width: 34px;
+      height: 34px;
       border-radius: var(--radius-full);
-      background: var(--glass-surface-subtle);
-      border: 1px solid var(--glass-border);
+      background: transparent;
+      border: 1px solid transparent;
       color: var(--text-primary);
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       position: relative;
-      backdrop-filter: var(--blur-strength);
-      -webkit-backdrop-filter: var(--blur-strength);
       transition: var(--transition-liquid);
       user-select: none;
       flex-shrink: 0;
@@ -288,7 +307,16 @@
       background: var(--accent-glass);
       border-color: var(--accent);
       color: var(--accent);
-      box-shadow: 0 0 14px rgba(0, 113, 227, 0.35);
+      box-shadow: 0 0 12px rgba(0, 113, 227, 0.3);
+    }
+
+    .nav-icon-btn.admin-active {
+      color: #FF9500;
+    }
+
+    .nav-icon-btn.admin-active:hover {
+      color: #FF9500;
+      box-shadow: 0 0 12px rgba(255, 149, 0, 0.35);
     }
 
     .nav-icon-btn svg {
@@ -318,51 +346,22 @@
       box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
     }
 
-    .nav-role-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 5px 12px;
-      border-radius: var(--radius-full);
-      background: var(--glass-surface-subtle);
-      border: 1px solid var(--glass-border);
-      color: var(--text-primary);
-      font-size: 11.5px;
-      font-weight: 500;
-      cursor: pointer;
-      backdrop-filter: var(--blur-strength);
-      -webkit-backdrop-filter: var(--blur-strength);
-      transition: var(--transition-liquid);
-      user-select: none;
-      white-space: nowrap !important;
-      flex-shrink: 0;
-      line-height: 1;
-    }
-
-    .nav-role-badge:hover {
-      background: var(--glass-surface-hover);
-      border-color: var(--glass-border-hover);
-      box-shadow: var(--glass-glow-halo);
-    }
-
-    .role-dot {
+    .nav-role-dot {
+      position: absolute;
+      bottom: 3px;
+      right: 3px;
       width: 7px;
       height: 7px;
       border-radius: 50%;
       background: #34C759;
-      box-shadow: 0 0 6px rgba(52, 199, 89, 0.6);
-      transition: background 0.25s ease;
+      border: 1.5px solid var(--bg-canvas);
+      box-shadow: 0 0 5px rgba(52, 199, 89, 0.6);
+      transition: background 0.25s ease, box-shadow 0.25s ease;
     }
 
-    .nav-role-badge.admin-active .role-dot {
+    .nav-icon-btn.admin-active .nav-role-dot {
       background: #FF9500;
       box-shadow: 0 0 6px rgba(255, 149, 0, 0.8);
-    }
-
-    .nav-role-badge.admin-active {
-      border-color: rgba(255, 149, 0, 0.4);
-      background: rgba(255, 149, 0, 0.08);
-      color: #FF9500;
     }
 
     /* ---------------- Main View Container ---------------- */
@@ -1068,23 +1067,33 @@
       </nav>
 
       <div class="nav-right-actions">
-        <!-- Role Switcher (创客视角 / 管理视角) -->
-        <button class="nav-role-badge" id="roleToggleBtn" onclick="toggleUserRole()" data-tooltip="点击在创客视角与管理员视角之间切换">
-          <span class="role-dot" id="roleDot"></span>
-          <span id="roleLabel">创客视角</span>
-        </button>
+        <!-- Unified VisionOS Frosted Island Layer (同一个图层：视角切换、暗黑模式、用户信息三合一) -->
+        <div class="nav-actions-island" id="navActionsIsland">
+          <!-- 1. Perspective / Role Switcher Icon Button -->
+          <button class="nav-icon-btn" id="roleToggleBtn" onclick="toggleUserRole()" data-tooltip="创客视角 (点击切换为管理视角)">
+            <!-- Maker View: 3D Stack / Maker Layer Cube -->
+            <svg id="roleIconMaker" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+            <!-- Admin View: Security Governance Shield -->
+            <svg id="roleIconAdmin" viewBox="0 0 24 24" style="display: none;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <span class="nav-role-dot" id="roleDot" title="当前角色状态"></span>
+          </button>
 
-        <!-- Dark / Light Theme Icon Toggle -->
-        <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" data-tooltip="切换视觉风格 (深色 / 浅色)">
-          <svg id="themeIconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-          <svg id="themeIconSun" viewBox="0 0 24 24" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
-        </button>
+          <div class="nav-island-divider"></div>
 
-        <!-- User Profile & Entitlements Icon Button -->
-        <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)" data-tooltip="创客档案与权益中心 (管理用户信息)">
-          <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          <span class="nav-user-badge" title="企业创客已认证"></span>
-        </button>
+          <!-- 2. Dark / Light Theme Icon Toggle -->
+          <button class="nav-icon-btn" id="themeToggleBtn" onclick="toggleTheme()" data-tooltip="切换视觉风格 (深色 / 浅色)">
+            <svg id="themeIconMoon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            <svg id="themeIconSun" viewBox="0 0 24 24" style="display: none;"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+          </button>
+
+          <div class="nav-island-divider"></div>
+
+          <!-- 3. User Profile & Entitlements Icon Button -->
+          <button class="nav-icon-btn" id="userProfileNavBtn" onclick="switchView('user', this)" data-tooltip="创客档案与权益中心 (管理用户信息)">
+            <svg viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span class="nav-user-badge" title="企业创客已认证"></span>
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -3294,8 +3303,9 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const userTabs = document.querySelectorAll('.tab-user-only');
       const adminTabs = document.querySelectorAll('.tab-admin-only');
       const roleDot = document.getElementById('roleDot');
-      const roleLabel = document.getElementById('roleLabel');
       const roleToggleBtn = document.getElementById('roleToggleBtn');
+      const roleIconMaker = document.getElementById('roleIconMaker');
+      const roleIconAdmin = document.getElementById('roleIconAdmin');
       const userRoleBadgeText = document.getElementById('userRoleBadgeText');
       const userRoleBtnText = document.getElementById('userRoleBtnText');
 
@@ -3303,9 +3313,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         userTabs.forEach(t => t.style.setProperty('display', 'none', 'important'));
         adminTabs.forEach(t => t.style.setProperty('display', 'inline-flex', 'important'));
         
-        if (roleDot) roleDot.classList.add('admin');
-        if (roleLabel) roleLabel.textContent = '管理视角';
-        if (roleToggleBtn) roleToggleBtn.setAttribute('data-tooltip', '当前处于管理视角（点击切换为创客视角）');
+        if (roleToggleBtn) {
+          roleToggleBtn.classList.add('admin-active');
+          roleToggleBtn.setAttribute('data-tooltip', '管理视角 (点击切换为创客视角)');
+        }
+        if (roleIconMaker) roleIconMaker.style.display = 'none';
+        if (roleIconAdmin) roleIconAdmin.style.display = 'block';
+        if (roleDot) roleDot.style.background = '#FF9500';
+
         if (userRoleBadgeText) userRoleBadgeText.textContent = '平台管理员 (ADMIN)';
         if (userRoleBtnText) userRoleBtnText.textContent = '切换创客';
 
@@ -3320,9 +3335,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         userTabs.forEach(t => t.style.setProperty('display', 'inline-flex', 'important'));
         adminTabs.forEach(t => t.style.setProperty('display', 'none', 'important'));
 
-        if (roleDot) roleDot.classList.remove('admin');
-        if (roleLabel) roleLabel.textContent = '创客视角';
-        if (roleToggleBtn) roleToggleBtn.setAttribute('data-tooltip', '当前处于创客视角（点击切换为管理视角）');
+        if (roleToggleBtn) {
+          roleToggleBtn.classList.remove('admin-active');
+          roleToggleBtn.setAttribute('data-tooltip', '创客视角 (点击切换为管理视角)');
+        }
+        if (roleIconMaker) roleIconMaker.style.display = 'block';
+        if (roleIconAdmin) roleIconAdmin.style.display = 'none';
+        if (roleDot) roleDot.style.background = '#34C759';
+
         if (userRoleBadgeText) userRoleBadgeText.textContent = '普通创客 (USER)';
         if (userRoleBtnText) userRoleBtnText.textContent = '切换管理';
 
