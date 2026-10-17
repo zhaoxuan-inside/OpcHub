@@ -442,6 +442,20 @@ async def external_siliconflow_summarize_adapter(p: Dict[str, Any], c: Dict[str,
     )
 
 
+async def external_siliconflow_charter_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes SiliconFlow AI legal charter drafting for One-Person Companies."""
+    company_name = p.get("company_name", "杭州超级个体科技有限公司")
+    biz_scope = p.get("biz_scope", "软件研发与人工智能算法服务")
+    capital = float(p.get("registered_capital_cny", 100000.0))
+    model = p.get("model")
+    return await siliconflow_gateway.generate_charter_text(
+        company_name=company_name,
+        biz_scope=biz_scope,
+        registered_capital_cny=capital,
+        model=model
+    )
+
+
 async def external_payment_split_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes anti-fund-pooling split payment order via WeChat Pay or Stripe."""
     order_id = p.get("order_id", f"ord_{int(time.time()*1000)}")

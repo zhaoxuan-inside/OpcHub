@@ -28,6 +28,8 @@ class PolicyMatchRequest(BaseModel):
     quarterly_income: float = Field(..., ge=0.0, description="季度含税销售额 (CNY)")
     maker_type: str = Field(default="INDIVIDUAL", description="INDIVIDUAL (个体户) or OPC (一人有限责任公司)")
     region: str = Field(default="杭州", description="经营所在地城市")
+    search_query: Optional[str] = Field(default=None, description="自然语言业务描述或意向关键词")
+    industry_keywords: Optional[List[str]] = Field(default=None, description="业务行业标签列表")
 
 
 class PolicyMatchResponse(BaseModel):
@@ -37,3 +39,4 @@ class PolicyMatchResponse(BaseModel):
     legal_basis: str
     matched_policies: List[PolicyResponse]
     explanation: str
+    relevance_scores: Optional[dict[str, float]] = None

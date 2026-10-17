@@ -1657,7 +1657,10 @@
                 <option value="实际办公场地租赁合同">实际办公场地租赁合同</option>
               </select>
             </div>
-            <div style="display: flex; gap: 10px; margin-top: 12px;">
+            <div style="display: flex; gap: 8px; margin-top: 12px;">
+              <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="generateCharterWithAI()" data-tooltip="调用 SiliconFlow 算力起草一人公司合规章程">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>智能起草
+              </button>
               <button class="btn-liquid" style="flex: 1; justify-content: center;" onclick="renderAndSaveSopDoc(true)" data-tooltip="提交填报信息至后端完成合规渲染并持久化保存">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>保存文书
               </button>
@@ -4277,6 +4280,20 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       );
     }
 
+    async function summarizePolicyWithAI(policyTitle, policySummary) {
+      showLiquidNotice('SiliconFlow AI 提炼中', `正在调度 SiliconFlow (DeepSeek-V3) 算力提炼《${policyTitle}》...`, 'INFO');
+      const gwRes = await dispatchGateway('external.siliconflow.summarize', {
+        title: policyTitle,
+        full_text: policySummary
+      });
+      if (gwRes.ok && gwRes.data) {
+        const plain = gwRes.data.plain_summary || '提炼完成';
+        showLiquidNotice('AI 白话提炼完成', `【${policyTitle}】\n${plain}\n(模型: ${gwRes.data.model_used || 'DeepSeek-V3'})`, 'SUCCESS');
+      } else {
+        showLiquidNotice('AI 提炼失败', gwRes.error || '模型推理服务暂不可用', 'WARNING');
+      }
+    }
+
     // -------------------------------------------------------------
     // Demand Publishing Controller (Backend Persistence)
     // -------------------------------------------------------------
@@ -5158,6 +5175,24 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (showNotice) {
         showLiquidNotice('文书已生成', '申报文书已根据填报关键字段完成合规排版！', 'SUCCESS');
       }
+    async function generateCharterWithAI() {
+      const company = document.getElementById('sopCompanyName').value || '拟定一人有限公司';
+      const scope = document.getElementById('sopBizScope').value || '技术研发与人工智能应用';
+      showLiquidNotice('SiliconFlow AI 起草中', `正在调用 DeepSeek-V3 算力起草《${company}》章程合规条款...`, 'INFO');
+
+      const gwRes = await dispatchGateway('external.siliconflow.charter', {
+        company_name: company,
+        biz_scope: scope,
+        registered_capital_cny: 100000.0
+      });
+
+      if (gwRes.ok && gwRes.data) {
+        const text = gwRes.data.charter_text || gwRes.data.reply_text || '章程起草完成';
+        document.getElementById('sopDocOutput').textContent = text;
+        showLiquidNotice('章程起草成功', `已依据新《公司法》完成自然人独资章程智能撰写并合规排版！\n模型: ${gwRes.data.model || 'DeepSeek-V3'}`, 'SUCCESS');
+      } else {
+        showLiquidNotice('起草失败', gwRes.error || '模型推理服务暂不可用', 'WARNING');
+      }
     }
 
     function downloadGeneratedDoc() {
@@ -6037,9 +6072,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           </div>
           <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
             <span style="color: var(--text-tertiary);">最高补: ¥${(p.subsidy_amount_max || 0).toLocaleString()}</span>
-            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="evaluatePolicyQualification('${escapeHtml(p.title)}')">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
-            </button>
+            <div style="display: flex; gap: 6px;">
+              <button class="btn-liquid-outline" style="padding: 3px 8px; font-size: 11.5px;" data-tooltip="调用 SiliconFlow 大模型提炼大白话核心收益" onclick="summarizePolicyWithAI('${escapeHtml(p.title)}', '${escapeHtml(p.summary)}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>白话提炼
+              </button>
+              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="evaluatePolicyQualification('${escapeHtml(p.title)}')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
+              </button>
+            </div>
           </div>
         `;
         grid.appendChild(card);

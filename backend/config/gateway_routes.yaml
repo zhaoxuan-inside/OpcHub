@@ -377,6 +377,13 @@ gateway:
       is_default: true
       handler: "src.core.gateway.adapters:external_siliconflow_summarize_adapter"
 
+    - scenario: "external.siliconflow.charter"
+      version: "v1.0.0"
+      domain: "external"
+      description: "调用 SiliconFlow 硅基流动 AI 算力生成一人有限责任公司章程条款"
+      is_default: true
+      handler: "src.core.gateway.adapters:external_siliconflow_charter_adapter"
+
     - scenario: "external.payment.split"
       version: "v1.0.0"
       domain: "external"
