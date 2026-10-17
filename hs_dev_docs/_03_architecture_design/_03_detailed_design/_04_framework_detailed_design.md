@@ -139,6 +139,148 @@ sequenceDiagram
     Dispatcher-->>Engine: 统一聚合回传管线执行结果
 ```
 
+### 3.3 框架统一入站网关与场景动态路由规约 (Unified Inbound Gateway & Scenario Dynamic Routing Specification)
+
+#### 1. 传统 RESTful 架构痛点 vs 场景动态路由引擎
+在传统的 Web 与 RESTful 设计模式中，每一个细分业务动作（如创建政策、审批公文、下架言论、发起竞标）均对应一个独立的 HTTP URL 路径与专属控制器方法（如 `@app.post("/policies")`, `@app.post("/demands/{id}/bid")`）。该模式存在三大核心结构性瓶颈：
+1. **接口持续膨胀**：随着业务场景增多，网关层不断增生散落端点，导致跨模块治理与安全审计难度呈指数级增加；
+2. **前后端紧耦合**：前端视图强绑定具体 REST URL 路径，后端微服务拆分或聚合时必须大动干戈修改前端请求链路；
+3. **与低代码组合天然冲突**：低代码平台本质是通过**参数化场景描述符（Scenario Descriptor）**驱动后端执行流水线，RESTful 僵化的 URL 映射无法支持运行期动态组装与零代码路由扩展。
+
+为此，OpcHub 框架全面革新入站接入层，引入**统一入站网关与场景动态路由引擎 (Unified Inbound Gateway & Scenario Routing Engine)**：
+- **统一入口恒定**：全平台所有业务请求收口至单一入站端点 `POST /api/v1/dispatch`（别名 `POST /api/v1/gateway/dispatch`）；
+- **业务场景路由解耦**：请求通过请求体中的 `scenario` 字段指示业务场景，由场景路由器基于注册表透明转发至对应领域服务；
+- **零 HTTP 接口改造**：新业务上线、策略调整或微服务拆分时，**后端 HTTP 控制器代码零改动**，仅需在注册表中增加一条场景规则映射即可！
+
+```mermaid
+flowchart LR
+    subgraph Frontend["前端展示层 (UI / Low-Code Client)"]
+        UI["统一客户端 dispatchGateway(scenario, payload, context)"]
+    end
+
+    subgraph Gateway["入站统一网关 (Unified Inbound Gateway)"]
+        EP["单一入口 POST /api/v1/dispatch"]
+        Trace["X-Trace-ID 自动注入与毫秒度量"]
+        Router["场景动态路由器 ScenarioRouter"]
+    end
+
+    subgraph Registry["场景路由规则注册表 (Rule Registry)"]
+        R1["products.publish -> product_service.create_product"]
+        R2["policies.match -> policy_service.match_policies"]
+        R3["demands.publish -> demand_service.create_demand"]
+        R4["sop.document.render -> sop_service.render_and_save_document"]
+        R5["orchestration.scenarios.execute -> microkernel_engine"]
+        R6["... 动态业务扩展规则 ..."]
+    end
+
+    subgraph Handlers["业务层 / 微服务执行体"]
+        H1["单体进程内自治领域服务 (IN_PROCESS)"]
+        H2["独立微服务远程端点 (HTTP_REMOTE)"]
+    end
+
+    UI -->|统一请求信封 DispatchRequest| EP
+    EP --> Trace --> Router
+    Router -->|场景匹配与参数自适应适配| Registry
+    Registry -->|直接执行| H1
+    Registry -->|代理派发| H2
+    Router -->|统一响应信封 DispatchResponse| UI
+```
+
+#### 2. 统一入站通信信封与数据契约
+入站请求与出站响应均采用严格规范的标准信封包裹：
+
+##### (1) 入站请求信封 (`DispatchRequest`)
+```json
+{
+  "scenario": "policies.match",
+  "payload": {
+    "annual_revenue": 1200000.0,
+    "employee_count": 8,
+    "city": "杭州",
+    "industry": "AI"
+  },
+  "context": {
+    "client_env": "browser_h5",
+    "timestamp": "2026-10-17T12:00:00Z",
+    "trace_id": "tr_gw_8f1a9b2c"
+  }
+}
+```
+
+##### (2) 统一出站响应信封 (`DispatchResponse`)
+```json
+{
+  "code": 200,
+  "scenario": "policies.match",
+  "message": "success",
+  "data": {
+    "matched_policies": [],
+    "estimated_tax_savings_cny": 8400.0
+  },
+  "trace_id": "tr_gw_8f1a9b2c",
+  "duration_ms": 3.82
+}
+```
+
+#### 3. 动态自适应执行与规则注册机制
+`RouteRule` 与 `ScenarioRouter` 具备动态参数自适应能力：
+1. **函数签名自适应**：无论底层业务 handler 为无参函数、单参 `(payload)`、双参 `(payload, context)`，路由执行器均能根据反射自适应匹配并执行；
+2. **同步/异步透明桥接**：自动识别 `async def` 协程函数与普通同步函数，非阻塞调度；
+3. **全域场景自省能力**：暴露 `GET /api/v1/dispatch/rules` 接口，低代码设计器与第三方开发者可实时自省全平台所有已注册场景、所属领域、描述及参数形态；
+4. **零 HTTP 改造扩容范式**：
+   ```python
+   # 当需要新增“政策申诉”业务时，无需增加任何 FastAPI 路由装饰器，仅需注册规则：
+   scenario_router.register(
+       scenario="policies.appeal",
+       handler=lambda p, c: policy_service.submit_appeal(p),
+       domain="policies",
+       description="提交小微政策免税申报复议与申诉",
+   )
+   # 前端即可立即通过 dispatchGateway("policies.appeal", { ... }) 调用！
+   ```
+
+#### 4. 全域默认场景路由拓扑映射表 (Default Scenarios Mapping)
+| 业务领域 | 场景标识码 (Scenario) | 映射业务目标 | 描述与职能 |
+| :--- | :--- | :--- | :--- |
+| `products` | `products.list` | `product_service.list_products` | 检索独立创客商业作品列表 |
+| `products` | `products.publish` | `product_service.create_product` | 发布新独立创客作品至橱窗 |
+| `products` | `products.upvote` | `product_service.upvote_product` | 为作品点赞打榜 |
+| `policies` | `policies.list` | `policy_service.list_policies` | 获取政府扶持与税收减免政策列表 |
+| `policies` | `policies.publish` | `policy_service.create_policy` | 发布最新政府扶持与补贴政策 |
+| `policies` | `policies.match` | `policy_service.match_policies` | 测算创客免税资格与预计减免额 |
+| `demands` | `demands.list` | `demand_service.list_demands` | 检索企业委托寻源商机列表 |
+| `demands` | `demands.publish` | `demand_service.create_demand` | 发布企业外包委托与法律求助 |
+| `demands` | `demands.bid` | `demand_service.submit_bid` | 提交创客竞标方案与报价 |
+| `sop` | `sop.templates` | `sop_service.get_stages_and_templates`| 获取合规流程阶段与文档模板列表 |
+| `sop` | `sop.template.publish`| `sop_service.create_template` | 发布并登记新合规文书模板 |
+| `sop` | `sop.document.render` | `sop_service.render_and_save_document`| 根据用户填报数据渲染并持久化合规文书 |
+| `sop` | `sop.document.get` | `sop_service.get_document` | 按 ID 获取已生成的文书实例 |
+| `sop` | `sop.document.list` | `sop_service.list_documents` | 获取创客已保存的文书历史列表 |
+| `perks` | `perks.list` | `perk_service.list_perks` | 获取基础设施折扣与算力福利列表 |
+| `perks` | `perks.publish` | `perk_service.create_perk` | 提报并上线生态特权福利 |
+| `perks` | `perks.claim` | `perk_service.claim_perk` | 领取特权并生成专属兑换凭据 |
+| `forum` | `forum.threads.list` | `forum_service.list_threads` | 检索头脑风暴社区讨论帖列表 |
+| `forum` | `forum.threads.publish`| `forum_service.create_thread` | 发布新创客讨论帖与踩坑复盘 |
+| `forum` | `forum.threads.get` | `forum_service.get_thread` | 获取讨论帖详情与正文 |
+| `forum` | `forum.comments.create`| `forum_service.create_comment` | 发表一级回答或物化路径嵌套子回复 |
+| `telemetry` | `home.overview` | 平台核心概览指标对象 | 获取首页功能全景与宏观活跃指标 |
+| `telemetry` | `telemetry.dashboard` / `ops.dashboard` | `telemetry_service.get_dashboard_metrics` | 全域运营大盘实时核心指标聚合 |
+| `user` | `user.profile` | `user_service.get_maker_profile` | 获取创客个人主体档案与已激活权益 |
+| `user` | `user.entitlements.activate` | `user_service.activate_entitlement` | 激活创客专属商业权益与特权门禁 |
+| `moderation`| `moderation.items.list` | `moderation_service.list_items` | 获取内容安全与敏感词审核队列 |
+| `moderation`| `moderation.takedown` | `moderation_service.takedown` | 执行违规内容一键全网下架 |
+| `moderation`| `moderation.restore` | `moderation_service.restore` | 恢复误判下架内容至正常展示 |
+| `compliance`| `compliance.dimensions` | `compliance_service.list_dimensions` | 获取六维合规防线核心法则与处罚依据 |
+| `compliance`| `compliance.cases` | `compliance_service.list_cases` | 获取典型踩坑与行政处罚案例库 |
+| `compliance`| `compliance.checkpoints`| `compliance_service.list_checkpoints`| 获取上线前自检清单与合规门禁条目 |
+| `compliance`| `compliance.audit` | `compliance_service.evaluate_audit` | 评估创客产品自检并出具评分报告 |
+| `orchestration`| `orchestration.operators.list` | `orchestration_service.list_operators` | 获取全域微内核原子算子清单与元数据 |
+| `orchestration`| `orchestration.dag.save` | `orchestration_service.save_dag_config` | 保存并部署微内核 DAG 编排配置 |
+| `orchestration`| `orchestration.dag.list` | `orchestration_service.list_dag_configs` | 获取微内核 DAG 编排配置列表 |
+| `orchestration`| `orchestration.scenarios.execute` | `orchestration_service.execute_scenario` | 执行低代码编排的有向无环图场景流水线 |
+| `orchestration`| `frontend.layouts.get` | `orchestration_service.get_frontend_layout` | 获取 24 栅格低代码页面布局 |
+| `orchestration`| `frontend.layouts.save` | `orchestration_service.save_frontend_layout`| 保存 24 栅格低代码前端可视化布局 |
+
 ---
 
 ## 4. 统一外部出站代理网关详细契约 (Unified Outbound Gateway Spec)

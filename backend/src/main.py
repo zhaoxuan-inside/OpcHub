@@ -93,6 +93,16 @@ from src.domains.compliance.models import (
     AuditEvaluateRequest,
     AuditReportResponse,
 )
+from src.core.gateway import (
+    DispatchRequest,
+    DispatchResponse,
+    RouteRuleDescriptor,
+    scenario_router,
+    register_default_scenario_routes,
+)
+
+# Register default business scenario route rules into router
+register_default_scenario_routes()
 
 
 app = FastAPI(
@@ -121,6 +131,34 @@ class ScriptValidationRequest(BaseModel):
 class DAGExecutionRequest(BaseModel):
     config: DAGConfig
     inputs: dict[str, Any] | None = None
+
+
+# ==========================================
+# Unified Gateway Dispatcher Endpoints (Single Inbound Entrypoint)
+# ==========================================
+@app.post(
+    f"{settings.api_prefix}/dispatch",
+    response_model=DispatchResponse,
+    tags=["Unified Gateway Dispatcher"]
+)
+@app.post(
+    f"{settings.api_prefix}/gateway/dispatch",
+    response_model=DispatchResponse,
+    tags=["Unified Gateway Dispatcher"]
+)
+async def dispatch_scenario(payload: DispatchRequest):
+    """Unified entrypoint receiving any business request and dynamically routing by scenario."""
+    return await scenario_router.dispatch(payload)
+
+
+@app.get(
+    f"{settings.api_prefix}/dispatch/rules",
+    response_model=list[RouteRuleDescriptor],
+    tags=["Unified Gateway Dispatcher"]
+)
+async def list_scenario_rules():
+    """List all registered scenario routing rules across business domains."""
+    return scenario_router.list_rules()
 
 
 # ==========================================

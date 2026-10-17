@@ -3582,6 +3582,44 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
   <script>
     // -------------------------------------------------------------
+    // Unified Inbound Gateway & Scenario Dynamic Routing Client
+    // -------------------------------------------------------------
+    const GATEWAY_ENDPOINT = "http://127.0.0.1:8000/api/v1/dispatch";
+
+    async function dispatchGateway(scenario, payload = {}, context = {}) {
+      const traceId = 'tr_gw_' + Math.random().toString(36).substring(2, 10);
+      const envelope = {
+        scenario: scenario,
+        payload: payload,
+        context: {
+          client_env: 'browser_h5',
+          timestamp: new Date().toISOString(),
+          trace_id: traceId,
+          ...context
+        }
+      };
+
+      try {
+        const res = await fetch(GATEWAY_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(envelope)
+        });
+        if (res.ok) {
+          const respData = await res.json();
+          return { ok: true, data: respData.data, meta: respData };
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.warn(`Gateway dispatch error [${scenario}]:`, errData);
+          return { ok: false, error: errData.detail || errData.message || res.statusText };
+        }
+      } catch (err) {
+        console.warn(`Gateway offline/network exception [${scenario}]:`, err);
+        return { ok: false, networkError: true, error: err.message };
+      }
+    }
+
+    // -------------------------------------------------------------
     // Liquid Glass Tooltip Engine (Zero-Overflow Single Instance)
     // -------------------------------------------------------------
     function initLiquidTooltips() {
@@ -3739,24 +3777,15 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let threadId = 'th_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/forum/threads", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title,
-            content: content || "（暂无详细正文内容）",
-            category: cat.split(' ')[0],
-            author_id: "usr_2026_opc_9981",
-            author_name: "赵玄"
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          threadId = data.id;
-        }
-      } catch (e) {
-        // standalone offline fallback
+      const gwRes = await dispatchGateway('forum.threads.publish', {
+        title: title,
+        content: content || "（暂无详细正文内容）",
+        category: cat.split(' ')[0],
+        author_id: "usr_2026_opc_9981",
+        author_name: "赵玄"
+      });
+      if (gwRes.ok && gwRes.data) {
+        threadId = gwRes.data.id || threadId;
       }
 
       const container = document.getElementById('forumPostsContainer') || document.querySelector('.forum-container .glass-box:last-child');
@@ -3824,27 +3853,18 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let prodId = 'prod_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/products", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title,
-            tagline: tagline || title,
-            description: desc || "独立创客自主研发商业作品",
-            category: category.includes("AI") ? "AI" : category.includes("跨境") ? "SAAS" : "DEV",
-            pricing_model: pricing,
-            price_cny: price,
-            demo_url: url,
-            author_id: "usr_2026_opc_9981"
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          prodId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('products.publish', {
+        title: title,
+        tagline: tagline || title,
+        description: desc || "独立创客自主研发商业作品",
+        category: category.includes("AI") ? "AI" : category.includes("跨境") ? "SAAS" : "DEV",
+        pricing_model: pricing,
+        price_cny: price,
+        demo_url: url,
+        author_id: "usr_2026_opc_9981"
+      });
+      if (gwRes.ok && gwRes.data) {
+        prodId = gwRes.data.id || prodId;
       }
 
       const grid = document.getElementById('productCardsGrid');
@@ -3916,26 +3936,17 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let policyId = 'pol_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/policies", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title,
-            policy_level: level,
-            category: cat,
-            subsidy_amount_max: subsidy,
-            summary: summary || "面向超级个体与科技初创主体的普惠政策支持。",
-            eligible_conditions: ["纳税主体处于正常存续状态", "符合小微免税或算力补贴申报标准"],
-            legal_basis: legal
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          policyId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('policies.publish', {
+        title: title,
+        policy_level: level,
+        category: cat,
+        subsidy_amount_max: subsidy,
+        summary: summary || "面向超级个体与科技初创主体的普惠政策支持。",
+        eligible_conditions: ["纳税主体处于正常存续状态", "符合小微免税或算力补贴申报标准"],
+        legal_basis: legal
+      });
+      if (gwRes.ok && gwRes.data) {
+        policyId = gwRes.data.id || policyId;
       }
 
       const grid = document.getElementById('policyCardsGrid');
@@ -4004,25 +4015,16 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let demandId = 'dmd_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/demands", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: title,
-            description: desc || "企业外包委托及技术交付需求",
-            budget_cny: budget,
-            category: cat,
-            deadline_days: deadline,
-            creator_id: "usr_2026_opc_9981"
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          demandId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('demands.publish', {
+        title: title,
+        description: desc || "企业外包委托及技术交付需求",
+        budget_cny: budget,
+        category: cat,
+        deadline_days: deadline,
+        creator_id: "usr_2026_opc_9981"
+      });
+      if (gwRes.ok && gwRes.data) {
+        demandId = gwRes.data.id || demandId;
       }
 
       const grid = document.getElementById('demandCardsGrid');
@@ -4102,25 +4104,16 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let perkId = 'perk_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/perks", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: name,
-            provider: provider,
-            value_cny: val,
-            category: cat,
-            summary: summary || "面向超级个体的开发者基础设施特权补贴支持。",
-            quota_remaining: quota
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          perkId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('perks.publish', {
+        name: name,
+        provider: provider,
+        value_cny: val,
+        category: cat,
+        summary: summary || "面向超级个体的开发者基础设施特权补贴支持。",
+        quota_remaining: quota
+      });
+      if (gwRes.ok && gwRes.data) {
+        perkId = gwRes.data.id || perkId;
       }
 
       const grid = document.getElementById('perkCardsGrid');
@@ -4189,29 +4182,20 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let templateId = 'tpl_' + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/templates", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stage: stage,
-            code: code,
-            name: name,
-            category: stage === 1 ? "TAX" : stage === 2 ? "FINANCE" : stage === 3 ? "IP" : "LEGAL",
-            description: desc || "创客自主设立与经营合规标准文书模板",
-            template_content: content || (name + "\n---------------------------------------------\n主体全称：{company_name}\n法定代表：{founder_name}\n签署日期：2026-10-17\n---------------------------------------------\n[电子印签] 状态: READY"),
-            required_fields: [
-              { key: "company_name", label: "拟定主体名称", type: "string", required: true },
-              { key: "founder_name", label: "法定代表人姓名", type: "string", required: true }
-            ]
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          templateId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('sop.template.publish', {
+        stage: stage,
+        code: code,
+        name: name,
+        category: stage === 1 ? "TAX" : stage === 2 ? "FINANCE" : stage === 3 ? "IP" : "LEGAL",
+        description: desc || "创客自主设立与经营合规标准文书模板",
+        template_content: content || (name + "\n---------------------------------------------\n主体全称：{company_name}\n法定代表：{founder_name}\n签署日期：2026-10-17\n---------------------------------------------\n[电子印签] 状态: READY"),
+        required_fields: [
+          { key: "company_name", label: "拟定主体名称", type: "string", required: true },
+          { key: "founder_name", label: "法定代表人姓名", type: "string", required: true }
+        ]
+      });
+      if (gwRes.ok && gwRes.data) {
+        templateId = gwRes.data.id || templateId;
       }
 
       // Update current preview directly
@@ -4236,21 +4220,12 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (perkName.includes("PingPong") || perkName.includes("Stripe")) perkId = "prk_pingpong_cross_border_fx";
       if (perkName.includes("飞书")) perkId = "prk_feishu_pro_license";
 
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/perks/claim", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            perk_id: perkId,
-            user_id: "usr_2026_opc_9981"
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          code = data.license_code;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('perks.claim', {
+        perk_id: perkId,
+        user_id: "usr_2026_opc_9981"
+      });
+      if (gwRes.ok && gwRes.data) {
+        code = gwRes.data.license_code || code;
       }
 
       showLiquidNotice(
@@ -4310,16 +4285,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       let pv = '628,300';
       let latency = '12ms (P99: 28ms)';
 
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/ops/dashboard");
-        if (res.ok) {
-          const data = await res.json();
-          dau = data.dau.value;
-          uv = data.uv.value;
-          pv = data.pv.value;
-          latency = data.api_throughput.sub_text;
-        }
-      } catch (e) {
+      const gwRes = await dispatchGateway("ops.dashboard");
+      if (gwRes.ok && gwRes.data) {
+        const data = gwRes.data;
+        dau = data.dau ? data.dau.value : dau;
+        uv = data.uv ? data.uv.value : uv;
+        pv = data.pv ? data.pv.value : pv;
+        latency = data.api_throughput ? data.api_throughput.sub_text : latency;
+      } else {
         dau = '14,' + Math.floor(820 + Math.random() * 80);
         uv = '89,' + Math.floor(540 + Math.random() * 90);
         pv = '628,' + Math.floor(300 + Math.random() * 200);
@@ -4610,15 +4583,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         ban_author: banAuthor
       };
 
-      try {
-        await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/takedown", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {
-        // Fallback for standalone demo mode
-      }
+      await dispatchGateway("moderation.takedown", payload);
 
       item.status = 'TAKEN_DOWN';
       item.takedown_reason = reason;
@@ -4642,15 +4607,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         restore_reason: "经管理员人工复核无实质合规风险，予以恢复展示"
       };
 
-      try {
-        await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/restore", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-      } catch (err) {
-        // Fallback for standalone demo mode
-      }
+      await dispatchGateway("moderation.restore", payload);
 
       item.status = 'FLAGGED';
       item.takedown_reason = null;
@@ -4722,23 +4679,18 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         }
       });
     }
-
     async function refreshModerationList() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/admin/moderation/items");
-        if (res.ok) {
-          const data = await res.json();
-          if (data && Array.isArray(data.items)) {
-            data.items.forEach(srvItem => {
-              if (moderationState.items[srvItem.id]) {
-                moderationState.items[srvItem.id].status = srvItem.status;
-                moderationState.items[srvItem.id].takedown_reason = srvItem.takedown_reason;
-                renderModerationCard(srvItem.id);
-              }
-            });
+      const gwRes = await dispatchGateway("moderation.items.list");
+      if (gwRes.ok && gwRes.data) {
+        const items = Array.isArray(gwRes.data.items) ? gwRes.data.items : Array.isArray(gwRes.data) ? gwRes.data : [];
+        items.forEach(srvItem => {
+          if (moderationState.items[srvItem.id]) {
+            moderationState.items[srvItem.id].status = srvItem.status;
+            moderationState.items[srvItem.id].takedown_reason = srvItem.takedown_reason;
+            renderModerationCard(srvItem.id);
           }
-        }
-      } catch (err) {}
+        });
+      }
       updateModerationStats();
       filterModerationCardsUI();
       showLiquidNotice('巡检清单已刷新', '已完成全网社区与评论区舆情雷达扫描，当前数据已是最新！', 'SUCCESS');
@@ -4807,23 +4759,15 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         }
       };
 
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/documents", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          currentSavedDocId = data.id;
-          document.getElementById('sopDocOutput').textContent = data.rendered_content;
-          if (showNotice) {
-            showLiquidNotice('文书生成入库', `申报材料已由后端微内核完成合规校验并持久化！\n\n文档编号: ${data.id}\n状态: READY FOR SUBMISSION\n合规判定: 通过`, 'SUCCESS');
-          }
-          return;
+      const gwRes = await dispatchGateway('sop.document.render', payload);
+      if (gwRes.ok && gwRes.data) {
+        const data = gwRes.data;
+        currentSavedDocId = data.id;
+        document.getElementById('sopDocOutput').textContent = data.rendered_content;
+        if (showNotice) {
+          showLiquidNotice('文书生成入库', `申报材料已由后端微内核完成合规校验并持久化！\n\n文档编号: ${data.id}\n状态: READY FOR SUBMISSION\n合规判定: 通过`, 'SUCCESS');
         }
-      } catch (err) {
-        // Fallback for standalone demo when local API is not connected
+        return;
       }
 
       // Standalone render fallback for offline HTML preview
@@ -4929,18 +4873,9 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       };
 
       let layoutId = "layout_rec_" + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/orchestration/layout", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          layoutId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('frontend.layouts.save', payload);
+      if (gwRes.ok && gwRes.data) {
+        layoutId = gwRes.data.id || layoutId;
       }
 
       showLiquidNotice('联合发布', `已向后端持久化前后端原子发布包！\n记录编号: ${layoutId}\n版本: Release Bundle v1.0.4\n全链路拓扑状态: PUBLISHED`, 'SUCCESS');
@@ -4965,22 +4900,13 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
     async function confirmEntitlementPayment() {
       let code = "ENT_VIP";
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/user/entitlements/activate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            user_id: "usr_2026_opc_9981",
-            entitlement_code: code,
-            duration_months: 12
-          })
-        });
-        if (res.ok) {
-          const data = await res.json();
-          code = data.entitlement_code;
-        }
-      } catch (e) {
-        // fallback
+      const gwRes = await dispatchGateway('user.entitlements.activate', {
+        user_id: "usr_2026_opc_9981",
+        entitlement_code: code,
+        duration_months: 12
+      });
+      if (gwRes.ok && gwRes.data) {
+        code = gwRes.data.entitlement_code || code;
       }
 
       showLiquidNotice('权益激活', `已成功持久化创客专属权益凭据并完成支付鉴权！\n权益编号: ${code}\n主体绑定: 赵玄 (usr_2026_opc_9981)\n高级模块与微内核 API 配额已开启！`, 'SUCCESS');
@@ -5203,18 +5129,9 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       };
 
       let recId = "dag_rec_" + Date.now();
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/orchestration/dag", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          recId = data.id;
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('orchestration.dag.save', payload);
+      if (gwRes.ok && gwRes.data) {
+        recId = gwRes.data.id || recId;
       }
 
       showLiquidNotice('部署生效', `已成功向后端框架提交 DAG 流程图配置！\n配置编号: ${recId}\n工作版本: [${dagState.version}]\n已编译加载至微内核执行引擎中，即刻生效！`, 'SUCCESS');
@@ -5361,26 +5278,18 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
 
       let resultData = null;
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/orchestration/scenarios/execute", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            scenario_code: currentScenarioCode,
-            inputs: {
-              quarterly_income: 260000,
-              company_name: "杭州智启超级个体科技有限公司",
-              owner_name: "赵玄",
-              checked_ids: ["chk_01", "chk_03", "chk_06", "chk_08"]
-            },
-            override_dispatch_mode: currentDispatchMode
-          })
-        });
-        if (res.ok) {
-          resultData = await res.json();
-        }
-      } catch (e) {
-        // standalone fallback
+      const gwRes = await dispatchGateway('orchestration.scenarios.execute', {
+        scenario_code: currentScenarioCode,
+        inputs: {
+          quarterly_income: 260000,
+          company_name: "杭州智启超级个体科技有限公司",
+          owner_name: "赵玄",
+          checked_ids: ["chk_01", "chk_03", "chk_06", "chk_08"]
+        },
+        override_dispatch_mode: currentDispatchMode
+      });
+      if (gwRes.ok && gwRes.data) {
+        resultData = gwRes.data;
       }
 
       if (!resultData) {
@@ -5593,265 +5502,237 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // Global Backend Data Hydration Engine (Frontend displays, Backend owns data)
     // -------------------------------------------------------------
     async function fetchHomeOverview() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/home/overview");
-        if (!res.ok) return;
-        const data = await res.json();
-        const overviewBadge = document.querySelector('#view-home .mono-tag');
-        if (overviewBadge && data.active_makers_count) {
-          overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
-        }
-      } catch (err) {}
+      const gwRes = await dispatchGateway("home.overview");
+      if (!gwRes.ok || !gwRes.data) return;
+      const data = gwRes.data;
+      const overviewBadge = document.querySelector('#view-home .mono-tag');
+      if (overviewBadge && data.active_makers_count) {
+        overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
+      }
     }
 
     async function fetchForumThreads() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/forum/threads");
-        if (!res.ok) return;
-        const threads = await res.json();
-        if (!Array.isArray(threads) || threads.length === 0) return;
-        const container = document.getElementById('forumPostsContainer');
-        if (!container) return;
-        container.innerHTML = '';
-        threads.forEach(t => {
-          const card = document.createElement('div');
-          card.className = 'post-card';
-          const pinBadge = t.is_pinned ? '<span class="post-pinned">置顶</span>' : '';
-          card.innerHTML = `
-            <div class="post-title">
-              ${pinBadge}
-              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent); font-size: 11px;">${escapeHtml(t.category_code)}</span>
-              <span>${escapeHtml(t.title)}</span>
-            </div>
-            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
-              ${escapeHtml(t.content)}
-            </p>
-            <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
-              <span>作者: ${escapeHtml(t.author_id.substring(0, 10))}</span>
-              <span>点赞: ${t.upvote_count || 0}</span>
-              <span>回复: ${t.comment_count || 0}</span>
-              <span>更新: ${escapeHtml((t.created_at || '').substring(0, 10))}</span>
-            </div>
-          `;
-          container.appendChild(card);
-        });
-      } catch (err) {}
+      const gwRes = await dispatchGateway("forum.threads.list");
+      if (!gwRes.ok || !gwRes.data) return;
+      const threads = gwRes.data;
+      if (!Array.isArray(threads) || threads.length === 0) return;
+      const container = document.getElementById('forumPostsContainer');
+      if (!container) return;
+      container.innerHTML = '';
+      threads.forEach(t => {
+        const card = document.createElement('div');
+        card.className = 'post-card';
+        const pinBadge = t.is_pinned ? '<span class="post-pinned">置顶</span>' : '';
+        card.innerHTML = `
+          <div class="post-title">
+            ${pinBadge}
+            <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent); font-size: 11px;">${escapeHtml(t.category_code)}</span>
+            <span>${escapeHtml(t.title)}</span>
+          </div>
+          <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+            ${escapeHtml(t.content)}
+          </p>
+          <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            <span>作者: ${escapeHtml(t.author_id.substring(0, 10))}</span>
+            <span>点赞: ${t.upvote_count || 0}</span>
+            <span>回复: ${t.comment_count || 0}</span>
+            <span>更新: ${escapeHtml((t.created_at || '').substring(0, 10))}</span>
+          </div>
+        `;
+        container.appendChild(card);
+      });
     }
 
     async function fetchProducts() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/products");
-        if (!res.ok) return;
-        const products = await res.json();
-        if (!Array.isArray(products) || products.length === 0) return;
-        const grid = document.getElementById('productCardsGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        products.forEach(p => {
-          const card = document.createElement('div');
-          card.className = 'glass-card';
-          const priceLabel = p.pricing_model === 'FREE' ? '免费开源' : `¥${p.price_cny}`;
-          card.innerHTML = `
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                <span class="mono-tag">${escapeHtml(p.category)} · ${priceLabel}</span>
-                <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ ${p.upvote_count || 0} 赞</span>
-              </div>
-              <h3 style="font-size: 17px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
-                ${escapeHtml(p.tagline || p.description)}
-              </p>
+      const gwRes = await dispatchGateway("products.list");
+      if (!gwRes.ok || !gwRes.data) return;
+      const products = gwRes.data;
+      if (!Array.isArray(products) || products.length === 0) return;
+      const grid = document.getElementById('productCardsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      products.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        const priceLabel = p.pricing_model === 'FREE' ? '免费开源' : `¥${p.price_cny}`;
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(p.category)} · ${priceLabel}</span>
+              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ ${p.upvote_count || 0} 赞</span>
             </div>
-            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-              <span style="color: var(--text-tertiary);">作者: @${escapeHtml(p.author_id.substring(0, 12))}</span>
-              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 ${escapeHtml(p.title)}" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(p.title)} 独立产品预览环境与创客主页...', 'INFO')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
-              </button>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-      } catch (err) {}
+            <h3 style="font-size: 17px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(p.tagline || p.description)}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">作者: @${escapeHtml(p.author_id.substring(0, 12))}</span>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 ${escapeHtml(p.title)}" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(p.title)} 独立产品预览环境与创客主页...', 'INFO')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
     }
 
     async function fetchPolicies() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/policies");
-        if (!res.ok) return;
-        const policies = await res.json();
-        if (!Array.isArray(policies) || policies.length === 0) return;
-        const grid = document.getElementById('policyCardsGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        policies.forEach(p => {
-          const card = document.createElement('div');
-          card.className = 'glass-card';
-          card.innerHTML = `
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                <span class="mono-tag">${escapeHtml(p.id.toUpperCase().substring(0, 14))}</span>
-                <span style="font-size: 11.5px; color: var(--text-tertiary);">${escapeHtml(p.policy_level)} · ${escapeHtml(p.category)}</span>
-              </div>
-              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
-                【白话要点】${escapeHtml(p.summary)}
-              </p>
+      const gwRes = await dispatchGateway("policies.list");
+      if (!gwRes.ok || !gwRes.data) return;
+      const policies = gwRes.data;
+      if (!Array.isArray(policies) || policies.length === 0) return;
+      const grid = document.getElementById('policyCardsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      policies.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(p.id.toUpperCase().substring(0, 14))}</span>
+              <span style="font-size: 11.5px; color: var(--text-tertiary);">${escapeHtml(p.policy_level)} · ${escapeHtml(p.category)}</span>
             </div>
-            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-              <span style="color: var(--text-tertiary);">最高补: ¥${(p.subsidy_amount_max || 0).toLocaleString()}</span>
-              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="showLiquidNotice('政策匹配测评', '正在为您检索全国税务知识库与政策《${escapeHtml(p.title)}》规则，当前主体符合申报条件！', 'SUCCESS')">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
-              </button>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-      } catch (err) {}
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              【白话要点】${escapeHtml(p.summary)}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">最高补: ¥${(p.subsidy_amount_max || 0).toLocaleString()}</span>
+            <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="showLiquidNotice('政策匹配测评', '正在为您检索全国税务知识库与政策《${escapeHtml(p.title)}》规则，当前主体符合申报条件！', 'SUCCESS')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
     }
 
     async function fetchDemands() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/demands");
-        if (!res.ok) return;
-        const demands = await res.json();
-        if (!Array.isArray(demands) || demands.length === 0) return;
-        const grid = document.getElementById('demandCardsGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        const catMap = {
-          'DEV': '技术开发',
-          'AI': 'AI智能体',
-          'TAX': '财税合规',
-          'LEGAL': '法律求助',
-          'BIZ': '出海商业'
-        };
-        demands.forEach(d => {
-          const card = document.createElement('div');
-          card.className = 'glass-card demand-card-item';
-          card.setAttribute('data-cat', d.category);
-          const catName = catMap[d.category] || d.category;
-          card.innerHTML = `
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                <span class="mono-tag">${catName} · ¥${(d.budget_cny || 0).toLocaleString()}</span>
-                <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
-              </div>
-              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(d.title)}</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
-                ${escapeHtml(d.description)}
-              </p>
+      const gwRes = await dispatchGateway("demands.list");
+      if (!gwRes.ok || !gwRes.data) return;
+      const demands = gwRes.data;
+      if (!Array.isArray(demands) || demands.length === 0) return;
+      const grid = document.getElementById('demandCardsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      const catMap = {
+        'DEV': '技术开发',
+        'AI': 'AI智能体',
+        'TAX': '财税合规',
+        'LEGAL': '法律求助',
+        'BIZ': '出海商业'
+      };
+      demands.forEach(d => {
+        const card = document.createElement('div');
+        card.className = 'glass-card demand-card-item';
+        card.setAttribute('data-cat', d.category);
+        const catName = catMap[d.category] || d.category;
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${catName} · ¥${(d.budget_cny || 0).toLocaleString()}</span>
+              <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
             </div>
-            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-              <span style="color: var(--text-tertiary);">${d.bidders_count || 0} 人已竞标</span>
-              <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
-              </button>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-      } catch (err) {}
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(d.title)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(d.description)}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">${d.bidders_count || 0} 人已竞标</span>
+            <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
     }
 
     async function fetchSopTemplates() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/templates");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && data.stages && Array.isArray(data.stages)) {
-          const stepper = document.querySelector('.sop-stepper');
-          if (stepper) {
-            stepper.innerHTML = '';
-            data.stages.forEach(st => {
-              const node = document.createElement('div');
-              node.className = `sop-step-node ${st.stage === currentSopStep ? 'active' : ''}`;
-              node.onclick = () => setSopStep(st.stage);
-              node.innerHTML = `
-                <div style="font-family: var(--font-mono); font-size: 11px; color: ${st.stage === currentSopStep ? 'var(--accent)' : 'var(--text-tertiary)'};">阶段 0${st.stage}</div>
-                <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">${escapeHtml(st.name.replace(/^阶段\s*\d+:\s*/, ''))}</div>
-              `;
-              stepper.appendChild(node);
-            });
-          }
+      const gwRes = await dispatchGateway("sop.templates");
+      if (!gwRes.ok || !gwRes.data) return;
+      const data = gwRes.data;
+      if (data && data.stages && Array.isArray(data.stages)) {
+        const stepper = document.querySelector('.sop-stepper');
+        if (stepper) {
+          stepper.innerHTML = '';
+          data.stages.forEach(st => {
+            const node = document.createElement('div');
+            node.className = `sop-step-node ${st.stage === currentSopStep ? 'active' : ''}`;
+            node.onclick = () => setSopStep(st.stage);
+            node.innerHTML = `
+              <div style="font-family: var(--font-mono); font-size: 11px; color: ${st.stage === currentSopStep ? 'var(--accent)' : 'var(--text-tertiary)'};">阶段 0${st.stage}</div>
+              <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">${escapeHtml(st.name.replace(/^阶段\s*\d+:\s*/, ''))}</div>
+            `;
+            stepper.appendChild(node);
+          });
         }
-      } catch (err) {}
+      }
     }
 
     async function fetchPerks() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/perks");
-        if (!res.ok) return;
-        const perks = await res.json();
-        if (!Array.isArray(perks) || perks.length === 0) return;
-        const grid = document.getElementById('perkCardsGrid');
-        if (!grid) return;
-        grid.innerHTML = '';
-        perks.forEach(p => {
-          const card = document.createElement('div');
-          card.className = 'glass-card';
-          card.innerHTML = `
-            <div>
-              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
-                <span class="mono-tag">${escapeHtml(p.provider)} · ${escapeHtml(p.category)}</span>
-                <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">价值 ¥${(p.value_cny || 0).toLocaleString()}</span>
-              </div>
-              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.name)}</h3>
-              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
-                ${escapeHtml(p.summary)}
-              </p>
+      const gwRes = await dispatchGateway("perks.list");
+      if (!gwRes.ok || !gwRes.data) return;
+      const perks = gwRes.data;
+      if (!Array.isArray(perks) || perks.length === 0) return;
+      const grid = document.getElementById('perkCardsGrid');
+      if (!grid) return;
+      grid.innerHTML = '';
+      perks.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'glass-card';
+        card.innerHTML = `
+          <div>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+              <span class="mono-tag">${escapeHtml(p.provider)} · ${escapeHtml(p.category)}</span>
+              <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">价值 ¥${(p.value_cny || 0).toLocaleString()}</span>
             </div>
-            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
-              <span style="color: var(--text-tertiary);">剩余额度: ${p.quota_remaining || 0}</span>
-              <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('${escapeHtml(p.name)}')" data-tooltip="领取 ${escapeHtml(p.name)} 专属兑换凭据">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取
-              </button>
-            </div>
-          `;
-          grid.appendChild(card);
-        });
-      } catch (err) {}
+            <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.name)}</h3>
+            <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+              ${escapeHtml(p.summary)}
+            </p>
+          </div>
+          <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+            <span style="color: var(--text-tertiary);">剩余额度: ${p.quota_remaining || 0}</span>
+            <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('${escapeHtml(p.name)}')" data-tooltip="领取 ${escapeHtml(p.name)} 专属兑换凭据">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取
+            </button>
+          </div>
+        `;
+        grid.appendChild(card);
+      });
     }
 
     async function fetchUserProfile() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/user/profile");
-        if (!res.ok) return;
-        const profile = await res.json();
-        if (profile) {
-          const compElem = document.querySelector('#view-user h1');
-          if (compElem && profile.company_name) {
-            compElem.textContent = `${profile.company_name} · 创客空间`;
-          }
-          const tierTag = document.querySelector('#view-user .mono-tag');
-          if (tierTag && profile.tier) {
-            tierTag.textContent = `MAKER TIER: ${profile.tier} · 增值税减免已享 ¥${(profile.vat_savings_ytd || 0).toLocaleString()}`;
-          }
+      const gwRes = await dispatchGateway("user.profile");
+      if (!gwRes.ok || !gwRes.data) return;
+      const profile = gwRes.data;
+      if (profile) {
+        const compElem = document.querySelector('#view-user h1');
+        if (compElem && profile.company_name) {
+          compElem.textContent = `${profile.company_name} · 创客空间`;
         }
-      } catch (err) {}
+        const tierTag = document.querySelector('#view-user .mono-tag');
+        if (tierTag && profile.tier) {
+          tierTag.textContent = `MAKER TIER: ${profile.tier} · 增值税减免已享 ¥${(profile.vat_savings_ytd || 0).toLocaleString()}`;
+        }
+      }
     }
 
     async function fetchBackendOrchData() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/orchestration/operators");
-        if (!res.ok) return;
-        const data = await res.json();
-      } catch (err) {}
+      await dispatchGateway("orchestration.operators.list");
     }
 
     async function fetchFrontendLayoutData() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/frontend/layouts");
-        if (!res.ok) return;
-        const layouts = await res.json();
-      } catch (err) {}
+      await dispatchGateway("frontend.layouts.get");
     }
 
     async function fetchComplianceData() {
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/v1/compliance/checkpoints");
-        if (!res.ok) return;
-        const checkpoints = await res.json();
-      } catch (err) {}
+      await dispatchGateway("compliance.checkpoints");
     }
 
     async function triggerViewDataLoader(viewName) {
