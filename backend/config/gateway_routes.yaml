@@ -272,18 +272,16 @@ gateway:
     - scenario: "moderation.takedown"
       version: "v1.0.0"
       domain: "moderation"
-      description: "执行违规内容一键全网下架"
+      description: "执行违规内容一键全网下架 (由微内核 DAG OPC_MODERATION_TAKEDOWN_PIPELINE 驱动)"
       is_default: true
-      handler: "src.domains.moderation.service.moderation_service:takedown"
-      model: "src.domains.moderation.models:TakedownRequest"
+      handler: "src.core.gateway.adapters:moderation_takedown_adapter"
 
     - scenario: "moderation.restore"
       version: "v1.0.0"
       domain: "moderation"
-      description: "恢复误判下架内容至正常展示"
+      description: "恢复误判下架内容至正常展示 (由微内核 DAG OPC_MODERATION_RESTORE_PIPELINE 驱动)"
       is_default: true
-      handler: "src.domains.moderation.service.moderation_service:restore"
-      model: "src.domains.moderation.models:RestoreRequest"
+      handler: "src.core.gateway.adapters:moderation_restore_adapter"
 
     # --------------------------------------------------------------------------
     # 10. Compliance (合规避坑与自检)

@@ -72,3 +72,15 @@
 - **更新时间**：`2026-10-17T06:33:24Z`
 ---
 
+### 任务简述：TASK-017
+- **标题**：P09内容治理微内核DAG编排流水线与全网下架管控
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P1
+- **负责人**：agent
+- **核心目标**：实现P09内容治理控制台底层微内核DAG流水线驱动(OPC_MODERATION_TAKEDOWN_PIPELINE与OPC_MODERATION_RESTORE_PIPELINE)及Saga逆向补偿
+- **详情索引**：`_02_task_detail/_01_TASK-017/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-017/_00_context_pack.md`
+- **更新时间**：`2026-10-17T06:39:22Z`
+---
+

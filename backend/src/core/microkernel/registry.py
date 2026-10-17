@@ -406,7 +406,7 @@ class AtomicRegistry:
         self.register("compliance.telemetry.incr", compliance_telemetry_incr, domain="compliance", description="合规自检评估与雷达度量打点算子")
 
 
-        # Domain 4: Moderation Domain
+        # Domain 4: Moderation Domain (内容安全审查、全网下架与误判恢复微内核算子与 Saga 补偿)
         async def moderation_inspect_content(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             content = inputs.get("content", "")
             forbidden_words = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
@@ -419,6 +419,143 @@ class AtomicRegistry:
                 "flagged_keywords": [],
             }
         self.register("moderation.inspect_content", moderation_inspect_content, domain="moderation", description="UGC文本敏感词审查与违规处置算子")
+
+        async def moderation_takedown_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            item_id = inputs.get("item_id", "").strip()
+            reason = inputs.get("reason") or inputs.get("takedown_reason", "").strip()
+            moderator_id = inputs.get("moderator_id") or inputs.get("operator_id", "admin_001")
+            ban_author = bool(inputs.get("ban_author", False))
+
+            if not item_id:
+                raise ValueError("item_id is required for takedown")
+            if not reason:
+                raise ValueError("takedown reason is required and cannot be empty")
+
+            item = moderation_service.get_item(item_id)
+            if not item:
+                raise ValueError(f"Moderation item {item_id} not found")
+
+            return {
+                "guard_passed": True,
+                "item_id": item_id,
+                "reason": reason,
+                "moderator_id": moderator_id,
+                "ban_author": ban_author,
+                "prev_status": item.status,
+            }
+        self.register("moderation.takedown.guard", moderation_takedown_guard, domain="moderation", description="内容治理违规下架前置守卫校验算子")
+
+        async def moderation_takedown_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            from src.domains.moderation.models import TakedownRequest
+
+            item_id = inputs.get("item_id")
+            reason = inputs.get("reason", "违规言论全网下架")
+            moderator_id = inputs.get("moderator_id", "admin_001")
+            ban_author = inputs.get("ban_author", False)
+            prev_status = inputs.get("prev_status", "FLAGGED")
+
+            req = TakedownRequest(
+                item_id=item_id,
+                reason=reason,
+                moderator_id=moderator_id,
+                ban_author=ban_author,
+            )
+            action_res = moderation_service.takedown(req)
+            return {
+                "item_id": action_res.item_id,
+                "status": action_res.status,
+                "moderated_at": action_res.moderated_at,
+                "note": action_res.note,
+                "prev_status": prev_status,
+                "orchestrated_by": "OPC_MODERATION_TAKEDOWN_PIPELINE",
+            }
+
+        async def moderation_takedown_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            item_id = inputs.get("item_id")
+            prev_status = inputs.get("prev_status", "FLAGGED")
+            if item_id:
+                reverted = moderation_service.revert_takedown(item_id, prev_status)
+                return {"item_id": item_id, "compensated": reverted, "action": "ROLLED_BACK", "restored_status": prev_status}
+            return {"compensated": False, "reason": "No item_id to rollback takedown"}
+
+        self.register(
+            "moderation.takedown.persist",
+            moderation_takedown_persist,
+            domain="moderation",
+            description="内容治理违规言论下架持久化算子",
+            compensator=moderation_takedown_persist_compensate,
+        )
+
+        async def moderation_restore_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            item_id = inputs.get("item_id", "").strip()
+            moderator_id = inputs.get("moderator_id") or inputs.get("operator_id", "admin_001")
+
+            if not item_id:
+                raise ValueError("item_id is required for restore")
+
+            item = moderation_service.get_item(item_id)
+            if not item:
+                raise ValueError(f"Moderation item {item_id} not found")
+            if item.status != "TAKEN_DOWN":
+                raise ValueError(f"Item {item_id} is currently in status '{item.status}', only TAKEN_DOWN items can be restored")
+
+            return {
+                "guard_passed": True,
+                "item_id": item_id,
+                "moderator_id": moderator_id,
+            }
+        self.register("moderation.restore.guard", moderation_restore_guard, domain="moderation", description="内容治理误判恢复前置守卫校验算子")
+
+        async def moderation_restore_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            from src.domains.moderation.models import RestoreRequest
+
+            item_id = inputs.get("item_id")
+            moderator_id = inputs.get("moderator_id", "admin_001")
+
+            req = RestoreRequest(item_id=item_id, moderator_id=moderator_id)
+            action_res = moderation_service.restore(req)
+            return {
+                "item_id": action_res.item_id,
+                "status": action_res.status,
+                "moderated_at": action_res.moderated_at,
+                "note": action_res.note,
+                "orchestrated_by": "OPC_MODERATION_RESTORE_PIPELINE",
+            }
+
+        async def moderation_restore_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+            item_id = inputs.get("item_id")
+            if item_id:
+                reverted = moderation_service.revert_restore(item_id)
+                return {"item_id": item_id, "compensated": reverted, "action": "ROLLED_BACK", "restored_status": "TAKEN_DOWN"}
+            return {"compensated": False, "reason": "No item_id to rollback restore"}
+
+        self.register(
+            "moderation.restore.persist",
+            moderation_restore_persist,
+            domain="moderation",
+            description="内容治理误判下架言论恢复正常展示持久化算子",
+            compensator=moderation_restore_persist_compensate,
+        )
+
+        async def moderation_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure to trigger Saga rollback")
+            item_id = inputs.get("item_id", "unknown")
+            action_status = inputs.get("status", "MODERATED")
+            return {
+                "telemetry_recorded": True,
+                "metric": "governance.moderation.actions",
+                "item_id": item_id,
+                "status": action_status,
+                "increment": 1,
+            }
+        self.register("moderation.telemetry.incr", moderation_telemetry_incr, domain="moderation", description="内容治理处置度量打点算子")
 
         # Domain 5: Home & Sitemap Domain
         async def home_metrics_collector(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

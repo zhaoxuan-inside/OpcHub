@@ -2834,7 +2834,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
               <span class="mono-tag" style="background: var(--glass-surface-subtle); color: var(--text-secondary); font-size: 11px;">ADMIN · GOVERNANCE</span>
               <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">社区合规与内容治理</span>
             </div>
-            <h1 class="page-title" style="font-size: 24px; font-weight: 600; margin-bottom: 4px; letter-spacing: -0.02em;">内容治理控制台</h1>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <h1 class="page-title" style="font-size: 24px; font-weight: 600; margin: 0; letter-spacing: -0.02em;">内容治理控制台</h1>
+              <span id="moderationPipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_MODERATION_TAKEDOWN_PIPELINE</span>
+            </div>
             <p style="font-size: 13px; color: var(--text-secondary); max-width: 680px; line-height: 1.5; margin: 0;">
               统一维护全网创客社区交流秩序，对涉嫌违规、侵权或违法的言论执行下架与合规审计。
             </p>
@@ -4925,7 +4928,11 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         ban_author: banAuthor
       };
 
-      await dispatchGateway("moderation.takedown", payload);
+      const gwRes = await dispatchGateway("moderation.takedown", payload);
+      if (gwRes && gwRes.ok && gwRes.data && gwRes.data.orchestrated_by) {
+        const badge = document.getElementById('moderationPipelineBadge');
+        if (badge) badge.textContent = `DAG: ${gwRes.data.orchestrated_by}`;
+      }
 
       item.status = 'TAKEN_DOWN';
       item.takedown_reason = reason;
@@ -4949,7 +4956,11 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         restore_reason: "经管理员人工复核无实质合规风险，予以恢复展示"
       };
 
-      await dispatchGateway("moderation.restore", payload);
+      const gwRes = await dispatchGateway("moderation.restore", payload);
+      if (gwRes && gwRes.ok && gwRes.data && gwRes.data.orchestrated_by) {
+        const badge = document.getElementById('moderationPipelineBadge');
+        if (badge) badge.textContent = `DAG: ${gwRes.data.orchestrated_by}`;
+      }
 
       item.status = 'FLAGGED';
       item.takedown_reason = null;

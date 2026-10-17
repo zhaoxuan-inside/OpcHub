@@ -85,6 +85,24 @@ class ModerationService:
             items = [it for it in items if it.status.upper() == status.upper()]
         return items
 
+    def get_item(self, item_id: str) -> Optional[ModerationItemResponse]:
+        return self._items.get(item_id)
+
+    def revert_takedown(self, item_id: str, prev_status: str = "FLAGGED") -> bool:
+        item = self._items.get(item_id)
+        if item:
+            item.status = prev_status
+            item.moderated_at = None
+            return True
+        return False
+
+    def revert_restore(self, item_id: str) -> bool:
+        item = self._items.get(item_id)
+        if item:
+            item.status = "TAKEN_DOWN"
+            return True
+        return False
+
     def takedown(self, req: TakedownRequest) -> ModerationActionResponse:
         item = self._items.get(req.item_id)
         if not item:

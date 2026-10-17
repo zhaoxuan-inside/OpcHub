@@ -135,6 +135,44 @@ async def compliance_audit_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) 
     return res.final_output.get("audit_report") or res.final_output
 
 
+async def moderation_takedown_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for content moderation takedown."""
+    inputs = dict(p)
+    if "takedown_payload" in inputs and isinstance(inputs["takedown_payload"], dict):
+        inputs.update(inputs["takedown_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_MODERATION_TAKEDOWN_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Moderation takedown pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
+
+
+async def moderation_restore_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for content moderation restore."""
+    inputs = dict(p)
+    if "restore_payload" in inputs and isinstance(inputs["restore_payload"], dict):
+        inputs.update(inputs["restore_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_MODERATION_RESTORE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Moderation restore pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
+
+
 
 
 
