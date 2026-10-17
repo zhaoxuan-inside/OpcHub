@@ -347,19 +347,41 @@ async def user_entitlement_activate_adapter(p: Dict[str, Any], c: Dict[str, Any]
     return res.final_output.get("activation") or res.final_output
 
 
-def save_dag_config_adapter(p: Dict[str, Any]) -> Any:
-    topo = p.get("topology_graph") or p.get("config") or {}
-    if "topology" not in topo and "topology" in p:
-        topo["topology"] = p["topology"]
-    return orchestration_service.save_dag_config(
-        DAGConfigSaveRequest(
-            scenario_code=p.get("scenario_code", "CUSTOM_SCENARIO"),
-            version=p.get("version", "v1.0.0"),
-            topology_graph=topo,
-            status=p.get("status", "ACTIVE"),
-            created_by=p.get("created_by", "usr_admin_001"),
+async def save_dag_config_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for orchestration config saving and deployment."""
+    inputs = dict(p or {})
+    topo = inputs.get("topology_graph") or inputs.get("config") or {}
+    if "topology" not in topo and "topology" in inputs:
+        topo["topology"] = inputs["topology"]
+    inputs["topology_graph"] = topo
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_ORCHESTRATION_CONTROL_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
         )
     )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Orchestration control pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("dag_record") or res.final_output
+
+
+async def list_operators_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for operator descriptor enumeration."""
+    inputs = dict(p or {})
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Operators list pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("operators") or res.final_output
 
 
 def save_layout_adapter(p: Dict[str, Any]) -> Any:

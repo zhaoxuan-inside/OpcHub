@@ -320,14 +320,14 @@ gateway:
     - scenario: "orchestration.operators.list"
       version: "v1.0.0"
       domain: "orchestration"
-      description: "获取全域微内核原子算子清单与元数据"
+      description: "获取全域微内核原子算子清单与元数据 (由微内核 DAG OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE 驱动)"
       is_default: true
-      handler: "src.domains.orchestration.service.orchestration_service:list_operators"
+      handler: "src.core.gateway.adapters:list_operators_adapter"
 
     - scenario: "orchestration.dag.save"
       version: "v1.0.0"
       domain: "orchestration"
-      description: "保存并部署微内核 DAG 编排配置"
+      description: "保存并部署微内核 DAG 编排配置 (由微内核 DAG OPC_ORCHESTRATION_CONTROL_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:save_dag_config_adapter"
 

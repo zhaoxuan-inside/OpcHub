@@ -533,6 +533,52 @@ class OrchestrationService:
             )
         )
 
+        # 21. Orchestration Control DAG Pipeline: OPC_ORCHESTRATION_CONTROL_PIPELINE
+        topo_orch_control = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "orchestration.control.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "orchestration.control.persist", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "orchestration.control.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_ORCHESTRATION_CONTROL_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_orch_control,
+                status="ACTIVE",
+            )
+        )
+
+        # 22. Orchestration Operators List DAG Pipeline: OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE
+        topo_orch_ops_list = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "orchestration.operators.guard", "type": "GUARD"},
+                {"id": "step_collect", "action_handler": "orchestration.operators.collect", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_collect"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_orch_ops_list,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(
@@ -577,6 +623,13 @@ class OrchestrationService:
         if scenario_code:
             configs = [c for c in configs if c.scenario_code == scenario_code]
         return configs
+
+    def delete_dag_config(self, scenario_code: str, version: str) -> bool:
+        key = (scenario_code, version)
+        if key in self._dag_configs:
+            del self._dag_configs[key]
+            return True
+        return False
 
     def list_operators(self) -> List[OperatorDescriptor]:
         """List all registered atomic operator descriptors across all domains."""

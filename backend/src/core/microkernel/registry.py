@@ -1350,5 +1350,101 @@ class AtomicRegistry:
             }
         self.register("user.telemetry.incr", user_telemetry_incr, domain="user", description="创客中心业务与转化度量打点算子")
 
+        # Domain 12: Orchestration Domain (微内核流程图可视化编排控制台、拓扑部署与热载算子及 Saga 补偿)
+        async def orchestration_control_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            scenario_code = inputs.get("scenario_code", "").strip()
+            version = inputs.get("version", "v1.0.0").strip()
+            topology_graph = inputs.get("topology_graph") or inputs.get("config") or {}
+
+            if not scenario_code:
+                raise ValueError("scenario_code is required for DAG orchestration deployment")
+            if not version:
+                raise ValueError("version is required for DAG orchestration deployment")
+
+            return {
+                "guard_passed": True,
+                "scenario_code": scenario_code,
+                "version": version,
+                "topology_graph": topology_graph,
+                "status": inputs.get("status", "ACTIVE"),
+                "created_by": inputs.get("created_by", "usr_admin_001"),
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("orchestration.control.guard", orchestration_control_guard, domain="orchestration", description="微内核DAG编排部署守卫校验算子")
+
+        async def orchestration_control_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.orchestration.service import orchestration_service
+            from src.domains.orchestration.models import DAGConfigSaveRequest
+
+            scenario_code = inputs.get("scenario_code")
+            version = inputs.get("version")
+            topo = inputs.get("topology_graph", {})
+            if "topology" not in topo and "topology" in inputs:
+                topo["topology"] = inputs["topology"]
+
+            req = DAGConfigSaveRequest(
+                scenario_code=scenario_code,
+                version=version,
+                topology_graph=topo,
+                status=inputs.get("status", "ACTIVE"),
+                created_by=inputs.get("created_by", "usr_admin_001"),
+            )
+            saved_rec = orchestration_service.save_dag_config(req)
+            res_dict = saved_rec.model_dump()
+            res_dict["orchestrated_by"] = "OPC_ORCHESTRATION_CONTROL_PIPELINE"
+            return {
+                "dag_record": res_dict,
+                "scenario_code": scenario_code,
+                "version": version,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+
+        async def orchestration_control_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.orchestration.service import orchestration_service
+            scenario_code = inputs.get("scenario_code")
+            version = inputs.get("version")
+            if scenario_code and version:
+                deleted = orchestration_service.delete_dag_config(scenario_code, version)
+                return {"scenario_code": scenario_code, "version": version, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No scenario_code/version to rollback"}
+
+        self.register(
+            "orchestration.control.persist",
+            orchestration_control_persist,
+            domain="orchestration",
+            description="微内核DAG编排拓扑配置原子持久化与热载算子",
+            compensator=orchestration_control_persist_compensate,
+        )
+
+        async def orchestration_control_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in orchestration pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "orchestration.dag.deployed",
+                "scenario_code": inputs.get("scenario_code", "unknown"),
+                "increment": 1,
+            }
+        self.register("orchestration.control.telemetry.incr", orchestration_control_telemetry_incr, domain="orchestration", description="编排控制台部署度量打点算子")
+
+        async def orchestration_operators_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "guard_passed": True,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("orchestration.operators.guard", orchestration_operators_guard, domain="orchestration", description="算子清单检索参数守卫算子")
+
+        async def orchestration_operators_collect(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.orchestration.service import orchestration_service
+            descriptors = orchestration_service.list_operators()
+            desc_list = [d.model_dump() for d in descriptors]
+            return {
+                "operators": desc_list,
+                "total_count": len(desc_list),
+                "orchestrated_by": "OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE",
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("orchestration.operators.collect", orchestration_operators_collect, domain="orchestration", description="全域微内核原子算子清单聚合算子")
+
 
 registry = AtomicRegistry()

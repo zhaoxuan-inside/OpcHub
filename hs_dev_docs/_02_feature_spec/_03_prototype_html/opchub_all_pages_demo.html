@@ -1922,7 +1922,10 @@
         <!-- Header & Version Control Toolbar -->
         <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px;">
           <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">后端微内核流程图可视化编排 · DAG Orchestrator</h1>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <h1 class="page-title" style="font-size: 26px; margin: 0;">后端微内核流程图可视化编排 · DAG Orchestrator</h1>
+              <span id="orchConsolePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_ORCHESTRATION_CONTROL_PIPELINE</span>
+            </div>
             <p style="font-size: 13px; color: var(--text-secondary);">
               低代码业务组合驱动：各领域原子算子与外部代理网关自由拼装组合为场景流水线，支持单体直接调用与微服务无缝双模调度。
             </p>
@@ -5492,6 +5495,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       const gwRes = await dispatchGateway('orchestration.dag.save', payload);
       if (gwRes.ok && gwRes.data) {
         recId = gwRes.data.id || recId;
+        const pipeBadge = document.getElementById('orchConsolePipelineBadge');
+        if (pipeBadge && gwRes.data.orchestrated_by) {
+          pipeBadge.textContent = `DAG: ${gwRes.data.orchestrated_by}`;
+        }
       }
 
       showLiquidNotice('部署生效', `已成功向后端框架提交 DAG 流程图配置！\n配置编号: ${recId}\n工作版本: [${dagState.version}]\n已编译加载至微内核执行引擎中，即刻生效！`, 'SUCCESS');
