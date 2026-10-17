@@ -137,6 +137,16 @@ class DAGExecutionRequest(BaseModel):
 # Unified Gateway Dispatcher Endpoints (Single Inbound Entrypoint)
 # ==========================================
 @app.post(
+    "/api/welcom/opc_world",
+    response_model=DispatchResponse,
+    tags=["Unified Gateway Dispatcher"]
+)
+@app.post(
+    "/api/welcome/opc_world",
+    response_model=DispatchResponse,
+    tags=["Unified Gateway Dispatcher"]
+)
+@app.post(
     f"{settings.api_prefix}/dispatch",
     response_model=DispatchResponse,
     tags=["Unified Gateway Dispatcher"]
@@ -151,6 +161,16 @@ async def dispatch_scenario(payload: DispatchRequest):
     return await scenario_router.dispatch(payload)
 
 
+@app.get(
+    "/api/welcom/opc_world/rules",
+    response_model=list[RouteRuleDescriptor],
+    tags=["Unified Gateway Dispatcher"]
+)
+@app.get(
+    "/api/welcome/opc_world/rules",
+    response_model=list[RouteRuleDescriptor],
+    tags=["Unified Gateway Dispatcher"]
+)
 @app.get(
     f"{settings.api_prefix}/dispatch/rules",
     response_model=list[RouteRuleDescriptor],

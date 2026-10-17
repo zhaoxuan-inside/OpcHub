@@ -148,7 +148,7 @@ sequenceDiagram
 3. **与低代码组合天然冲突**：低代码平台本质是通过**参数化场景描述符（Scenario Descriptor）**驱动后端执行流水线，RESTful 僵化的 URL 映射无法支持运行期动态组装与零代码路由扩展。
 
 为此，OpcHub 框架全面革新入站接入层，引入**统一入站网关与场景动态路由引擎 (Unified Inbound Gateway & Scenario Routing Engine)**：
-- **统一入口恒定**：全平台所有业务请求收口至单一入站端点 `POST /api/v1/dispatch`（别名 `POST /api/v1/gateway/dispatch`）；
+- **统一入口恒定**：全平台所有业务请求收口至单一入站端点 `POST /api/welcom/opc_world`（别名 `/api/welcome/opc_world`、`POST /api/v1/dispatch`）；
 - **业务场景路由解耦**：请求通过请求体中的 `scenario` 字段指示业务场景，由场景路由器基于注册表透明转发至对应领域服务；
 - **零 HTTP 接口改造**：新业务上线、策略调整或微服务拆分时，**后端 HTTP 控制器代码零改动**，仅需在注册表中增加一条场景规则映射即可！
 
@@ -159,7 +159,7 @@ flowchart LR
     end
 
     subgraph Gateway["入站统一网关 (Unified Inbound Gateway)"]
-        EP["单一入口 POST /api/v1/dispatch"]
+        EP["单一入口 POST /api/welcom/opc_world"]
         Trace["X-Trace-ID 自动注入与毫秒度量"]
         Router["场景动态路由器 ScenarioRouter"]
     end
@@ -226,7 +226,7 @@ flowchart LR
 `RouteRule` 与 `ScenarioRouter` 具备动态参数自适应能力：
 1. **函数签名自适应**：无论底层业务 handler 为无参函数、单参 `(payload)`、双参 `(payload, context)`，路由执行器均能根据反射自适应匹配并执行；
 2. **同步/异步透明桥接**：自动识别 `async def` 协程函数与普通同步函数，非阻塞调度；
-3. **全域场景自省能力**：暴露 `GET /api/v1/dispatch/rules` 接口，低代码设计器与第三方开发者可实时自省全平台所有已注册场景、所属领域、描述及参数形态；
+3. **全域场景自省能力**：暴露 `GET /api/welcom/opc_world/rules` 接口，低代码设计器与第三方开发者可实时自省全平台所有已注册场景、所属领域、描述及参数形态；
 4. **零 HTTP 改造扩容范式**：
    ```python
    # 当需要新增“政策申诉”业务时，无需增加任何 FastAPI 路由装饰器，仅需注册规则：

@@ -8,7 +8,7 @@ client = TestClient(app)
 
 def test_list_dispatch_rules():
     """Verify that all default scenario rules are discoverable via API."""
-    resp = client.get("/api/v1/dispatch/rules")
+    resp = client.get("/api/welcom/opc_world/rules")
     assert resp.status_code == 200
     rules = resp.json()
     assert len(rules) >= 15
@@ -25,6 +25,11 @@ def test_list_dispatch_rules():
     assert "forum.threads.list" in scenarios
     assert "telemetry.dashboard" in scenarios
     assert "compliance.checkpoints" in scenarios
+
+    # Also verify alias /api/welcome/opc_world/rules
+    alias_resp = client.get("/api/welcome/opc_world/rules")
+    assert alias_resp.status_code == 200
+    assert len(alias_resp.json()) == len(rules)
 
 
 def test_unified_dispatch_products_flow():
@@ -44,7 +49,7 @@ def test_unified_dispatch_products_flow():
         },
         "context": {"user_id": "usr_maker_audit_01", "trace_id": "test-trace-prod-01"}
     }
-    pub_resp = client.post("/api/v1/dispatch", json=pub_req)
+    pub_resp = client.post("/api/welcom/opc_world", json=pub_req)
     assert pub_resp.status_code == 200
     res_data = pub_resp.json()
     assert res_data["code"] == 200
@@ -58,7 +63,7 @@ def test_unified_dispatch_products_flow():
         "payload": {},
         "context": {}
     }
-    list_resp = client.post("/api/v1/dispatch", json=list_req)
+    list_resp = client.post("/api/welcom/opc_world", json=list_req)
     assert list_resp.status_code == 200
     list_data = list_resp.json()
     assert list_data["code"] == 200
@@ -78,7 +83,7 @@ def test_unified_dispatch_policies_and_demands():
         },
         "context": {}
     }
-    match_resp = client.post("/api/v1/dispatch", json=match_req)
+    match_resp = client.post("/api/welcom/opc_world", json=match_req)
     assert match_resp.status_code == 200
     match_data = match_resp.json()
     assert match_data["code"] == 200
@@ -98,7 +103,7 @@ def test_unified_dispatch_policies_and_demands():
         },
         "context": {}
     }
-    dmd_resp = client.post("/api/v1/dispatch", json=dmd_req)
+    dmd_resp = client.post("/api/welcom/opc_world", json=dmd_req)
     assert dmd_resp.status_code == 200
     dmd_data = dmd_resp.json()
     assert dmd_data["code"] == 200
@@ -132,7 +137,7 @@ def test_dynamic_scenario_registration_without_http_code_change():
             "payload": {"base_price": 500, "discount_percent": 20},
             "context": {"user_id": "usr_maker_alice"}
         }
-        resp = client.post("/api/v1/dispatch", json=req)
+        resp = client.post("/api/welcom/opc_world", json=req)
         assert resp.status_code == 200
         data = resp.json()
         assert data["code"] == 200
@@ -151,7 +156,7 @@ def test_unknown_scenario_handling():
         "payload": {},
         "context": {"trace_id": "trace-fake-01"}
     }
-    resp = client.post("/api/v1/dispatch", json=req)
+    resp = client.post("/api/welcom/opc_world", json=req)
     assert resp.status_code == 200
     data = resp.json()
     assert data["code"] == 404
