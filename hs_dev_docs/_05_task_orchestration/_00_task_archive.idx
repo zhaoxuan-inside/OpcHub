@@ -14,3 +14,4 @@
 {"id": "TASK-013", "title": "P05需求集市微内核DAG编排流水线与创客竞标撮合", "path": "_02_task_detail/_01_TASK-013/_00_task_detail.md", "status": "COMPLETED", "digest": "24043226", "updated_at": "2026-10-17T06:15:56Z", "last_note": "P05需求集市微内核DAG编排交付完成"}
 {"id": "TASK-014", "title": "P06流程文书微内核DAG编排流水线与文书即时生成", "path": "_02_task_detail/_01_TASK-014/_00_task_detail.md", "status": "COMPLETED", "digest": "03c91417", "updated_at": "2026-10-17T06:21:27Z", "last_note": "P06流程文书微内核DAG编排交付完成"}
 {"id": "TASK-015", "title": "P07生态特权微内核DAG编排流水线与福利核销", "path": "_02_task_detail/_01_TASK-015/_00_task_detail.md", "status": "COMPLETED", "digest": "d6fb711b", "updated_at": "2026-10-17T06:27:10Z", "last_note": "P07生态特权微内核DAG编排交付完成"}
+{"id": "TASK-016", "title": "P08合规指南微内核DAG编排流水线与上线自检雷达", "path": "_02_task_detail/_01_TASK-016/_00_task_detail.md", "status": "COMPLETED", "digest": "042ea0a2", "updated_at": "2026-10-17T06:33:24Z", "last_note": "P08合规指南微内核DAG编排交付完成"}

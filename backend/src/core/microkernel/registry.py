@@ -345,7 +345,19 @@ class AtomicRegistry:
         self.register("sop.telemetry.incr", sop_telemetry_incr, domain="sop", description="合规文书生成与流水号防伪签发度量打点算子")
 
 
-        # Domain 3: Compliance Domain
+        # Domain 3: Compliance Domain (六维合规防线与上线自检雷达算子与 Saga 补偿)
+        async def compliance_audit_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            checked = inputs.get("passed_item_ids") or inputs.get("checked_ids") or []
+            if not isinstance(checked, list):
+                raise ValueError("passed_item_ids must be a list of checkpoint IDs")
+            return {
+                "guard_passed": True,
+                "passed_item_ids": checked,
+                "checked_ids": checked,
+                "strict_mode": bool(inputs.get("strict_mode", False)),
+            }
+        self.register("compliance.audit.guard", compliance_audit_guard, domain="compliance", description="合规自检参数归一化与前置校验门禁")
+
         async def compliance_evaluate_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.compliance.service import compliance_service
             from src.domains.compliance.models import AuditEvaluateRequest
@@ -354,14 +366,45 @@ class AtomicRegistry:
             if report.grade == "CRITICAL" and inputs.get("strict_mode", False):
                 raise PermissionError(f"Compliance strict guard blocked: score is {report.score} (CRITICAL)")
             return {
+                "score": report.score,
+                "grade": report.grade,
                 "compliance_score": report.score,
                 "compliance_grade": report.grade,
+                "total_items": report.total_items,
                 "passed_items_count": report.passed_items_count,
                 "failed_items_count": report.failed_items_count,
+                "risk_items": [item.model_dump() for item in report.risk_items],
                 "remedy_suggestions": report.remedy_suggestions,
                 "legal_help_recommendation": report.legal_help_recommendation,
+                "audit_report": report.model_dump(),
             }
-        self.register("compliance.evaluate_audit", compliance_evaluate_audit, domain="compliance", description="六维合规防线自检打分与风险阻断算子")
+
+        async def compliance_audit_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "compensated": True,
+                "action": "ROLLED_BACK",
+                "details": "Transient compliance audit session and recommendations cleared",
+            }
+
+        self.register(
+            "compliance.evaluate_audit",
+            compliance_evaluate_audit,
+            domain="compliance",
+            description="六维合规防线自检打分与风险阻断算子",
+            compensator=compliance_audit_compensate,
+        )
+
+        async def compliance_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in compliance pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "compliance.audit.evaluated",
+                "score": inputs.get("score") or inputs.get("compliance_score", 0),
+                "increment": 1,
+            }
+        self.register("compliance.telemetry.incr", compliance_telemetry_incr, domain="compliance", description="合规自检评估与雷达度量打点算子")
+
 
         # Domain 4: Moderation Domain
         async def moderation_inspect_content(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

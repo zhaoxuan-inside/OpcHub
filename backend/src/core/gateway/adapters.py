@@ -116,6 +116,26 @@ async def perk_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     return res.final_output.get("created_perk") or res.final_output
 
 
+async def compliance_audit_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for product compliance self-audit."""
+    inputs = dict(p)
+    if "audit_payload" in inputs and isinstance(inputs["audit_payload"], dict):
+        inputs.update(inputs["audit_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_COMPLIANCE_AUDIT_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Compliance audit pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("audit_report") or res.final_output
+
+
+
 
 
 

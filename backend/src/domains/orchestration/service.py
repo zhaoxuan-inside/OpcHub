@@ -387,6 +387,31 @@ class OrchestrationService:
             )
         )
 
+        # 15. Compliance Audit DAG Pipeline: OPC_COMPLIANCE_AUDIT_PIPELINE
+        topo_compliance_audit = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "compliance.audit.guard", "type": "GUARD"},
+                {"id": "step_eval", "action_handler": "compliance.evaluate_audit", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "compliance.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_eval"},
+                {"from": "step_eval", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_COMPLIANCE_AUDIT_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_compliance_audit,
+                status="ACTIVE",
+            )
+        )
+
+
 
 
 

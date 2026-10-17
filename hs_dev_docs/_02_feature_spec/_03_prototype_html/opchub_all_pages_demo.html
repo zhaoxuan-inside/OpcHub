@@ -3019,7 +3019,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       <div class="glass-box" style="padding: 24px 32px 18px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">产品开发合规指南</h1>
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+              <h1 class="page-title" style="font-size: 26px; margin: 0;">产品开发合规指南</h1>
+              <span id="compliancePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_COMPLIANCE_AUDIT_PIPELINE</span>
+            </div>
             <p style="font-size: 13px; color: var(--text-secondary);">六维合规防线体系 · 典型避坑案例剖析 · 上线前合规自检雷达</p>
           </div>
           <div style="display: flex; gap: 10px;">
@@ -5771,7 +5774,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       showLiquidNotice('自检重置', '合规自检雷达所有检查项已重置为初始达标状态！', 'INFO');
     }
 
-    function evaluateSelfAudit() {
+    async function evaluateSelfAudit() {
       const totalWeight = complianceCheckpoints.reduce((sum, c) => sum + c.weight, 0);
       const earnedWeight = complianceCheckpoints.filter(c => auditState.passed.has(c.id)).reduce((sum, c) => sum + c.weight, 0);
       const score = Math.round((earnedWeight / totalWeight) * 100);
@@ -5812,6 +5815,21 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         } else {
           summaryTextEl.innerHTML = `⚠️ 警告：检测到 <strong>${failedCount}</strong> 项未达标风险点！可能面临通报整改或行政处罚，建议点击下方【发布求助】对接涉外律所与专业法务顾问。`;
         }
+      }
+
+      // 调度微内核 DAG 编排流水线同步合规评估雷达指标
+      try {
+        const gwRes = await dispatchGateway('compliance.audit', {
+          passed_checkpoints: Array.from(auditState.passed)
+        });
+        if (gwRes && gwRes.ok && gwRes.data) {
+          const compBadge = document.getElementById('compliancePipelineBadge');
+          if (compBadge && gwRes.data.orchestrated_by) {
+            compBadge.textContent = `DAG: ${gwRes.data.orchestrated_by}`;
+          }
+        }
+      } catch (err) {
+        // 独立纯静态演示模式下保持平稳降级
       }
     }
 

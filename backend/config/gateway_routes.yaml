@@ -312,10 +312,10 @@ gateway:
     - scenario: "compliance.audit"
       version: "v1.0.0"
       domain: "compliance"
-      description: "评估创客产品自检并出具评分报告"
+      description: "微内核DAG编排：评估创客产品自检并出具评分报告"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.evaluate_audit"
-      model: "src.domains.compliance.models:AuditEvaluateRequest"
+      handler: "src.core.gateway.adapters:compliance_audit_adapter"
+
 
     # --------------------------------------------------------------------------
     # 11. Low-Code Orchestration & DAG Pipelines (微内核编排)
