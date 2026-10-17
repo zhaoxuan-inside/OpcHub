@@ -228,3 +228,59 @@ def test_code_version_routing_and_coexistence():
         assert data_def["data"]["rate"] == 0.03
     finally:
         scenario_router.unregister("demo.tax_calc")
+
+
+def test_config_driven_routes_and_reload():
+    """Verify that routes are loaded entirely from external configuration with zero hardcoding, and reload works."""
+    # Check that rules introspection returns rules loaded from yaml
+    resp = client.get("/api/welcom/opc_world/rules")
+    assert resp.status_code == 200
+    rules = resp.json()
+    assert len(rules) >= 20
+    scenarios = [r["scenario"] for r in rules]
+    assert "products.list" in scenarios
+    assert "demands.publish" in scenarios
+    assert "compliance.dimensions" in scenarios
+
+    # Check reload endpoint
+    reload_resp = client.post("/api/welcom/opc_world/reload")
+    assert reload_resp.status_code == 200
+    reload_data = reload_resp.json()
+    assert reload_data["status"] == "ok"
+    assert reload_data["reloaded_routes_count"] >= 20
+
+
+def test_legacy_version_sunset_policy_rejection():
+    """Verify that requests carrying sunset/EOL versions in body are rejected with clean upgrade guidance."""
+    req_sunset = {
+        "scenario": "products.list",
+        "version": "v0.8.0",  # Declared in yaml as sunset_versions
+        "payload": {},
+        "context": {}
+    }
+    resp = client.post("/api/welcom/opc_world", json=req_sunset)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 426  # Upgrade Required
+    assert "v0.8.0" in data["message"]
+    assert "已停运下线" in data["message"]
+    assert data["data"]["sunset"] is True
+    assert data["data"]["upgrade_required"] is True
+    assert data["data"]["min_supported_version"] == "v1.0.0"
+
+
+def test_legacy_version_deprecation_warning():
+    """Verify that requests carrying deprecated versions are serviced with deprecation warning notices."""
+    req_deprecated = {
+        "scenario": "products.list",
+        "version": "v0.9.0",  # Declared in yaml as deprecated_versions
+        "payload": {},
+        "context": {}
+    }
+    resp = client.post("/api/welcom/opc_world", json=req_deprecated)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["code"] == 200
+    assert "warning" in data["message"]
+    assert "v0.9.0 即将终止服务" in data["message"]
+

@@ -3583,15 +3583,28 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
   <script>
     // -------------------------------------------------------------
     // Unified Inbound Gateway & Scenario Dynamic Routing Client
+    // Config-driven runtime environment (zero hardcoding), supports version lifecycle
     // -------------------------------------------------------------
-    const GATEWAY_ENDPOINT = "http://127.0.0.1:8000/api/welcom/opc_world";
-    const OPC_CODE_VERSION = "v1.0.4";
+    window.__OPC_CONFIG__ = Object.assign({
+      gatewayEndpoint: "http://127.0.0.1:8000/api/welcom/opc_world",
+      clientCodeVersion: "v1.0.4",
+      timeoutMs: 8000,
+    }, window.__OPC_CONFIG__ || {});
 
-    async function dispatchGateway(scenario, payload = {}, context = {}, version = OPC_CODE_VERSION) {
+    function getGatewayEndpoint() {
+      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.gatewayEndpoint) || "http://127.0.0.1:8000/api/welcom/opc_world";
+    }
+
+    function getClientCodeVersion() {
+      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.clientCodeVersion) || "v1.0.4";
+    }
+
+    async function dispatchGateway(scenario, payload = {}, context = {}, version = null) {
       const traceId = 'tr_gw_' + Math.random().toString(36).substring(2, 10);
+      const codeVersion = version || getClientCodeVersion();
       const envelope = {
         scenario: scenario,
-        version: version || OPC_CODE_VERSION,
+        version: codeVersion,
         payload: payload,
         context: {
           client_env: 'browser_h5',
@@ -3602,18 +3615,33 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       };
 
       try {
-        const res = await fetch(GATEWAY_ENDPOINT, {
+        const res = await fetch(getGatewayEndpoint(), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(envelope)
         });
-        if (res.ok) {
-          const respData = await res.json();
+        const respData = await res.json().catch(() => ({}));
+
+        // Handle Sunset / EOL Policy (code 426)
+        if (respData.code === 426 || (respData.data && respData.data.sunset)) {
+          showLiquidNotice(
+            "版本停运提示",
+            respData.message || "当前客户端代码版本已停止维护，请及时升级到最新版本。",
+            "ERROR"
+          );
+          return { ok: false, sunset: true, error: respData.message, meta: respData };
+        }
+
+        // Handle Deprecation Notice Warning
+        if (respData.message && respData.message.includes("warning")) {
+          console.warn(`[Gateway Notice] Scenario '${scenario}': ${respData.message}`);
+        }
+
+        if (res.ok && respData.code === 200) {
           return { ok: true, data: respData.data, meta: respData };
         } else {
-          const errData = await res.json().catch(() => ({}));
-          console.warn(`Gateway dispatch error [${scenario}]:`, errData);
-          return { ok: false, error: errData.detail || errData.message || res.statusText };
+          console.warn(`Gateway dispatch error [${scenario}]:`, respData);
+          return { ok: false, error: respData.message || respData.detail || res.statusText, meta: respData };
         }
       } catch (err) {
         console.warn(`Gateway offline/network exception [${scenario}]:`, err);

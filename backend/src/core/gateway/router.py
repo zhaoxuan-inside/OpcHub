@@ -1,8 +1,9 @@
 """Unified Inbound Gateway Scenario Router.
 
-Accepts any incoming request, parses the scenario identifier,
+Accepts any incoming request, parses the scenario identifier and code version,
+evaluates version governance policies (sunset, deprecation, fallback),
 and dynamically dispatches execution to registered domain handlers or microkernel DAG pipelines
-without requiring any HTTP interface modifications.
+without requiring any HTTP interface modifications. Zero-hardcoding configuration-driven.
 """
 import inspect
 import time
@@ -63,6 +64,35 @@ class ScenarioRouter:
         self._routes: Dict[Tuple[str, str], RouteRule] = {}
         # Default version for a scenario
         self._default_versions: Dict[str, str] = {}
+        # Router-level version governance policies
+        self.default_version: str = "v1.0.0"
+        self.unknown_strategy: str = "fallback_to_default"  # fallback_to_default | reject
+        self.sunset_versions: Dict[str, Dict[str, Any]] = {}
+        self.deprecated_versions: Dict[str, Dict[str, Any]] = {}
+
+    def clear(self) -> None:
+        """Clear all registered routes and reset version configuration."""
+        self._routes.clear()
+        self._default_versions.clear()
+        self.sunset_versions.clear()
+        self.deprecated_versions.clear()
+
+    def set_version_policy(
+        self,
+        default_version: str = "v1.0.0",
+        unknown_strategy: str = "fallback_to_default",
+        sunset_versions: Optional[Dict[str, Any]] = None,
+        deprecated_versions: Optional[Dict[str, Any]] = None,
+    ) -> None:
+        """Set dynamic version governance policies loaded from configuration."""
+        self.default_version = default_version
+        self.unknown_strategy = unknown_strategy
+        self.sunset_versions = sunset_versions or {}
+        self.deprecated_versions = deprecated_versions or {}
+        logger.info(
+            f"Configured router version policy: default={default_version}, "
+            f"unknown_strategy={unknown_strategy}, sunset_versions={list(self.sunset_versions.keys())}"
+        )
 
     def register(
         self,
@@ -110,22 +140,33 @@ class ScenarioRouter:
             return removed
 
     def get_rule(self, scenario: str, version: Optional[str] = None) -> Optional[RouteRule]:
-        """Resolve route rule supporting exact version matching, wildcard '*', and default version fallback."""
+        """Resolve route rule supporting exact version matching, wildcard '*', and policy fallback."""
+        req_ver = version or self.default_version
+
         # 1. Exact match (scenario, requested_version)
-        if version and (scenario, version) in self._routes:
-            return self._routes[(scenario, version)]
+        if (scenario, req_ver) in self._routes:
+            return self._routes[(scenario, req_ver)]
+
         # 2. Wildcard rule (scenario, "*")
         if (scenario, "*") in self._routes:
             return self._routes[(scenario, "*")]
+
+        # If strategy is reject unknown versions for this scenario, don't fall back
+        if self.unknown_strategy == "reject":
+            # Only match if requested version is explicitly present
+            return None
+
         # 3. Default version fallback
         if scenario in self._default_versions:
             def_ver = self._default_versions[scenario]
             if (scenario, def_ver) in self._routes:
                 return self._routes[(scenario, def_ver)]
+
         # 4. Any registered version for this scenario
         for (s, v), rule in self._routes.items():
             if s == scenario:
                 return rule
+
         return None
 
     def has_scenario(self, scenario: str, version: Optional[str] = None) -> bool:
@@ -145,41 +186,85 @@ class ScenarioRouter:
         ]
 
     async def dispatch(self, req: DispatchRequest) -> DispatchResponse:
-        """Process unified request and route to matching domain handler by scenario & version."""
+        """Process unified request and route to matching domain handler by scenario & version.
+        
+        Evaluates lifecycle policies (sunset, deprecation) and gracefully resolves legacy requests.
+        """
         start_time = time.perf_counter()
         trace_id = req.context.get("trace_id") or get_current_trace_id()
         now_iso = datetime.now(timezone.utc).isoformat()
+        requested_ver = req.version or self.default_version
 
-        rule = self.get_rule(req.scenario, req.version)
+        # 1. Check Sunset / EOL Policy for old versions
+        if requested_ver in self.sunset_versions:
+            duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            sunset_info = self.sunset_versions[requested_ver]
+            code = sunset_info.get("code", 426)
+            min_ver = sunset_info.get("min_supported_version", self.default_version)
+            msg = sunset_info.get(
+                "message",
+                f"Client code version '{requested_ver}' has been sunset. Minimum supported version is '{min_ver}'."
+            )
+            logger.warning(f"Request rejected by Sunset Policy: version '{requested_ver}' on scenario '{req.scenario}'")
+            return DispatchResponse(
+                code=code,
+                scenario=req.scenario,
+                version=requested_ver,
+                message=msg,
+                data={
+                    "sunset": True,
+                    "requested_version": requested_ver,
+                    "min_supported_version": min_ver,
+                    "upgrade_required": True,
+                },
+                trace_id=trace_id,
+                timestamp=now_iso,
+                duration_ms=duration_ms,
+            )
+
+        # 2. Resolve Route Rule
+        rule = self.get_rule(req.scenario, requested_ver)
         if not rule:
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
             logger.warning(
-                f"Unknown scenario/version '{req.scenario}' [{req.version}] received in dispatch gateway"
+                f"No matching route for scenario '{req.scenario}' [version: '{requested_ver}']"
             )
             return DispatchResponse(
                 code=404,
                 scenario=req.scenario,
-                version=req.version,
-                message=f"Unknown scenario '{req.scenario}' version '{req.version}'. No matching route rule registered.",
+                version=requested_ver,
+                message=f"Unknown scenario '{req.scenario}' version '{requested_ver}'. No matching route rule registered.",
                 data=None,
                 trace_id=trace_id,
                 timestamp=now_iso,
                 duration_ms=duration_ms,
             )
 
-        # Inject version into context for downstream inspectability
+        # 3. Context Injection & Deprecation Inspection
         ctx = dict(req.context)
-        ctx["version"] = req.version
+        ctx["requested_version"] = requested_ver
         ctx["matched_version"] = rule.version
+        ctx["is_fallback"] = (rule.version != requested_ver and rule.version != "*")
 
+        if requested_ver in self.deprecated_versions:
+            deprec_info = self.deprecated_versions[requested_ver]
+            ctx["deprecation_warning"] = deprec_info.get("message", f"Version '{requested_ver}' is deprecated.")
+
+        # 4. Handler Execution
         try:
             res_data = await rule.execute(req.payload, ctx)
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
+            
+            # If deprecated, include deprecation hint in response message or data
+            msg = "success"
+            if "deprecation_warning" in ctx:
+                msg = f"success (warning: {ctx['deprecation_warning']})"
+
             return DispatchResponse(
                 code=200,
                 scenario=req.scenario,
                 version=rule.version,
-                message="success",
+                message=msg,
                 data=res_data,
                 trace_id=trace_id,
                 timestamp=now_iso,

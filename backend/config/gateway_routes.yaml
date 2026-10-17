@@ -1,0 +1,369 @@
+# ==============================================================================
+# OpcHub Unified Inbound Gateway Scenario Routing & Version Governance Config
+# Defines all scenarios, code versions, domain mappings, and legacy request handling.
+# Zero hardcoding in application code: all dispatching is driven by this file.
+# ==============================================================================
+gateway:
+  default_version: "v1.0.0"
+
+  # ----------------------------------------------------------------------------
+  # Version Governance & Lifecycle Policy
+  # Defines how old / unknown versions are handled when new versions are released
+  # ----------------------------------------------------------------------------
+  version_policy:
+    unknown_version_strategy: "fallback_to_default"  # options: fallback_to_default | reject
+
+    # Sunset / EOL Versions: requests with these versions in body are cleanly rejected with upgrade instructions
+    sunset_versions:
+      "v0.8.0":
+        code: 426
+        min_supported_version: "v1.0.0"
+        message: "客户端代码版本 v0.8.0 已停运下线，系统支持的最低版本为 v1.0.0，请升级客户端。"
+      "v0.8.1":
+        code: 426
+        min_supported_version: "v1.0.0"
+        message: "客户端代码版本 v0.8.1 已停运下线，系统支持的最低版本为 v1.0.0，请升级客户端。"
+
+    # Deprecated Versions: still serviced, but warning notice is returned in metadata/context
+    deprecated_versions:
+      "v0.9.0":
+        message: "代码版本 v0.9.0 即将终止服务，建议升级至 v1.0.0 或更高版本。"
+      "v0.9.5":
+        message: "代码版本 v0.9.5 即将终止服务，建议升级至 v1.0.0 或更高版本。"
+
+  # ----------------------------------------------------------------------------
+  # Scenario Route Rules
+  # Each scenario can have multiple versions coexisting simultaneously.
+  # ----------------------------------------------------------------------------
+  routes:
+    # --------------------------------------------------------------------------
+    # 1. Product Showcase (商业作品)
+    # --------------------------------------------------------------------------
+    - scenario: "products.list"
+      version: "v1.0.0"
+      domain: "products"
+      description: "检索独立创客商业作品列表"
+      is_default: true
+      handler: "src.domains.products.service.product_service:list_products"
+      args_type: "kwargs"
+
+    - scenario: "products.publish"
+      version: "v1.0.0"
+      domain: "products"
+      description: "发布新独立创客作品至橱窗"
+      is_default: true
+      handler: "src.domains.products.service.product_service:create_product"
+      model: "src.domains.products.models:ProductCreate"
+
+    - scenario: "products.upvote"
+      version: "v1.0.0"
+      domain: "products"
+      description: "为独立作品点赞打榜"
+      is_default: true
+      handler: "src.domains.products.service.product_service:upvote_product"
+      args_type: "key"
+      key_name: "product_id"
+
+    # --------------------------------------------------------------------------
+    # 2. Policy Radar (政策雷达)
+    # --------------------------------------------------------------------------
+    - scenario: "policies.list"
+      version: "v1.0.0"
+      domain: "policies"
+      description: "获取政府扶持与税收减免政策列表"
+      is_default: true
+      handler: "src.domains.policies.service.policy_service:list_policies"
+      args_type: "kwargs"
+
+    - scenario: "policies.publish"
+      version: "v1.0.0"
+      domain: "policies"
+      description: "发布最新政府扶持与补贴政策"
+      is_default: true
+      handler: "src.domains.policies.service.policy_service:create_policy"
+      model: "src.domains.policies.models:PolicyCreate"
+
+    - scenario: "policies.match"
+      version: "v1.0.0"
+      domain: "policies"
+      description: "测算创客免税资格与预计减免额"
+      is_default: true
+      handler: "src.domains.policies.service.policy_service:match_policies"
+      model: "src.domains.policies.models:PolicyMatchRequest"
+
+    # --------------------------------------------------------------------------
+    # 3. Demands & Bidding (需求集市与竞标)
+    # --------------------------------------------------------------------------
+    - scenario: "demands.list"
+      version: "v1.0.0"
+      domain: "demands"
+      description: "检索企业委托寻源商机列表"
+      is_default: true
+      handler: "src.domains.demands.service.demand_service:list_demands"
+      args_type: "kwargs"
+
+    - scenario: "demands.publish"
+      version: "v1.0.0"
+      domain: "demands"
+      description: "发布企业外包委托与法律求助"
+      is_default: true
+      handler: "src.domains.demands.service.demand_service:create_demand"
+      model: "src.domains.demands.models:DemandCreate"
+
+    - scenario: "demands.bid"
+      version: "v1.0.0"
+      domain: "demands"
+      description: "提交创客竞标方案"
+      is_default: true
+      handler: "src.core.gateway.adapters:demands_bid_adapter"
+
+    # --------------------------------------------------------------------------
+    # 4. SOP & Compliance Documents (合规文书与流程模板)
+    # --------------------------------------------------------------------------
+    - scenario: "sop.templates"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取合规流程阶段与文档模板列表"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:get_stages_and_templates"
+
+    - scenario: "sop.template.publish"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "发布并登记新合规文书模板"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:create_template"
+      model: "src.domains.sop.models:SOPTemplateCreate"
+
+    - scenario: "sop.document.render"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "根据用户输入渲染并持久化合规文书"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:render_and_save_document"
+      model: "src.domains.sop.models:SOPDocumentCreate"
+
+    - scenario: "sop.document.get"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "按 ID 获取已生成的文书实例"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:get_document"
+      args_type: "key"
+      key_name: "doc_id"
+
+    - scenario: "sop.document.list"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取创客已保存的文书历史列表"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:list_documents"
+      args_type: "kwargs"
+
+    # --------------------------------------------------------------------------
+    # 5. Perks & Infrastructure (基础设施与福利)
+    # --------------------------------------------------------------------------
+    - scenario: "perks.list"
+      version: "v1.0.0"
+      domain: "perks"
+      description: "获取开发者基础设施折扣与算力福利列表"
+      is_default: true
+      handler: "src.domains.perks.service.perk_service:list_perks"
+
+    - scenario: "perks.publish"
+      version: "v1.0.0"
+      domain: "perks"
+      description: "提报并上线生态特权福利"
+      is_default: true
+      handler: "src.domains.perks.service.perk_service:create_perk"
+      model: "src.domains.perks.models:PerkCreate"
+
+    - scenario: "perks.claim"
+      version: "v1.0.0"
+      domain: "perks"
+      description: "领取特权并生成专属兑换凭据"
+      is_default: true
+      handler: "src.domains.perks.service.perk_service:claim_perk"
+      model: "src.domains.perks.models:PerkClaimRequest"
+
+    # --------------------------------------------------------------------------
+    # 6. Forum & Brainstorm (头脑风暴社区)
+    # --------------------------------------------------------------------------
+    - scenario: "forum.threads.list"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "检索头脑风暴社区讨论帖列表"
+      is_default: true
+      handler: "src.domains.forum.service.forum_service:list_threads"
+      args_type: "kwargs"
+
+    - scenario: "forum.threads.publish"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "发布新创客讨论帖与踩坑复盘"
+      is_default: true
+      handler: "src.domains.forum.service.forum_service:create_thread"
+      model: "src.domains.forum.models:ForumThreadCreate"
+
+    - scenario: "forum.threads.get"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "获取讨论帖详情与正文"
+      is_default: true
+      handler: "src.domains.forum.service.forum_service:get_thread"
+      args_type: "key"
+      key_name: "thread_id"
+
+    - scenario: "forum.comments.create"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "发表一级回答或物化路径嵌套子回复"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_comment_adapter"
+
+    # --------------------------------------------------------------------------
+    # 7. Telemetry & Platform Overview (运营大盘与全景)
+    # --------------------------------------------------------------------------
+    - scenario: "home.overview"
+      version: "v1.0.0"
+      domain: "telemetry"
+      description: "获取首页功能全景与平台宏观指标"
+      is_default: true
+      handler: "src.core.gateway.adapters:home_overview_adapter"
+
+    - scenario: "telemetry.dashboard"
+      version: "v1.0.0"
+      domain: "telemetry"
+      description: "全域运营大盘实时核心指标聚合"
+      is_default: true
+      handler: "src.domains.telemetry.service.telemetry_service:get_dashboard_metrics"
+
+    - scenario: "ops.dashboard"
+      version: "v1.0.0"
+      domain: "telemetry"
+      description: "运营大盘三端指标检索别名"
+      is_default: true
+      handler: "src.domains.telemetry.service.telemetry_service:get_dashboard_metrics"
+
+    # --------------------------------------------------------------------------
+    # 8. User Profile & Entitlements (创客档案与权益)
+    # --------------------------------------------------------------------------
+    - scenario: "user.profile"
+      version: "v1.0.0"
+      domain: "user"
+      description: "获取创客个人主体档案与已激活权益"
+      is_default: true
+      handler: "src.core.gateway.adapters:user_profile_adapter"
+
+    - scenario: "user.entitlements.activate"
+      version: "v1.0.0"
+      domain: "user"
+      description: "激活创客专属商业权益与特权门禁"
+      is_default: true
+      handler: "src.domains.user.service.user_service:activate_entitlement"
+      model: "src.domains.user.models:EntitlementActivateRequest"
+
+    # --------------------------------------------------------------------------
+    # 9. Content Moderation (内容治理)
+    # --------------------------------------------------------------------------
+    - scenario: "moderation.items.list"
+      version: "v1.0.0"
+      domain: "moderation"
+      description: "获取内容安全与敏感词审核队列"
+      is_default: true
+      handler: "src.domains.moderation.service.moderation_service:list_items"
+      args_type: "kwargs"
+
+    - scenario: "moderation.takedown"
+      version: "v1.0.0"
+      domain: "moderation"
+      description: "执行违规内容一键全网下架"
+      is_default: true
+      handler: "src.domains.moderation.service.moderation_service:takedown"
+      model: "src.domains.moderation.models:TakedownRequest"
+
+    - scenario: "moderation.restore"
+      version: "v1.0.0"
+      domain: "moderation"
+      description: "恢复误判下架内容至正常展示"
+      is_default: true
+      handler: "src.domains.moderation.service.moderation_service:restore"
+      model: "src.domains.moderation.models:RestoreRequest"
+
+    # --------------------------------------------------------------------------
+    # 10. Compliance (合规避坑与自检)
+    # --------------------------------------------------------------------------
+    - scenario: "compliance.dimensions"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "获取六维合规防线核心法则与处罚依据"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.get_dimensions"
+
+    - scenario: "compliance.cases"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "获取典型踩坑与行政处罚案例库"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.get_cases"
+
+    - scenario: "compliance.checkpoints"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "获取上线前自检清单与合规门禁条目"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.get_checkpoints"
+
+    - scenario: "compliance.audit"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "评估创客产品自检并出具评分报告"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.evaluate_audit"
+      model: "src.domains.compliance.models:AuditEvaluateRequest"
+
+    # --------------------------------------------------------------------------
+    # 11. Low-Code Orchestration & DAG Pipelines (微内核编排)
+    # --------------------------------------------------------------------------
+    - scenario: "orchestration.operators.list"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "获取全域微内核原子算子清单与元数据"
+      is_default: true
+      handler: "src.domains.orchestration.service.orchestration_service:list_operators"
+
+    - scenario: "orchestration.dag.save"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "保存并部署微内核 DAG 编排配置"
+      is_default: true
+      handler: "src.core.gateway.adapters:save_dag_config_adapter"
+
+    - scenario: "orchestration.dag.list"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "获取微内核 DAG 编排配置列表"
+      is_default: true
+      handler: "src.domains.orchestration.service.orchestration_service:list_dag_configs"
+      args_type: "kwargs"
+
+    - scenario: "orchestration.scenarios.execute"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "执行低代码平台编排的有向无环图场景流水线"
+      is_default: true
+      handler: "src.core.gateway.adapters:async_scenario_executor"
+
+    - scenario: "frontend.layouts.get"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "获取 24 栅格低代码页面布局"
+      is_default: true
+      handler: "src.core.gateway.adapters:get_frontend_layout_adapter"
+
+    - scenario: "frontend.layouts.save"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "保存 24 栅格低代码前端可视化布局"
+      is_default: true
+      handler: "src.core.gateway.adapters:save_layout_adapter"

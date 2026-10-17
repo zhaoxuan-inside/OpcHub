@@ -133,52 +133,57 @@ class DAGExecutionRequest(BaseModel):
     inputs: dict[str, Any] | None = None
 
 
-# ==========================================
-# Unified Gateway Dispatcher Endpoints (Single Inbound Entrypoint)
-# ==========================================
-@app.post(
-    "/api/welcom/opc_world",
-    response_model=DispatchResponse,
-    tags=["Unified Gateway Dispatcher"]
-)
-@app.post(
-    "/api/welcome/opc_world",
-    response_model=DispatchResponse,
-    tags=["Unified Gateway Dispatcher"]
-)
-@app.post(
-    f"{settings.api_prefix}/dispatch",
-    response_model=DispatchResponse,
-    tags=["Unified Gateway Dispatcher"]
-)
-@app.post(
-    f"{settings.api_prefix}/gateway/dispatch",
-    response_model=DispatchResponse,
-    tags=["Unified Gateway Dispatcher"]
-)
 async def dispatch_scenario(payload: DispatchRequest):
     """Unified entrypoint receiving any business request and dynamically routing by scenario."""
     return await scenario_router.dispatch(payload)
 
 
-@app.get(
-    "/api/welcom/opc_world/rules",
-    response_model=list[RouteRuleDescriptor],
-    tags=["Unified Gateway Dispatcher"]
-)
-@app.get(
-    "/api/welcome/opc_world/rules",
-    response_model=list[RouteRuleDescriptor],
-    tags=["Unified Gateway Dispatcher"]
-)
-@app.get(
-    f"{settings.api_prefix}/dispatch/rules",
-    response_model=list[RouteRuleDescriptor],
-    tags=["Unified Gateway Dispatcher"]
-)
 async def list_scenario_rules():
     """List all registered scenario routing rules across business domains."""
     return scenario_router.list_rules()
+
+
+async def reload_scenario_routes():
+    """Reload scenario routes and version policies directly from external YAML configuration."""
+    count = register_default_scenario_routes()
+    return {"status": "ok", "reloaded_routes_count": count}
+
+
+# Dynamically register gateway endpoints defined in configuration (zero hardcoding)
+for _endpoint in settings.gateway_endpoints:
+    app.add_api_route(
+        _endpoint,
+        dispatch_scenario,
+        methods=["POST"],
+        response_model=DispatchResponse,
+        tags=["Unified Gateway Dispatcher"],
+        summary="Unified Gateway Inbound Dispatcher",
+    )
+
+for _meta_endpoint in settings.gateway_metadata_endpoints:
+    app.add_api_route(
+        _meta_endpoint,
+        list_scenario_rules,
+        methods=["GET"],
+        response_model=list[RouteRuleDescriptor],
+        tags=["Unified Gateway Dispatcher"],
+        summary="Unified Gateway Rules Introspection",
+    )
+
+app.add_api_route(
+    "/api/welcom/opc_world/reload",
+    reload_scenario_routes,
+    methods=["POST"],
+    tags=["Unified Gateway Dispatcher"],
+    summary="Reload Routes and Version Policies from YAML",
+)
+app.add_api_route(
+    "/api/welcome/opc_world/reload",
+    reload_scenario_routes,
+    methods=["POST"],
+    tags=["Unified Gateway Dispatcher"],
+    summary="Reload Routes and Version Policies from YAML",
+)
 
 
 # ==========================================

@@ -225,32 +225,66 @@ flowchart LR
 }
 ```
 
-#### 3. 代码版本路由与多版本并存规约 (Multi-Version Side-by-Side Coexistence)
-统一网关全面原生支持**代码版本号 (Code / Protocol Version)**：
-1. **多版本并存与灰度**：同一场景（如 `tax.calculate`）可同时注册 `v1.0.0`（旧版算法）与 `v2.0.0`（新版普惠免征算法），实现零停机平滑灰度发布；
-2. **四级版本解析退避机制**：
-   - **精确匹配**：若指定 `version`，优先匹配 `(scenario, version)`；
-   - **通配符路由**：若未命中精确版本，匹配 `(scenario, "*")` 通配规则；
-   - **默认版本兜底**：若请求未显式指定版本或无对应版本规则，自动路由至该场景注册的 `default_version`（默认 `v1.0.0`）；
-   - **任意版本保底**：最后保底调用该场景下任意已激活版本，确保服务高可用不轻易 404；
-3. **上下文感知注入**：请求中的代码版本自动透传注入至执行上下文 `context["version"]` 与 `context["matched_version"]`，供下游领域算子感知。
+#### 3. 代码中零硬编码与全配置驱动体系 (Zero-Hardcoding Configuration-Driven Architecture)
+遵循“代码中不应该存在任何配置或写死的内容”这一核心架构铁律，网关层的所有参数、挂载端点、路由规则和版本生命周期策略**全部从外部 YAML 配置文件驱动**：
+1. **应用全局配置 (`backend/config/application.yaml`)**：定义网关入站端点列表、元数据端点列表、服务端口、CORS 白名单以及路由规则文件路径。系统启动时动态读取并遍历挂载端点，代码中无硬编码 URL；
+2. **场景路由与版本治理配置 (`backend/config/gateway_routes.yaml`)**：声明所有业务场景的映射目标（通过 Python 模块反射动态加载）、入参模型、所属领域、代码版本与缺省策略；
+3. **运行时热重载能力 (Dynamic Hot-Reload)**：通过 `POST /api/welcom/opc_world/reload` 端点，在生产环境不重启服务、不修改任何代码的情况下，实时重载所有路由规则与版本治理策略。
 
-#### 4. 动态自适应执行与规则注册机制
-`RouteRule` 与 `ScenarioRouter` 具备动态参数自适应能力：
-1. **函数签名自适应**：无论底层业务 handler 为无参函数、单参 `(payload)`、双参 `(payload, context)`，路由执行器均能根据反射自适应匹配并执行；
-2. **同步/异步透明桥接**：自动识别 `async def` 协程函数与普通同步函数，非阻塞调度；
-3. **全域场景自省能力**：暴露 `GET /api/welcom/opc_world/rules` 接口，低代码设计器与第三方开发者可实时自省全平台所有已注册场景、所属领域、描述及参数形态；
-4. **零 HTTP 改造扩容范式**：
-   ```python
-   # 当需要新增“政策申诉”业务时，无需增加任何 FastAPI 路由装饰器，仅需注册规则：
-   scenario_router.register(
-       scenario="policies.appeal",
-       handler=lambda p, c: policy_service.submit_appeal(p),
-       domain="policies",
-       description="提交小微政策免税申报复议与申诉",
-   )
-   # 前端即可立即通过 dispatchGateway("policies.appeal", { ... }) 调用！
+#### 4. 请求体携带代码版本与老版本全生命周期处理规约 (Legacy Version Governance & Request Body Version Handling)
+当平台发布新版本（例如 `v2.0.0`），客户端请求体中显式携带代码版本号 `version: "v1.0.0"`。网关通过请求体精准识别调用方的客户端代码版本，并严格根据外部配置执行老版本处理策略：
+
+```mermaid
+flowchart TD
+    Client["客户端请求 (Body 携带 scenario 与 version)"] --> Gateway["统一入站网关 POST /api/welcom/opc_world"]
+    Gateway --> CheckSunset{"命中 Sunset / EOL 日落名单?"}
+    
+    CheckSunset -- 是 --> Reject426["返回 426 Upgrade Required\n提示最低支持版本及升级指引\n老版本客户端弹出升级弹窗"]
+    CheckSunset -- 否 --> MatchRule{"命中 (scenario, version) 精确规则?"}
+
+    MatchRule -- 是 (老版本独立规则) --> RunLegacy["执行老版本专用逻辑/适配器\n无缝支持多版本并存"]
+    MatchRule -- 否 --> HasAdapter{"配置了 Upgrade Adapter 升舱映射?"}
+
+    HasAdapter -- 是 --> Transform["字段映射与升舱清洗\n转换为新版本输入规格\n转发至新版执行"]
+    HasAdapter -- 否 --> Fallback{"配置允许 Fallback 默认版本?"}
+
+    Fallback -- 是 --> RunDefault["路由至场景 default_version\n执行平滑降级兜底"]
+    Fallback -- 否 --> Reject400["返回 400 Bad Request\n未知版本拒绝"]
+
+    RunLegacy --> CheckDeprec{"版本处于 Deprecation 弃用期?"}
+    Transform --> CheckDeprec
+    RunDefault --> CheckDeprec
+
+    CheckDeprec -- 是 --> AddWarning["响应 message 附带弃用预警 Notice"]
+    CheckDeprec -- 否 --> StandardSuccess["返回 200 成功统一信封"]
+```
+
+老版本请求支持的四大处理模式：
+1. **多版本独立平滑共存 (Coexistence Routing)**：
+   在配置文件中同时保留老版本与新版本的路由规则（如 `v1.0.0` 对应旧业务逻辑，`v2.0.0` 对应新重构逻辑）。老客户端发来的请求严格进入老版本处理分支，老客户端完全不受新版发布的影响；
+2. **老版本自动升舱适配 (Payload Upgrade Adapter)**：
+   当新版本重构了入参结构（例如将 `budget` 改为 `budget_amount`，或补充了默认策略字段）时，无需在业务代码中写繁琐的 `if-else`。只需在配置中给老版本指定 `upgrade_adapter` 转换函数或字段映射表，网关自动将老版本入参升舱转换为新版输入规格后透明转发至最新版业务服务执行；
+3. **老版本停运与日落拦截 (Sunset / EOL Policy)**：
+   当老版本因协议严重过时、安全漏洞或服务下线而停止维护时，在配置的 `version_policy.sunset_versions` 中标记该版本。网关自动拦截该请求，并返回 HTTP 状态码 `426 (Upgrade Required)` 及统一结构：
+   ```json
+   {
+     "code": 426,
+     "scenario": "products.list",
+     "version": "v0.8.0",
+     "message": "客户端代码版本 v0.8.0 已停运下线，系统支持的最低版本为 v1.0.0，请升级客户端。",
+     "data": {
+       "sunset": true,
+       "requested_version": "v0.8.0",
+       "min_supported_version": "v1.0.0",
+       "upgrade_required": true
+     }
+   }
    ```
+   前端老版本收到后立即捕获并展示专业的版本升级指引；
+4. **弃用期预警通知 (Deprecation Notice)**：
+   在 `version_policy.deprecated_versions` 中声明即将进入废弃期的老版本，请求仍然能够成功执行（Code 200），但响应体中会附带显式的弃用警告提示，引导用户择机升级；
+5. **四级退避保底机制**：
+   `精确版本 (scenario, version)` $\to$ `通配符 (scenario, "*")` $\to$ `配置的缺省版本 (default_version)` $\to$ `场景下任意可用版本`，确保在任何网络与版本组合下系统始终具备自愈与优雅降级能力。
 
 #### 5. 全域默认场景路由拓扑映射表 (Default Scenarios Mapping)
 | 业务领域 | 场景标识码 (Scenario) | 映射业务目标 | 描述与职能 |
