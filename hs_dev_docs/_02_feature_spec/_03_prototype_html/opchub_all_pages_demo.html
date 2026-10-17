@@ -3585,11 +3585,13 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // Unified Inbound Gateway & Scenario Dynamic Routing Client
     // -------------------------------------------------------------
     const GATEWAY_ENDPOINT = "http://127.0.0.1:8000/api/welcom/opc_world";
+    const OPC_CODE_VERSION = "v1.0.4";
 
-    async function dispatchGateway(scenario, payload = {}, context = {}) {
+    async function dispatchGateway(scenario, payload = {}, context = {}, version = OPC_CODE_VERSION) {
       const traceId = 'tr_gw_' + Math.random().toString(36).substring(2, 10);
       const envelope = {
         scenario: scenario,
+        version: version || OPC_CODE_VERSION,
         payload: payload,
         context: {
           client_env: 'browser_h5',

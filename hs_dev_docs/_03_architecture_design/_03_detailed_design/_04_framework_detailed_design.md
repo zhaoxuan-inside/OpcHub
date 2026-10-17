@@ -193,6 +193,7 @@ flowchart LR
 ```json
 {
   "scenario": "policies.match",
+  "version": "v1.0.4",
   "payload": {
     "annual_revenue": 1200000.0,
     "employee_count": 8,
@@ -212,17 +213,29 @@ flowchart LR
 {
   "code": 200,
   "scenario": "policies.match",
+  "version": "v1.0.4",
   "message": "success",
   "data": {
     "matched_policies": [],
     "estimated_tax_savings_cny": 8400.0
   },
   "trace_id": "tr_gw_8f1a9b2c",
+  "timestamp": "2026-10-17T12:00:00.123456+00:00",
   "duration_ms": 3.82
 }
 ```
 
-#### 3. 动态自适应执行与规则注册机制
+#### 3. 代码版本路由与多版本并存规约 (Multi-Version Side-by-Side Coexistence)
+统一网关全面原生支持**代码版本号 (Code / Protocol Version)**：
+1. **多版本并存与灰度**：同一场景（如 `tax.calculate`）可同时注册 `v1.0.0`（旧版算法）与 `v2.0.0`（新版普惠免征算法），实现零停机平滑灰度发布；
+2. **四级版本解析退避机制**：
+   - **精确匹配**：若指定 `version`，优先匹配 `(scenario, version)`；
+   - **通配符路由**：若未命中精确版本，匹配 `(scenario, "*")` 通配规则；
+   - **默认版本兜底**：若请求未显式指定版本或无对应版本规则，自动路由至该场景注册的 `default_version`（默认 `v1.0.0`）；
+   - **任意版本保底**：最后保底调用该场景下任意已激活版本，确保服务高可用不轻易 404；
+3. **上下文感知注入**：请求中的代码版本自动透传注入至执行上下文 `context["version"]` 与 `context["matched_version"]`，供下游领域算子感知。
+
+#### 4. 动态自适应执行与规则注册机制
 `RouteRule` 与 `ScenarioRouter` 具备动态参数自适应能力：
 1. **函数签名自适应**：无论底层业务 handler 为无参函数、单参 `(payload)`、双参 `(payload, context)`，路由执行器均能根据反射自适应匹配并执行；
 2. **同步/异步透明桥接**：自动识别 `async def` 协程函数与普通同步函数，非阻塞调度；
@@ -239,7 +252,7 @@ flowchart LR
    # 前端即可立即通过 dispatchGateway("policies.appeal", { ... }) 调用！
    ```
 
-#### 4. 全域默认场景路由拓扑映射表 (Default Scenarios Mapping)
+#### 5. 全域默认场景路由拓扑映射表 (Default Scenarios Mapping)
 | 业务领域 | 场景标识码 (Scenario) | 映射业务目标 | 描述与职能 |
 | :--- | :--- | :--- | :--- |
 | `products` | `products.list` | `product_service.list_products` | 检索独立创客商业作品列表 |

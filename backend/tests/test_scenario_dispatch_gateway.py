@@ -153,6 +153,7 @@ def test_unknown_scenario_handling():
     """Verify clean 404 response when scenario is not in routing table."""
     req = {
         "scenario": "unregistered.fake_scenario",
+        "version": "v1.0.0",
         "payload": {},
         "context": {"trace_id": "trace-fake-01"}
     }
@@ -162,3 +163,68 @@ def test_unknown_scenario_handling():
     assert data["code"] == 404
     assert "Unknown scenario" in data["message"]
     assert data["trace_id"] == "trace-fake-01"
+
+
+def test_code_version_routing_and_coexistence():
+    """Verify that request with specific code version executes the corresponding versioned handler."""
+    # Register v1 handler
+    scenario_router.register(
+        scenario="demo.tax_calc",
+        handler=lambda p, c: {"rate": 0.03, "version": c.get("version"), "note": "legacy v1"},
+        version="v1.0.0",
+        domain="finance",
+        description="小微征税试算 v1.0.0",
+        is_default=True,
+    )
+    # Register v2 handler (updated tax incentive)
+    scenario_router.register(
+        scenario="demo.tax_calc",
+        handler=lambda p, c: {"rate": 0.01, "version": c.get("version"), "note": "new incentive v2"},
+        version="v2.0.0",
+        domain="finance",
+        description="小微征税试算 v2.0.0 (优惠政策)",
+        is_default=False,
+    )
+
+    try:
+        # 1. Request v1 explicitly
+        req_v1 = {
+            "scenario": "demo.tax_calc",
+            "version": "v1.0.0",
+            "payload": {},
+            "context": {}
+        }
+        resp_v1 = client.post("/api/welcom/opc_world", json=req_v1)
+        assert resp_v1.status_code == 200
+        data_v1 = resp_v1.json()
+        assert data_v1["version"] == "v1.0.0"
+        assert data_v1["data"]["rate"] == 0.03
+        assert data_v1["data"]["note"] == "legacy v1"
+
+        # 2. Request v2 explicitly
+        req_v2 = {
+            "scenario": "demo.tax_calc",
+            "version": "v2.0.0",
+            "payload": {},
+            "context": {}
+        }
+        resp_v2 = client.post("/api/welcom/opc_world", json=req_v2)
+        assert resp_v2.status_code == 200
+        data_v2 = resp_v2.json()
+        assert data_v2["version"] == "v2.0.0"
+        assert data_v2["data"]["rate"] == 0.01
+        assert data_v2["data"]["note"] == "new incentive v2"
+
+        # 3. Default fallback when version is omitted in request (defaults to v1.0.0)
+        req_def = {
+            "scenario": "demo.tax_calc",
+            "payload": {},
+            "context": {}
+        }
+        resp_def = client.post("/api/welcom/opc_world", json=req_def)
+        assert resp_def.status_code == 200
+        data_def = resp_def.json()
+        assert data_def["version"] == "v1.0.0"
+        assert data_def["data"]["rate"] == 0.03
+    finally:
+        scenario_router.unregister("demo.tax_calc")
