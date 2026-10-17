@@ -3700,18 +3700,23 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     // Unified Inbound Gateway & Scenario Dynamic Routing Client
     // Config-driven runtime environment (zero hardcoding), supports version lifecycle
     // -------------------------------------------------------------
+    // Dynamic endpoint detection: if running under http/https, use window.location.origin
+    const _defaultOrigin = (typeof window !== 'undefined' && window.location && window.location.origin && window.location.origin.startsWith('http'))
+      ? window.location.origin
+      : 'http://127.0.0.1:8000';
+
     window.__OPC_CONFIG__ = Object.assign({
-      gatewayEndpoint: "http://127.0.0.1:8000/api/welcom/opc_world",
-      clientCodeVersion: "v1.0.4",
+      gatewayEndpoint: _defaultOrigin + "/api/welcom/opc_world",
+      clientCodeVersion: "v1.0.0",
       timeoutMs: 8000,
     }, window.__OPC_CONFIG__ || {});
 
     function getGatewayEndpoint() {
-      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.gatewayEndpoint) || "http://127.0.0.1:8000/api/welcom/opc_world";
+      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.gatewayEndpoint) || (_defaultOrigin + "/api/welcom/opc_world");
     }
 
     function getClientCodeVersion() {
-      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.clientCodeVersion) || "v1.0.4";
+      return (window.__OPC_CONFIG__ && window.__OPC_CONFIG__.clientCodeVersion) || "v1.0.0";
     }
 
     async function dispatchGateway(scenario, payload = {}, context = {}, version = null) {
@@ -6167,7 +6172,17 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     }
 
     async function fetchComplianceData() {
-      await dispatchGateway("compliance.checkpoints");
+      const [resChecks, resDims, resCases] = await Promise.all([
+        dispatchGateway("compliance.checkpoints"),
+        dispatchGateway("compliance.dimensions"),
+        dispatchGateway("compliance.cases")
+      ]);
+      if (resChecks && resChecks.ok && resChecks.data) {
+        const compBadge = document.getElementById('compliancePipelineBadge');
+        if (compBadge && resChecks.data.orchestrated_by) {
+          compBadge.textContent = `DAG: ${resChecks.data.orchestrated_by}`;
+        }
+      }
     }
 
     async function triggerViewDataLoader(viewName) {
