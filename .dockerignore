@@ -1,0 +1,26 @@
+# Git & Version Control
+.git
+.gitignore
+
+# Python Bytecode & Environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Node / Web temporary files
+node_modules/
+dist/
+.DS_Store
+*.log
+
+# Local runtime databases & scratch
+*.sqlite-journal
+brain/
+scratch/
