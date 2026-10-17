@@ -4397,6 +4397,9 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         }, 60);
       }
 
+      // Dynamically hydrate view with latest backend data
+      triggerViewDataLoader(viewName);
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -5586,6 +5589,329 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       });
     }
 
+    // -------------------------------------------------------------
+    // Global Backend Data Hydration Engine (Frontend displays, Backend owns data)
+    // -------------------------------------------------------------
+    async function fetchHomeOverview() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/home/overview");
+        if (!res.ok) return;
+        const data = await res.json();
+        const overviewBadge = document.querySelector('#view-home .mono-tag');
+        if (overviewBadge && data.active_makers_count) {
+          overviewBadge.textContent = `SYSTEM PLATFORM OVERVIEW · ${data.active_makers_count.toLocaleString()} 活跃创客已认证`;
+        }
+      } catch (err) {}
+    }
+
+    async function fetchForumThreads() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/forum/threads");
+        if (!res.ok) return;
+        const threads = await res.json();
+        if (!Array.isArray(threads) || threads.length === 0) return;
+        const container = document.getElementById('forumPostsContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        threads.forEach(t => {
+          const card = document.createElement('div');
+          card.className = 'post-card';
+          const pinBadge = t.is_pinned ? '<span class="post-pinned">置顶</span>' : '';
+          card.innerHTML = `
+            <div class="post-title">
+              ${pinBadge}
+              <span class="mono-tag" style="background: var(--accent-glass); color: var(--accent); font-size: 11px;">${escapeHtml(t.category_code)}</span>
+              <span>${escapeHtml(t.title)}</span>
+            </div>
+            <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">
+              ${escapeHtml(t.content)}
+            </p>
+            <div style="display: flex; gap: 16px; font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>作者: ${escapeHtml(t.author_id.substring(0, 10))}</span>
+              <span>点赞: ${t.upvote_count || 0}</span>
+              <span>回复: ${t.comment_count || 0}</span>
+              <span>更新: ${escapeHtml((t.created_at || '').substring(0, 10))}</span>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+      } catch (err) {}
+    }
+
+    async function fetchProducts() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/products");
+        if (!res.ok) return;
+        const products = await res.json();
+        if (!Array.isArray(products) || products.length === 0) return;
+        const grid = document.getElementById('productCardsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        products.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'glass-card';
+          const priceLabel = p.pricing_model === 'FREE' ? '免费开源' : `¥${p.price_cny}`;
+          card.innerHTML = `
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span class="mono-tag">${escapeHtml(p.category)} · ${priceLabel}</span>
+                <span style="font-family: var(--font-mono); font-size: 12px; color: var(--accent);">▲ ${p.upvote_count || 0} 赞</span>
+              </div>
+              <h3 style="font-size: 17px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+                ${escapeHtml(p.tagline || p.description)}
+              </p>
+            </div>
+            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+              <span style="color: var(--text-tertiary);">作者: @${escapeHtml(p.author_id.substring(0, 12))}</span>
+              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="前往体验 ${escapeHtml(p.title)}" onclick="showLiquidNotice('产品体验通道', '正在为您跳转至 ${escapeHtml(p.title)} 独立产品预览环境与创客主页...', 'INFO')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>体验
+              </button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {}
+    }
+
+    async function fetchPolicies() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/policies");
+        if (!res.ok) return;
+        const policies = await res.json();
+        if (!Array.isArray(policies) || policies.length === 0) return;
+        const grid = document.getElementById('policyCardsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        policies.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'glass-card';
+          card.innerHTML = `
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span class="mono-tag">${escapeHtml(p.id.toUpperCase().substring(0, 14))}</span>
+                <span style="font-size: 11.5px; color: var(--text-tertiary);">${escapeHtml(p.policy_level)} · ${escapeHtml(p.category)}</span>
+              </div>
+              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.title)}</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+                【白话要点】${escapeHtml(p.summary)}
+              </p>
+            </div>
+            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+              <span style="color: var(--text-tertiary);">最高补: ¥${(p.subsidy_amount_max || 0).toLocaleString()}</span>
+              <button class="btn-liquid-outline" style="padding: 3px 10px; font-size: 11.5px;" data-tooltip="测评个人与企业是否符合该项政策免税条件" onclick="showLiquidNotice('政策匹配测评', '正在为您检索全国税务知识库与政策《${escapeHtml(p.title)}》规则，当前主体符合申报条件！', 'SUCCESS')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>匹配资格
+              </button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {}
+    }
+
+    async function fetchDemands() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/demands");
+        if (!res.ok) return;
+        const demands = await res.json();
+        if (!Array.isArray(demands) || demands.length === 0) return;
+        const grid = document.getElementById('demandCardsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const catMap = {
+          'DEV': '技术开发',
+          'AI': 'AI智能体',
+          'TAX': '财税合规',
+          'LEGAL': '法律求助',
+          'BIZ': '出海商业'
+        };
+        demands.forEach(d => {
+          const card = document.createElement('div');
+          card.className = 'glass-card demand-card-item';
+          card.setAttribute('data-cat', d.category);
+          const catName = catMap[d.category] || d.category;
+          card.innerHTML = `
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span class="mono-tag">${catName} · ¥${(d.budget_cny || 0).toLocaleString()}</span>
+                <span style="font-size: 11.5px; color: #34C759; font-family: var(--font-mono);">资金已托管</span>
+              </div>
+              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(d.title)}</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+                ${escapeHtml(d.description)}
+              </p>
+            </div>
+            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+              <span style="color: var(--text-tertiary);">${d.bidders_count || 0} 人已竞标</span>
+              <button class="btn-liquid" style="padding: 4px 12px; font-size: 12px;" data-tooltip="提交技术解决方案与商务报价参与委托竞标" onclick="showLiquidNotice('商机竞标通道', '您的创客认证资质核验通过，竞标意向书已提交委托企业方！', 'SUCCESS')">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>竞标
+              </button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {}
+    }
+
+    async function fetchSopTemplates() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/sop/templates");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.stages && Array.isArray(data.stages)) {
+          const stepper = document.querySelector('.sop-stepper');
+          if (stepper) {
+            stepper.innerHTML = '';
+            data.stages.forEach(st => {
+              const node = document.createElement('div');
+              node.className = `sop-step-node ${st.stage === currentSopStep ? 'active' : ''}`;
+              node.onclick = () => setSopStep(st.stage);
+              node.innerHTML = `
+                <div style="font-family: var(--font-mono); font-size: 11px; color: ${st.stage === currentSopStep ? 'var(--accent)' : 'var(--text-tertiary)'};">阶段 0${st.stage}</div>
+                <div style="font-weight: 600; font-size: 13.5px; margin-top: 2px;">${escapeHtml(st.name.replace(/^阶段\s*\d+:\s*/, ''))}</div>
+              `;
+              stepper.appendChild(node);
+            });
+          }
+        }
+      } catch (err) {}
+    }
+
+    async function fetchPerks() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/perks");
+        if (!res.ok) return;
+        const perks = await res.json();
+        if (!Array.isArray(perks) || perks.length === 0) return;
+        const grid = document.getElementById('perkCardsGrid');
+        if (!grid) return;
+        grid.innerHTML = '';
+        perks.forEach(p => {
+          const card = document.createElement('div');
+          card.className = 'glass-card';
+          card.innerHTML = `
+            <div>
+              <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+                <span class="mono-tag">${escapeHtml(p.provider)} · ${escapeHtml(p.category)}</span>
+                <span style="font-size: 12px; color: #34C759; font-family: var(--font-mono);">价值 ¥${(p.value_cny || 0).toLocaleString()}</span>
+              </div>
+              <h3 style="font-size: 16px; margin-bottom: 8px;">${escapeHtml(p.name)}</h3>
+              <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.55;">
+                ${escapeHtml(p.summary)}
+              </p>
+            </div>
+            <div style="border-top: 1px solid var(--glass-border-subtle); padding-top: 14px; margin-top: 18px; display: flex; justify-content: space-between; align-items: center; font-size: 12.5px;">
+              <span style="color: var(--text-tertiary);">剩余额度: ${p.quota_remaining || 0}</span>
+              <button class="btn-liquid-outline" style="padding: 4px 12px; font-size: 12px;" onclick="claimPerk('${escapeHtml(p.name)}')" data-tooltip="领取 ${escapeHtml(p.name)} 专属兑换凭据">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>领取
+              </button>
+            </div>
+          `;
+          grid.appendChild(card);
+        });
+      } catch (err) {}
+    }
+
+    async function fetchUserProfile() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/user/profile");
+        if (!res.ok) return;
+        const profile = await res.json();
+        if (profile) {
+          const compElem = document.querySelector('#view-user h1');
+          if (compElem && profile.company_name) {
+            compElem.textContent = `${profile.company_name} · 创客空间`;
+          }
+          const tierTag = document.querySelector('#view-user .mono-tag');
+          if (tierTag && profile.tier) {
+            tierTag.textContent = `MAKER TIER: ${profile.tier} · 增值税减免已享 ¥${(profile.vat_savings_ytd || 0).toLocaleString()}`;
+          }
+        }
+      } catch (err) {}
+    }
+
+    async function fetchBackendOrchData() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/orchestration/operators");
+        if (!res.ok) return;
+        const data = await res.json();
+      } catch (err) {}
+    }
+
+    async function fetchFrontendLayoutData() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/frontend/layouts");
+        if (!res.ok) return;
+        const layouts = await res.json();
+      } catch (err) {}
+    }
+
+    async function fetchComplianceData() {
+      try {
+        const res = await fetch("http://127.0.0.1:8000/api/v1/compliance/checkpoints");
+        if (!res.ok) return;
+        const checkpoints = await res.json();
+      } catch (err) {}
+    }
+
+    async function triggerViewDataLoader(viewName) {
+      switch (viewName) {
+        case 'home':
+          fetchHomeOverview();
+          break;
+        case 'forum':
+          fetchForumThreads();
+          break;
+        case 'product':
+          fetchProducts();
+          break;
+        case 'policy':
+          fetchPolicies();
+          break;
+        case 'demand':
+          fetchDemands();
+          break;
+        case 'sop':
+          fetchSopTemplates();
+          break;
+        case 'perks':
+          fetchPerks();
+          break;
+        case 'user':
+          fetchUserProfile();
+          break;
+        case 'backend-orch':
+          fetchBackendOrchData();
+          break;
+        case 'frontend-orch':
+          fetchFrontendLayoutData();
+          break;
+        case 'ops':
+          refreshOpsData();
+          break;
+        case 'moderation':
+          refreshModerationList();
+          break;
+        case 'compliance':
+          fetchComplianceData();
+          break;
+      }
+    }
+
+    async function syncAllDataFromBackend() {
+      fetchHomeOverview();
+      fetchForumThreads();
+      fetchProducts();
+      fetchPolicies();
+      fetchDemands();
+      fetchSopTemplates();
+      fetchPerks();
+      fetchUserProfile();
+      refreshOpsData();
+      refreshModerationList();
+      fetchComplianceData();
+    }
+
     function initNavScroll() {
       const navTabs = document.getElementById('mainNavTabs');
       if (!navTabs) return;
@@ -5606,6 +5932,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       updateModerationStats();
       initSelfAuditChecklist();
       initNavScroll();
+      syncAllDataFromBackend();
     });
     window.addEventListener("resize", renderDagEdges);
   </script>
