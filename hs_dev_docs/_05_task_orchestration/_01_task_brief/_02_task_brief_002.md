@@ -96,3 +96,15 @@
 - **更新时间**：`2026-10-17T06:44:49Z`
 ---
 
+### 任务简述：TASK-019
+- **标题**：P11创客中心微内核DAG编排流水线与收费权益激活
+- **change_size**：`M`
+- **状态**：`COMPLETED`
+- **优先级**：P1
+- **负责人**：agent
+- **核心目标**：实现P11创客中心底层微内核DAG流水线驱动(OPC_USER_PROFILE_PIPELINE与OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE)及Saga逆向补偿
+- **详情索引**：`_02_task_detail/_01_TASK-019/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-019/_00_context_pack.md`
+- **更新时间**：`2026-10-17T06:51:17Z`
+---
+

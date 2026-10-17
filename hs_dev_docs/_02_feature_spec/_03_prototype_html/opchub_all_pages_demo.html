@@ -1773,8 +1773,10 @@
          VIEW 8: 用户管理与收费权益体系 (User & Entitlements)
          ========================================== -->
     <div id="view-user" class="view-panel">
-      <div class="glass-box">
-        <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">创客用户体系与收费权益中心</h1>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <h1 class="page-title" style="font-size: 26px; margin: 0;">创客用户体系与收费权益中心</h1>
+          <span id="userProfilePipelineBadge" class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">DAG: OPC_USER_PROFILE_PIPELINE</span>
+        </div>
         <p style="font-size: 13px; color: var(--text-secondary); margin-bottom: 24px;">
           基于 user_id 与 entitlement_id 强绑定架构。涵盖三级用户体系（管理员、创客、游客）与功能权限开关控制。
         </p>
@@ -6134,6 +6136,10 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (!gwRes.ok || !gwRes.data) return;
       const profile = gwRes.data;
       if (profile) {
+        const pipeBadge = document.getElementById('userProfilePipelineBadge');
+        if (pipeBadge && profile.orchestrated_by) {
+          pipeBadge.textContent = `DAG: ${profile.orchestrated_by}`;
+        }
         const compElem = document.querySelector('#view-user h1');
         if (compElem && profile.company_name) {
           compElem.textContent = `${profile.company_name} · 创客空间`;

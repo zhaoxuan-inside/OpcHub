@@ -309,9 +309,42 @@ async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
     return res.final_output
 
 
-def user_profile_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
-    user_id = p.get("user_id", "usr_2026_opc_9981")
-    return user_service.get_maker_profile(user_id=user_id)
+async def user_profile_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for maker profile retrieval."""
+    inputs = dict(p or {})
+    if "user_payload" in inputs and isinstance(inputs["user_payload"], dict):
+        inputs.update(inputs["user_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_USER_PROFILE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "User profile pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("profile") or res.final_output
+
+
+async def user_entitlement_activate_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for maker entitlement activation."""
+    inputs = dict(p or {})
+    if "activate_payload" in inputs and isinstance(inputs["activate_payload"], dict):
+        inputs.update(inputs["activate_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "User entitlement activate pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("activation") or res.final_output
 
 
 def save_dag_config_adapter(p: Dict[str, Any]) -> Any:

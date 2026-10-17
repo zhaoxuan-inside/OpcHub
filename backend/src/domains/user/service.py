@@ -82,19 +82,34 @@ class UserService:
         )
 
     def activate_entitlement(self, req: EntitlementActivateRequest) -> EntitlementActivateResponse:
-        if req.entitlement_id not in self._entitlements:
-            raise KeyError(f"Entitlement {req.entitlement_id} not found")
+        ent_id = req.entitlement_id
+        if ent_id not in self._entitlements:
+            if ent_id == "ENT_VIP":
+                ent_id = "ent_black_diamond_priority"
+            elif f"ent_{ent_id.lower()}" in self._entitlements:
+                ent_id = f"ent_{ent_id.lower()}"
+            else:
+                raise KeyError(f"Entitlement {req.entitlement_id} not found")
 
-        self._active_entitlements.add(req.entitlement_id)
+        self._active_entitlements.add(ent_id)
         receipt = "REC-" + uuid.uuid4().hex[:10].upper()
         return EntitlementActivateResponse(
             user_id=req.user_id,
-            entitlement_id=req.entitlement_id,
+            entitlement_id=ent_id,
             is_active=True,
             status="ACTIVATED",
             receipt_no=receipt,
             message="专属创客收费权益已激活并绑定，权限即刻生效！",
         )
+
+    def deactivate_entitlement(self, entitlement_id: str) -> bool:
+        ent_id = entitlement_id
+        if ent_id not in self._active_entitlements and ent_id == "ENT_VIP":
+            ent_id = "ent_black_diamond_priority"
+        if ent_id in self._active_entitlements:
+            self._active_entitlements.remove(ent_id)
+            return True
+        return False
 
 
 user_service = UserService()

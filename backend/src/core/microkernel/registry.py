@@ -1263,5 +1263,92 @@ class AtomicRegistry:
             }
         self.register("telemetry.dashboard.telemetry.incr", telemetry_dashboard_telemetry_incr, domain="telemetry", description="运营大盘调阅度量指标自增算子")
 
+        # Domain 11: User & Maker Domain (创客档案画像、收费权益激活与防伪凭据签发算子及 Saga 补偿)
+        async def user_profile_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            user_id = inputs.get("user_id", "usr_2026_opc_9981").strip()
+            if not user_id:
+                raise ValueError("user_id cannot be empty")
+            return {
+                "guard_passed": True,
+                "user_id": user_id,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("user.profile.guard", user_profile_guard, domain="user", description="创客中心档案调阅参数守卫算子")
+
+        async def user_profile_load(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.user.service import user_service
+            user_id = inputs.get("user_id", "usr_2026_opc_9981")
+            profile = user_service.get_profile(user_id)
+            profile_dict = profile.model_dump()
+            profile_dict["orchestrated_by"] = "OPC_USER_PROFILE_PIPELINE"
+            return {
+                "profile": profile_dict,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("user.profile.load", user_profile_load, domain="user", description="创客主体认证档案与权益矩阵加载算子")
+
+        async def user_entitlement_activate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            user_id = inputs.get("user_id", "").strip()
+            ent_id = inputs.get("entitlement_id") or inputs.get("entitlement_code", "").strip()
+
+            if not user_id:
+                raise ValueError("user_id is required for entitlement activation")
+            if not ent_id:
+                raise ValueError("entitlement_id or entitlement_code is required for activation")
+
+            return {
+                "guard_passed": True,
+                "user_id": user_id,
+                "entitlement_id": ent_id,
+                "duration_months": inputs.get("duration_months", 12),
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+        self.register("user.entitlement.activate.guard", user_entitlement_activate_guard, domain="user", description="创客收费商业权益激活前置参数守卫算子")
+
+        async def user_entitlement_activate_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.user.service import user_service
+            from src.domains.user.models import EntitlementActivateRequest
+
+            user_id = inputs.get("user_id")
+            ent_id = inputs.get("entitlement_id")
+            req = EntitlementActivateRequest(user_id=user_id, entitlement_id=ent_id)
+            res = user_service.activate_entitlement(req)
+
+            res_dict = res.model_dump()
+            res_dict["orchestrated_by"] = "OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE"
+            return {
+                "activation": res_dict,
+                "user_id": user_id,
+                "entitlement_id": res.entitlement_id,
+                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
+            }
+
+        async def user_entitlement_activate_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.user.service import user_service
+            ent_id = inputs.get("entitlement_id")
+            if ent_id:
+                deactivated = user_service.deactivate_entitlement(ent_id)
+                return {"entitlement_id": ent_id, "compensated": deactivated, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No entitlement_id to rollback"}
+
+        self.register(
+            "user.entitlement.activate.persist",
+            user_entitlement_activate_persist,
+            domain="user",
+            description="创客专属商业权益原子激活持久化算子",
+            compensator=user_entitlement_activate_persist_compensate,
+        )
+
+        async def user_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in user maker pipeline")
+            metric = "user.entitlement.activated" if "activation" in inputs else "user.profile.view"
+            return {
+                "telemetry_recorded": True,
+                "metric": metric,
+                "increment": 1,
+            }
+        self.register("user.telemetry.incr", user_telemetry_incr, domain="user", description="创客中心业务与转化度量打点算子")
+
 
 registry = AtomicRegistry()

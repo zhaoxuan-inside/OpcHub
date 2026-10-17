@@ -246,17 +246,16 @@ gateway:
     - scenario: "user.profile"
       version: "v1.0.0"
       domain: "user"
-      description: "获取创客个人主体档案与已激活权益"
+      description: "获取创客个人主体档案与已激活权益 (由微内核 DAG OPC_USER_PROFILE_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:user_profile_adapter"
 
     - scenario: "user.entitlements.activate"
       version: "v1.0.0"
       domain: "user"
-      description: "激活创客专属商业权益与特权门禁"
+      description: "激活创客专属商业权益与特权门禁 (由微内核 DAG OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE 驱动)"
       is_default: true
-      handler: "src.domains.user.service.user_service:activate_entitlement"
-      model: "src.domains.user.models:EntitlementActivateRequest"
+      handler: "src.core.gateway.adapters:user_entitlement_activate_adapter"
 
     # --------------------------------------------------------------------------
     # 9. Content Moderation (内容治理)

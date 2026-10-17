@@ -485,6 +485,54 @@ class OrchestrationService:
             )
         )
 
+        # 19. User Maker Profile DAG Pipeline: OPC_USER_PROFILE_PIPELINE
+        topo_user_profile = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "user.profile.guard", "type": "GUARD"},
+                {"id": "step_load", "action_handler": "user.profile.load", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "user.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_load"},
+                {"from": "step_load", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_USER_PROFILE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_user_profile,
+                status="ACTIVE",
+            )
+        )
+
+        # 20. User Entitlement Activate DAG Pipeline: OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE
+        topo_user_activate = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "user.entitlement.activate.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "user.entitlement.activate.persist", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "user.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_user_activate,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(
