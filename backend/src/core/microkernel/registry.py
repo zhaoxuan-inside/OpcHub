@@ -121,6 +121,21 @@ class AtomicRegistry:
     def _register_domain_handlers(self):
         """Auto-register domain business operators."""
         # Domain 1: Policy Domain
+        async def policy_qualify_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            income = float(inputs.get("quarterly_income", 0.0))
+            if income < 0:
+                raise ValueError("quarterly_income cannot be negative")
+            region = inputs.get("region") or inputs.get("city", "杭州")
+            maker_type = inputs.get("maker_type") or ("INDIVIDUAL" if "个体" in inputs.get("entity_type", "") else "OPC")
+            return {
+                "guard_passed": True,
+                "quarterly_income": income,
+                "region": region,
+                "city": region,
+                "maker_type": maker_type,
+            }
+        self.register("policy.qualify_guard", policy_qualify_guard, domain="policy", description="政策测算资质准入与参数归一化门禁")
+
         async def policy_calculate_tax(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             income = float(inputs.get("quarterly_income", 0.0))
             is_exempt = income <= 300000.0
@@ -134,11 +149,12 @@ class AtomicRegistry:
                 "policy_citation": "财政部 税务总局公告 2023年第12号",
             }
         self.register("policy.calculate_tax", policy_calculate_tax, domain="policy", description="高精度增值税及综合税负试算算子")
+
         async def policy_match_subsidies(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.policies.service import policy_service
             from src.domains.policies.models import PolicyMatchRequest
-            city = inputs.get("city", "杭州")
-            maker_type = "INDIVIDUAL" if "个体" in inputs.get("entity_type", "个体工商户") else "OPC"
+            city = inputs.get("region") or inputs.get("city", "杭州")
+            maker_type = "INDIVIDUAL" if "INDIVIDUAL" in inputs.get("maker_type", "INDIVIDUAL") or "个体" in inputs.get("entity_type", "") else "OPC"
             income = float(inputs.get("quarterly_income", 100000.0))
             req = PolicyMatchRequest(
                 quarterly_income=income,
@@ -150,9 +166,92 @@ class AtomicRegistry:
                 "subsidies_matched": True,
                 "matched_count": len(matched_resp.matched_policies),
                 "matched_subsidies": [p.model_dump() for p in matched_resp.matched_policies],
+                "matched_policies": [p.model_dump() for p in matched_resp.matched_policies],
                 "estimated_tax_savings": matched_resp.estimated_tax_savings,
+                "explanation": matched_resp.explanation,
+                "eligible": matched_resp.eligible,
+                "applicable_tax_rate": matched_resp.applicable_tax_rate,
+                "legal_basis": matched_resp.legal_basis,
             }
         self.register("policy.match_subsidies", policy_match_subsidies, domain="policy", description="根据地域主体匹配扶持补贴算子")
+
+        async def policy_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in policy pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": "policy.match.executed",
+                "matched_count": inputs.get("matched_count", 0),
+                "increment": 1,
+            }
+        self.register("policy.telemetry.incr", policy_telemetry_incr, domain="policy", description="政策雷达智能测算与撮合检索度量打点算子")
+
+        # Policy Publishing Operators
+        async def policy_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            title = inputs.get("title", "").strip()
+            summary = inputs.get("summary", "").strip()
+            legal_basis = inputs.get("legal_basis", "").strip()
+            if len(title) < 2:
+                raise ValueError("Policy title must be at least 2 characters long")
+            if len(summary) < 5:
+                raise ValueError("Policy summary must be at least 5 characters long")
+            if not legal_basis:
+                raise ValueError("legal_basis is required for government policy")
+            
+            # Moderation check
+            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            full_text = f"{title} {summary} {legal_basis}"
+            for f in forbidden:
+                if f in full_text:
+                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in policy publish")
+            
+            return {
+                "guard_passed": True,
+                "title": title,
+                "summary": summary,
+                "legal_basis": legal_basis,
+                "policy_level": inputs.get("policy_level", "国家级"),
+                "category": inputs.get("category", "TAX"),
+                "subsidy_amount_max": float(inputs.get("subsidy_amount_max", 0.0)),
+                "eligible_conditions": inputs.get("eligible_conditions", []),
+            }
+        self.register("policy.publish.guard", policy_publish_guard, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
+
+        async def policy_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.policies.service import policy_service
+            from src.domains.policies.models import PolicyCreate
+            payload = PolicyCreate(
+                title=inputs.get("title", ""),
+                policy_level=inputs.get("policy_level", "国家级"),
+                category=inputs.get("category", "TAX"),
+                subsidy_amount_max=float(inputs.get("subsidy_amount_max", 0.0)),
+                summary=inputs.get("summary", ""),
+                eligible_conditions=inputs.get("eligible_conditions", []),
+                legal_basis=inputs.get("legal_basis", ""),
+            )
+            created = policy_service.create_policy(payload)
+            return {
+                "policy_id": created.id,
+                "created_policy": created.model_dump(),
+                "status": "PUBLISHED",
+            }
+
+        async def policy_publish_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.policies.service import policy_service
+            policy_id = inputs.get("policy_id") or (inputs.get("created_policy", {}).get("id"))
+            if policy_id:
+                deleted = policy_service.delete_policy(policy_id)
+                return {"policy_id": policy_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No policy_id to rollback"}
+
+        self.register(
+            "policy.publish.persist",
+            policy_publish_persist,
+            domain="policy",
+            description="政策雷达政府扶持红利持久化存储算子",
+            compensator=policy_publish_persist_compensate,
+        )
+
 
         # Domain 2: SOP Document Domain
         async def sop_render_document(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:

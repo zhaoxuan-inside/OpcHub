@@ -217,6 +217,57 @@ class OrchestrationService:
             )
         )
 
+        # 8. Policy Radar Match DAG Pipeline: OPC_POLICY_MATCH_PIPELINE
+        topo_policy_match = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "policy.qualify_guard", "type": "GUARD"},
+                {"id": "step_tax", "action_handler": "policy.calculate_tax", "type": "BIZ"},
+                {"id": "step_subsidies", "action_handler": "policy.match_subsidies", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "policy.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_tax"},
+                {"from": "step_tax", "to": "step_subsidies"},
+                {"from": "step_subsidies", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_POLICY_MATCH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_policy_match,
+                status="ACTIVE",
+            )
+        )
+
+        # 9. Policy Radar Publish DAG Pipeline: OPC_POLICY_PUBLISH_PIPELINE
+        topo_policy_publish = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "policy.publish.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "policy.publish.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "policy.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_POLICY_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_policy_publish,
+                status="ACTIVE",
+            )
+        )
+
+
 
         # Default frontend layout
         self.save_frontend_layout(

@@ -118,4 +118,16 @@ class PolicyService:
         )
 
 
+    def delete_policy(self, policy_id: str) -> bool:
+        """Physically delete policy for Saga reverse compensation."""
+        if policy_id in self._policies:
+            del self._policies[policy_id]
+            return True
+        return False
+
+    def clear(self) -> None:
+        """Reset policies for isolated testing."""
+        self._policies.clear()
+
+
 policy_service = PolicyService()

@@ -77,18 +77,16 @@ gateway:
     - scenario: "policies.publish"
       version: "v1.0.0"
       domain: "policies"
-      description: "发布最新政府扶持与补贴政策"
+      description: "发布最新政府扶持与补贴政策 (微内核 DAG 编排驱动)"
       is_default: true
-      handler: "src.domains.policies.service.policy_service:create_policy"
-      model: "src.domains.policies.models:PolicyCreate"
+      handler: "src.core.gateway.adapters:policy_publish_adapter"
 
     - scenario: "policies.match"
       version: "v1.0.0"
       domain: "policies"
-      description: "测算创客免税资格与预计减免额"
+      description: "测算创客免税资格与预计减免额 (微内核 DAG 编排驱动)"
       is_default: true
-      handler: "src.domains.policies.service.policy_service:match_policies"
-      model: "src.domains.policies.models:PolicyMatchRequest"
+      handler: "src.core.gateway.adapters:policy_match_adapter"
 
     # --------------------------------------------------------------------------
     # 3. Demands & Bidding (需求集市与竞标)

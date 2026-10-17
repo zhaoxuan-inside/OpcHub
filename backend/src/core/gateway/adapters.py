@@ -77,6 +77,44 @@ async def product_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -
     return res.final_output.get("created_product") or res.final_output
 
 
+async def policy_match_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for policy qualification matching."""
+    inputs = dict(p)
+    if "match_payload" in inputs and isinstance(inputs["match_payload"], dict):
+        inputs.update(inputs["match_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_POLICY_MATCH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Policy match pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
+
+
+async def policy_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for government policy publishing."""
+    inputs = dict(p)
+    if "policy_payload" in inputs and isinstance(inputs["policy_payload"], dict):
+        inputs.update(inputs["policy_payload"])
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_POLICY_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Policy publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_policy") or res.final_output
+
+
 async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
     """Executes the microkernel DAG pipeline for the Home page overview."""
     res = await orchestration_service.execute_scenario(
