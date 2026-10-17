@@ -69,7 +69,7 @@ class ModerationService:
                 target_id="pr_viol_04",
                 author_id="usr_bot_4490",
                 author_name="黑灰脚本号",
-                snippet_content="低价承接贴吧热帖批量刷赞、虚假点赞刷量与竞标霸榜脚本，秒杀同行...",
+                snippet_content="低价承接热帖批量刷赞、虚假点赞刷量与竞标霸榜脚本，秒杀同行...",
                 violation_type="SPAM",
                 status="FLAGGED",
                 reported_at="2026-10-17T07:30:00Z",

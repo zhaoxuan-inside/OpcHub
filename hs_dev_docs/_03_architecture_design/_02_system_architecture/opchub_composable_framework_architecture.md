@@ -53,7 +53,7 @@ backend/src/
 ├── domains/                            # 业务领域模块 (Domain Modules - 微服务就绪)
 │   ├── policy/                         # 政策雷达域 (提供 calculate, match 等可编排算子)
 │   ├── sop/                            # 流程文书域 (提供 render, save 等可编排算子)
-│   ├── forum/                          # 创客贴吧域 (提供 post, reply, upvote 等可编排算子)
+│   ├── forum/                          # 创客头脑风暴域 (提供 post, reply, upvote 等可编排算子)
 │   ├── demand/                         # 需求集市域 (提供 publish, bid 等可编排算子)
 │   ├── product/                        # 产品橱窗域 (提供 showcase, review 等可编排算子)
 │   ├── perks/                          # 生态特权域 (提供 claim, verify 等可编排算子)

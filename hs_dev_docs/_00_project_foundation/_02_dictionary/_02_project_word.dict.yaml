@@ -33,9 +33,14 @@ terms:
     description: "后端通过有向无环图串联门禁、算子与存储的执行拓扑流程"
     forbidden_alias: ["script_chain", "raw_workflow"]
 
+  - term: "头脑风暴"
+    en_name: "Brainstorm"
+    description: "创客灵感碰撞、实战经验沉淀与多级问答互助的社区板块（原贴吧问答）"
+    forbidden_alias: ["贴吧问答", "创客贴吧"]
+
   - term: "论坛讨论帖"
     en_name: "ForumThread"
-    description: "创客交流贴吧中发布的实战经验、踩坑记录或出海商业主题帖"
+    description: "头脑风暴社区中发布的实战经验、踩坑记录或出海商业主题帖"
     forbidden_alias: ["main_post", "topic_entity", "article_item"]
 
   - term: "多级问答回复"
@@ -90,7 +95,7 @@ terms:
 
   - term: "发帖IP属地"
     en_name: "IPLocation"
-    description: "依国家规定在贴吧与评论区前台公开展示的发帖人境内省份或境外国家属地信息"
+    description: "依国家规定在头脑风暴社区与评论区前台公开展示的发帖人境内省份或境外国家属地信息"
     forbidden_alias: ["user_city", "geo_flag"]
 
   - term: "审计日志留存"

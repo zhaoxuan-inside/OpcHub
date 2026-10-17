@@ -312,7 +312,7 @@ async def get_home_overview():
         "demands_orders_count": 89,
         "perks_saved_cny": 1820000.0,
         "quick_links": [
-            {"name": "创客贴吧", "route": "forum", "count_desc": "1,240 篇实战经验"},
+            {"name": "头脑风暴", "route": "forum", "count_desc": "1,240 篇实战经验"},
             {"name": "流程文书", "route": "sop", "count_desc": "4 阶段合规材料"},
             {"name": "政策雷达", "route": "policy", "count_desc": "30万增值税免征"},
             {"name": "需求集市", "route": "demand", "count_desc": "89 笔进行中委托"},

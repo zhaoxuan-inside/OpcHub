@@ -157,7 +157,7 @@ flowchart TD
     And 记录一条 MatchRecord 撮合线索事件
   ```
 
-### REQ-06：创业者交流贴吧与无限层级问答社区 (Community Forum & Discussion Tree)
+### REQ-06：创客头脑风暴与无限层级问答社区 (Community Brainstorm & Discussion Tree)
 - **业务要求**：
   1. **讨论帖发布与分类**：支持 DEV、BIZ、TAX、AGENTS 分类发布实战经验与避坑帖；
   2. **物化路径无限层级问答回复 (`forum_comments`)**：采用物化路径模型（Materialized Path）+ 顶级回答索引，高效支撑顶级回答、楼中楼以及深层对回答的回答等无限嵌套评论树，后端 $O(N)$ 自动装配；

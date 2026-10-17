@@ -68,7 +68,7 @@ class TelemetryService:
             module_heatmaps=[
                 ModuleHeatmap(module_name="政策雷达", code="POLICY", pv_count=201000, percentage=32.0, color="#0071E3"),
                 ModuleHeatmap(module_name="流程文书SOP", code="SOP", pv_count=163300, percentage=26.0, color="#34C759"),
-                ModuleHeatmap(module_name="创客贴吧", code="FORUM", pv_count=113000, percentage=18.0, color="#FF9500"),
+                ModuleHeatmap(module_name="头脑风暴", code="FORUM", pv_count=113000, percentage=18.0, color="#FF9500"),
                 ModuleHeatmap(module_name="需求外包集市", code="MARKET", pv_count=87900, percentage=14.0, color="#AF52DE"),
                 ModuleHeatmap(module_name="算力与特权", code="PERKS", pv_count=62800, percentage=10.0, color="#5AC8FA"),
             ],
