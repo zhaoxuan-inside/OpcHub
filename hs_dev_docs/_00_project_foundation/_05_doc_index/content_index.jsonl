@@ -1,0 +1,2 @@
+{"schema_version": 1, "generation": "20261018_082805_950974", "scope": "hs_dev_docs/_00_project_foundation/_05_doc_index", "recursive": false, "complete": true, "indexed_at": "2026-10-18T08:28:05.950970Z"}
+{"key": "hs_dev_docs/_00_project_foundation/_05_doc_index/_00_doc_index_guide.md#1", "title": "文档倒排索引数据库与查询说明 (Doc Index Database)", "start": 1, "end": 10, "source_digest": "14a82aa4e4020314d1e88ba735e021c66f0e2eaff7a1f48218b07da7513d06a4", "properties": {"kind": "md", "status": "current", "tags": []}, "content_updated_at": "2026-10-18T08:28:05.950970Z"}

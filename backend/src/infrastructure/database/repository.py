@@ -7,7 +7,8 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete as sa_delete, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.core.database import get_async_engine, get_async_sessionmaker, check_database_health
 from src.core.security import hash_password
@@ -15,9 +16,10 @@ from src.infrastructure.database.models import (
     AuditLog,
     AuditLogArchive,
     Base,
-    User,
     Demand,
+    DomainSnapshot,
     ForumThread,
+    User,
 )
 
 logger = logging.getLogger("opchub.repository")
@@ -77,22 +79,28 @@ class DatabaseRepository:
         nickname: Optional[str] = None,
         company_name: Optional[str] = None,
         role: str = "MAKER",
+        credit_code: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None,
     ) -> User:
         clean_email = email.strip().lower()
         clean_nick = nickname.strip() if nickname else clean_email.split("@")[0]
         uid = str(uuid.uuid4())
         pwd_hash = hash_password(password_plain)
 
+        user_meta = {"tier": "STANDARD", "created_source": "COMMERCIAL_REG"}
+        if metadata:
+            user_meta.update(metadata)
+
         new_user = User(
             uid=uid,
             email=clean_email,
             nickname=clean_nick,
             company_name=company_name or "",
-            unified_social_credit_code=None,
+            unified_social_credit_code=credit_code,
             role=role,
             password_hash=pwd_hash,
             is_active=True,
-            metadata_payload={"tier": "STANDARD", "created_source": "EMAIL_REG"},
+            metadata_payload=user_meta,
         )
 
         if await self.is_ready():
@@ -127,12 +135,64 @@ class DatabaseRepository:
                 company_name="OpcHub 平台运营",
                 password_hash=password_hash,
                 is_active=True,
-                metadata_payload={"must_change_password": True, "builtin": True},
+                metadata_payload={"must_change_password": True, "builtin": True, "tier_name": "平台管理员"},
             )
             session.add(admin)
             await session.commit()
             await session.refresh(admin)
             return admin
+
+    async def get_user_by_uid(self, uid: str) -> Optional[User]:
+        """Fetch a user by its stable business uid."""
+        if not await self.is_ready():
+            return None
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(User).where(User.uid == uid)
+            return (await session.execute(stmt)).scalar_one_or_none()
+
+    async def list_users(self, limit: int = 10000) -> List[User]:
+        """List persisted users (used to hydrate the in-memory user index on startup)."""
+        if not await self.is_ready():
+            return []
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(User).order_by(User.created_at.asc()).limit(limit)
+            return list((await session.execute(stmt)).scalars().all())
+
+    async def update_user_fields(
+        self,
+        uid: str,
+        nickname: Optional[str] = None,
+        company_name: Optional[str] = None,
+        password_hash: Optional[str] = None,
+        metadata_patch: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        """Commit profile / credential / metadata field changes for a user.
+
+        Returns ``True`` when a matching row was updated (``False`` when the database
+        is unavailable or the user does not exist).
+        """
+        if not await self.is_ready():
+            return False
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(User).where(User.uid == uid)
+            user = (await session.execute(stmt)).scalar_one_or_none()
+            if user is None:
+                return False
+            if nickname is not None:
+                user.nickname = nickname
+            if company_name is not None:
+                user.company_name = company_name
+            if password_hash is not None:
+                user.password_hash = password_hash
+            if metadata_patch:
+                meta = dict(user.metadata_payload or {})
+                meta.update(metadata_patch)
+                user.metadata_payload = meta
+            await session.commit()
+            return True
 
     # -------------------------------------------------------------
     # Forum Repository Methods
@@ -311,6 +371,54 @@ class DatabaseRepository:
             stmt = select(AuditLogArchive).order_by(AuditLogArchive.created_at.desc()).limit(limit)
             rows = (await session.execute(stmt)).scalars().all()
             return [self._audit_row_to_dict(r) for r in rows]
+
+    # -------------------------------------------------------------
+    # Generic Domain Snapshot Store (domain_snapshots)
+    # Enables in-memory primary index hydration + write-behind persistence
+    # -------------------------------------------------------------
+    async def load_domain_snapshots(self, domain: str) -> List[Dict[str, Any]]:
+        """Load every persisted document for a domain (used for startup hydration)."""
+        if not await self.is_ready():
+            return []
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(DomainSnapshot).where(DomainSnapshot.domain == domain)
+            rows = (await session.execute(stmt)).scalars().all()
+            return [dict(r.payload) for r in rows]
+
+    async def upsert_domain_snapshot(self, domain: str, entity_id: str, payload: Dict[str, Any]) -> None:
+        """Atomically insert or update a single domain aggregate document."""
+        if not await self.is_ready():
+            return
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = pg_insert(DomainSnapshot).values(
+                domain=domain,
+                entity_id=entity_id,
+                payload=payload,
+                updated_at=datetime.now(timezone.utc),
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=[DomainSnapshot.domain, DomainSnapshot.entity_id],
+                set_={
+                    "payload": stmt.excluded.payload,
+                    "updated_at": stmt.excluded.updated_at,
+                },
+            )
+            await session.execute(stmt)
+            await session.commit()
+
+    async def delete_domain_snapshot(self, domain: str, entity_id: str) -> None:
+        """Remove a single domain aggregate document."""
+        if not await self.is_ready():
+            return
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = sa_delete(DomainSnapshot).where(
+                DomainSnapshot.domain == domain, DomainSnapshot.entity_id == entity_id
+            )
+            await session.execute(stmt)
+            await session.commit()
 
 
 db_repository = DatabaseRepository()

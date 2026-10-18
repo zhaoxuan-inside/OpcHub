@@ -68,7 +68,7 @@
 
 ## 5. 已知偏差与后续建议 (Open Items)
 
-1. **全 REST 端点 vs 全 DAG 驱动**：`main.py` 保留了一批直接调用领域服务的 REST 端点（与统一网关 DAG 场景路由并存）。stage_6 验收声称「零 Bypass」，此为架构层面的既有双重接口，未在本次范围内重构。
+1. **全 REST 端点 vs 全 DAG 驱动**：`main.py` 保留了一批直接调用领域服务的 REST 端点（与统一网关 DAG 场景路由并存）。stage_6 验收声称「零 Bypass」，此为架构层面的既有双重接口，未在本次范围内重构。 → **已由 [TASK-031](file:///home/hardstone/Share/Common/CodeSpace/OpcHub/hs_dev_docs/_06_dev_process/_01_plan_log/TASK-031_plan.md) 修复**：业务 REST 全量删除，仅保留统一网关入口与平台/管理端点。
 2. **PostgreSQL 真实持久化**：领域服务仍以进程内存储为运行时主路径（repository 提供 DB 能力），本次清空种子后需后续把领域服务完整接入 DB 持久化。
 3. **运维部署端口**：`scripts/quickstart.*` 与 `Dockerfile` 仍以 CLI 硬编码端口启动；`main.py` 已支持 `__main__` 配置驱动启动。
 

@@ -146,14 +146,19 @@ def test_password_rotation_clears_flag_and_unblocks():
     token = _login_admin()["token"]
     c = _guest_client()
     new_password = "OpcHub@Rotated#2026"
-    r = c.post("/api/v1/auth/change-password", json={
+    r = c.post("/api/welcom/opc_world", json={
+        "scenario": "auth.change-password", "version": "v1.0.0",
+        "payload": {
+            "old_password": settings.admin_initial_password,
+            "new_password": new_password,
+        },
         "token": token,
-        "old_password": settings.admin_initial_password,
-        "new_password": new_password,
     })
     assert r.status_code == 200, r.text
-    new_token = r.json()["token"]
-    assert r.json()["must_change_password"] is False
+    body = r.json()
+    assert body["code"] == 200, body
+    new_token = body["data"]["token"]
+    assert body["data"]["must_change_password"] is False
 
     c.headers["Authorization"] = f"Bearer {new_token}"
     r2 = c.post("/api/welcom/opc_world", json={
@@ -162,19 +167,22 @@ def test_password_rotation_clears_flag_and_unblocks():
     assert r2.json()["code"] == 200
 
     # Restore the bootstrap credential so the suite remains deterministic
-    c.post("/api/v1/auth/change-password", json={
-        "token": new_token, "old_password": new_password,
-        "new_password": settings.admin_initial_password,
+    c.post("/api/welcom/opc_world", json={
+        "scenario": "auth.change-password", "version": "v1.0.0",
+        "payload": {"old_password": new_password, "new_password": settings.admin_initial_password},
+        "token": new_token,
     })
 
 
 def test_change_password_rejects_wrong_old_password():
     token = _login_admin()["token"]
     c = _guest_client()
-    r = c.post("/api/v1/auth/change-password", json={
-        "token": token, "old_password": "wrong-old-password", "new_password": "WhateverNew#2026",
+    r = c.post("/api/welcom/opc_world", json={
+        "scenario": "auth.change-password", "version": "v1.0.0",
+        "payload": {"old_password": "wrong-old-password", "new_password": "WhateverNew#2026"},
+        "token": token,
     })
-    assert r.status_code == 400
+    assert r.json()["code"] == 400
 
 
 # ---------------------------------------------------------------------------

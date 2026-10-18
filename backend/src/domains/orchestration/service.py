@@ -25,6 +25,7 @@ from src.core.microkernel.models import (
     NodeType,
 )
 from src.core.telemetry import get_current_trace_id
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -609,6 +610,7 @@ class OrchestrationService:
             created_at=now,
         )
         self._dag_configs[(req.scenario_code, req.version)] = record
+        domain_persistence.write("orchestration.dag_configs", f"{req.scenario_code}@@{req.version}", record)
         return record
 
     def get_dag_config(self, scenario_code: str, version: str) -> DAGConfigRecord:
@@ -627,6 +629,7 @@ class OrchestrationService:
         key = (scenario_code, version)
         if key in self._dag_configs:
             del self._dag_configs[key]
+            domain_persistence.delete("orchestration.dag_configs", f"{scenario_code}@@{version}")
             return True
         return False
 
@@ -731,6 +734,7 @@ class OrchestrationService:
             updated_at=utc_now_iso(),
         )
         self._layouts[req.layout_name] = record
+        domain_persistence.write("orchestration.layouts", req.layout_name, record)
         return record
 
     def get_frontend_layout(self, layout_name: str = "main_console_layout") -> FrontendLayoutRecord:
@@ -738,5 +742,20 @@ class OrchestrationService:
             raise KeyError(f"Frontend layout {layout_name} not found")
         return self._layouts[layout_name]
 
+    def hydrate_dag_configs(self, rows: List[Dict]) -> int:
+        for r in rows:
+            record = DAGConfigRecord(**r)
+            self._dag_configs[(record.scenario_code, record.version)] = record
+        return len(rows)
+
+    def hydrate_layouts(self, rows: List[Dict]) -> int:
+        for r in rows:
+            record = FrontendLayoutRecord(**r)
+            self._layouts[record.layout_name] = record
+        return len(rows)
+
 
 orchestration_service = OrchestrationService()
+
+domain_persistence.register("orchestration.dag_configs", orchestration_service.hydrate_dag_configs)
+domain_persistence.register("orchestration.layouts", orchestration_service.hydrate_layouts)

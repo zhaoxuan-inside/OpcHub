@@ -1,4 +1,4 @@
-# hs-dev-skill 工程治理机制启用控制配置 (Governance Capabilities Toggle)
+# OpcHub 平台工程治理机制启用控制配置 (Governance Capabilities Toggle)
 # 用于按需开启/禁用特定治理功能模式，支持灵活插拔
 version: "1.0"
 

@@ -513,11 +513,60 @@ async def external_rag_forum_qa_adapter(p: Dict[str, Any], c: Dict[str, Any] = N
 
 
 async def auth_register_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Register maker account via email."""
+    """Register maker account via email with commercial validations."""
     from src.domains.user.models import UserRegisterRequest
-    req = UserRegisterRequest(**p)
+    params = dict(p)
+    if c and not params.get("client_ip") and c.get("client_ip"):
+        params["client_ip"] = c.get("client_ip")
+    req = UserRegisterRequest(**params)
     res = await user_service.register_by_email(req)
     return res.model_dump()
+
+
+async def auth_captcha_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Generate lightweight anti-bot SVG challenge."""
+    from src.domains.user.service import user_service
+    return user_service.generate_captcha()
+
+
+async def auth_send_code_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Dispatch email verification code with rate-limiting and anti-bot validation."""
+    from src.domains.user.service import user_service
+    email = p.get("email", "")
+    captcha_id = p.get("captcha_id")
+    captcha_code = p.get("captcha_code")
+    client_ip = (c or {}).get("client_ip") or p.get("client_ip")
+    return user_service.send_verification_code(
+        email=email,
+        captcha_id=captcha_id,
+        captcha_code=captcha_code,
+        client_ip=client_ip,
+    )
+
+
+async def auth_verify_code_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Pre-verify an email verification code."""
+    from src.domains.user.service import user_service
+    email = p.get("email", "")
+    code = p.get("code", "")
+    valid = user_service.verify_email_code(email, code)
+    if not valid:
+        raise ValueError("验证码错误或已失效")
+    return {"valid": True, "message": "验证码有效"}
+
+
+async def auth_password_strength_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Evaluate password strength against commercial standards."""
+    from src.domains.user.service import user_service
+    password = p.get("password", "")
+    email = p.get("email")
+    return user_service.evaluate_password_strength(password, email=email)
+
+
+async def auth_legal_agreements_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Retrieve full text and versions of legal service agreements and privacy policy."""
+    from src.domains.user.service import user_service
+    return user_service.get_legal_agreements()
 
 
 async def auth_login_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -550,5 +599,40 @@ async def auth_session_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
         "session": payload,
         "profile": profile.model_dump() if profile else {},
     }
+
+
+async def auth_change_password_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Rotate the caller's password; clears the built-in admin must_change_password flag."""
+    from src.domains.user.models import ChangePasswordRequest
+    token = p.get("token") or (c or {}).get("token") or ""
+    payload = {k: v for k, v in (p or {}).items() if k in {"old_password", "new_password", "user_id", "token"}}
+    if token and not payload.get("token"):
+        payload["token"] = token
+    res = await user_service.change_password(ChangePasswordRequest(**payload))
+    return res.model_dump()
+
+
+async def forum_upvote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle an upvote on a forum thread or comment (authenticated maker)."""
+    from src.domains.forum.service import forum_service
+    user_id = p.get("user_id") or (c or {}).get("user_id") or ""
+    res = forum_service.toggle_upvote(user_id, p.get("target_type", "THREAD"), p.get("target_id", ""))
+    return res.model_dump()
+
+
+async def forum_bookmark_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle a bookmark on a forum thread (authenticated maker)."""
+    from src.domains.forum.service import forum_service
+    user_id = p.get("user_id") or (c or {}).get("user_id") or ""
+    res = forum_service.toggle_bookmark(user_id, p.get("thread_id", ""), p.get("folder_name", "默认收藏夹"))
+    return res.model_dump()
+
+
+async def operator_mode_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Update an operator's dispatch mode (IN_PROCESS vs HTTP_REMOTE) — ADMIN orchestration."""
+    from src.domains.orchestration.models import OperatorModeUpdateRequest
+    req = OperatorModeUpdateRequest(**p)
+    res = orchestration_service.update_operator_mode(req)
+    return res.model_dump()
 
 

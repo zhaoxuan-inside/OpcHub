@@ -2,10 +2,11 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
+from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, FileResponse
 from pydantic import BaseModel
 
 from src.core.config import settings
@@ -21,89 +22,16 @@ from src.core.microkernel.script_ingestion import script_ingestion_service
 from src.core.audit import audit_service
 from src.core.security import verify_session_token
 from src.core.microkernel.registry import registry
-from src.domains.telemetry.service import telemetry_service
-from src.domains.telemetry.models import OpsDashboardResponse
-from src.domains.forum.service import forum_service
-from src.domains.forum.models import (
-    ForumThreadCreate,
-    ForumThreadResponse,
-    ForumCommentCreate,
-    ForumCommentResponse,
-    ThreadDetailResponse,
-    UpvoteRequest,
-    UpvoteResponse,
-    BookmarkRequest,
-    BookmarkResponse,
-)
-from src.domains.sop.service import sop_service
-from src.domains.sop.models import (
-    SOPTemplatesResponse,
-    SOPTemplate,
-    SOPTemplateCreate,
-    SOPDocumentCreate,
-    SOPDocumentResponse,
-)
-from src.domains.products.service import product_service
-from src.domains.products.models import ProductCreate, ProductResponse
-from src.domains.policies.service import policy_service
-from src.domains.policies.models import (
-    PolicyCreate,
-    PolicyResponse,
-    PolicyMatchRequest,
-    PolicyMatchResponse,
-)
-from src.domains.demands.service import demand_service
-from src.domains.demands.models import (
-    DemandCreate,
-    DemandResponse,
-    BidCreate,
-    BidResponse,
-)
-from src.domains.perks.service import perk_service
-from src.domains.perks.models import (
-    PerkCreate,
-    PerkResponse,
-    PerkClaimRequest,
-    PerkClaimResponse,
-)
 from src.domains.user.service import user_service
 from src.domains.user.models import (
-    MakerProfileResponse,
-    UserProfileUpdateRequest,
-    EntitlementActivateRequest,
-    EntitlementActivateResponse,
     UserRegisterRequest,
     UserLoginRequest,
-    AuthSessionResponse,
-    ChangePasswordRequest,
+    SendCodeRequest,
+    VerifyCodeRequest,
+    PasswordStrengthRequest,
 )
 from src.infrastructure.database.repository import db_repository
-from src.domains.orchestration.service import orchestration_service
-from src.domains.orchestration.models import (
-    DAGConfigSaveRequest,
-    DAGConfigRecord,
-    FrontendLayoutSaveRequest,
-    FrontendLayoutRecord,
-    OperatorDescriptor,
-    OperatorModeUpdateRequest,
-    ScenarioExecuteRequest,
-    ScenarioExecuteResponse,
-)
-from src.domains.moderation.service import moderation_service
-from src.domains.moderation.models import (
-    ModerationItemResponse,
-    TakedownRequest,
-    RestoreRequest,
-    ModerationActionResponse,
-)
-from src.domains.compliance.service import compliance_service
-from src.domains.compliance.models import (
-    ComplianceDimension,
-    ComplianceCase,
-    AuditCheckItem,
-    AuditEvaluateRequest,
-    AuditReportResponse,
-)
+from src.infrastructure.database.persistence import domain_persistence
 from src.core.gateway import (
     DispatchRequest,
     DispatchResponse,
@@ -131,10 +59,23 @@ async def lifespan(app: FastAPI):
             )
         # Retention: move audit records older than the configured window to cold archive
         await audit_service.archive_older_than()
+        # Rebuild the in-memory domain indexes from persisted state (restart durability)
+        await user_service.hydrate_from_db()
+        await domain_persistence.initialize()
     except Exception as e:
         import logging
         logging.getLogger("uvicorn").warning(f"Startup initialization note: {e}")
     yield
+    # Flush any outstanding write-behind persistence tasks before shutdown
+    try:
+        await domain_persistence.flush()
+    except Exception:
+        pass
+    try:
+        from src.core.database import dispose_engine
+        await dispose_engine()
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -159,7 +100,7 @@ app.add_middleware(TracePropagationMiddleware)
 @app.get("/", response_class=HTMLResponse, tags=["Web Console"])
 @app.get("/app", response_class=HTMLResponse, tags=["Web Console"])
 async def serve_web_console():
-    """Serve the OpcHub API landing page (no prototype mock data)."""
+    """Serve the OpcHub API landing page with quick entrance to interactive console."""
     return HTMLResponse(
         """
         <!DOCTYPE html>
@@ -177,15 +118,39 @@ async def serve_web_console():
           p  { color:#4B4E56; line-height:1.7; margin:8px 0; }
           code{ font-family:"SF Mono", Menlo, monospace; font-size:13px;
                 background:rgba(0,113,227,.08); color:#0071E3; padding:2px 6px; border-radius:6px; }
+          .btn { display:inline-block; margin-top:14px; padding:10px 20px; background:#0071E3;
+                 color:#FFFFFF; text-decoration:none; border-radius:10px; font-size:14px;
+                 font-weight:500; box-shadow:0 4px 14px rgba(0,113,227,.3); transition:background .2s; }
+          .btn:hover { background:#0077ED; }
         </style></head>
         <body><div class="card">
           <h1>OpcHub 微内核服务平台</h1>
           <p>API-First 服务已就绪。交互式 API 文档：<code>/docs</code>，统一网关入口：<code>/api/welcom/opc_world</code>。</p>
           <p>健康探针：<code>/livez</code> · <code>/readyz</code> · <code>/healthz</code></p>
+          <a class="btn" href="/console">进入 OpcHub Web 可视化工作台 &rarr;</a>
         </div></body></html>
         """,
         status_code=200,
     )
+
+
+@app.get("/console", tags=["Web Console"])
+async def serve_interactive_console():
+    """Serve the complete OpcHub interactive visual console from frontend build or redirect to frontend service."""
+    dist_html = Path(__file__).resolve().parents[2] / "frontend/dist/index.html"
+    if dist_html.is_file():
+        return FileResponse(
+            dist_html,
+            media_type="text/html; charset=utf-8",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+    from fastapi.responses import RedirectResponse
+    frontend_url = os.getenv("OPCHUB_FRONTEND_URL", "http://127.0.0.1:3000")
+    return RedirectResponse(url=frontend_url)
 
 
 FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0071E3"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>"""
@@ -275,14 +240,16 @@ for _meta_endpoint in settings.gateway_metadata_endpoints:
         tags=["Unified Gateway Dispatcher"],
         summary="Unified Gateway Rules Introspection",
     )
-
-app.add_api_route(
-    "/api/welcom/opc_world/reload",
-    reload_scenario_routes,
-    methods=["POST"],
-    tags=["Unified Gateway Dispatcher"],
-    summary="Reload Routes and Version Policies from YAML",
-)
+    # Sibling hot-reload endpoint keeps the management surface symmetric & config-driven
+    # (e.g. /api/v1/gateway/rules -> /api/v1/gateway/reload).
+    if _meta_endpoint.endswith("/rules"):
+        app.add_api_route(
+            _meta_endpoint[: -len("/rules")] + "/reload",
+            reload_scenario_routes,
+            methods=["POST"],
+            tags=["Unified Gateway Dispatcher"],
+            summary="Reload Routes and Version Policies from YAML",
+        )
 
 
 # ==========================================
@@ -301,16 +268,18 @@ async def liveness_probe():
 
 @app.get("/readyz", tags=["System Probes"])
 async def readiness_probe():
-    """Readiness probe checking readiness of kernel operators and domain repositories."""
+    """Readiness probe checking readiness of database, kernel operators and domain repositories."""
     ops_count = len(registry.list_handlers())
     if ops_count < 4:
         raise HTTPException(status_code=503, detail="Kernel operators below readiness threshold")
     
+    db_ready = await db_repository.is_ready()
     return {
         "status": "READY",
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "trace_id": get_current_trace_id(),
         "checks": {
+            "database": "CONNECTED" if db_ready else "DISCONNECTED",
             "kernel_operators": f"OK ({ops_count} registered)",
             "telemetry": "OK",
             "forum": "OK",
@@ -348,19 +317,6 @@ async def health_check():
         "trace_id": get_current_trace_id(),
         "kernel_operators_count": len(registry.list_handlers())
     }
-
-
-# ==========================================
-# Operational Telemetry Endpoints (Ops Intelligence)
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/ops/dashboard",
-    response_model=OpsDashboardResponse,
-    tags=["Operational Analytics"]
-)
-async def get_ops_dashboard():
-    """Retrieve full operational metrics including DAU, UV, PV, retention and 3-terminal distribution."""
-    return telemetry_service.get_dashboard_metrics()
 
 
 # ==========================================
@@ -495,615 +451,77 @@ async def run_security_audit_archive(
 
 
 # ==========================================
-# Forum Domain Endpoints (Threads, Nested Tree, Upvotes & Bookmarks)
+# Commercial Authentication & Registration Endpoints
 # ==========================================
-@app.post(
-    f"{settings.api_prefix}/forum/threads",
-    response_model=ForumThreadResponse,
-    status_code=201,
-    tags=["Forum"]
-)
-async def create_forum_thread(payload: ForumThreadCreate):
-    """Publish a new maker discussion thread."""
-    return forum_service.create_thread(payload)
+@app.get("/api/auth/captcha", tags=["Authentication & Commercial Onboarding"])
+@app.get(f"{settings.api_prefix}/auth/captcha", tags=["Authentication & Commercial Onboarding"])
+async def get_captcha():
+    """Generate anti-bot SVG challenge."""
+    return user_service.generate_captcha()
 
 
-@app.get(
-    f"{settings.api_prefix}/forum/threads",
-    response_model=list[ForumThreadResponse],
-    tags=["Forum"]
-)
-async def list_forum_threads(category_code: str | None = None):
-    """List forum discussion threads, optionally filtered by category."""
-    return forum_service.list_threads(category_code=category_code)
-
-
-@app.get(
-    f"{settings.api_prefix}/forum/threads/{{thread_id}}",
-    response_model=ThreadDetailResponse,
-    tags=["Forum"]
-)
-async def get_forum_thread_detail(thread_id: str):
-    """Get discussion thread detail including full recursive comment tree."""
+@app.post("/api/auth/send-code", tags=["Authentication & Commercial Onboarding"])
+@app.post(f"{settings.api_prefix}/auth/send-code", tags=["Authentication & Commercial Onboarding"])
+async def send_verification_code(req: SendCodeRequest, request: Request):
+    """Dispatch verification code to email with rate-limiting and anti-bot validation."""
+    client_ip = req.client_ip or (request.client.host if request.client else "127.0.0.1")
     try:
-        return forum_service.get_thread_detail(thread_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Forum thread not found")
-
-
-@app.post(
-    f"{settings.api_prefix}/forum/threads/{{thread_id}}/comments",
-    response_model=ForumCommentResponse,
-    status_code=201,
-    tags=["Forum"]
-)
-async def create_forum_comment(thread_id: str, payload: ForumCommentCreate):
-    """Post a top-level answer or nested sub-reply with materialized path computation."""
-    try:
-        return forum_service.create_comment(thread_id, payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        return user_service.send_verification_code(
+            email=req.email,
+            captcha_id=req.captcha_id,
+            captcha_code=req.captcha_code,
+            client_ip=client_ip,
+        )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post(
-    f"{settings.api_prefix}/forum/upvote",
-    response_model=UpvoteResponse,
-    tags=["Forum"]
-)
-async def toggle_forum_upvote(payload: UpvoteRequest):
-    """Atomically toggle upvote on a thread or comment."""
+@app.post("/api/auth/verify-code", tags=["Authentication & Commercial Onboarding"])
+@app.post(f"{settings.api_prefix}/auth/verify-code", tags=["Authentication & Commercial Onboarding"])
+async def verify_code(req: VerifyCodeRequest):
+    """Pre-verify verification code."""
+    valid = user_service.verify_email_code(req.email, req.code)
+    if not valid:
+        raise HTTPException(status_code=400, detail="验证码错误或已失效")
+    return {"valid": True, "message": "验证码有效"}
+
+
+@app.post("/api/auth/password-strength", tags=["Authentication & Commercial Onboarding"])
+@app.post(f"{settings.api_prefix}/auth/password-strength", tags=["Authentication & Commercial Onboarding"])
+async def check_password_strength(req: PasswordStrengthRequest):
+    """Evaluate password strength against commercial standards."""
+    return user_service.evaluate_password_strength(req.password, email=req.email)
+
+
+@app.get("/api/auth/agreements", tags=["Authentication & Commercial Onboarding"])
+@app.get(f"{settings.api_prefix}/auth/agreements", tags=["Authentication & Commercial Onboarding"])
+async def get_agreements():
+    """Retrieve statutory user terms of service and privacy policy."""
+    return user_service.get_legal_agreements()
+
+
+@app.post("/api/auth/register", tags=["Authentication & Commercial Onboarding"])
+@app.post(f"{settings.api_prefix}/auth/register", tags=["Authentication & Commercial Onboarding"])
+async def register_maker(req: UserRegisterRequest, request: Request):
+    """Commercial maker account registration with legal consent and ownership proof."""
+    if not req.client_ip and request.client:
+        req.client_ip = request.client.host
     try:
-        return forum_service.toggle_upvote(payload.user_id, payload.target_type, payload.target_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        res = await user_service.register_by_email(req)
+        return res.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.post(
-    f"{settings.api_prefix}/forum/bookmark",
-    response_model=BookmarkResponse,
-    tags=["Forum"]
-)
-async def toggle_forum_bookmark(payload: BookmarkRequest):
-    """Atomically toggle bookmark on a thread."""
+@app.post("/api/auth/login", tags=["Authentication & Commercial Onboarding"])
+@app.post(f"{settings.api_prefix}/auth/login", tags=["Authentication & Commercial Onboarding"])
+async def login_maker(req: UserLoginRequest):
+    """Maker email and password authentication."""
     try:
-        return forum_service.toggle_bookmark(payload.user_id, payload.thread_id, payload.folder_name)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ==========================================
-# Home Platform Overview Endpoints
-# ==========================================
-@app.get(f"{settings.api_prefix}/home/overview", tags=["Home Overview"])
-async def get_home_overview():
-    """Retrieve platform aggregate overview statistics and navigation summary."""
-    from src.domains.user.service import user_service
-    from src.domains.forum.service import forum_service
-    from src.domains.demands.service import demand_service
-    from src.domains.policies.service import policy_service
-    from src.domains.sop.service import sop_service
-
-    users_count = len([u for u in user_service._users_by_uid.values() if u.get("role") != "GUEST"])
-    demands = demand_service.list_demands()
-    policies = policy_service.list_policies()
-    threads = forum_service.list_threads()
-    templates_count = len(sop_service._templates)
-
-    return {
-        "active_makers_count": users_count,
-        "active_dags_count": 0,
-        "matched_policies_count": len(policies),
-        "demands_orders_count": len(demands),
-        "perks_saved_cny": 0.0,
-        "quick_links": [
-            {"name": "头脑风暴", "route": "forum", "count_desc": f"{len(threads)} 篇讨论"},
-            {"name": "流程文书", "route": "sop", "count_desc": f"{templates_count} 阶段合规材料"},
-            {"name": "政策雷达", "route": "policy", "count_desc": f"{len(policies)} 条扶持政策"},
-            {"name": "需求集市", "route": "demand", "count_desc": f"{len(demands)} 笔进行中委托"},
-            {"name": "生态特权", "route": "perks", "count_desc": "特权福利通道"},
-            {"name": "合规指南", "route": "compliance", "count_desc": "6大防线自检雷达"},
-            {"name": "创客中心", "route": "user", "count_desc": "创客会员中心"},
-        ],
-    }
-
-
-# ==========================================
-# SOP Document & Template Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/sop/templates",
-    response_model=SOPTemplatesResponse,
-    tags=["SOP Workflow"]
-)
-async def get_sop_stages_and_templates():
-    """Get all 4-stage business creation steps and standard document templates."""
-    return sop_service.get_stages_and_templates()
-
-
-@app.post(
-    f"{settings.api_prefix}/sop/templates",
-    response_model=SOPTemplate,
-    status_code=201,
-    tags=["SOP Workflow"]
-)
-async def create_sop_template(payload: SOPTemplateCreate):
-    """Publish a new SOP compliance document template."""
-    return sop_service.create_template(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/sop/documents",
-    response_model=SOPDocumentResponse,
-    status_code=201,
-    tags=["SOP Workflow"]
-)
-async def render_and_save_sop_document(payload: SOPDocumentCreate):
-    """Render document template with maker input data and persist instance to backend."""
-    try:
-        return sop_service.render_and_save_document(payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.get(
-    f"{settings.api_prefix}/sop/documents/{{doc_id}}",
-    response_model=SOPDocumentResponse,
-    tags=["SOP Workflow"]
-)
-async def get_sop_document(doc_id: str):
-    """Retrieve saved document instance by ID."""
-    try:
-        return sop_service.get_document(doc_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.get(
-    f"{settings.api_prefix}/sop/documents",
-    response_model=list[SOPDocumentResponse],
-    tags=["SOP Workflow"]
-)
-async def list_sop_documents(user_id: str | None = None):
-    """List saved documents, optionally filtered by maker user_id."""
-    return sop_service.list_documents(user_id=user_id)
-
-
-# ==========================================
-# Product Showcase Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/products",
-    response_model=list[ProductResponse],
-    tags=["Product Showcase"]
-)
-async def list_products(category: str | None = None):
-    """List maker independent products, optionally filtered by category."""
-    return product_service.list_products(category=category)
-
-
-@app.post(
-    f"{settings.api_prefix}/products",
-    response_model=ProductResponse,
-    status_code=201,
-    tags=["Product Showcase"]
-)
-async def create_product(payload: ProductCreate):
-    """Publish a new maker product showcase."""
-    return product_service.create_product(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/products/{{product_id}}/upvote",
-    response_model=ProductResponse,
-    tags=["Product Showcase"]
-)
-async def upvote_product(product_id: str):
-    """Upvote an independent maker product."""
-    try:
-        return product_service.upvote_product(product_id)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ==========================================
-# Policy Radar Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/policies",
-    response_model=list[PolicyResponse],
-    tags=["Policy Radar"]
-)
-async def list_policies(category: str | None = None):
-    """List government incentive and tax exemption policies."""
-    return policy_service.list_policies(category=category)
-
-
-@app.post(
-    f"{settings.api_prefix}/policies",
-    response_model=PolicyResponse,
-    status_code=201,
-    tags=["Policy Radar"]
-)
-async def create_policy(payload: PolicyCreate):
-    """Publish a new government policy or incentive rule."""
-    return policy_service.create_policy(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/policies/match",
-    response_model=PolicyMatchResponse,
-    tags=["Policy Radar"]
-)
-async def match_policies(payload: PolicyMatchRequest):
-    """Evaluate maker financial data against policies and calculate tax savings."""
-    return policy_service.match_policies(payload)
-
-
-# ==========================================
-# Demand Market & Bidding Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/demands",
-    response_model=list[DemandResponse],
-    tags=["Demand Market"]
-)
-async def list_demands(category: str | None = None):
-    """List enterprise outsourcing and custom demands."""
-    return demand_service.list_demands(category=category)
-
-
-@app.post(
-    f"{settings.api_prefix}/demands",
-    response_model=DemandResponse,
-    status_code=201,
-    tags=["Demand Market"]
-)
-async def create_demand(payload: DemandCreate):
-    """Publish a new corporate outsourcing demand."""
-    return demand_service.create_demand(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/demands/{{demand_id}}/bids",
-    response_model=BidResponse,
-    status_code=201,
-    tags=["Demand Market"]
-)
-async def submit_demand_bid(demand_id: str, payload: BidCreate):
-    """Submit a maker bid for a demand."""
-    try:
-        return demand_service.submit_bid(demand_id, payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ==========================================
-# Perks & Infrastructure Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/perks",
-    response_model=list[PerkResponse],
-    tags=["Perks & Infra"]
-)
-async def list_perks():
-    """List available developer credits and platform discounts."""
-    return perk_service.list_perks()
-
-
-@app.post(
-    f"{settings.api_prefix}/perks",
-    response_model=PerkResponse,
-    status_code=201,
-    tags=["Perks & Infra"]
-)
-async def create_perk(payload: PerkCreate):
-    """Publish a new developer ecosystem perk or credit."""
-    return perk_service.create_perk(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/perks/claim",
-    response_model=PerkClaimResponse,
-    tags=["Perks & Infra"]
-)
-async def claim_perk(payload: PerkClaimRequest):
-    """Claim and activate an exclusive maker infrastructure deal."""
-    try:
-        return perk_service.claim_perk(payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        res = await user_service.login_by_email(req)
+        return res.model_dump()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-# ==========================================
-# Authentication & Identity Endpoints
-# ==========================================
-@app.post(
-    f"{settings.api_prefix}/auth/register",
-    response_model=AuthSessionResponse,
-    status_code=201,
-    tags=["Auth & Identity"]
-)
-@app.post(
-    "/api/auth/register",
-    response_model=AuthSessionResponse,
-    status_code=201,
-    tags=["Auth & Identity"]
-)
-async def register_by_email(payload: UserRegisterRequest):
-    """Register a new maker account by email."""
-    try:
-        return await user_service.register_by_email(payload)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post(
-    f"{settings.api_prefix}/auth/login",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"]
-)
-@app.post(
-    "/api/auth/login",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"]
-)
-async def login_by_email(payload: UserLoginRequest):
-    """Login with email and password to receive session token."""
-    try:
-        return await user_service.login_by_email(payload)
-    except ValueError as e:
-        raise HTTPException(status_code=401, detail=str(e))
-
-
-@app.get(
-    f"{settings.api_prefix}/auth/session",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"]
-)
-@app.get(
-    "/api/auth/session",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"]
-)
-async def get_current_session(token: str | None = None):
-    """Verify session token and retrieve current maker profile."""
-    if not token:
-        raise HTTPException(status_code=401, detail="Token is required")
-    res = await user_service.get_session_by_token(token)
-    if not res:
-        raise HTTPException(status_code=401, detail="Invalid or expired token")
-    return res
-
-
-@app.post(
-    f"{settings.api_prefix}/auth/change-password",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"],
-)
-@app.post(
-    "/api/auth/change-password",
-    response_model=AuthSessionResponse,
-    tags=["Auth & Identity"],
-)
-async def change_password(payload: ChangePasswordRequest):
-    """Rotate the caller's password (clears the built-in admin must_change_password flag)."""
-    try:
-        return user_service.change_password(payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-# ==========================================
-# User Profile & Entitlements Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/user/profile",
-    response_model=MakerProfileResponse,
-    tags=["User & Entitlements"]
-)
-async def get_user_profile(user_id: Optional[str] = None, token: Optional[str] = None):
-    """Get maker account profile and active feature entitlements."""
-    if not user_id and token:
-        from src.core.security import verify_session_token
-        payload = verify_session_token(token)
-        if payload and payload.get("uid"):
-            user_id = payload.get("uid")
-    if not user_id:
-        user_id = "usr_guest"
-    return user_service.get_profile(user_id)
-
-
-@app.post(
-    f"{settings.api_prefix}/user/profile",
-    response_model=MakerProfileResponse,
-    tags=["User & Entitlements"]
-)
-async def update_user_profile(payload: UserProfileUpdateRequest):
-    """Update maker account profile."""
-    try:
-        return await user_service.update_profile(payload)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-
-@app.post(
-    f"{settings.api_prefix}/user/entitlements/activate",
-    response_model=EntitlementActivateResponse,
-    tags=["User & Entitlements"]
-)
-async def activate_entitlement(payload: EntitlementActivateRequest):
-    """Purchase or activate a paid feature entitlement."""
-    try:
-        return user_service.activate_entitlement(payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-# ==========================================
-# Orchestration Config Persistence Endpoints
-# ==========================================
-@app.post(
-    f"{settings.api_prefix}/microkernel/dag/configs",
-    response_model=DAGConfigRecord,
-    status_code=201,
-    tags=["Orchestration Persistence"]
-)
-async def save_dag_config(payload: DAGConfigSaveRequest):
-    """Save and compile a versioned DAG pipeline configuration."""
-    return orchestration_service.save_dag_config(payload)
-
-
-@app.get(
-    f"{settings.api_prefix}/microkernel/dag/configs",
-    response_model=list[DAGConfigRecord],
-    tags=["Orchestration Persistence"]
-)
-async def list_dag_configs(scenario_code: str | None = None):
-    """List saved DAG configurations."""
-    return orchestration_service.list_dag_configs(scenario_code=scenario_code)
-
-
-@app.post(
-    f"{settings.api_prefix}/frontend/layouts",
-    response_model=FrontendLayoutRecord,
-    status_code=201,
-    tags=["Orchestration Persistence"]
-)
-async def save_frontend_layout(payload: FrontendLayoutSaveRequest):
-    """Save low-code canvas 24-grid responsive layout."""
-    return orchestration_service.save_frontend_layout(payload)
-
-
-@app.get(
-    f"{settings.api_prefix}/frontend/layouts",
-    response_model=FrontendLayoutRecord,
-    tags=["Orchestration Persistence"]
-)
-async def get_frontend_layout(layout_name: str = "main_console_layout"):
-    """Load latest published frontend layout schema."""
-    try:
-        return orchestration_service.get_frontend_layout(layout_name)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
-
-@app.get(
-    f"{settings.api_prefix}/orchestration/operators",
-    response_model=list[OperatorDescriptor],
-    tags=["Low-Code Composition & Microkernel Orchestration"]
-)
-async def list_registered_operators():
-    """List all registered atomic domain operators and external gateway proxies."""
-    return orchestration_service.list_operators()
-
-
-@app.post(
-    f"{settings.api_prefix}/orchestration/operators/mode",
-    response_model=OperatorDescriptor,
-    tags=["Low-Code Composition & Microkernel Orchestration"]
-)
-async def update_operator_dispatch_mode(payload: OperatorModeUpdateRequest):
-    """Toggle operator execution mode between IN_PROCESS and HTTP_REMOTE."""
-    return orchestration_service.update_operator_mode(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/orchestration/scenarios/execute",
-    response_model=ScenarioExecuteResponse,
-    tags=["Low-Code Composition & Microkernel Orchestration"]
-)
-async def execute_composable_scenario(payload: ScenarioExecuteRequest):
-    """Execute a composable scenario DAG pipeline across domain modules and external gateways."""
-    try:
-        return await orchestration_service.execute_scenario(payload)
-    except KeyError as e:
-        raise HTTPException(status_code=404, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ==========================================
-# Administrator Content Moderation Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/admin/moderation/items",
-    response_model=list[ModerationItemResponse],
-    tags=["Content Moderation"]
-)
-async def list_moderation_items(status: str | None = None):
-    """Retrieve reported and flagged content items for administrative review."""
-    return moderation_service.list_items(status=status)
-
-
-@app.post(
-    f"{settings.api_prefix}/admin/moderation/takedown",
-    response_model=ModerationActionResponse,
-    tags=["Content Moderation"]
-)
-async def takedown_content(payload: TakedownRequest):
-    """Take down violating speech and hide from public view."""
-    return moderation_service.takedown(payload)
-
-
-@app.post(
-    f"{settings.api_prefix}/admin/moderation/restore",
-    response_model=ModerationActionResponse,
-    tags=["Content Moderation"]
-)
-async def restore_content(payload: RestoreRequest):
-    """Restore mistakenly flagged content item."""
-    return moderation_service.restore(payload)
-
-
-# ==========================================
-# Product Compliance & Self-Audit Endpoints
-# ==========================================
-@app.get(
-    f"{settings.api_prefix}/compliance/dimensions",
-    response_model=list[ComplianceDimension],
-    tags=["Product Compliance"]
-)
-async def get_compliance_dimensions():
-    """Retrieve six-dimensional product compliance guidelines and legal rules."""
-    return compliance_service.get_dimensions()
-
-
-@app.get(
-    f"{settings.api_prefix}/compliance/cases",
-    response_model=list[ComplianceCase],
-    tags=["Product Compliance"]
-)
-async def get_compliance_cases():
-    """Retrieve real-world regulatory pitfall cases and penalties."""
-    return compliance_service.get_cases()
-
-
-@app.get(
-    f"{settings.api_prefix}/compliance/checkpoints",
-    response_model=list[AuditCheckItem],
-    tags=["Product Compliance"]
-)
-async def get_compliance_checkpoints():
-    """Retrieve 10-point standard pre-launch compliance self-audit checklist."""
-    return compliance_service.get_checkpoints()
-
-
-@app.post(
-    f"{settings.api_prefix}/compliance/audit",
-    response_model=AuditReportResponse,
-    tags=["Product Compliance"]
-)
-async def evaluate_compliance_audit(payload: AuditEvaluateRequest):
-    """Evaluate developer's self-audit submission and generate a compliance score report."""
-    return compliance_service.evaluate_audit(payload)
 
 
 if __name__ == "__main__":

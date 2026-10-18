@@ -1,7 +1,6 @@
 """SQLAlchemy 2.0 Declarative ORM Models for PostgreSQL 16+ (ADR-002 & ADR-003).
 
-Strictly maps all 16 core business tables specified in:
-hs_dev_docs/_03_architecture_design/_03_detailed_design/_01_database_schema.md
+Strictly maps all 16 core business tables for the OpcHub platform.
 """
 import uuid
 from datetime import datetime, timezone
@@ -380,4 +379,23 @@ class AuditLogArchive(Base):
     detail_encrypted: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class DomainSnapshot(Base):
+    """Generic JSONB document store for domain aggregates (domain_snapshots).
+
+    Persists each domain service's runtime aggregates as versioned JSON documents so that
+    the in-memory primary index can be rebuilt verbatim across process restarts
+    (write-behind on mutation + hydrate-on-startup). Complements the normalized
+    relational tables which remain the schema-of-record for relational reporting.
+    """
+    __tablename__ = "domain_snapshots"
+
+    domain: Mapped[str] = mapped_column(String(64), primary_key=True)
+    entity_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
 

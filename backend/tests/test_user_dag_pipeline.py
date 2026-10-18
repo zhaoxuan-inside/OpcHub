@@ -102,7 +102,7 @@ async def test_user_entitlement_activate_saga_rollback_on_downstream_failure(cle
     """Verify Saga reverse compensation deactivates entitlement if downstream step fails."""
     test_user = clean_user_state
     # Ensure initially inactive
-    user_service.deactivate_entitlement("ent_black_diamond_priority")
+    await user_service.deactivate_entitlement("ent_black_diamond_priority")
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:

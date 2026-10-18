@@ -184,40 +184,44 @@ async def test_gateway_auth_scenario_dispatch():
     assert session_result.data["email"] == email
 
 
-def test_fastapi_rest_endpoints():
-    """Verify direct REST API endpoints for user authentication."""
+def test_gateway_auth_rest_equivalents():
+    """Verify auth capabilities are reached through the single unified gateway entrypoint."""
     ts = int(time.time() * 1000)
     email = f"rest_maker_{ts}@opchub.cn"
     pwd = "RestPassword2026"
 
-    # POST /api/auth/register
-    resp_reg = client.post(
-        "/api/auth/register",
-        json={"email": email, "password": pwd, "nickname": "REST创客", "company_name": "REST工作室"}
-    )
-    assert resp_reg.status_code == 201
+    def _post(scenario, payload, token=None):
+        body = {"scenario": scenario, "version": "v1.0.0", "payload": payload}
+        if token is not None:
+            body["token"] = token
+        return client.post("/api/welcom/opc_world", json=body)
+
+    # auth.register
+    resp_reg = _post("auth.register", {
+        "email": email, "password": pwd, "nickname": "REST创客", "company_name": "REST工作室",
+    })
+    assert resp_reg.status_code == 200
     data_reg = resp_reg.json()
-    assert data_reg["email"] == email
-    token = data_reg["token"]
+    assert data_reg["code"] == 200
+    assert data_reg["data"]["email"] == email
+    token = data_reg["data"]["token"]
 
-    # POST /api/auth/login
-    resp_login = client.post(
-        "/api/auth/login",
-        json={"email": email, "password": pwd}
-    )
-    assert resp_login.status_code == 200
+    # auth.login
+    resp_login = _post("auth.login", {"email": email, "password": pwd})
     data_login = resp_login.json()
-    assert data_login["token"] is not None
+    assert data_login["code"] == 200
+    assert data_login["data"]["token"] is not None
 
-    # GET /api/auth/session with token
-    resp_sess = client.get(f"/api/auth/session?token={token}")
-    assert resp_sess.status_code == 200
-    assert resp_sess.json()["email"] == email
+    # auth.session with token
+    resp_sess = _post("auth.session", {"token": token})
+    assert resp_sess.json()["code"] == 200
+    assert resp_sess.json()["data"]["email"] == email
 
-    # GET /api/auth/session without token -> 401
-    resp_sess_no_token = client.get("/api/auth/session")
-    assert resp_sess_no_token.status_code in [400, 401, 422]
+    # auth.session without token -> error (no valid session)
+    client.headers.pop("Authorization", None)
+    resp_sess_no_token = _post("auth.session", {})
+    assert resp_sess_no_token.json()["code"] != 200
 
-    # GET /api/auth/session with invalid token -> 401
-    resp_sess_invalid = client.get("/api/auth/session?token=invalid.token.signature")
-    assert resp_sess_invalid.status_code == 401
+    # auth.session with invalid token -> error
+    resp_sess_invalid = _post("auth.session", {"token": "invalid.token.signature"})
+    assert resp_sess_invalid.json()["code"] != 200

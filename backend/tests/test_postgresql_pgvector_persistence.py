@@ -1,8 +1,7 @@
 """Test suite verifying PostgreSQL 16+ ORM models, pgvector integration, and database engine (ADR-002 & ADR-003).
 
 Validates:
-1. All 16 core platform entity models strictly comply with the database schema specification:
-   hs_dev_docs/_03_architecture_design/_03_detailed_design/_01_database_schema.md
+1. All 16 core platform entity models strictly comply with the database schema specification.
 2. PostgreSQL DDL compilation succeeds with UUID, JSONB, and Vector(128) types.
 3. pgvector cosine distance operator (<=>) compilation and query building.
 4. Database engine lifecycle and health check functionality.

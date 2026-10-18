@@ -8,6 +8,7 @@ from src.domains.policies.models import (
     PolicyMatchRequest,
     PolicyMatchResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 class PolicyService:
@@ -36,6 +37,7 @@ class PolicyService:
             legal_basis=req.legal_basis,
         )
         self._policies[pid] = policy
+        domain_persistence.write("policies.items", pid, policy)
         return policy
 
     def match_policies(self, req: PolicyMatchRequest) -> PolicyMatchResponse:
@@ -110,8 +112,14 @@ class PolicyService:
         """Physically delete policy for Saga reverse compensation."""
         if policy_id in self._policies:
             del self._policies[policy_id]
+            domain_persistence.delete("policies.items", policy_id)
             return True
         return False
+
+    def hydrate_items(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._policies[r["id"]] = PolicyResponse(**r)
+        return len(rows)
 
     def clear(self) -> None:
         """Reset policies for isolated testing."""
@@ -119,3 +127,5 @@ class PolicyService:
 
 
 policy_service = PolicyService()
+
+domain_persistence.register("policies.items", policy_service.hydrate_items)

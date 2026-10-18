@@ -1,7 +1,6 @@
 """AST Security Scanner & Restricted-Namespace Loader for Hot-Loaded Python Operators.
 
-Implements the four-firewall design of
-hs_dev_docs/_03_architecture_design/_02_system_architecture/opchub_rbac_auth_architecture.md §3.2:
+Implements the four-firewall design for microkernel operators:
 
 1. AST static lexical/syntax sandbox scan (forbidden modules / calls / attribute escapes)
 2. Entry-point signature convention verification (must export an async entry function)

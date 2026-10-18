@@ -79,6 +79,12 @@ external_gateway:
     api_key_env: "ALIYUN_SMS_ACCESS_KEY"
     mock_mode: true
 
+  # Aliyun Content Moderation (Green) Anti-Spam & Sensitive Keyword Scan Gateway
+  content_moderation:
+    base_url: "http://127.0.0.1:8099"
+    api_key_env: "ALIYUN_GREEN_API_KEY"
+    timeout_seconds: 5.0
+
   # Lightweight SQLite Vector Store & RAG Engine
   rag:
     embedding_model: "BAAI/bge-large-zh-v1.5"

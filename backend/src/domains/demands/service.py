@@ -9,6 +9,7 @@ from src.domains.demands.models import (
     BidCreate,
     BidResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -40,6 +41,7 @@ class DemandService:
         )
         self._demands[did] = demand
         self._bids[did] = []
+        domain_persistence.write("demands.items", did, demand)
         return demand
 
     def list_demands(self, category: Optional[str] = None) -> List[DemandResponse]:
@@ -70,6 +72,8 @@ class DemandService:
             self._bids[demand_id] = []
         self._bids[demand_id].append(bid)
         demand.bidders_count += 1
+        domain_persistence.write("demands.bids", bid_id, bid)
+        domain_persistence.write("demands.items", demand_id, demand)
         return bid
 
     def get_demand(self, demand_id: str) -> Optional[DemandResponse]:
@@ -78,7 +82,9 @@ class DemandService:
     def delete_demand(self, demand_id: str) -> bool:
         if demand_id in self._demands:
             del self._demands[demand_id]
-            self._bids.pop(demand_id, None)
+            domain_persistence.delete("demands.items", demand_id)
+            for bid in self._bids.pop(demand_id, []):
+                domain_persistence.delete("demands.bids", bid.id)
             return True
         return False
 
@@ -89,9 +95,25 @@ class DemandService:
             if len(self._bids[demand_id]) < original_len:
                 if self._demands[demand_id].bidders_count > 0:
                     self._demands[demand_id].bidders_count -= 1
+                domain_persistence.delete("demands.bids", bid_id)
+                domain_persistence.write("demands.items", demand_id, self._demands[demand_id])
                 return True
         return False
 
+    def hydrate_demands(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._demands[r["id"]] = DemandResponse(**r)
+            self._bids.setdefault(r["id"], [])
+        return len(rows)
+
+    def hydrate_bids(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._bids.setdefault(r["demand_id"], []).append(BidResponse(**r))
+        return len(rows)
+
 
 demand_service = DemandService()
+
+domain_persistence.register("demands.items", demand_service.hydrate_demands)
+domain_persistence.register("demands.bids", demand_service.hydrate_bids)
 

@@ -8,6 +8,7 @@ from .models import (
     RestoreRequest,
     ModerationActionResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -34,6 +35,7 @@ class ModerationService:
         if item:
             item.status = prev_status
             item.moderated_at = None
+            domain_persistence.write("moderation.items", item_id, item)
             return True
         return False
 
@@ -41,6 +43,7 @@ class ModerationService:
         item = self._items.get(item_id)
         if item:
             item.status = "TAKEN_DOWN"
+            domain_persistence.write("moderation.items", item_id, item)
             return True
         return False
 
@@ -54,6 +57,7 @@ class ModerationService:
         item.reason = req.reason
         item.moderator_id = req.moderator_id
         item.moderated_at = now
+        domain_persistence.write("moderation.items", item.id, item)
 
         return ModerationActionResponse(
             item_id=item.id,
@@ -71,6 +75,7 @@ class ModerationService:
         item.status = "NORMAL"
         item.moderator_id = req.moderator_id
         item.moderated_at = now
+        domain_persistence.write("moderation.items", item.id, item)
 
         return ModerationActionResponse(
             item_id=item.id,
@@ -79,5 +84,12 @@ class ModerationService:
             note="处罚已撤销，言论恢复正常展示"
         )
 
+    def hydrate_items(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._items[r["id"]] = ModerationItemResponse(**r)
+        return len(rows)
+
 
 moderation_service = ModerationService()
+
+domain_persistence.register("moderation.items", moderation_service.hydrate_items)

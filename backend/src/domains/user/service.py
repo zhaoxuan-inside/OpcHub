@@ -17,6 +17,12 @@ from src.domains.user.models import (
     UserLoginRequest,
     AuthSessionResponse,
 )
+from src.domains.user.verification import (
+    captcha_service,
+    email_verification_service,
+    PasswordPolicyService,
+    LegalAgreementsRepository,
+)
 
 
 class UserService:
@@ -27,6 +33,7 @@ class UserService:
         self._entitlements: Dict[str, EntitlementItem] = {}
         self._users_by_email: Dict[str, Dict[str, Any]] = {}
         self._users_by_uid: Dict[str, Dict[str, Any]] = {}
+        self.require_email_code: bool = False
         self._seed_default_entitlements()
         self._ensure_builtin_admin()
 
@@ -54,6 +61,35 @@ class UserService:
         }
         self._users_by_uid[admin_uid] = admin
         self._users_by_email[admin["email"]] = admin
+
+    @staticmethod
+    def _record_from_db_user(db_user: Any) -> Dict[str, Any]:
+        """Project a persisted User row into the service's in-memory record shape."""
+        meta = db_user.metadata_payload or {}
+        return {
+            "uid": db_user.uid,
+            "email": db_user.email,
+            "nickname": db_user.nickname,
+            "role": db_user.role,
+            "company_name": db_user.company_name or "",
+            "phone": meta.get("phone", ""),
+            "credit_code": getattr(db_user, "unified_social_credit_code", None) or meta.get("credit_code", ""),
+            "tier_name": meta.get("tier_name", "标准创客"),
+            "account_type": meta.get("account_type", "MAKER"),
+            "industry_track": meta.get("industry_track", ""),
+            "password_hash": db_user.password_hash or "",
+            "active_entitlements": set(meta.get("active_entitlements", [])),
+            "must_change_password": bool(meta.get("must_change_password", False)),
+        }
+
+    async def hydrate_from_db(self) -> int:
+        """Rebuild the in-memory user index from the canonical ``users`` table on startup."""
+        rows = await db_repository.list_users()
+        for db_user in rows:
+            record = self._record_from_db_user(db_user)
+            self._users_by_uid[record["uid"]] = record
+            self._users_by_email[record["email"]] = record
+        return len(rows)
 
     def _seed_default_entitlements(self):
         items = [
@@ -106,65 +142,150 @@ class UserService:
         pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
         return bool(re.match(pattern, email.strip()))
 
+    def generate_captcha(self) -> Dict[str, Any]:
+        """Generate a lightweight anti-bot SVG challenge."""
+        return captcha_service.generate()
+
+    def send_verification_code(
+        self,
+        email: str,
+        captcha_id: Optional[str] = None,
+        captcha_code: Optional[str] = None,
+        client_ip: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Send 6-digit email verification code with anti-bot check and rate limiting."""
+        clean_email = email.strip().lower()
+        if not self.validate_email(clean_email):
+            raise ValueError(f"邮箱格式不正确: {email}")
+
+        # If a captcha was requested or provided, enforce single-use verification
+        if captcha_id:
+            if not captcha_service.verify(captcha_id, captcha_code):
+                raise ValueError("图形验证码错误或已失效，请重新输入")
+
+        return email_verification_service.send_code(clean_email, client_ip=client_ip)
+
+    def verify_email_code(self, email: str, code: str) -> bool:
+        """Directly verify if the email verification code is valid."""
+        return email_verification_service.verify_code(email, code)
+
+    def evaluate_password_strength(self, password: str, email: Optional[str] = None) -> Dict[str, Any]:
+        """Evaluate password entropy, complexity, and compliance suggestions."""
+        return PasswordPolicyService.evaluate(password, email=email)
+
+    def get_legal_agreements(self) -> Dict[str, Any]:
+        """Retrieve statutory platform user terms and privacy policy documents."""
+        return LegalAgreementsRepository.get_agreements()
+
     async def register_by_email(self, req: UserRegisterRequest) -> AuthSessionResponse:
-        """Register a new maker using email and password."""
+        """Register a new maker using email, password, and commercial validations."""
         email = req.email.strip().lower()
         if not self.validate_email(email):
             raise ValueError(f"邮箱格式不正确: {req.email}")
 
+        # 1. Statutory Consent (网络安全法 / 个人信息保护法: 明确同意条款且禁止默认勾选)
+        if not req.agreed_terms:
+            raise ValueError("必须阅读并同意《用户服务协议》与《隐私保护指引》方可完成注册")
+
+        # 2. Password Strength & Policy
         if len(req.password) < 6:
             raise ValueError("密码长度不能少于 6 位")
 
-        # Check DB first if available
+        if req.password.lower() in PasswordPolicyService.COMMON_WEAK_PASSWORDS:
+            raise ValueError("密码过于简单，属于常见弱口令字典，请设置更安全的密码")
+
+        # 3. Ownership Proof & Anti-Bot Protection
+        if req.verification_code:
+            # Primary commercial registration flow: Email verification code proves mailbox ownership.
+            # Anti-bot captcha was already challenged and consumed during auth.send-code.
+            if not email_verification_service.verify_code(email, req.verification_code):
+                raise ValueError("邮箱验证码错误或已过期，请重新获取")
+        elif req.captcha_id:
+            # Fallback for flows where email verification code is not configured
+            if not captcha_service.verify(req.captcha_id, req.captcha_code):
+                raise ValueError("图形验证码错误或已失效，请重新输入")
+        elif self.require_email_code:
+            raise ValueError("请输入邮箱验证码以核验账号真实性")
+
+        # 5. Commercial Identity & Credit Code validation
+        credit_code = (req.credit_code or "").strip().upper()
+        if credit_code:
+            if not re.match(r"^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$", credit_code) and (
+                len(credit_code) < 15 or len(credit_code) > 18
+            ):
+                raise ValueError("统一社会信用代码格式不正确 (应为18位标准代码)")
+
+        # 6. Duplicate Check in DB & Memory
         db_user = await db_repository.get_user_by_email(email)
         if db_user is not None:
             raise ValueError("该邮箱已被注册，请直接登录")
 
-        # Check in-memory store
         if email in self._users_by_email:
             raise ValueError("该邮箱已被注册，请直接登录")
 
         nickname = req.nickname.strip() if req.nickname else email.split("@")[0]
         company = req.company_name.strip() if req.company_name else ""
+        account_type = req.account_type or "MAKER"
+        industry_track = req.industry_track or "独立软件全栈开发"
+        phone = (req.phone or "").strip()
         pwd_hash = hash_password(req.password)
         uid = str(uuid.uuid4())
 
-        # Persist to database if live
-        try:
-            created_db_user = await db_repository.create_user(
-                email=email,
-                password_plain=req.password,
-                nickname=nickname,
-                company_name=company,
-                role="MAKER",
-            )
-            if created_db_user:
-                uid = created_db_user.uid
-        except Exception:
-            pass
+        metadata = {
+            "tier": "STANDARD",
+            "tier_name": "标准创客",
+            "account_type": account_type,
+            "industry_track": industry_track,
+            "phone": phone,
+            "credit_code": credit_code,
+            "invitation_code": req.invitation_code or "",
+            "agreement_consent": {
+                "agreed_terms": True,
+                "agreed_privacy": True,
+                "version": req.agreement_version,
+                "client_ip": req.client_ip or "127.0.0.1",
+            },
+            "created_source": "COMMERCIAL_REG",
+        }
 
-        # Save to in-memory cache
+        # 7. Persist to PostgreSQL database (Mandatory Commercial Strong Persistence)
+        created_db_user = await db_repository.create_user(
+            email=email,
+            password_plain=req.password,
+            nickname=nickname,
+            company_name=company,
+            role="MAKER",
+            credit_code=credit_code if credit_code else None,
+            metadata=metadata,
+        )
+        if created_db_user:
+            uid = created_db_user.uid
+
+        # 8. Save to in-memory cache
         user_record = {
             "uid": uid,
             "email": email,
             "nickname": nickname,
             "role": "MAKER",
             "company_name": company,
-            "phone": "",
-            "credit_code": "",
+            "phone": phone,
+            "credit_code": credit_code,
             "tier_name": "标准创客",
+            "account_type": account_type,
+            "industry_track": industry_track,
             "password_hash": pwd_hash,
             "active_entitlements": set(),
         }
         self._users_by_email[email] = user_record
         self._users_by_uid[uid] = user_record
 
-        # Issue signed token
+        # 9. Issue signed token
         token = create_session_token({
             "uid": uid,
             "email": email,
             "nickname": nickname,
             "role": "MAKER",
+            "account_type": account_type,
         })
 
         return AuthSessionResponse(
@@ -175,7 +296,9 @@ class UserService:
             role="MAKER",
             company_name=company,
             tier_name="标准创客",
-            message="注册成功，欢迎加入超级个体创客中心！",
+            account_type=account_type,
+            industry_track=industry_track,
+            message="商用创客账号注册成功，已初始化超级个体工作区！",
         )
 
     async def login_by_email(self, req: UserLoginRequest) -> AuthSessionResponse:
@@ -186,14 +309,18 @@ class UserService:
         db_user = await db_repository.get_user_by_email(email)
         user_record = None
         if db_user is not None:
+            meta = db_user.metadata_payload or {}
             user_record = {
                 "uid": db_user.uid,
                 "email": db_user.email,
                 "nickname": db_user.nickname,
                 "role": db_user.role,
                 "company_name": db_user.company_name or "",
-                "tier_name": (db_user.metadata_payload or {}).get("tier_name", "标准创客"),
+                "tier_name": meta.get("tier_name", "标准创客"),
+                "account_type": meta.get("account_type", "MAKER"),
+                "industry_track": meta.get("industry_track", ""),
                 "password_hash": db_user.password_hash,
+                "must_change_password": bool(meta.get("must_change_password", False)),
             }
         elif email in self._users_by_email:
             user_record = self._users_by_email[email]
@@ -212,6 +339,7 @@ class UserService:
             "email": user_record["email"],
             "nickname": user_record["nickname"],
             "role": user_record.get("role", "MAKER"),
+            "account_type": user_record.get("account_type", "MAKER"),
             "must_change_password": must_chg,
         })
 
@@ -223,6 +351,8 @@ class UserService:
             role=user_record.get("role", "MAKER"),
             company_name=user_record.get("company_name"),
             tier_name=user_record.get("tier_name", "标准创客"),
+            account_type=user_record.get("account_type", "MAKER"),
+            industry_track=user_record.get("industry_track", ""),
             message="登录成功，已恢复创客工作台会话",
             must_change_password=must_chg,
         )
@@ -238,6 +368,7 @@ class UserService:
         # Query DB or fallback
         db_user = await db_repository.get_user_by_email(email) if email else None
         if db_user:
+            db_meta = db_user.metadata_payload or {}
             return AuthSessionResponse(
                 token=token,
                 uid=db_user.uid,
@@ -245,8 +376,9 @@ class UserService:
                 nickname=db_user.nickname,
                 role=db_user.role,
                 company_name=db_user.company_name,
-                tier_name=(db_user.metadata_payload or {}).get("tier_name", "标准创客"),
+                tier_name=db_meta.get("tier_name", "标准创客"),
                 message="会话有效",
+                must_change_password=bool(db_meta.get("must_change_password", False)),
             )
         user_record = self._users_by_uid.get(uid) or self._users_by_email.get(email)
         if user_record:
@@ -259,6 +391,7 @@ class UserService:
                 company_name=user_record.get("company_name"),
                 tier_name=user_record.get("tier_name", "标准创客"),
                 message="会话有效",
+                must_change_password=bool(user_record.get("must_change_password", False)),
             )
         return AuthSessionResponse(
             token=token,
@@ -365,27 +498,21 @@ class UserService:
             user_record["credit_code"] = req.credit_code.strip()
 
         # Update DB if available
-        try:
-            email = user_record.get("email")
-            if email:
-                db_user = await db_repository.get_user_by_email(email)
-                if db_user:
-                    if req.nickname is not None:
-                        db_user.nickname = req.nickname.strip()
-                    if req.company_name is not None:
-                        db_user.company_name = req.company_name.strip()
-                    meta = db_user.metadata_payload or {}
-                    if req.phone is not None:
-                        meta["phone"] = req.phone.strip()
-                    if req.credit_code is not None:
-                        meta["credit_code"] = req.credit_code.strip()
-                    db_user.metadata_payload = meta
-        except Exception:
-            pass
+        metadata_patch: Dict[str, Any] = {}
+        if req.phone is not None:
+            metadata_patch["phone"] = req.phone.strip()
+        if req.credit_code is not None:
+            metadata_patch["credit_code"] = req.credit_code.strip()
+        await db_repository.update_user_fields(
+            uid,
+            nickname=req.nickname.strip() if req.nickname is not None else None,
+            company_name=req.company_name.strip() if req.company_name is not None else None,
+            metadata_patch=metadata_patch or None,
+        )
 
         return self.get_profile(uid)
 
-    def activate_entitlement(self, req: EntitlementActivateRequest) -> EntitlementActivateResponse:
+    async def activate_entitlement(self, req: EntitlementActivateRequest) -> EntitlementActivateResponse:
         ent_id = req.entitlement_id
         if ent_id not in self._entitlements:
             if ent_id == "ENT_VIP":
@@ -403,6 +530,13 @@ class UserService:
             rec["active_entitlements"].add(ent_id)
             if ent_id == "ent_black_diamond_priority":
                 rec["tier_name"] = "黑钻创客 VIP"
+            await db_repository.update_user_fields(
+                req.user_id,
+                metadata_patch={
+                    "active_entitlements": sorted(rec.get("active_entitlements", set())),
+                    "tier_name": rec.get("tier_name", "标准创客"),
+                },
+            )
 
         receipt = "REC-" + uuid.uuid4().hex[:10].upper()
         return EntitlementActivateResponse(
@@ -414,7 +548,7 @@ class UserService:
             message="专属创客收费权益已激活并绑定，权限即刻生效！",
         )
 
-    def deactivate_entitlement(self, entitlement_id: str, user_id: Optional[str] = None) -> bool:
+    async def deactivate_entitlement(self, entitlement_id: str, user_id: Optional[str] = None) -> bool:
         ent_id = entitlement_id
         if ent_id not in self._active_entitlements and ent_id == "ENT_VIP":
             ent_id = "ent_black_diamond_priority"
@@ -425,17 +559,27 @@ class UserService:
             removed = True
 
         # Keep per-user active_entitlements consistent (Saga compensation symmetry)
-        targets = [self._users_by_uid.get(user_id)] if user_id else list(self._users_by_uid.values())
-        for rec in targets:
-            if rec and "active_entitlements" in rec and ent_id in rec["active_entitlements"]:
+        targets = [user_id] if user_id else list(self._users_by_uid.keys())
+        for uid in targets:
+            rec = self._users_by_uid.get(uid)
+            if not rec:
+                continue
+            if "active_entitlements" in rec and ent_id in rec["active_entitlements"]:
                 rec["active_entitlements"].discard(ent_id)
                 removed = True
-            if rec and ent_id == "ent_black_diamond_priority" and rec.get("tier_name") == "黑钻创客 VIP":
+            if ent_id == "ent_black_diamond_priority" and rec.get("tier_name") == "黑钻创客 VIP":
                 rec["tier_name"] = "标准创客"
+            await db_repository.update_user_fields(
+                uid,
+                metadata_patch={
+                    "active_entitlements": sorted(rec.get("active_entitlements", set())),
+                    "tier_name": rec.get("tier_name", "标准创客"),
+                },
+            )
         return removed
 
 
-    def change_password(self, req: ChangePasswordRequest) -> AuthSessionResponse:
+    async def change_password(self, req: ChangePasswordRequest) -> AuthSessionResponse:
         """Rotate a maker's password; clears must_change_password and re-issues a token."""
         uid = req.user_id
         if req.token:
@@ -457,8 +601,16 @@ class UserService:
         if req.new_password == req.old_password:
             raise ValueError("新密码不能与原密码相同")
 
-        user_record["password_hash"] = hash_password(req.new_password)
+        new_hash = hash_password(req.new_password)
+        user_record["password_hash"] = new_hash
         user_record["must_change_password"] = False
+
+        # Durable rotation: persist the new credential + clear the first-login flag
+        await db_repository.update_user_fields(
+            uid,
+            password_hash=new_hash,
+            metadata_patch={"must_change_password": False},
+        )
 
         token = create_session_token({
             "uid": user_record["uid"],

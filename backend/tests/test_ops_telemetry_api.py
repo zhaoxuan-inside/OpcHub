@@ -2,6 +2,7 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
+from conftest import DEFAULT_ADMIN_TOKEN
 
 
 @pytest.mark.asyncio
@@ -19,9 +20,14 @@ async def test_health_check_endpoint():
 async def test_ops_dashboard_endpoint():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        response = await ac.get("/api/v1/ops/dashboard")
+        ac.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+        response = await ac.post("/api/welcom/opc_world", json={
+            "scenario": "ops.dashboard", "version": "v1.0.0", "payload": {},
+        })
     assert response.status_code == 200
-    data = response.json()
+    body = response.json()
+    assert body["code"] == 200
+    data = body["data"]
 
     # Metrics without instrumentation source report 0 (no fabricated numbers)
     assert data["dau"]["value"] == "0"

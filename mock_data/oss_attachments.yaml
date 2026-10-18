@@ -1,0 +1,21 @@
+# ==============================================================================
+# Mock Dataset: OSS & WeChat Media Attachment Uploads
+# Shared by both HTTP Mock Server and Automated Test Suites
+# ==============================================================================
+defaults:
+  bucket: "opchub-attachments"
+  folder: "attachments"
+
+sample_attachments:
+  business_license:
+    filename: "business_license_test.pdf"
+    content_type: "application/pdf"
+    raw_content_utf8: "%PDF-1.4 Mock Business License Certificate PDF Binary Bytes"
+    target_bucket: "opchub-enterprise-docs"
+    target_folder: "licenses"
+  wechat_id_card:
+    filename: "id_card_front.jpg"
+    content_type: "image/jpeg"
+    raw_content_hex: "ffd8ffe000104a46494600010101006000600000"
+    meta:
+      sha256: "auto"

@@ -55,6 +55,18 @@ def get_async_sessionmaker() -> async_sessionmaker[AsyncSession]:
     return _async_session_factory
 
 
+async def dispose_engine() -> None:
+    """Dispose the connection pool and reset the lazily-created engine singleton."""
+    global _async_engine, _async_session_factory
+    if _async_engine is not None:
+        try:
+            await _async_engine.dispose()
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Engine disposal skipped: %s", exc)
+    _async_engine = None
+    _async_session_factory = None
+
+
 async def check_database_health() -> dict:
     """Probe PostgreSQL database health returning structured telemetry."""
     try:

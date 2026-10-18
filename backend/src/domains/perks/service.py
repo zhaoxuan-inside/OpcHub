@@ -9,6 +9,7 @@ from src.domains.perks.models import (
     PerkClaimRequest,
     PerkClaimResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -39,6 +40,7 @@ class PerkService:
             quota_remaining=req.quota_remaining,
         )
         self._perks[pid] = perk
+        domain_persistence.write("perks.items", pid, perk)
         return perk
 
     def claim_perk(self, req: PerkClaimRequest) -> PerkClaimResponse:
@@ -67,6 +69,8 @@ class PerkService:
             created_at=utc_now_iso(),
         )
         self._claims[key] = claim
+        domain_persistence.write("perks.items", perk.id, perk)
+        domain_persistence.write_raw("perks.claims", f"{req.user_id}|{req.perk_id}", claim.model_dump(mode="json"))
         return claim
 
     def get_perk(self, perk_id: str) -> Optional[PerkResponse]:
@@ -75,6 +79,7 @@ class PerkService:
     def delete_perk(self, perk_id: str) -> bool:
         if perk_id in self._perks:
             del self._perks[perk_id]
+            domain_persistence.delete("perks.items", perk_id)
             return True
         return False
 
@@ -82,11 +87,26 @@ class PerkService:
         key = (user_id, perk_id)
         if key in self._claims:
             del self._claims[key]
+            domain_persistence.delete("perks.claims", f"{user_id}|{perk_id}")
             if perk_id in self._perks:
                 self._perks[perk_id].quota_remaining += 1
+                domain_persistence.write("perks.items", perk_id, self._perks[perk_id])
             return True
         return False
 
+    def hydrate_perks(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._perks[r["id"]] = PerkResponse(**r)
+        return len(rows)
+
+    def hydrate_claims(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._claims[(r["user_id"], r["perk_id"])] = PerkClaimResponse(**r)
+        return len(rows)
+
 
 perk_service = PerkService()
+
+domain_persistence.register("perks.items", perk_service.hydrate_perks)
+domain_persistence.register("perks.claims", perk_service.hydrate_claims)
 

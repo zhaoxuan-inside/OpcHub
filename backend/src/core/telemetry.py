@@ -1,5 +1,5 @@
 """Observability & Distributed Tracing subsystem for OpcHub.
-Complies with hs-dev-skill auxiliary_governance.md §5:
+Features:
 - Global distributed TraceID generation and HTTP header propagation (X-Trace-ID)
 - ContextVar-based request-scoped tracing context
 - Structured JSON logging contract

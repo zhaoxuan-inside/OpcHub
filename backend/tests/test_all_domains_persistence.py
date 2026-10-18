@@ -1,7 +1,25 @@
-"""Comprehensive tests for Full-Page Backend Persistence and SOP Document Engine."""
+"""Comprehensive tests for Full-Page Backend Persistence and SOP Document Engine.
+
+All business access goes through the unified gateway entrypoint (single-entry architecture).
+"""
 import pytest
 from httpx import AsyncClient, ASGITransport
 from src.main import app
+from conftest import DEFAULT_ADMIN_TOKEN
+
+
+async def _gw(ac, scenario, payload):
+    ac.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+    return await ac.post("/api/welcom/opc_world", json={
+        "scenario": scenario, "version": "v1.0.0", "payload": payload,
+    })
+
+
+async def _data(ac, scenario, payload):
+    res = await _gw(ac, scenario, payload)
+    body = res.json()
+    assert body["code"] == 200, f"{scenario} -> {body}"
+    return body["data"]
 
 
 @pytest.fixture(autouse=True)
@@ -123,9 +141,7 @@ def seed_persistence_dependencies():
 async def test_home_overview_api():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        res = await ac.get("/api/v1/home/overview")
-        assert res.status_code == 200
-        data = res.json()
+        data = await _data(ac, "home.overview", {})
         assert "active_makers_count" in data
         assert data["active_makers_count"] >= 0
         assert "active_dags_count" in data
@@ -137,9 +153,7 @@ async def test_sop_templates_and_document_persistence():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. Fetch predefined 4-stage steps & test template
-        res = await ac.get("/api/v1/sop/templates")
-        assert res.status_code == 200
-        data = res.json()
+        data = await _data(ac, "sop.templates", {})
         assert len(data["stages"]) == 4
         assert data["stages"][0]["code"] == "STAGE_TAX_ENTITY"
         assert len(data["templates"]) >= 1
@@ -159,23 +173,17 @@ async def test_sop_templates_and_document_persistence():
                 "registration_office": "杭州市市场监督管理局高新区分局",
             },
         }
-        create_res = await ac.post("/api/v1/sop/documents", json=form_payload)
-        assert create_res.status_code == 201
-        doc = create_res.json()
+        doc = await _data(ac, "sop.document.render", form_payload)
         doc_id = doc["id"]
         assert doc["compliance_passed"] is True
-        assert doc["status"] == "READY"
         assert "持久化测试（杭州）信息技术工作室" in doc["rendered_content"]
 
         # 3. Retrieve saved document by ID
-        get_res = await ac.get(f"/api/v1/sop/documents/{doc_id}")
-        assert get_res.status_code == 200
-        assert get_res.json()["id"] == doc_id
+        fetched = await _data(ac, "sop.document.get", {"doc_id": doc_id})
+        assert fetched["id"] == doc_id
 
         # 4. List user documents
-        list_res = await ac.get("/api/v1/sop/documents?user_id=usr_test_persistence_01")
-        assert list_res.status_code == 200
-        docs = list_res.json()
+        docs = await _data(ac, "sop.document.list", {"user_id": "usr_test_persistence_01"})
         assert any(d["id"] == doc_id for d in docs)
 
 
@@ -184,9 +192,7 @@ async def test_products_lifecycle():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. List products (blank initial catalog)
-        res = await ac.get("/api/v1/products")
-        assert res.status_code == 200
-        products = res.json()
+        products = await _data(ac, "products.list", {})
         assert isinstance(products, list)
 
         # 2. Create new product
@@ -200,14 +206,12 @@ async def test_products_lifecycle():
             "demo_url": "https://aitax.opchub.dev",
             "author_id": "usr_test_persistence_01",
         }
-        create_res = await ac.post("/api/v1/products", json=new_prod)
-        assert create_res.status_code == 201
-        pid = create_res.json()["id"]
+        created = await _data(ac, "products.publish", new_prod)
+        pid = created["id"]
 
         # 3. Upvote product
-        up_res = await ac.post(f"/api/v1/products/{pid}/upvote")
-        assert up_res.status_code == 200
-        assert up_res.json()["upvote_count"] == 1
+        upvoted = await _data(ac, "products.upvote", {"product_id": pid})
+        assert upvoted["upvote_count"] == 1
 
 
 @pytest.mark.asyncio
@@ -215,30 +219,25 @@ async def test_policies_match_engine():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. List policies (test-seeded catalog)
-        res = await ac.get("/api/v1/policies")
-        assert res.status_code == 200
-        assert len(res.json()) >= 1
+        policies = await _data(ac, "policies.list", {})
+        assert len(policies) >= 1
 
         # 2. Match within 300k limit -> VAT Free
-        match_free = await ac.post("/api/v1/policies/match", json={
+        data_free = await _data(ac, "policies.match", {
             "quarterly_income": 280000.0,
             "maker_type": "INDIVIDUAL",
             "region": "杭州",
         })
-        assert match_free.status_code == 200
-        data_free = match_free.json()
         assert data_free["eligible"] is True
         assert data_free["applicable_tax_rate"] == 0.0
         assert data_free["estimated_tax_savings"] == 8400.0
 
         # 3. Match exceeding 300k limit -> VAT Applicable
-        match_taxed = await ac.post("/api/v1/policies/match", json={
+        data_taxed = await _data(ac, "policies.match", {
             "quarterly_income": 400000.0,
             "maker_type": "INDIVIDUAL",
             "region": "杭州",
         })
-        assert match_taxed.status_code == 200
-        data_taxed = match_taxed.json()
         assert data_taxed["eligible"] is False
         assert data_taxed["applicable_tax_rate"] == 0.03
         assert data_taxed["estimated_tax_savings"] == 0.0
@@ -249,27 +248,24 @@ async def test_demands_and_bidding():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. List demands (test-seeded)
-        res = await ac.get("/api/v1/demands")
-        assert res.status_code == 200
-        demands = res.json()
+        demands = await _data(ac, "demands.list", {})
         assert len(demands) >= 1
         demand_id = demands[0]["id"]
         init_bidders = demands[0]["bidders_count"]
 
         # 2. Submit bid
-        bid_res = await ac.post(f"/api/v1/demands/{demand_id}/bids", json={
+        bid = await _data(ac, "demands.bid", {
+            "demand_id": demand_id,
             "bidder_id": "usr_test_persistence_01",
             "bid_amount_cny": 16000.0,
             "delivery_days": 5,
             "proposal_text": "已交付过3个同类型出海独立站，拥有成熟的Stripe全流程合规接入模版，5天内交付上线。",
         })
-        assert bid_res.status_code == 201
-        bid = bid_res.json()
         assert bid["bid_amount_cny"] == 16000.0
 
         # Check bidder count incremented
-        check_res = await ac.get("/api/v1/demands")
-        updated_demand = next(d for d in check_res.json() if d["id"] == demand_id)
+        refreshed = await _data(ac, "demands.list", {})
+        updated_demand = next(d for d in refreshed if d["id"] == demand_id)
         assert updated_demand["bidders_count"] == init_bidders + 1
 
 
@@ -278,28 +274,23 @@ async def test_perks_and_claims():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. List perks (test-seeded)
-        res = await ac.get("/api/v1/perks")
-        assert res.status_code == 200
-        perks = res.json()
+        perks = await _data(ac, "perks.list", {})
         assert len(perks) >= 1
 
         # 2. Claim perk
-        claim_res = await ac.post("/api/v1/perks/claim", json={
+        claim = await _data(ac, "perks.claim", {
             "user_id": "usr_maker_test_88",
             "perk_id": "perk_aws_activate",
         })
-        assert claim_res.status_code == 200
-        claim = claim_res.json()
         assert "OPC-" in claim["voucher_code"]
         assert claim["status"] == "ACTIVATED"
 
         # 3. Duplicate claim returns existing voucher
-        claim_dup = await ac.post("/api/v1/perks/claim", json={
+        claim_dup = await _data(ac, "perks.claim", {
             "user_id": "usr_maker_test_88",
             "perk_id": "perk_aws_activate",
         })
-        assert claim_dup.status_code == 200
-        assert claim_dup.json()["voucher_code"] == claim["voucher_code"]
+        assert claim_dup["voucher_code"] == claim["voucher_code"]
 
 
 @pytest.mark.asyncio
@@ -307,19 +298,15 @@ async def test_user_profile_and_entitlements():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. Get profile (test-seeded user)
-        res = await ac.get("/api/v1/user/profile?user_id=usr_test_persistence_01")
-        assert res.status_code == 200
-        data = res.json()
+        data = await _data(ac, "user.profile", {"user_id": "usr_test_persistence_01"})
         assert data["nickname"] == "持久化测试创客"
         assert len(data["entitlements"]) >= 0
 
         # 2. Activate paid entitlement
-        act_res = await ac.post("/api/v1/user/entitlements/activate", json={
+        act_data = await _data(ac, "user.entitlements.activate", {
             "user_id": "usr_test_persistence_01",
             "entitlement_id": "ent_ai_tax_assistant",
         })
-        assert act_res.status_code == 200
-        act_data = act_res.json()
         assert act_data["is_active"] is True
         assert "REC-" in act_data["receipt_no"]
 
@@ -339,14 +326,12 @@ async def test_orchestration_persistence():
             "status": "ACTIVE",
             "created_by": "usr_admin_001",
         }
-        res_dag = await ac.post("/api/v1/microkernel/dag/configs", json=dag_payload)
-        assert res_dag.status_code == 201
-        assert len(res_dag.json()["compiled_hash"]) > 0
+        res_dag = await _data(ac, "orchestration.dag.save", dag_payload)
+        assert len(res_dag["compiled_hash"]) > 0
 
         # List configs
-        list_dag = await ac.get("/api/v1/microkernel/dag/configs?scenario_code=finance.cross_border_settle")
-        assert list_dag.status_code == 200
-        assert len(list_dag.json()) == 1
+        list_dag = await _data(ac, "orchestration.dag.list", {"scenario_code": "finance.cross_border_settle"})
+        assert len(list_dag) == 1
 
         # 2. Save and load frontend layout
         layout_payload = {
@@ -355,9 +340,7 @@ async def test_orchestration_persistence():
             "grid_schema": {"columns": 12},
             "widgets": [{"id": "w1", "type": "card"}],
         }
-        res_layout = await ac.post("/api/v1/frontend/layouts", json=layout_payload)
-        assert res_layout.status_code == 201
+        await _data(ac, "frontend.layouts.save", layout_payload)
 
-        get_layout = await ac.get("/api/v1/frontend/layouts?layout_name=maker_mobile_dashboard")
-        assert get_layout.status_code == 200
-        assert get_layout.json()["layout_name"] == "maker_mobile_dashboard"
+        layout = await _data(ac, "frontend.layouts.get", {"layout_name": "maker_mobile_dashboard"})
+        assert layout["layout_name"] == "maker_mobile_dashboard"

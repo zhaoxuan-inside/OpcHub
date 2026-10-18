@@ -3,6 +3,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.main import app
+from conftest import gw_data
 from src.core.microkernel.dispatcher import dispatcher, DispatchMode
 from src.core.microkernel.registry import registry
 from src.domains.orchestration.service import orchestration_service
@@ -173,10 +174,8 @@ async def test_execute_composable_policy_match_flow():
 
 
 def test_api_list_operators():
-    """Test HTTP API GET /api/v1/orchestration/operators."""
-    response = client.get("/api/v1/orchestration/operators")
-    assert response.status_code == 200
-    data = response.json()
+    """Operator enumeration goes through the unified gateway (orchestration.operators.list)."""
+    data = gw_data(client, "orchestration.operators.list", {})
     assert isinstance(data, list)
     assert len(data) >= 12
     op_names = [item["name"] for item in data]
@@ -185,26 +184,24 @@ def test_api_list_operators():
 
 
 def test_api_update_operator_mode():
-    """Test HTTP API POST /api/v1/orchestration/operators/mode."""
+    """Operator mode switching goes through the gateway (orchestration.operators.mode)."""
     payload = {
         "name": "external.ai.generate_charter",
         "mode": "HTTP_REMOTE",
         "remote_endpoint": "http://ai-svc:8080/generate",
     }
-    response = client.post("/api/v1/orchestration/operators/mode", json=payload)
-    assert response.status_code == 200
-    data = response.json()
+    data = gw_data(client, "orchestration.operators.mode", payload)
     assert data["name"] == "external.ai.generate_charter"
     assert data["mode"] == "HTTP_REMOTE"
 
     # Reset back to IN_PROCESS
-    payload["mode"] = "IN_PROCESS"
-    payload["remote_endpoint"] = None
-    client.post("/api/v1/orchestration/operators/mode", json=payload)
+    gw_data(client, "orchestration.operators.mode", {
+        "name": "external.ai.generate_charter", "mode": "IN_PROCESS", "remote_endpoint": None,
+    })
 
 
 def test_api_execute_scenario():
-    """Test HTTP API POST /api/v1/orchestration/scenarios/execute."""
+    """Scenario execution goes through the gateway (orchestration.scenarios.execute)."""
     payload = {
         "scenario_code": "OPC_POLICY_TAX_AI_MATCH",
         "inputs": {
@@ -213,9 +210,7 @@ def test_api_execute_scenario():
             "entity_type": "个体工商户",
         },
     }
-    response = client.post("/api/v1/orchestration/scenarios/execute", json=payload)
-    assert response.status_code == 200
-    data = response.json()
+    data = gw_data(client, "orchestration.scenarios.execute", payload)
     assert data["status"] == "SUCCESS"
     assert data["scenario_code"] == "OPC_POLICY_TAX_AI_MATCH"
     assert "execution_time_ms" in data

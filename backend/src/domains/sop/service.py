@@ -11,6 +11,7 @@ from src.domains.sop.models import (
     SOPDocumentCreate,
     SOPDocumentResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -79,6 +80,7 @@ class SOPService:
             is_active=True,
         )
         self._templates[tid] = template
+        domain_persistence.write("sop.templates", tid, template)
         return template
 
     def render_and_save_document(self, payload: SOPDocumentCreate) -> SOPDocumentResponse:
@@ -122,6 +124,7 @@ class SOPService:
         )
 
         self._documents[doc_id] = document
+        domain_persistence.write("sop.documents", doc_id, document)
         return document
 
     def get_document(self, doc_id: str) -> SOPDocumentResponse:
@@ -142,9 +145,23 @@ class SOPService:
         """Physically delete persisted document by ID for Saga rollback."""
         if doc_id in self._documents:
             del self._documents[doc_id]
+            domain_persistence.delete("sop.documents", doc_id)
             return True
         return False
 
+    def hydrate_templates(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._templates[r["id"]] = SOPTemplate(**r)
+        return len(rows)
+
+    def hydrate_documents(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._documents[r["id"]] = SOPDocumentResponse(**r)
+        return len(rows)
+
 
 sop_service = SOPService()
+
+domain_persistence.register("sop.templates", sop_service.hydrate_templates)
+domain_persistence.register("sop.documents", sop_service.hydrate_documents)
 

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from src.domains.products.models import ProductCreate, ProductResponse
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -35,6 +36,7 @@ class ProductService:
             updated_at=now,
         )
         self._products[pid] = product
+        domain_persistence.write("products.items", pid, product)
         return product
 
     def list_products(self, category: Optional[str] = None) -> List[ProductResponse]:
@@ -49,6 +51,7 @@ class ProductService:
             raise KeyError(f"Product {product_id} not found")
         prod = self._products[product_id]
         prod.upvote_count += 1
+        domain_persistence.write("products.items", product_id, prod)
         return prod
 
 
@@ -56,8 +59,14 @@ class ProductService:
         """Physically delete product for Saga reverse compensation."""
         if product_id in self._products:
             del self._products[product_id]
+            domain_persistence.delete("products.items", product_id)
             return True
         return False
+
+    def hydrate_items(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._products[r["id"]] = ProductResponse(**r)
+        return len(rows)
 
     def clear(self) -> None:
         """Reset products state for isolated test execution."""
@@ -65,3 +74,5 @@ class ProductService:
 
 
 product_service = ProductService()
+
+domain_persistence.register("products.items", product_service.hydrate_items)

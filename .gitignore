@@ -32,7 +32,9 @@ node_modules/
 dist/
 .DS_Store
 *.log
+*.pid
 
 # Runtime Data Cache
 data/
 backend/data/
+mock_server/storage/

@@ -425,8 +425,9 @@ flowchart LR
 | 阶段 3 验收项 | 架构与详细设计应对方案 | 验证依据与测试用例 |
 | :--- | :--- | :--- |
 | **DETAIL-01 数据约束** | 各领域模块模型使用 Pydantic 强类型严格约束，唯一性键、空值控制及时间戳明确 | `models.py` 定义，`test_all_domains_persistence.py` |
-| **DETAIL-02 接口契约** | 开放 `/api/v1/orchestration/operators` 与 `/api/v1/orchestration/scenarios/execute` 强类型接口 | `backend/src/main.py` OpenAPI 契约，`test_composable_microkernel_dispatcher.py` |
+| **DETAIL-02 接口契约** | 业务能力经统一入站网关以场景码开放（`orchestration.operators.list` / `orchestration.scenarios.execute` 等，见 `gateway_routes.yaml`），单一入口 `POST /api/welcom/opc_world` 强类型信封 | `backend/config/gateway_routes.yaml`，`test_composable_microkernel_dispatcher.py` |
 | **DETAIL-03 方法行为** | 统一原子算子方法签名 `(inputs, context) -> dict`，零副作用计算与 I/O 适配严格分类 | `_03_method_archetypes.md`，`registry.py` |
 | **DETAIL-04 失败语义** | 门禁拦截中断、节点超时熔断、外部微服务网络异常自动退避回退本地实现 | `engine.py` 异常保护分支，`dispatcher.py` 降级容灾 |
 | **DETAIL-05 跨文档映射** | 映射 PRD REQ-01~07、系统架构规范、微内核双模调度器与低代码组合场景 | `opchub_composable_framework_architecture.md` ↔ 本规范 |
-| **DETAIL-06 实现准备度** | 单体直接方法调用与微服务 HTTP 派发双模架构全景闭环，单元测试全部通过 | 53 个全量单测 PASS，代码完全自洽 |
+| **DETAIL-06 实现准备度** | 单体直接方法调用与微服务 HTTP 派发双模架构全景闭环，单元测试全部通过 | 199 个全量单测 PASS + 5 个 DB 集成用例（opt-in），代码完全自洽 |
+| **DETAIL-07 状态持久化** | 领域服务以同步内存索引为主读路径，变更经 `domain_snapshots` 写后落库并在启动时回灌（`persistence.py`）；用户账号/凭据/权益以 `users` 表为唯一真实来源 | `tests/test_domain_persistence.py`（封闭单测），`tests/test_db_persistence_integration.py`（真实 PostgreSQL 重启持久化，opt-in） |

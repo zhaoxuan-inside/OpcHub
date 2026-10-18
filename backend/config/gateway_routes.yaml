@@ -227,6 +227,22 @@ gateway:
       handler: "src.core.gateway.adapters:forum_comment_adapter"
       required_permission: "forum:post_comment"
 
+    - scenario: "forum.upvote"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "对讨论帖或评论进行 Upvote 点赞/取消 (已认证创客互动)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_upvote_adapter"
+      required_permission: "forum:post_comment"
+
+    - scenario: "forum.bookmark"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "收藏/取消收藏讨论帖至个人收藏夹 (已认证创客互动)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_bookmark_adapter"
+      required_permission: "forum:post_comment"
+
     # --------------------------------------------------------------------------
     # 7. Telemetry & Platform Overview (运营大盘与全景)
     # --------------------------------------------------------------------------
@@ -283,9 +299,44 @@ gateway:
     - scenario: "auth.register"
       version: "v1.0.0"
       domain: "auth"
-      description: "创客邮箱快速注册与租户主体初始化"
+      description: "创客商业化邮箱注册、资质存证与租户主体初始化"
       is_default: true
       handler: "src.core.gateway.adapters:auth_register_adapter"
+
+    - scenario: "auth.captcha"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "获取人机验证与防刷图形 SVG 算术验证码"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_captcha_adapter"
+
+    - scenario: "auth.send-code"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "发送邮箱/手机身份所有权核验验证码 (带60s频控与防刷拦截)"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_send_code_adapter"
+
+    - scenario: "auth.verify-code"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "预核验邮箱/手机验证码的有效性与时效"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_verify_code_adapter"
+
+    - scenario: "auth.password-strength"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "评估密码复杂度、熵值与商用安全合规评级"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_password_strength_adapter"
+
+    - scenario: "auth.legal-agreements"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "获取平台法定用户服务协议与隐私保护指引正文及版本"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_legal_agreements_adapter"
 
     - scenario: "auth.login"
       version: "v1.0.0"
@@ -300,6 +351,14 @@ gateway:
       description: "验证创客会话 Token 并获取登录工作台状态"
       is_default: true
       handler: "src.core.gateway.adapters:auth_session_adapter"
+
+    - scenario: "auth.change-password"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "轮换创客登录密码并清除首次登录强制改密标志"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_change_password_adapter"
+
 
 
     # --------------------------------------------------------------------------
@@ -371,6 +430,14 @@ gateway:
       description: "获取全域微内核原子算子清单与元数据 (由微内核 DAG OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE 驱动)"
       is_default: true
       handler: "src.core.gateway.adapters:list_operators_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.operators.mode"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "切换算子调度模式 IN_PROCESS / HTTP_REMOTE (管理员编排特权)"
+      is_default: true
+      handler: "src.core.gateway.adapters:operator_mode_adapter"
       required_permission: "page:orchestrate"
 
     - scenario: "orchestration.dag.save"

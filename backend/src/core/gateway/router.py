@@ -248,11 +248,12 @@ class ScenarioRouter:
             )
 
         # 2.5 RBAC (declarative permission) + ABAC (ownership) enforcement
-        identity = parse_identity(
+        resolved_token = (
             req.token
             or (req.context or {}).get("token")
             or (req.payload or {}).get("token")
         )
+        identity = parse_identity(resolved_token)
         client_ip = (req.context or {}).get("client_ip", "")
 
         if not has_permission(identity["role"], rule.required_permission):
@@ -349,6 +350,7 @@ class ScenarioRouter:
         ctx = dict(req.context)
         ctx["user_id"] = identity["uid"]
         ctx["user_role"] = identity["role"]
+        ctx["token"] = resolved_token or ""
         ctx["requested_version"] = requested_ver
         ctx["matched_version"] = rule.version
         ctx["is_fallback"] = (rule.version != requested_ver and rule.version != "*")
@@ -393,8 +395,17 @@ class ScenarioRouter:
         except Exception as e:
             duration_ms = round((time.perf_counter() - start_time) * 1000, 2)
             logger.exception(f"Error executing scenario '{req.scenario}' [{rule.version}]: {e}")
+            # Preserve REST-like semantic codes inside the unified envelope
+            if isinstance(e, PermissionError):
+                err_code = 403
+            elif isinstance(e, KeyError):
+                err_code = 404
+            elif isinstance(e, ValueError):
+                err_code = 400
+            else:
+                err_code = 500
             return DispatchResponse(
-                code=500,
+                code=err_code,
                 scenario=req.scenario,
                 version=rule.version,
                 message=str(e),

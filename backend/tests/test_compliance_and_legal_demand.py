@@ -1,17 +1,27 @@
-"""Tests for Product Compliance Guide & Legal Demands in Marketplace."""
+"""Tests for Product Compliance Guide & Legal Demands in Marketplace.
+
+All business access goes through the unified gateway entrypoint (single-entry architecture).
+"""
 import pytest
 from httpx import ASGITransport, AsyncClient
 from src.main import app
-from src.core.config import settings
+from conftest import DEFAULT_ADMIN_TOKEN
+
+
+async def _gw(client, scenario, payload):
+    client.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+    return await client.post("/api/welcom/opc_world", json={
+        "scenario": scenario, "version": "v1.0.0", "payload": payload,
+    })
 
 
 @pytest.mark.asyncio
 async def test_get_compliance_dimensions():
     """Verify compliance framework endpoint returns live knowledge base (blank initial catalog)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        res = await client.get(f"{settings.api_prefix}/compliance/dimensions")
-        assert res.status_code == 200
-        data = res.json()
+        res = await _gw(client, "compliance.dimensions", {})
+        assert res.json()["code"] == 200
+        data = res.json()["data"]
         assert isinstance(data, list)
 
 
@@ -19,9 +29,9 @@ async def test_get_compliance_dimensions():
 async def test_get_compliance_cases():
     """Verify regulatory pitfall cases endpoint returns live knowledge base (blank initial catalog)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        res = await client.get(f"{settings.api_prefix}/compliance/cases")
-        assert res.status_code == 200
-        cases = res.json()
+        res = await _gw(client, "compliance.cases", {})
+        assert res.json()["code"] == 200
+        cases = res.json()["data"]
         assert isinstance(cases, list)
 
 
@@ -29,9 +39,9 @@ async def test_get_compliance_cases():
 async def test_get_compliance_checkpoints():
     """Verify pre-launch compliance checklist endpoint returns live items (blank initial catalog)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        res = await client.get(f"{settings.api_prefix}/compliance/checkpoints")
-        assert res.status_code == 200
-        checkpoints = res.json()
+        res = await _gw(client, "compliance.checkpoints", {})
+        assert res.json()["code"] == 200
+        checkpoints = res.json()["data"]
         assert isinstance(checkpoints, list)
 
 
@@ -39,15 +49,12 @@ async def test_get_compliance_checkpoints():
 async def test_evaluate_compliance_audit_all_pass():
     """Verify audit over empty checklist stays safe (no crash, score 0)."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        chks_res = await client.get(f"{settings.api_prefix}/compliance/checkpoints")
-        all_ids = [chk["id"] for chk in chks_res.json()]
+        chks_res = await _gw(client, "compliance.checkpoints", {})
+        all_ids = [chk["id"] for chk in chks_res.json()["data"]]
 
-        audit_res = await client.post(
-            f"{settings.api_prefix}/compliance/audit",
-            json={"passed_item_ids": all_ids}
-        )
-        assert audit_res.status_code == 200
-        report = audit_res.json()
+        audit_res = await _gw(client, "compliance.audit", {"passed_item_ids": all_ids, "strict_mode": False})
+        assert audit_res.json()["code"] == 200
+        report = audit_res.json()["data"]
         assert report["score"] == 0
         assert report["failed_items_count"] == 0
 
@@ -56,12 +63,9 @@ async def test_evaluate_compliance_audit_all_pass():
 async def test_evaluate_compliance_audit_critical_risks():
     """Verify audit over empty checklist remains safe with no risk items."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        audit_res = await client.post(
-            f"{settings.api_prefix}/compliance/audit",
-            json={"passed_item_ids": []}
-        )
-        assert audit_res.status_code == 200
-        report = audit_res.json()
+        audit_res = await _gw(client, "compliance.audit", {"passed_item_ids": [], "strict_mode": False})
+        assert audit_res.json()["code"] == 200
+        report = audit_res.json()["data"]
         assert report["score"] == 0
         assert report["failed_items_count"] == 0
 
@@ -71,9 +75,9 @@ async def test_legal_demands_in_marketplace():
     """Verify marketplace supports LEGAL category queries, posts and bidding."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         # 1. Fetch demands filtered by LEGAL (blank initial catalog)
-        res = await client.get(f"{settings.api_prefix}/demands?category=LEGAL")
-        assert res.status_code == 200
-        legal_demands = res.json()
+        res = await _gw(client, "demands.list", {"category": "LEGAL"})
+        assert res.json()["code"] == 200
+        legal_demands = res.json()["data"]
         assert isinstance(legal_demands, list)
 
         # 2. Publish a new LEGAL help demand
@@ -85,19 +89,20 @@ async def test_legal_demands_in_marketplace():
             "deadline_days": 7,
             "creator_id": "usr_maker_test_88"
         }
-        create_res = await client.post(f"{settings.api_prefix}/demands", json=new_demand)
-        assert create_res.status_code == 201
-        created_data = create_res.json()
+        create_res = await _gw(client, "demands.publish", new_demand)
+        assert create_res.json()["code"] == 200
+        created_data = create_res.json()["data"]
         assert created_data["category"] == "LEGAL"
         demand_id = created_data["id"]
 
         # 3. Bid on the legal help demand
         bid_payload = {
+            "demand_id": demand_id,
             "bidder_id": "usr_legal_expert_01",
             "bid_amount_cny": 14000.0,
             "delivery_days": 5,
             "proposal_text": "专业涉外网络安全律所，已主导完成数十个出海独立项目的 GDPR/DPA 审查交付。"
         }
-        bid_res = await client.post(f"{settings.api_prefix}/demands/{demand_id}/bids", json=bid_payload)
-        assert bid_res.status_code == 201
-        assert bid_res.json()["bidder_id"] == "usr_legal_expert_01"
+        bid_res = await _gw(client, "demands.bid", bid_payload)
+        assert bid_res.json()["code"] == 200
+        assert bid_res.json()["data"]["bidder_id"] == "usr_legal_expert_01"

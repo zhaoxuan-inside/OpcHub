@@ -1,0 +1,12 @@
+# ==============================================================================
+# Mock Dataset: SiliconFlow / OpenAI Compatible LLM Inference
+# Shared by both HTTP Mock Server and Automated Test Suites
+# ==============================================================================
+defaults:
+  default_model: "deepseek-ai/DeepSeek-V3"
+
+sample_prompts:
+  charter_generation:
+    user_message: "请提供一人有限责任公司章程模板核心要点"
+    system_role: "你是一人公司智能顾问"
+    expected_keyword: "SiliconFlow 官方推理 Mock"

@@ -1,0 +1,25 @@
+# ==============================================================================
+# Mock Dataset: SMS Authentication & Enterprise Legal Identity
+# Shared by both HTTP Mock Server and Automated Test Suites
+# ==============================================================================
+sms:
+  default_channel: "ALIYUN_SMS_DIRECT"
+  valid_seconds: 300
+  test_phone: "13800138000"
+  test_code: "888999"
+
+enterprises:
+  valid_records:
+    - credit_code: "91330100MA2B888888"
+      legal_person: "创客张三"
+      company_name: "杭州创客科技有限公司"
+      enterprise_status: "NORMAL_ACTIVE"
+    - credit_code: "91110108MA00AAAA01"
+      legal_person: "独立创客李四"
+      company_name: "北京超级个体智能软件技术有限公司"
+      enterprise_status: "NORMAL_ACTIVE"
+  invalid_records:
+    - credit_code: "123"
+      legal_person: "王五"
+      expected_status: "FAILED"
+      expected_message: "统一社会信用代码格式非法"

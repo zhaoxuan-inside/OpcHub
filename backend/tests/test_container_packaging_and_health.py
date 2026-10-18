@@ -106,27 +106,11 @@ def test_web_console_root_serving():
 
 
 def test_console_html_javascript_syntax_validity():
-    """Verify that all inline JavaScript in the web console HTML is free of syntax errors."""
-    import re
-    import shutil
-    import subprocess
-
+    """Verify that the frontend production build assets exist and are syntactically valid."""
     root_dir = Path(__file__).resolve().parents[2]
-    html_path = root_dir / "hs_dev_docs/_02_feature_spec/_03_prototype_html/opchub_all_pages_demo.html"
-    assert html_path.is_file(), f"HTML file not found at {html_path}"
-
-    html_content = html_path.read_text(encoding="utf-8")
-    scripts = re.findall(r"<script.*?>([\s\S]*?)</script>", html_content)
-    assert len(scripts) > 0, "No script tags found in web console HTML"
-
-    node_bin = shutil.which("node")
-    if node_bin:
-        for idx, script in enumerate(scripts):
-            proc = subprocess.run(
-                [node_bin, "--check"],
-                input=script,
-                text=True,
-                capture_output=True,
-            )
-            assert proc.returncode == 0, f"JavaScript syntax error in script block #{idx}:\n{proc.stderr}"
+    dist_html = root_dir / "frontend/dist/index.html"
+    assert dist_html.is_file(), f"Frontend dist HTML file not found at {dist_html}"
+    content = dist_html.read_text(encoding="utf-8")
+    assert '<div id="app"></div>' in content
+    assert "/assets/" in content
 

@@ -13,6 +13,7 @@ from src.domains.forum.models import (
     UpvoteResponse,
     BookmarkResponse,
 )
+from src.infrastructure.database.persistence import domain_persistence
 
 
 def utc_now_iso() -> str:
@@ -57,6 +58,7 @@ class ForumService:
             updated_at=now,
         )
         self._threads[thread_id] = thread
+        domain_persistence.write("forum.threads", thread_id, thread)
         return thread
 
     def get_thread(self, thread_id: str, record_view: bool = True) -> ForumThreadResponse:
@@ -66,6 +68,7 @@ class ForumService:
         thread = self._threads[thread_id]
         if record_view:
             thread.view_count += 1
+            domain_persistence.write("forum.threads", thread_id, thread)
         return thread
 
     def list_threads(self, category_code: Optional[str] = None) -> List[ForumThreadResponse]:
@@ -121,6 +124,8 @@ class ForumService:
         )
         self._comments[comment_id] = comment
         thread.comment_count += 1
+        domain_persistence.write("forum.comments", comment_id, comment)
+        domain_persistence.write("forum.threads", thread_id, thread)
         return comment
 
     def build_comment_tree(self, thread_id: str) -> List[CommentTreeNode]:
@@ -182,14 +187,25 @@ class ForumService:
             raise ValueError(f"Invalid target_type: {target_type}")
 
         key = (user_id, target_type, target_id)
+        upvote_doc_id = f"{user_id}|{target_type}|{target_id}"
         if key in self._upvotes:
             self._upvotes.remove(key)
             target.upvote_count = max(0, target.upvote_count - 1)
             is_upvoted = False
+            domain_persistence.delete("forum.upvotes", upvote_doc_id)
         else:
             self._upvotes.add(key)
             target.upvote_count += 1
             is_upvoted = True
+            domain_persistence.write_raw("forum.upvotes", upvote_doc_id, {
+                "user_id": user_id, "target_type": target_type, "target_id": target_id,
+            })
+
+        # Persist the recomputed aggregate count on the upvoted target
+        if target_type == "THREAD":
+            domain_persistence.write("forum.threads", target_id, target)
+        else:
+            domain_persistence.write("forum.comments", target_id, target)
 
         return UpvoteResponse(
             is_upvoted=is_upvoted,
@@ -205,14 +221,21 @@ class ForumService:
         thread = self._threads[thread_id]
 
         key = (user_id, thread_id)
+        bookmark_doc_id = f"{user_id}|{thread_id}"
         if key in self._bookmarks:
             del self._bookmarks[key]
             thread.bookmark_count = max(0, thread.bookmark_count - 1)
             is_bookmarked = False
+            domain_persistence.delete("forum.bookmarks", bookmark_doc_id)
         else:
             self._bookmarks[key] = folder_name
             thread.bookmark_count += 1
             is_bookmarked = True
+            domain_persistence.write_raw("forum.bookmarks", bookmark_doc_id, {
+                "user_id": user_id, "thread_id": thread_id, "folder_name": folder_name,
+            })
+
+        domain_persistence.write("forum.threads", thread_id, thread)
 
         return BookmarkResponse(
             is_bookmarked=is_bookmarked,
@@ -226,10 +249,12 @@ class ForumService:
         """Physically delete thread and its associated comments for Saga compensation."""
         if thread_id in self._threads:
             del self._threads[thread_id]
+            domain_persistence.delete("forum.threads", thread_id)
             # Cascade delete associated comments
             to_delete = [cid for cid, c in self._comments.items() if c.thread_id == thread_id]
             for cid in to_delete:
                 del self._comments[cid]
+                domain_persistence.delete("forum.comments", cid)
             return True
         return False
 
@@ -239,11 +264,41 @@ class ForumService:
             comment = self._comments[comment_id]
             thread_id = comment.thread_id
             del self._comments[comment_id]
+            domain_persistence.delete("forum.comments", comment_id)
             if thread_id in self._threads:
                 self._threads[thread_id].comment_count = max(0, self._threads[thread_id].comment_count - 1)
+                domain_persistence.write("forum.threads", thread_id, self._threads[thread_id])
             return True
         return False
+
+    # ------------------------------------------------------------------
+    # Startup hydration (in-memory index rebuild from persisted documents)
+    # ------------------------------------------------------------------
+    def hydrate_threads(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._threads[r["id"]] = ForumThreadResponse(**r)
+        return len(rows)
+
+    def hydrate_comments(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._comments[r["id"]] = ForumCommentResponse(**r)
+        return len(rows)
+
+    def hydrate_upvotes(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._upvotes.add((r["user_id"], r["target_type"], r["target_id"]))
+        return len(rows)
+
+    def hydrate_bookmarks(self, rows: List[Dict]) -> int:
+        for r in rows:
+            self._bookmarks[(r["user_id"], r["thread_id"])] = r["folder_name"]
+        return len(rows)
 
 
 # Global singleton instance
 forum_service = ForumService()
+
+domain_persistence.register("forum.threads", forum_service.hydrate_threads)
+domain_persistence.register("forum.comments", forum_service.hydrate_comments)
+domain_persistence.register("forum.upvotes", forum_service.hydrate_upvotes)
+domain_persistence.register("forum.bookmarks", forum_service.hydrate_bookmarks)

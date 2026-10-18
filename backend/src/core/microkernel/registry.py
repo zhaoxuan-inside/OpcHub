@@ -219,12 +219,9 @@ class AtomicRegistry:
             if not legal_basis:
                 raise ValueError("legal_basis is required for government policy")
             
-            # Moderation check
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            full_text = f"{title} {summary} {legal_basis}"
-            for f in forbidden:
-                if f in full_text:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in policy publish")
+            # Moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(f"{title} {summary} {legal_basis}", field_name="policy publish")
             
             return {
                 "guard_passed": True,
@@ -289,12 +286,10 @@ class AtomicRegistry:
             if not isinstance(form_data, dict):
                 form_data = {}
 
-            # Content moderation check on form data
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
+            # Content moderation check on form data via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
             full_text = " ".join(str(v) for v in form_data.values())
-            for f in forbidden:
-                if f in full_text:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in SOP document form data")
+            await check_content_safety(full_text, field_name="SOP document form data")
 
             return {
                 "guard_passed": True,
@@ -431,15 +426,17 @@ class AtomicRegistry:
 
         # Domain 4: Moderation Domain (内容安全审查、全网下架与误判恢复微内核算子与 Saga 补偿)
         async def moderation_inspect_content(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.infrastructure.external_gateway.content_moderation_gateway import content_moderation_gateway
             content = inputs.get("content", "")
-            forbidden_words = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            hit_words = [w for w in forbidden_words if w in content]
-            if hit_words:
+            scan_res = await content_moderation_gateway.scan_text(content)
+            if not scan_res["passed"]:
+                hit_words = scan_res["hit_words"]
                 raise ValueError(f"Content moderation violation: found prohibited keywords {hit_words}")
             return {
                 "moderation_inspected": True,
                 "passed": True,
                 "flagged_keywords": [],
+                "filtered_content": scan_res.get("filtered_content", content),
             }
         self.register("moderation.inspect_content", moderation_inspect_content, domain="moderation", description="UGC文本敏感词审查与违规处置算子")
 
@@ -697,11 +694,9 @@ class AtomicRegistry:
             if len(content) < 10:
                 raise ValueError("Forum thread content must be at least 10 characters long")
             
-            # Content moderation check
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            for f in forbidden:
-                if f in title or f in content:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in forum thread")
+            # Content moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(f"{title} {content}", field_name="forum thread")
             
             return {
                 "guard_passed": True,
@@ -758,11 +753,9 @@ class AtomicRegistry:
             if parent_id and parent_id not in forum_service._comments:
                 raise KeyError(f"Parent comment with ID {parent_id} not found")
             
-            # Content moderation check
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            for f in forbidden:
-                if f in content:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in forum comment")
+            # Content moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(content, field_name="forum comment")
             
             return {
                 "guard_passed": True,
@@ -836,12 +829,9 @@ class AtomicRegistry:
             if price < 0:
                 raise ValueError("Product price cannot be negative")
             
-            # Content moderation check
-            full_text = f"{title} {tagline} {desc}"
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            for f in forbidden:
-                if f in full_text:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in product showcase")
+            # Content moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(f"{title} {tagline} {desc}", field_name="product showcase")
             
             return {
                 "guard_passed": True,
@@ -926,12 +916,9 @@ class AtomicRegistry:
             if deadline_days < 1:
                 deadline_days = 14
 
-            # Moderation check
-            full_text = f"{title} {desc}"
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            for f in forbidden:
-                if f in full_text:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in demand publish")
+            # Moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(f"{title} {desc}", field_name="demand publish")
 
             return {
                 "guard_passed": True,
@@ -1000,11 +987,9 @@ class AtomicRegistry:
             if len(proposal) < 5:
                 raise ValueError("proposal_text must be at least 5 characters long")
 
-            # Moderation check
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            for f in forbidden:
-                if f in proposal:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in demand bid proposal")
+            # Moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(proposal, field_name="demand bid proposal")
 
             return {
                 "guard_passed": True,
@@ -1132,12 +1117,9 @@ class AtomicRegistry:
             if len(summary) < 5:
                 raise ValueError("Perk summary must be at least 5 characters long")
 
-            # Moderation check
-            forbidden = ["代开假发票", "内嵌自设资金池", "洗钱", "非法集资"]
-            full_text = f"{name} {provider} {summary}"
-            for f in forbidden:
-                if f in full_text:
-                    raise ValueError(f"Content moderation violation: found prohibited keyword '{f}' in perk publish")
+            # Moderation check via external HTTP moderation gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            await check_content_safety(f"{name} {provider} {summary}", field_name="perk publish")
 
             return {
                 "guard_passed": True,
@@ -1408,7 +1390,7 @@ class AtomicRegistry:
             user_id = inputs.get("user_id")
             ent_id = inputs.get("entitlement_id")
             req = EntitlementActivateRequest(user_id=user_id, entitlement_id=ent_id)
-            res = user_service.activate_entitlement(req)
+            res = await user_service.activate_entitlement(req)
 
             res_dict = res.model_dump()
             res_dict["orchestrated_by"] = "OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE"
@@ -1424,7 +1406,7 @@ class AtomicRegistry:
             ent_id = inputs.get("entitlement_id")
             user_id = inputs.get("user_id")
             if ent_id:
-                deactivated = user_service.deactivate_entitlement(ent_id, user_id=user_id)
+                deactivated = await user_service.deactivate_entitlement(ent_id, user_id=user_id)
                 return {
                     "entitlement_id": ent_id,
                     "user_id": user_id,

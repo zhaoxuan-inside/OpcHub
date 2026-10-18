@@ -3529,69 +3529,203 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
     </div>
   </div>
 
-  <!-- Maker Email Registration Modal Sheet -->
+  <!-- Maker Commercial Registration Modal Sheet -->
   <div class="sheet-modal" id="liquidRegisterModal">
-    <div class="sheet-body" style="max-width: 480px;">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+    <div class="sheet-body" style="max-width: 530px; max-height: 90vh; overflow-y: auto;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 34px; height: 34px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          <div style="width: 36px; height: 36px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
           </div>
           <div>
-            <h3 style="font-size: 17px; font-weight: 600;">创客注册 · 开启超级个体之旅</h3>
-            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">EMAIL REGISTRATION · OPC HUB</div>
+            <h3 style="font-size: 17px; font-weight: 600;">创客注册 · 开启超级个体商业之旅</h3>
+            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-tertiary);">COMMERCIAL ONBOARDING · OPC HUB</div>
           </div>
         </div>
         <button class="btn-liquid-outline" onclick="closeAuthModals()" style="padding: 4px 8px;" data-tooltip="关闭注册窗口"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
       </div>
 
       <!-- Segmented Auth Mode Switcher -->
-      <div style="display: flex; background: var(--glass-surface-subtle); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle); margin-bottom: 16px;">
+      <div style="display: flex; background: var(--glass-surface-subtle); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle); margin-bottom: 14px;">
         <button class="auth-tab-btn" type="button" onclick="openLoginModal()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
           创客登录
         </button>
         <button class="auth-tab-btn active" type="button" onclick="openRegisterModal()">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
-          免费注册
+          商用入驻注册
         </button>
       </div>
 
-      <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-        <div>
-          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">创客邮箱 <span style="color: #ff453a;">*</span></label>
-          <input type="email" id="regEmailInput" class="glass-input" placeholder="例如: yourname@gmail.com / qq.com" style="width: 100%; box-sizing: border-box;" />
+      <!-- Commercial Account Identity Selector -->
+      <div style="margin-bottom: 14px;">
+        <label style="display: block; font-size: 11.5px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">入驻身份类型 <span style="color: #ff453a;">*</span></label>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+          <div class="account-type-card active" id="accType_MAKER" onclick="selectAccountType('MAKER')" style="border: 1px solid var(--accent); background: var(--accent-glass); padding: 8px 6px; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">个人创客</div>
+            <div style="font-size: 9.5px; color: var(--text-tertiary); margin-top: 2px;">独立开发者/顾问</div>
+          </div>
+          <div class="account-type-card" id="accType_OPC" onclick="selectAccountType('OPC')" style="border: 1px solid var(--glass-border-subtle); background: var(--glass-surface-subtle); padding: 8px 6px; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">一人公司 (OPC)</div>
+            <div style="font-size: 9.5px; color: var(--text-tertiary); margin-top: 2px;">个体户/工作室</div>
+          </div>
+          <div class="account-type-card" id="accType_ENTERPRISE" onclick="selectAccountType('ENTERPRISE')" style="border: 1px solid var(--glass-border-subtle); background: var(--glass-surface-subtle); padding: 8px 6px; border-radius: 8px; cursor: pointer; text-align: center; transition: all 0.2s;">
+            <div style="font-size: 12px; font-weight: 600; color: var(--text-primary);">企业机构</div>
+            <div style="font-size: 9.5px; color: var(--text-tertiary); margin-top: 2px;">生态伙伴/企业</div>
+          </div>
         </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 11px; margin-bottom: 16px;">
+        <!-- Email & Verification Code Row -->
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">创客商用邮箱 <span style="color: #ff453a;">*</span></label>
+          <input type="email" id="regEmailInput" class="glass-input" placeholder="例如: yourname@opchub.cn 或 常用邮箱" style="width: 100%; box-sizing: border-box;" />
+        </div>
+
+        <!-- Anti-Bot Captcha Row -->
+        <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">人机防刷安全验证 <span style="color: #ff453a;">*</span></label>
+            <input type="text" id="regCaptchaInput" class="glass-input" placeholder="输入计算结果或字符" style="width: 100%; box-sizing: border-box;" />
+          </div>
+          <div>
+            <div id="regCaptchaImgContainer" onclick="refreshCaptcha()" style="height: 38px; border-radius: 8px; overflow: hidden; cursor: pointer; display: flex; align-items: center; justify-content: center; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle);" title="点击更换验证码">
+              <span style="font-size: 11px; color: var(--text-tertiary);">加载中...</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Verification Code Row -->
+        <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end;">
+          <div>
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">邮箱验证码 <span style="color: #ff453a;">*</span></label>
+            <input type="text" id="regVerificationCodeInput" class="glass-input" placeholder="6 位数字验证码" maxlength="6" style="width: 100%; box-sizing: border-box; letter-spacing: 2px; font-weight: 600;" />
+          </div>
+          <div>
+            <button type="button" class="btn-liquid-outline" id="regSendCodeBtn" onclick="requestVerificationCode()" style="width: 100%; height: 38px; justify-content: center; font-size: 12px; white-space: nowrap;">
+              获取验证码
+            </button>
+          </div>
+        </div>
+
+        <!-- Passwords & Strength Meter -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">登录密码 <span style="color: #ff453a;">*</span></label>
-            <input type="password" id="regPasswordInput" class="glass-input" placeholder="至少 6 位密码" style="width: 100%; box-sizing: border-box;" />
+            <input type="password" id="regPasswordInput" oninput="onPasswordInput(this.value)" class="glass-input" placeholder="至少8位字母+数字" style="width: 100%; box-sizing: border-box;" />
           </div>
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">确认密码 <span style="color: #ff453a;">*</span></label>
-            <input type="password" id="regConfirmPasswordInput" class="glass-input" placeholder="再次输入密码" style="width: 100%; box-sizing: border-box;" />
+            <input type="password" id="regConfirmPasswordInput" oninput="checkPasswordMatch()" class="glass-input" placeholder="再次输入密码" style="width: 100%; box-sizing: border-box;" />
           </div>
         </div>
+
+        <!-- Dynamic Password Strength Indicator -->
+        <div id="pwdStrengthWrapper" style="margin-top: -2px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; margin-bottom: 4px;">
+            <span style="color: var(--text-tertiary);">安全策略：需8位以上包含字母与数字</span>
+            <span id="pwdStrengthLabel" style="font-weight: 600; color: #8e8e93;">未输入</span>
+          </div>
+          <div style="height: 4px; background: rgba(142, 142, 147, 0.2); border-radius: 2px; overflow: hidden; display: flex; gap: 2px;">
+            <div id="pwdStrengthBar1" style="flex: 1; background: transparent; transition: background 0.3s;"></div>
+            <div id="pwdStrengthBar2" style="flex: 1; background: transparent; transition: background 0.3s;"></div>
+            <div id="pwdStrengthBar3" style="flex: 1; background: transparent; transition: background 0.3s;"></div>
+            <div id="pwdStrengthBar4" style="flex: 1; background: transparent; transition: background 0.3s;"></div>
+          </div>
+        </div>
+
+        <!-- Identity Profile Information -->
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">创客昵称 (选填)</label>
             <input type="text" id="regNicknameInput" class="glass-input" placeholder="默认取邮箱前缀" style="width: 100%; box-sizing: border-box;" />
           </div>
           <div>
-            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">工作室/组织 (选填)</label>
-            <input type="text" id="regCompanyInput" class="glass-input" placeholder="如：极客视界独立工作室" style="width: 100%; box-sizing: border-box;" />
+            <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">联系手机 (选填)</label>
+            <input type="text" id="regPhoneInput" class="glass-input" placeholder="用于商机与履约通知" style="width: 100%; box-sizing: border-box;" />
           </div>
         </div>
+
+        <!-- Company Name and Credit Code (Dynamic based on Account Type) -->
+        <div id="regCorporateFields" style="display: none; flex-direction: column; gap: 10px;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">企业/工作室全称 <span style="color: #ff453a;">*</span></label>
+              <input type="text" id="regCompanyInput" class="glass-input" placeholder="如：极客视界一人公司" style="width: 100%; box-sizing: border-box;" />
+            </div>
+            <div>
+              <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">统一社会信用代码 (选填)</label>
+              <input type="text" id="regCreditCodeInput" class="glass-input" placeholder="18位法人/个体工商代码" maxlength="18" style="width: 100%; box-sizing: border-box; text-transform: uppercase;" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Industry Track Selection -->
+        <div>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">意向业务赛道 (有助于定制工作台)</label>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <span class="track-pill active" onclick="selectTrack(this, 'AI原生应用与智能体')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--accent-glass); border: 1px solid var(--accent); color: var(--text-primary); cursor: pointer;">AI 原生应用与智能体</span>
+            <span class="track-pill" onclick="selectTrack(this, '出海SaaS与独立开发')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">出海 SaaS 与独立开发</span>
+            <span class="track-pill" onclick="selectTrack(this, '跨境电商与数字贸易')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">跨境电商与数字贸易</span>
+            <span class="track-pill" onclick="selectTrack(this, '智能软硬件与IoT')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">智能软硬件与 IoT</span>
+            <span class="track-pill" onclick="selectTrack(this, '咨询与数字创意服务')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">咨询与数字创意服务</span>
+          </div>
+        </div>
+
+        <!-- Statutory Compliance Checkbox (Mandatory PIPL / Cybersecurity Law Check: Default Unchecked) -->
+        <div id="regTermsConsentBox" style="margin-top: 2px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); transition: border 0.3s;">
+          <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none;">
+            <input type="checkbox" id="regAgreeTerms" style="margin-top: 2px; cursor: pointer; accent-color: var(--accent);" />
+            <span style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.45;">
+              我已阅读并完全同意
+              <a href="javascript:void(0)" onclick="openLegalAgreements('terms')" style="color: var(--accent); text-decoration: none; font-weight: 500;">《用户服务协议》</a>
+              与
+              <a href="javascript:void(0)" onclick="openLegalAgreements('privacy')" style="color: var(--accent); text-decoration: none; font-weight: 500;">《隐私政策与个人信息保护指引》</a>
+              ，承诺严格遵循国家法律法规及一人公司合规经营守则。
+            </span>
+          </label>
+        </div>
+
         <div id="regErrorMsg" style="display: none; color: #ff453a; font-size: 12px; padding: 6px 10px; background: rgba(255, 69, 58, 0.1); border-radius: var(--radius-sm);"></div>
       </div>
 
-      <div style="display: flex; gap: 10px; margin-bottom: 16px;">
+      <div style="display: flex; gap: 10px; margin-bottom: 14px;">
         <button class="btn-liquid-outline" style="flex: 1; justify-content: center;" onclick="closeAuthModals()">取消</button>
-        <button class="btn-liquid" style="flex: 1; justify-content: center;" id="regSubmitBtn" onclick="submitRegister()">创建创客账号</button>
+        <button class="btn-liquid" style="flex: 1; justify-content: center;" id="regSubmitBtn" onclick="submitRegister()">完成商用入驻注册</button>
       </div>
 
       <div style="text-align: center; font-size: 12.5px; color: var(--text-tertiary); border-top: 1px solid var(--glass-border-subtle); padding-top: 12px;">
         已有创客账号？ <a href="javascript:void(0)" onclick="openLoginModal()" style="color: var(--accent); font-weight: 500; text-decoration: none;">直接登录</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Statutory Legal Agreements Modal Sheet -->
+  <div class="sheet-modal" id="liquidLegalAgreementsModal">
+    <div class="sheet-body" style="max-width: 600px; max-height: 85vh; display: flex; flex-direction: column;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <div style="width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--accent-glass); color: var(--accent);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </div>
+          <h3 id="legalModalTitle" style="font-size: 16px; font-weight: 600;">合规协议与隐私政策</h3>
+        </div>
+        <button class="btn-liquid-outline" onclick="closeLegalAgreements()" style="padding: 4px 8px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+      </div>
+
+      <div style="display: flex; gap: 8px; margin-bottom: 10px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 8px;">
+        <button id="legalTabTerms" class="btn-liquid" onclick="switchLegalTab('terms')" style="font-size: 12px; padding: 4px 12px;">用户服务协议 (v1.2.0)</button>
+        <button id="legalTabPrivacy" class="btn-liquid-outline" onclick="switchLegalTab('privacy')" style="font-size: 12px; padding: 4px 12px;">隐私政策指引 (v1.2.0)</button>
+      </div>
+
+      <div id="legalModalContent" style="flex: 1; overflow-y: auto; font-size: 12.5px; line-height: 1.6; color: var(--text-secondary); background: var(--glass-surface-subtle); padding: 14px; border-radius: 8px; border: 1px solid var(--glass-border-subtle); margin-bottom: 14px; white-space: pre-wrap; font-family: system-ui, -apple-system, sans-serif;">
+        加载协议内容中...
+      </div>
+
+      <div style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button class="btn-liquid-outline" onclick="closeLegalAgreements()">关闭</button>
+        <button class="btn-liquid" onclick="agreeAndCloseLegal()">我已阅读并同意签署</button>
       </div>
     </div>
   </div>
@@ -5726,6 +5860,311 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if (input) setTimeout(() => input.focus(), 100);
     }
 
+    let regCurrentCaptchaId = null;
+    let regSelectedAccountType = 'MAKER';
+    let regSelectedIndustryTrack = 'AI原生应用与智能体';
+    let regCodeCooldownTimer = null;
+    let regCodeCooldownSeconds = 0;
+    let regCaptchaVerified = false;
+    let legalAgreementsCache = null;
+
+    async function refreshCaptcha() {
+      regCaptchaVerified = false;
+      const captchaInput = document.getElementById('regCaptchaInput');
+      if (captchaInput) {
+        captchaInput.disabled = false;
+        captchaInput.value = '';
+        captchaInput.style.borderColor = 'var(--glass-border-subtle)';
+      }
+      const container = document.getElementById('regCaptchaImgContainer');
+      if (container) {
+        container.innerHTML = '<span style="font-size: 11px; color: var(--text-tertiary);">加载中...</span>';
+        container.title = '点击更换验证码';
+      }
+      try {
+        let capData = null;
+        const gwRes = await dispatchGateway('auth.captcha', {});
+        if (gwRes.ok && gwRes.data) {
+          capData = gwRes.data;
+        } else {
+          const res = await fetch('/api/auth/captcha');
+          if (res.ok) capData = await res.json();
+        }
+        if (capData && capData.captcha_id && capData.captcha_svg) {
+          regCurrentCaptchaId = capData.captcha_id;
+          if (container) {
+            container.innerHTML = capData.captcha_svg;
+          }
+        }
+      } catch (e) {
+        console.warn('Captcha load failed', e);
+      }
+    }
+
+    function selectAccountType(type) {
+      regSelectedAccountType = type;
+      ['MAKER', 'OPC', 'ENTERPRISE'].forEach(t => {
+        const el = document.getElementById('accType_' + t);
+        if (el) {
+          if (t === type) {
+            el.style.border = '1px solid var(--accent)';
+            el.style.background = 'var(--accent-glass)';
+          } else {
+            el.style.border = '1px solid var(--glass-border-subtle)';
+            el.style.background = 'var(--glass-surface-subtle)';
+          }
+        }
+      });
+      const corpFields = document.getElementById('regCorporateFields');
+      if (corpFields) {
+        corpFields.style.display = (type === 'OPC' || type === 'ENTERPRISE') ? 'flex' : 'none';
+      }
+    }
+
+    function selectTrack(el, trackName) {
+      regSelectedIndustryTrack = trackName;
+      document.querySelectorAll('.track-pill').forEach(pill => {
+        pill.style.background = 'var(--glass-surface-subtle)';
+        pill.style.border = '1px solid var(--glass-border-subtle)';
+        pill.style.color = 'var(--text-secondary)';
+      });
+      if (el) {
+        el.style.background = 'var(--accent-glass)';
+        el.style.border = '1px solid var(--accent)';
+        el.style.color = 'var(--text-primary)';
+      }
+    }
+
+    function onPasswordInput(pwd) {
+      const bar1 = document.getElementById('pwdStrengthBar1');
+      const bar2 = document.getElementById('pwdStrengthBar2');
+      const bar3 = document.getElementById('pwdStrengthBar3');
+      const bar4 = document.getElementById('pwdStrengthBar4');
+      const label = document.getElementById('pwdStrengthLabel');
+
+      [bar1, bar2, bar3, bar4].forEach(b => { if (b) b.style.background = 'transparent'; });
+
+      if (!pwd) {
+        if (label) { label.textContent = '未输入'; label.style.color = '#8e8e93'; }
+        return;
+      }
+
+      let score = 0;
+      if (pwd.length >= 6) score += 1;
+      if (pwd.length >= 8) score += 1;
+      if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
+      if (/[0-9]/.test(pwd)) score += 1;
+      if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
+
+      if (score <= 1) {
+        if (bar1) bar1.style.background = '#ff453a';
+        if (label) { label.textContent = '密码强度：弱 (至少6位)'; label.style.color = '#ff453a'; }
+      } else if (score === 2) {
+        if (bar1) bar1.style.background = '#ff9f0a';
+        if (bar2) bar2.style.background = '#ff9f0a';
+        if (label) { label.textContent = '密码强度：一般'; label.style.color = '#ff9f0a'; }
+      } else if (score === 3) {
+        if (bar1) bar1.style.background = '#30d158';
+        if (bar2) bar2.style.background = '#30d158';
+        if (bar3) bar3.style.background = '#30d158';
+        if (label) { label.textContent = '密码强度：良好'; label.style.color = '#30d158'; }
+      } else {
+        [bar1, bar2, bar3, bar4].forEach(b => { if (b) b.style.background = '#0071E3'; });
+        if (label) { label.textContent = '密码强度：强固'; label.style.color = '#0071E3'; }
+      }
+      checkPasswordMatch();
+    }
+
+    function checkPasswordMatch() {
+      const pwd = (document.getElementById('regPasswordInput') || {}).value || '';
+      const confirmPwd = (document.getElementById('regConfirmPasswordInput') || {}).value || '';
+      const errBox = document.getElementById('regErrorMsg');
+      if (confirmPwd && pwd !== confirmPwd) {
+        if (errBox) {
+          errBox.textContent = '两次输入的密码不一致，请核对';
+          errBox.style.display = 'block';
+        }
+      } else if (errBox && errBox.textContent === '两次输入的密码不一致，请核对') {
+        errBox.style.display = 'none';
+      }
+    }
+
+    async function requestVerificationCode() {
+      const email = ((document.getElementById('regEmailInput') || {}).value || '').trim();
+      const captchaInput = document.getElementById('regCaptchaInput');
+      const captchaVal = (captchaInput ? captchaInput.value : '').trim();
+      const errBox = document.getElementById('regErrorMsg');
+      const sendBtn = document.getElementById('regSendCodeBtn');
+
+      if (errBox) errBox.style.display = 'none';
+
+      const emailPattern = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+      if (!email || !emailPattern.test(email)) {
+        if (errBox) {
+          errBox.textContent = '请先输入有效的商用创客邮箱地址';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+      if (!regCaptchaVerified && !captchaVal) {
+        if (errBox) {
+          errBox.textContent = '请先输入人机防刷图形验证码';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      sendBtn.disabled = true;
+      sendBtn.textContent = '发送中...';
+
+      try {
+        let sendData = null;
+        const gwRes = await dispatchGateway('auth.send-code', {
+          email: email,
+          captcha_id: regCurrentCaptchaId,
+          captcha_code: captchaVal,
+        });
+
+        if (gwRes.ok && gwRes.data) {
+          sendData = gwRes.data;
+        } else {
+          const res = await fetch('/api/auth/send-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              email: email,
+              captcha_id: regCurrentCaptchaId,
+              captcha_code: captchaVal,
+            })
+          });
+          const json = await res.json().catch(() => ({}));
+          if (res.ok) {
+            sendData = json;
+          } else {
+            throw new Error(json.detail || (gwRes && gwRes.error) || '发送验证码失败，请检查验证码或稍后再试');
+          }
+        }
+
+        // Successfully sent code!
+        // Lock captcha in verified state - DO NOT refresh captcha
+        regCaptchaVerified = true;
+        if (captchaInput) {
+          captchaInput.disabled = true;
+          captchaInput.style.borderColor = '#30d158';
+        }
+        const captchaContainer = document.getElementById('regCaptchaImgContainer');
+        if (captchaContainer) {
+          captchaContainer.title = '人机防刷安全验证已通过';
+        }
+
+        // Start 60s cooldown timer
+        regCodeCooldownSeconds = sendData.cooldown_seconds || 60;
+        sendBtn.textContent = `${regCodeCooldownSeconds}s 后可重发`;
+        clearInterval(regCodeCooldownTimer);
+        regCodeCooldownTimer = setInterval(() => {
+          regCodeCooldownSeconds--;
+          if (regCodeCooldownSeconds <= 0) {
+            clearInterval(regCodeCooldownTimer);
+            sendBtn.disabled = false;
+            sendBtn.textContent = '重新获取验证码';
+            // When cooldown finishes, reset captcha verified status so re-sending is protected
+            regCaptchaVerified = false;
+            if (captchaInput) {
+              captchaInput.disabled = false;
+              captchaInput.value = '';
+              captchaInput.style.borderColor = 'var(--glass-border-subtle)';
+            }
+            refreshCaptcha();
+          } else {
+            sendBtn.textContent = `${regCodeCooldownSeconds}s 后可重发`;
+          }
+        }, 1000);
+
+        // DO NOT auto-fill fake code! Clear field and prompt user to enter real code from mailbox
+        const codeInput = document.getElementById('regVerificationCodeInput');
+        if (codeInput) {
+          codeInput.value = '';
+          setTimeout(() => codeInput.focus(), 200);
+        }
+
+        showLiquidNotice(
+          '验证码已发送',
+          `真实 6 位验证码已派发至商用邮箱 ${email}，5分钟内有效，请查收邮件并手动填入。`,
+          'SUCCESS'
+        );
+      } catch (err) {
+        if (errBox) {
+          errBox.textContent = err.message || '获取验证码异常，请检查图形验证码或网络连接';
+          errBox.style.display = 'block';
+        }
+        sendBtn.disabled = false;
+        sendBtn.textContent = '获取验证码';
+        // Only refresh captcha upon failure so user can retry
+        refreshCaptcha();
+      }
+    }
+
+    async function openLegalAgreements(tab = 'terms') {
+      const modal = document.getElementById('liquidLegalAgreementsModal');
+      if (modal) modal.classList.add('active');
+      const content = document.getElementById('legalModalContent');
+      if (content) content.textContent = '加载协议文本中...';
+
+      if (!legalAgreementsCache) {
+        try {
+          const gwRes = await dispatchGateway('auth.legal-agreements', {});
+          if (gwRes.ok && gwRes.data) {
+            legalAgreementsCache = gwRes.data;
+          } else {
+            const res = await fetch('/api/auth/agreements');
+            if (res.ok) legalAgreementsCache = await res.json();
+          }
+        } catch (e) {
+          console.warn('Load agreements failed', e);
+        }
+      }
+      switchLegalTab(tab);
+    }
+
+    function switchLegalTab(tab) {
+      const tabTerms = document.getElementById('legalTabTerms');
+      const tabPrivacy = document.getElementById('legalTabPrivacy');
+      const content = document.getElementById('legalModalContent');
+      const title = document.getElementById('legalModalTitle');
+
+      if (tab === 'terms') {
+        if (tabTerms) { tabTerms.className = 'btn-liquid'; }
+        if (tabPrivacy) { tabPrivacy.className = 'btn-liquid-outline'; }
+        if (title) title.textContent = 'OpcHub 平台用户服务协议';
+        const txt = (legalAgreementsCache && legalAgreementsCache.terms_of_service && legalAgreementsCache.terms_of_service.summary) ||
+          '【OpcHub 平台用户服务协议 (v1.2.0)】\n\n1. 欢迎使用 OpcHub 商业操作系统。\n2. 创客对其账户资产与业务履约负完全责任。\n3. 严禁从事违法违规违禁行为，坚持知识产权原创保护。';
+        if (content) content.textContent = txt;
+      } else {
+        if (tabTerms) { tabTerms.className = 'btn-liquid-outline'; }
+        if (tabPrivacy) { tabPrivacy.className = 'btn-liquid'; }
+        if (title) title.textContent = 'OpcHub 隐私政策与个人信息安全指引';
+        const txt = (legalAgreementsCache && legalAgreementsCache.privacy_policy && legalAgreementsCache.privacy_policy.summary) ||
+          '【OpcHub 隐私保护与个人信息安全指引 (v1.2.0)】\n\n1. 最小必要收集原则：仅收集认证与商用履约必需信息。\n2. 密码单向加盐哈希，保障凭据安全。\n3. 尊重用户注销与信息保护法定权益。';
+        if (content) content.textContent = txt;
+      }
+    }
+
+    function closeLegalAgreements() {
+      const modal = document.getElementById('liquidLegalAgreementsModal');
+      if (modal) modal.classList.remove('active');
+    }
+
+    function agreeAndCloseLegal() {
+      const chk = document.getElementById('regAgreeTerms');
+      if (chk) chk.checked = true;
+      const box = document.getElementById('regTermsConsentBox');
+      if (box) box.style.borderColor = 'var(--glass-border-subtle)';
+      const errBox = document.getElementById('regErrorMsg');
+      if (errBox && errBox.textContent.includes('用户服务协议')) errBox.style.display = 'none';
+      closeLegalAgreements();
+      showLiquidNotice('协议已确认', '您已完整阅读并同意《用户服务协议》与《隐私政策》！', 'INFO');
+    }
+
     function openRegisterModal() {
       const err = document.getElementById('regErrorMsg');
       if (err) err.style.display = 'none';
@@ -5733,104 +6172,106 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       document.getElementById('liquidRegisterModal').classList.add('active');
       const input = document.getElementById('regEmailInput');
       if (input) setTimeout(() => input.focus(), 100);
-    }
-
-    function closeAuthModals() {
-      document.getElementById('liquidLoginModal').classList.remove('active');
-      document.getElementById('liquidRegisterModal').classList.remove('active');
-    }
-
-    function renderAuthHeader() {
-      const bar = document.getElementById('navAuthBar');
-      if (bar) {
-        bar.style.display = 'none';
-        bar.innerHTML = '';
-      }
-
-      const userBtn = document.getElementById('userProfileNavBtn');
-      const defaultIcon = document.getElementById('userNavDefaultIcon');
-      const avatarInitial = document.getElementById('userNavAvatarInitial');
-      const userBadge = document.getElementById('navUserBadge');
-
-      const isLoggedIn = !!(currentUserSession && currentUserSession.token);
-
-      if (isLoggedIn) {
-        const initial = (currentUserSession.nickname || currentUserSession.email || 'M').slice(0, 2).toUpperCase();
-        const displayLabel = currentUserSession.nickname || currentUserSession.email.split('@')[0];
-
-        if (userBtn) {
-          userBtn.classList.remove('unlogged');
-          userBtn.classList.add('logged-in');
-          const tip = `创客档案: ${displayLabel} · 点击进入个人中心`;
-          userBtn.setAttribute('data-tooltip', tip);
-          userBtn.title = tip;
-        }
-        if (defaultIcon) defaultIcon.style.display = 'none';
-        if (avatarInitial) {
-          avatarInitial.style.display = 'flex';
-          avatarInitial.textContent = initial;
-        }
-        if (userBadge) {
-          userBadge.className = 'nav-user-badge online';
-          userBadge.title = '在线 · 已登录认证会话';
-        }
-      } else {
-        if (userBtn) {
-          userBtn.classList.remove('logged-in');
-          userBtn.classList.add('unlogged');
-          const tip = '未登录 · 点击登录或注册';
-          userBtn.setAttribute('data-tooltip', tip);
-          userBtn.title = tip;
-        }
-        if (defaultIcon) defaultIcon.style.display = 'block';
-        if (avatarInitial) avatarInitial.style.display = 'none';
-        if (userBadge) {
-          userBadge.className = 'nav-user-badge offline';
-          userBadge.title = '未登录 · 游客状态';
-        }
-      }
+      regCaptchaVerified = false;
+      const codeInput = document.getElementById('regVerificationCodeInput');
+      if (codeInput) codeInput.value = '';
+      refreshCaptcha();
     }
 
     async function submitRegister() {
-      const email = (document.getElementById('regEmailInput').value || '').trim();
-      const pwd = document.getElementById('regPasswordInput').value || '';
-      const confirmPwd = document.getElementById('regConfirmPasswordInput').value || '';
-      const nickname = (document.getElementById('regNicknameInput').value || '').trim();
-      const company = (document.getElementById('regCompanyInput').value || '').trim();
+      const email = ((document.getElementById('regEmailInput') || {}).value || '').trim();
+      const verificationCode = ((document.getElementById('regVerificationCodeInput') || {}).value || '').trim();
+      const captchaVal = ((document.getElementById('regCaptchaInput') || {}).value || '').trim();
+      const pwd = (document.getElementById('regPasswordInput') || {}).value || '';
+      const confirmPwd = (document.getElementById('regConfirmPasswordInput') || {}).value || '';
+      const nickname = ((document.getElementById('regNicknameInput') || {}).value || '').trim();
+      const company = ((document.getElementById('regCompanyInput') || {}).value || '').trim();
+      const phone = ((document.getElementById('regPhoneInput') || {}).value || '').trim();
+      const creditCode = ((document.getElementById('regCreditCodeInput') || {}).value || '').trim().toUpperCase();
+      const agreedTerms = !!((document.getElementById('regAgreeTerms') || {}).checked);
+
       const errBox = document.getElementById('regErrorMsg');
       const submitBtn = document.getElementById('regSubmitBtn');
+      const consentBox = document.getElementById('regTermsConsentBox');
 
-      errBox.style.display = 'none';
+      if (errBox) errBox.style.display = 'none';
+      if (consentBox) consentBox.style.borderColor = 'var(--glass-border-subtle)';
 
-      const emailPattern = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
-      if (!email || !emailPattern.test(email)) {
-        errBox.textContent = '请输入合法的邮箱地址 (例如: name@example.com)';
-        errBox.style.display = 'block';
+      // 1. Mandatory Statutory Consent Check (PIPL & Cybersecurity Law)
+      if (!agreedTerms) {
+        if (consentBox) consentBox.style.borderColor = '#ff453a';
+        if (errBox) {
+          errBox.textContent = '合规提示：请阅读并勾选同意《用户服务协议》与《隐私政策》方可完成商用入驻';
+          errBox.style.display = 'block';
+        }
         return;
       }
+
+      // 2. Email validation
+      const emailPattern = /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/;
+      if (!email || !emailPattern.test(email)) {
+        if (errBox) {
+          errBox.textContent = '请输入合法的商用创客邮箱地址 (例如: name@example.com)';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      // 3. Verification code validation
+      if (!verificationCode) {
+        if (errBox) {
+          errBox.textContent = '请输入 6 位邮箱验证码以证明邮箱归属所有权';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      // 4. Password validation
       if (pwd.length < 6) {
-        errBox.textContent = '密码长度不能少于 6 位';
-        errBox.style.display = 'block';
+        if (errBox) {
+          errBox.textContent = '密码长度不能少于 6 位';
+          errBox.style.display = 'block';
+        }
         return;
       }
       if (pwd !== confirmPwd) {
-        errBox.textContent = '两次输入的密码不一致，请核对';
-        errBox.style.display = 'block';
+        if (errBox) {
+          errBox.textContent = '两次输入的密码不一致，请核对';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      // 5. Corporate account name validation
+      if ((regSelectedAccountType === 'OPC' || regSelectedAccountType === 'ENTERPRISE') && !company) {
+        if (errBox) {
+          errBox.textContent = '一人公司或企业主体入驻，请填写完整的工作室或企业名称';
+          errBox.style.display = 'block';
+        }
         return;
       }
 
       submitBtn.disabled = true;
-      submitBtn.textContent = '注册中...';
+      submitBtn.textContent = '商用入驻审核中...';
+
+      const payload = {
+        email: email,
+        password: pwd,
+        nickname: nickname,
+        company_name: company,
+        account_type: regSelectedAccountType,
+        industry_track: regSelectedIndustryTrack,
+        credit_code: creditCode,
+        phone: phone,
+        verification_code: verificationCode,
+        agreed_terms: true,
+        agreement_version: 'v1.2.0',
+      };
 
       try {
         let authData = null;
         // 1. First try gateway dispatch
-        const gwRes = await dispatchGateway('auth.register', {
-          email: email,
-          password: pwd,
-          nickname: nickname,
-          company_name: company
-        });
+        const gwRes = await dispatchGateway('auth.register', payload);
 
         if (gwRes.ok && gwRes.data) {
           authData = gwRes.data;
@@ -5839,12 +6280,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           const res = await fetch('/api/auth/register', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              email: email,
-              password: pwd,
-              nickname: nickname,
-              company_name: company
-            })
+            body: JSON.stringify(payload)
           });
           const json = await res.json().catch(() => ({}));
           if (res.ok && json.token) {
@@ -5862,16 +6298,19 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         fetchUserProfile();
         switchView('user', document.getElementById('userProfileNavBtn'));
         showLiquidNotice(
-          '注册成功',
-          `恭喜！创客账号 ${authData.email} 已成功创建并完成数据库持久化。\n创客昵称: ${authData.nickname}\n工作台身份: ${authData.tier_name}\n已为您自动登录并初始化超级个体工作区！`,
+          '商用入驻成功',
+          `恭喜！创客账号 ${authData.email} 已完成合规注册并建立企业级持久化档案。\n创客昵称: ${authData.nickname}\n主体类型: ${authData.account_type || regSelectedAccountType}\n意向赛道: ${authData.industry_track || regSelectedIndustryTrack}\n已为您初始化超级个体商业工作台！`,
           'SUCCESS'
         );
       } catch (err) {
-        errBox.textContent = err.message || '注册发生异常，请稍后重试';
-        errBox.style.display = 'block';
+        if (errBox) {
+          errBox.textContent = err.message || '注册发生异常，请稍后重试';
+          errBox.style.display = 'block';
+        }
+        refreshCaptcha();
       } finally {
         submitBtn.disabled = false;
-        submitBtn.textContent = '创建创客账号';
+        submitBtn.textContent = '完成商用入驻注册';
       }
     }
 

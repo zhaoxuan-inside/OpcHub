@@ -8,6 +8,12 @@ from .ai_gateway import AIGateway, ai_gateway, SiliconFlowGateway, siliconflow_g
 from .payment_gateway import PaymentGateway, payment_gateway, WeChatPayGateway, StripeGateway
 from .sms_auth_gateway import SMSAuthGateway, sms_auth_gateway
 from .gov_crawler_gateway import GovCrawlerGateway, gov_crawler_gateway, AsyncTokenBucket
+from .content_moderation_gateway import (
+    ContentModerationGateway,
+    content_moderation_gateway,
+    check_content_safety,
+)
+from .oss_storage_gateway import OSSStorageGateway, oss_storage_gateway
 
 __all__ = [
     "BaseOutboundClient",
@@ -24,4 +30,9 @@ __all__ = [
     "GovCrawlerGateway",
     "gov_crawler_gateway",
     "AsyncTokenBucket",
+    "ContentModerationGateway",
+    "content_moderation_gateway",
+    "check_content_safety",
+    "OSSStorageGateway",
+    "oss_storage_gateway",
 ]

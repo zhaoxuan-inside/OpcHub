@@ -1,0 +1,28 @@
+# ==============================================================================
+# Mock Dataset: WeChat Pay V3 & Stripe Connect Profit Sharing
+# Shared by both HTTP Mock Server and Automated Test Suites
+# ==============================================================================
+wechat_pay:
+  default_mch_id: "1900000109"
+  profit_sharing_ratio_max: 0.30
+  sample_order:
+    transaction_id: "wx_tx_202610180001"
+    out_order_no: "pf_order_001"
+    receivers:
+      - account: "mch_vendor_888"
+        amount: 8000
+        description: "创客外包收益"
+      - account: "mch_opchub_001"
+        amount: 2000
+        description: "平台撮合佣金"
+    expected_total_fen: 10000
+    expected_state: "FINISHED"
+
+stripe_connect:
+  default_currency: "usd"
+  sample_transfer:
+    amount: 50000
+    currency: "usd"
+    destination: "acct_solo_maker_global"
+    description: "Global SaaS Settlement"
+    expected_status: "paid"

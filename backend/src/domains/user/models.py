@@ -52,6 +52,63 @@ class UserRegisterRequest(BaseModel):
     password: str
     nickname: Optional[str] = None
     company_name: Optional[str] = None
+    # Commercialization Extensions
+    verification_code: Optional[str] = None
+    captcha_id: Optional[str] = None
+    captcha_code: Optional[str] = None
+    agreed_terms: bool = True  # Defaults to True for backward compatibility in programmatic tests
+    account_type: str = "MAKER"  # "MAKER" (个人创客) | "OPC" (一人公司) | "ENTERPRISE" (企业机构)
+    industry_track: Optional[str] = None
+    credit_code: Optional[str] = None
+    phone: Optional[str] = None
+    invitation_code: Optional[str] = None
+    client_ip: Optional[str] = None
+    agreement_version: str = "v1.2.0"
+
+
+class SendCodeRequest(BaseModel):
+    email: str
+    captcha_id: Optional[str] = None
+    captcha_code: Optional[str] = None
+    client_ip: Optional[str] = None
+
+
+class SendCodeResponse(BaseModel):
+    sent: bool
+    email: str
+    cooldown_seconds: int = 60
+    expires_in: int = 300
+    message: str
+
+
+class VerifyCodeRequest(BaseModel):
+    email: str
+    code: str
+
+
+class VerifyCodeResponse(BaseModel):
+    valid: bool
+    message: str
+
+
+class CaptchaResponse(BaseModel):
+    captcha_id: str
+    captcha_svg: str
+    captcha_image: str
+    expires_in: int
+
+
+class PasswordStrengthRequest(BaseModel):
+    password: str
+    email: Optional[str] = None
+
+
+class PasswordStrengthResponse(BaseModel):
+    score: int
+    level: str
+    label: str
+    feedback: List[str]
+    meets_commercial_standard: bool
 
 
 class UserLoginRequest(BaseModel):
@@ -67,6 +124,8 @@ class AuthSessionResponse(BaseModel):
     role: str = "MAKER"
     company_name: Optional[str] = None
     tier_name: str = "标准创客"
+    account_type: Optional[str] = "MAKER"
+    industry_track: Optional[str] = None
     message: str = "登录成功"
     must_change_password: bool = False
 
@@ -77,4 +136,5 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
     user_id: Optional[str] = None
     token: Optional[str] = None
+
 

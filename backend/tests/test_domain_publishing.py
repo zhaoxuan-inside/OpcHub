@@ -1,6 +1,10 @@
-"""Tests for publishing capabilities across Policies, Perks, SOP Templates, Products, and Demands."""
+"""Tests for publishing capabilities across Policies, Perks, SOP Templates, Products, and Demands.
+
+All business access goes through the unified gateway entrypoint (single-entry architecture).
+"""
 from fastapi.testclient import TestClient
 from src.main import app
+from conftest import gw_data
 
 client = TestClient(app)
 
@@ -18,17 +22,13 @@ def test_publish_policy():
         ],
         "legal_basis": "工信部 2026 年算力普惠专项推进方案",
     }
-    resp = client.post("/api/v1/policies", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
+    data = gw_data(client, "policies.publish", payload)
     assert data["title"] == payload["title"]
     assert data["id"].startswith("pol_")
     assert data["subsidy_amount_max"] == 200000.0
 
     # Verify presence in list
-    list_resp = client.get("/api/v1/policies")
-    assert list_resp.status_code == 200
-    ids = [p["id"] for p in list_resp.json()]
+    ids = [p["id"] for p in gw_data(client, "policies.list", {})]
     assert data["id"] in ids
 
 
@@ -41,17 +41,13 @@ def test_publish_perk():
         "summary": "免费获得 12 个月 Pro 级 Postgres 数据库与 Auth 身份验证支持。",
         "quota_remaining": 50,
     }
-    resp = client.post("/api/v1/perks", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
+    data = gw_data(client, "perks.publish", payload)
     assert data["name"] == payload["name"]
     assert data["id"].startswith("perk_")
     assert data["quota_remaining"] == 50
 
     # Verify presence in list
-    list_resp = client.get("/api/v1/perks")
-    assert list_resp.status_code == 200
-    ids = [p["id"] for p in list_resp.json()]
+    ids = [p["id"] for p in gw_data(client, "perks.list", {})]
     assert data["id"] in ids
 
 
@@ -68,17 +64,13 @@ def test_publish_sop_template():
             {"key": "founder_name", "label": "法定代表人", "type": "string", "required": True},
         ],
     }
-    resp = client.post("/api/v1/sop/templates", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
+    data = gw_data(client, "sop.template.publish", payload)
     assert data["name"] == payload["name"]
     assert data["code"] == "BANK_CROSS_BORDER_ACCOUNT"
     assert data["id"].startswith("tpl_")
 
     # Verify presence in stages and templates
-    list_resp = client.get("/api/v1/sop/templates")
-    assert list_resp.status_code == 200
-    tpl_ids = [t["id"] for t in list_resp.json()["templates"]]
+    tpl_ids = [t["id"] for t in gw_data(client, "sop.templates", {})["templates"]]
     assert data["id"] in tpl_ids
 
 
@@ -93,16 +85,12 @@ def test_publish_product():
         "demo_url": "https://zenflow.dev",
         "author_id": "usr_maker_test_01",
     }
-    resp = client.post("/api/v1/products", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
+    data = gw_data(client, "products.publish", payload)
     assert data["title"] == payload["title"]
     assert data["price_cny"] == 99.0
 
     # Verify presence in list
-    list_resp = client.get("/api/v1/products")
-    assert list_resp.status_code == 200
-    ids = [p["id"] for p in list_resp.json()]
+    ids = [p["id"] for p in gw_data(client, "products.list", {})]
     assert data["id"] in ids
 
 
@@ -115,15 +103,11 @@ def test_publish_demand():
         "deadline_days": 10,
         "creator_id": "usr_maker_test_02",
     }
-    resp = client.post("/api/v1/demands", json=payload)
-    assert resp.status_code == 201
-    data = resp.json()
+    data = gw_data(client, "demands.publish", payload)
     assert data["title"] == payload["title"]
     assert data["budget_cny"] == 8000.0
     assert data["category"] == "TAX"
 
     # Verify presence in list
-    list_resp = client.get("/api/v1/demands")
-    assert list_resp.status_code == 200
-    ids = [d["id"] for d in list_resp.json()]
+    ids = [d["id"] for d in gw_data(client, "demands.list", {})]
     assert data["id"] in ids

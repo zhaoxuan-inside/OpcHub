@@ -4,6 +4,31 @@
 - **契约标准**：`OpenAPI 3.1 / Pydantic v2`
 - **阶段**：`Phase 3 (契约六元组)`
 
+> ⚠️ **架构变更提示（TASK-031，2026-10）— 单一统一入口**
+>
+> 依据框架详细设计 §3.3「统一入站网关与场景动态路由规约」，本文件下述**按 URL 分节的业务 REST 路径已全部移除**（历史契约，仅供参考用语义）。
+> 当前全平台业务请求**唯一入口**为：
+>
+> ```http
+> POST /api/welcom/opc_world        # 别名: /api/welcome/opc_world, /api/v1/dispatch, /api/v1/gateway/dispatch
+> Content-Type: application/json
+>
+> {
+>   "scenario": "products.publish",   # 业务场景码（见 backend/config/gateway_routes.yaml）
+>   "version":  "v1.0.0",
+>   "payload":  { /* 场景入参 */ },
+>   "context":  { /* 可选：client_env / client_ip / trace_id 等 */ },
+>   "token":    "可选：会话 Token（或置于 Authorization: Bearer 头）"
+> }
+> ```
+>
+> - **响应信封**：HTTP 恒为 `200`，业务结果以信封 `code` 表达（`200` 成功 / `400` 参数 / `401` 未登录 / `403` 越权 / `404` 不存在 / `500` 内部错误）。
+> - **鉴权**：身份来自 `Authorization: Bearer`、`context.token` 或 `payload.token`；RBAC/ABAC 由网关统一执行，`context.user_id` 不被信任。
+> - **场景清单 / 写操作权限**：见 `backend/config/gateway_routes.yaml`（54 个业务场景）。
+> - **仅保留的平台/管理端点**：统一网关入口、系统探针（`/livez` `/readyz` `/healthz` `/health`）、微内核自省（`/microkernel/methods` `/microkernel/dag/execute` `/microkernel/sandbox/validate`）、动态算子管理（`/scripts/*`，ADMIN）、安全审计（`/admin/audit/*`，ADMIN）、落地页（`/`、`/app`）。
+>
+> 变更记录见 [TASK-031_plan.md](file:///home/hardstone/Share/Common/CodeSpace/OpcHub/hs_dev_docs/_06_dev_process/_01_plan_log/TASK-031_plan.md)。
+
 ---
 
 ## [VIBE_CONTRACT] API 接口定义与错误码契约 (Machine-Actionable API Contract)

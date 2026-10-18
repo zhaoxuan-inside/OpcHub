@@ -45,6 +45,12 @@ schema_contract:
       primary_key: "id (UUID)"
     - name: "dag_pipeline_configs"
       primary_key: "id (UUID)"
+    - name: "audit_logs"
+      primary_key: "id (UUID)"
+    - name: "audit_logs_archive"
+      primary_key: "id (UUID)"
+    - name: "domain_snapshots"
+      primary_key: "(domain, entity_id)"
     - name: "forum_threads"
       primary_key: "id (UUID)"
     - name: "forum_comments"
@@ -366,6 +372,77 @@ CREATE TABLE IF NOT EXISTS content_moderation_logs (
 CREATE INDEX idx_moderation_target ON content_moderation_logs(target_type, target_id);
 CREATE INDEX idx_moderation_author ON content_moderation_logs(author_id);
 CREATE INDEX idx_moderation_created ON content_moderation_logs(created_at DESC);
+```
+
+### 1.17 安全与操作审计表 (`audit_logs` / `audit_logs_archive`)
+
+网关 RBAC/ABAC 决策与特权操作的全量审计留痕，`detail_encrypted` 为 HMAC-SHA256 加密后的明细载荷；超过保留窗口（>= 180 天）的记录迁入冷归档表。
+（由 TASK-030 引入，实现见 `src/core/audit.py` / `src/infrastructure/database/repository.py`。）
+
+```sql
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id VARCHAR(64) NOT NULL DEFAULT '',
+    actor_role VARCHAR(32) NOT NULL DEFAULT 'GUEST',
+    action VARCHAR(64) NOT NULL,
+    resource_type VARCHAR(64) NOT NULL DEFAULT '',
+    resource_id VARCHAR(64) NOT NULL DEFAULT '',
+    permission VARCHAR(64) NOT NULL DEFAULT '',
+    result VARCHAR(16) NOT NULL DEFAULT 'SUCCESS',
+    ip_address VARCHAR(64) NOT NULL DEFAULT '',
+    trace_id VARCHAR(64) NOT NULL DEFAULT '',
+    detail_encrypted TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_audit_actor ON audit_logs(actor_id);
+CREATE INDEX idx_audit_action ON audit_logs(action);
+CREATE INDEX idx_audit_resource ON audit_logs(resource_id);
+CREATE INDEX idx_audit_created ON audit_logs(created_at DESC);
+
+-- 冷归档表：与热表同构，追加 archived_at；索引独立命名以避免与热表冲突
+CREATE TABLE IF NOT EXISTS audit_logs_archive (
+    id UUID PRIMARY KEY,
+    actor_id VARCHAR(64) NOT NULL DEFAULT '',
+    actor_role VARCHAR(32) NOT NULL DEFAULT 'GUEST',
+    action VARCHAR(64) NOT NULL,
+    resource_type VARCHAR(64) NOT NULL DEFAULT '',
+    resource_id VARCHAR(64) NOT NULL DEFAULT '',
+    permission VARCHAR(64) NOT NULL DEFAULT '',
+    result VARCHAR(16) NOT NULL DEFAULT 'SUCCESS',
+    ip_address VARCHAR(64) NOT NULL DEFAULT '',
+    trace_id VARCHAR(64) NOT NULL DEFAULT '',
+    detail_encrypted TEXT NOT NULL DEFAULT '',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    archived_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_audit_archive_actor ON audit_logs_archive(actor_id);
+CREATE INDEX idx_audit_archive_action ON audit_logs_archive(action);
+CREATE INDEX idx_audit_archive_created ON audit_logs_archive(created_at DESC);
+```
+
+### 1.18 领域聚合文档快照表 (`domain_snapshots`)
+
+领域服务以**同步内存索引**作为运行时主读路径；本表以 JSONB 文档形式持久化每个聚合的**当前状态**，
+实现「变更写后（write-behind）+ 启动回灌（hydrate-on-startup）」，使平台工作状态跨进程重启不丢失，
+并避免为异步数据库访问改造全部同步领域方法。
+（由 TASK-032 引入，实现见 `src/infrastructure/database/persistence.py`。）
+
+- 主键 `(domain, entity_id)` 支持 `INSERT ... ON CONFLICT DO UPDATE` 原子 UPSERT；
+- `domain` 取值形如 `forum.threads`、`forum.comments`、`forum.upvotes`、`forum.bookmarks`、
+  `products.items`、`policies.items`、`demands.items`、`demands.bids`、`perks.items`、`perks.claims`、
+  `sop.templates`、`sop.documents`、`moderation.items`、`orchestration.dag_configs`、`orchestration.layouts`；
+- 用户账号/凭据/权益仍以后续规范化的 `users` 表为**唯一真实来源**（`metadata_payload` 承载 `phone` /
+  `credit_code` / `tier_name` / `active_entitlements` / `must_change_password`），启动时由 `users` 表回灌内存索引。
+
+```sql
+CREATE TABLE IF NOT EXISTS domain_snapshots (
+    domain VARCHAR(64) NOT NULL,
+    entity_id VARCHAR(160) NOT NULL,
+    payload JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (domain, entity_id)
+);
+CREATE INDEX idx_domain_snapshots_domain ON domain_snapshots(domain);
 ```
 
 
