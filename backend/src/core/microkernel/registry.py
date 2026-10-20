@@ -710,6 +710,136 @@ class AtomicRegistry:
             }
         self.register("forum.telemetry.incr", forum_telemetry_incr, domain="forum", description="头脑风暴社区互动度量指标递增算子")
 
+        # Forum Stream Feed Operators (流式无限滚动、缓存与预加载)
+        async def forum_feed_cursor_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            cat = str(inputs.get("category_code") or inputs.get("id") or "ALL").upper()
+            cursor_raw = inputs.get("cursor", 0)
+            try:
+                cursor_val = max(0, int(cursor_raw))
+            except (ValueError, TypeError):
+                cursor_val = 0
+            limit_raw = inputs.get("limit") or inputs.get("page_size") or inputs.get("page_length") or 10
+            try:
+                limit_val = max(1, min(int(limit_raw), 50))
+            except (ValueError, TypeError):
+                limit_val = 10
+            sort_by = str(inputs.get("sort_by") or "latest").lower()
+            if sort_by not in ("latest", "hot", "replies"):
+                sort_by = "latest"
+            user_id = inputs.get("user_id") or (context or {}).get("user_id") or ""
+            return {
+                "guard_passed": True,
+                "category_code": cat,
+                "cursor": cursor_val,
+                "limit": limit_val,
+                "sort_by": sort_by,
+                "user_id": user_id,
+            }
+        self.register("forum.feed.cursor_guard", forum_feed_cursor_guard, domain="forum", description="头脑风暴流式游标校验与防刷门禁算子")
+
+        async def forum_feed_cache_read(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            cat = inputs.get("category_code", "ALL")
+            cursor = inputs.get("cursor", 0)
+            limit = inputs.get("limit", 10)
+            sort_by = inputs.get("sort_by", "latest")
+            cache_key = f"{cat}:{sort_by}:{cursor}:{limit}"
+            cached_data = forum_service.get_feed_cache(cache_key)
+            if cached_data is not None:
+                return {
+                    "cache_hit": True,
+                    "cache_key": cache_key,
+                    "cached_data": cached_data,
+                }
+            return {
+                "cache_hit": False,
+                "cache_key": cache_key,
+                "cached_data": None,
+            }
+        self.register("forum.feed.cache_read", forum_feed_cache_read, domain="forum", description="头脑风暴流式分片多级缓存命中算子")
+
+        async def forum_feed_stream_fetch(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("cache_hit") and inputs.get("cached_data"):
+                return {"stream_payload": inputs["cached_data"]}
+            from src.domains.forum.service import forum_service
+            cat = inputs.get("category_code", "ALL")
+            cursor = inputs.get("cursor", 0)
+            limit = inputs.get("limit", 10)
+            sort_by = inputs.get("sort_by", "latest")
+            stream_result = forum_service.fetch_feed_stream(
+                category_code=cat,
+                cursor=cursor,
+                limit=limit,
+                sort_by=sort_by,
+            )
+            return {"stream_payload": stream_result}
+        self.register("forum.feed.stream_fetch", forum_feed_stream_fetch, domain="forum", description="头脑风暴帖子索引流检索与游标切片算子")
+
+        async def forum_feed_enrich_prefetch_meta(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            stream_payload = dict(inputs.get("stream_payload") or {})
+            next_cursor = stream_payload.get("next_cursor")
+            limit = stream_payload.get("limit", 10)
+            prefetch_hint = {
+                "recommended_prefetch_cursor": next_cursor,
+                "prefetch_threshold_ratio": 0.8,
+                "batch_size": limit,
+            }
+            stream_payload["prefetch_hint"] = prefetch_hint
+            return {
+                "feed_enriched": True,
+                "stream_payload": stream_payload,
+                "feed_result": stream_payload,
+            }
+        self.register("forum.feed.enrich_prefetch_meta", forum_feed_enrich_prefetch_meta, domain="forum", description="头脑风暴流式交互润色与预加载元信息增强算子")
+
+        async def forum_feed_cache_write(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            cache_hit = inputs.get("cache_hit", False)
+            cache_key = inputs.get("cache_key")
+            feed_result = inputs.get("feed_result") or inputs.get("stream_payload") or {}
+            from src.domains.forum.service import forum_service
+            if not cache_hit and cache_key and feed_result:
+                forum_service.set_feed_cache(cache_key, feed_result)
+            
+            # Speculative background pre-warming for next batch
+            prewarmed = False
+            if feed_result.get("has_more") and feed_result.get("next_cursor") is not None:
+                next_cur = feed_result["next_cursor"]
+                cat = feed_result.get("category_code", "ALL")
+                sort_by = feed_result.get("sort_by", "latest")
+                limit = feed_result.get("limit", 10)
+                next_cache_key = f"{cat}:{sort_by}:{next_cur}:{limit}"
+                if forum_service.get_feed_cache(next_cache_key) is None:
+                    next_batch = forum_service.fetch_feed_stream(
+                        category_code=cat,
+                        cursor=next_cur,
+                        limit=limit,
+                        sort_by=sort_by,
+                    )
+                    next_batch["prefetch_hint"] = {
+                        "recommended_prefetch_cursor": next_batch.get("next_cursor"),
+                        "prefetch_threshold_ratio": 0.8,
+                        "batch_size": limit,
+                    }
+                    forum_service.set_feed_cache(next_cache_key, next_batch)
+                    prewarmed = True
+
+            return {
+                "cache_written": True,
+                "prewarmed_next": prewarmed,
+                "feed_result": feed_result,
+            }
+        self.register("forum.feed.cache_write", forum_feed_cache_write, domain="forum", description="头脑风暴缓存回写与推测式下一批预热算子")
+
+        async def forum_cache_invalidate_operator(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            cat = inputs.get("category_code")
+            evicted_count = forum_service.invalidate_feed_cache(cat)
+            return {
+                "cache_invalidated": True,
+                "evicted_keys_count": evicted_count,
+            }
+        self.register("forum.cache.invalidate_operator", forum_cache_invalidate_operator, domain="forum", description="头脑风暴帖子变更缓存精准驱逐算子")
+
         # Domain 7: Product Showcase Domain (产品橱窗微内核算子与 Saga 补偿)
         async def validate_publish_product(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验独立商用作品发布入参合法性并做文本合规审查"""

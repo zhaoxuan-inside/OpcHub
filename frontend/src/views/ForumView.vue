@@ -66,10 +66,10 @@
             </div>
           </div>
 
-          <!-- Loading State Indicator -->
-          <div v-if="isLoadingPosts" class="posts-loading-banner">
+          <!-- Loading State Indicator (Initial or Category Reset) -->
+          <div v-if="isInitialLoading" class="posts-loading-banner glass-box">
             <span class="loading-spinner"></span>
-            <span>正在检索第 {{ currentPage }} 页风暴探讨...</span>
+            <span>正在检索「{{ currentCategoryName }}」实战风暴探讨...</span>
           </div>
 
           <div
@@ -84,6 +84,7 @@
               :density="viewDensity"
               :user-session="currentUserSession"
               @select="handleSelectPost"
+              @mouseenter="handlePostHover(post)"
               @upvote="handleCardUpvote"
               @bookmark="handleDetailBookmark"
               @delete="handleDeletePost"
@@ -91,71 +92,24 @@
             />
           </div>
 
-          <!-- VisionOS Liquid Pagination Bar (页号 + 页面长度 + 分页器) -->
-          <div v-if="totalCount > 0" class="forum-pagination-bar glass-box">
-            <div class="pagination-info">
-              <span class="pagination-meta-pill">第 {{ currentPage }} / {{ totalPages }} 页</span>
-              <span class="pagination-total-text">共 {{ totalCount }} 篇探讨</span>
-              <div class="page-size-selector">
-                <span class="page-size-label">页面长度:</span>
-                <select
-                  :value="pageSize"
-                  class="page-size-select"
-                  aria-label="选择每页文章数量"
-                  @change="handlePageSizeChange($event.target.value)"
-                >
-                  <option :value="3">3 篇 / 页</option>
-                  <option :value="5">5 篇 / 页</option>
-                  <option :value="10">10 篇 / 页</option>
-                  <option :value="20">20 篇 / 页</option>
-                </select>
-              </div>
-            </div>
+          <!-- Infinite Scroll Sentinel Anchor (触发下一批流式拉取) -->
+          <div ref="infiniteScrollSentinel" class="feed-sentinel-anchor"></div>
 
-            <div class="pagination-actions">
-              <button
-                type="button"
-                class="btn-liquid-outline btn-page-nav"
-                :disabled="currentPage <= 1 || isLoadingPosts"
-                aria-label="上一页"
-                @click="goToPage(currentPage - 1)"
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                  <polyline points="15 18 9 12 15 6"></polyline>
-                </svg>
-                <span>上一页</span>
-              </button>
+          <!-- Loading Next Batch Spinner -->
+          <div v-if="isLoadingMore" class="feed-stream-loading glass-box">
+            <span class="loading-spinner"></span>
+            <span>正在触底流式预加载后续风暴经验...</span>
+          </div>
 
-              <div class="page-pills">
-                <button
-                  v-for="p in visiblePageNumbers"
-                  :key="p"
-                  type="button"
-                  :class="['page-number-btn', { active: p === currentPage }]"
-                  :disabled="isLoadingPosts"
-                  @click="goToPage(p)"
-                >
-                  {{ p }}
-                </button>
-              </div>
-
-              <button
-                type="button"
-                class="btn-liquid-outline btn-page-nav"
-                :disabled="currentPage >= totalPages || isLoadingPosts"
-                aria-label="下一页"
-                @click="goToPage(currentPage + 1)"
-              >
-                <span>下一页</span>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                  <polyline points="9 18 15 12 9 6"></polyline>
-                </svg>
-              </button>
-            </div>
+          <!-- Stream Completion Crystal Marker -->
+          <div v-else-if="!hasMore && filteredAndSortedPosts.length > 0" class="feed-stream-end glass-box">
+            <span class="crystal-dot"></span>
+            <span>已呈现当前分类下全部 {{ totalCount }} 篇探讨 · 保持专注与创客自驱</span>
+            <span class="crystal-dot"></span>
           </div>
 
           <!-- Empty State -->
-          <div v-else class="glass-box empty-state-box">
+          <div v-else-if="!isInitialLoading && filteredAndSortedPosts.length === 0" class="glass-box empty-state-box">
             <div class="empty-icon-wrap">
               <ForumIcon name="empty-galaxy" size="38" />
             </div>
@@ -328,7 +282,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import ForumIcon from '@/components/ForumIcon.vue';
 import ForumCard from '@/components/ForumCard.vue';
 import ForumDetailView from '@/components/ForumDetailView.vue';
@@ -722,117 +676,247 @@ function recordDeletedThreadId(id) {
   } catch (e) {}
 }
 
-// Active Posts dataset (paginated)
+// Active Posts dataset (infinite scroll stream)
 const postsList = ref([]);
-
-// Pagination State (id + page + page_length)
-const currentPage = ref(1);
-const pageSize = ref(5);
+const currentCursor = ref(0);
+const feedLimit = ref(6);
 const totalCount = ref(0);
-const totalPages = ref(1);
-const isLoadingPosts = ref(false);
+const hasMore = ref(true);
+const isInitialLoading = ref(false);
+const isLoadingMore = ref(false);
+const isPrefetching = ref(false);
+const lastScrollY = ref(0);
+const infiniteScrollSentinel = ref(null);
+let scrollObserver = null;
+let hoverTimer = null;
 
-const visiblePageNumbers = computed(() => {
-  const pages = [];
-  const maxVisible = 5;
-  let start = Math.max(1, currentPage.value - Math.floor(maxVisible / 2));
-  let end = Math.min(totalPages.value, start + maxVisible - 1);
-  if (end - start + 1 < maxVisible) {
-    start = Math.max(1, end - maxVisible + 1);
-  }
-  for (let i = start; i <= end; i++) {
-    pages.push(i);
-  }
-  return pages;
+// L1 Client Feed Cache: Key: `${cat}:${sort}` -> { items: [], cursor, hasMore, total, timestamp }
+const clientFeedCache = new Map();
+// L1 Speculative Detail Cache: thread_id -> detailData
+const detailCache = new Map();
+// Prefetch Buffer: Key: `${cat}:${sort}:${cursor}` -> { items: [], next_cursor, has_more }
+const prefetchBuffer = new Map();
+
+const currentCategoryName = computed(() => {
+  return categories.find((c) => c.code === selectedCategoryCode.value)?.name || '全部';
 });
 
-async function fetchThreads(page = 1, size = pageSize.value, categoryId = selectedCategoryCode.value) {
-  isLoadingPosts.value = true;
-  currentPage.value = page;
+function transformThread(t) {
+  const existing = DEFAULT_SEEDS_DATA.find((s) => String(s.id) === String(t.id));
+  return {
+    id: t.id,
+    pinned: t.is_pinned ? '置顶' : (existing?.pinned || null),
+    category_code: t.category_code || existing?.category_code || 'DEV',
+    category: categories.find((c) => c.code === t.category_code)?.name || existing?.category || '技术踩坑',
+    title: t.title,
+    snippet: existing?.snippet || (t.content ? (t.content.slice(0, 160) + '...') : ''),
+    content: t.content || existing?.content || '',
+    metrics: existing?.metrics || [],
+    author: t.author_name || existing?.author || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
+    author_id: t.author_id || existing?.author_id || '',
+    ip_location: existing?.ip_location || '来自 浙江',
+    replies: t.comment_count ?? existing?.replies ?? 0,
+    comment_count: t.comment_count ?? existing?.comment_count ?? 0,
+    upvotes: t.upvote_count ?? existing?.upvotes ?? 0,
+    upvote_count: t.upvote_count ?? existing?.upvote_count ?? 0,
+    view_count: t.view_count ?? existing?.view_count ?? 500,
+    is_upvoted: existing?.is_upvoted || false,
+    created_at: t.created_at || existing?.created_at || new Date().toISOString(),
+    updated_at: existing?.updated_at || '刚刚',
+    tags: existing?.tags || [t.category_code || 'DEV'],
+  };
+}
+
+async function fetchFeedStream(reset = false, silent = false) {
+  const cat = selectedCategoryCode.value || 'ALL';
+  const sort = currentSort.value;
+  const cacheKey = `${cat}:${sort}`;
+
+  if (reset) {
+    currentCursor.value = 0;
+    hasMore.value = true;
+
+    // Check if client memory cache exists and is fresh (< 60s)
+    const cached = clientFeedCache.get(cacheKey);
+    if (cached && (Date.now() - cached.timestamp < 60000)) {
+      postsList.value = [...cached.items];
+      currentCursor.value = cached.cursor;
+      hasMore.value = cached.hasMore;
+      totalCount.value = cached.total;
+      syncStoredInteractions(postsList.value);
+      speculativePrefetchNext();
+      return;
+    }
+
+    if (!silent) isInitialLoading.value = true;
+    postsList.value = [];
+  } else {
+    if (isLoadingMore.value || !hasMore.value) return;
+
+    // Check prefetch buffer for instantaneous zero-latency append
+    const bufferKey = `${cat}:${sort}:${currentCursor.value}`;
+    if (prefetchBuffer.has(bufferKey)) {
+      const prefetched = prefetchBuffer.get(bufferKey);
+      prefetchBuffer.delete(bufferKey);
+      const newItems = prefetched.items.filter((p) => !postsList.value.some((ex) => String(ex.id) === String(p.id)));
+      postsList.value.push(...newItems);
+      currentCursor.value = prefetched.next_cursor !== null && prefetched.next_cursor !== undefined
+        ? prefetched.next_cursor
+        : (currentCursor.value + newItems.length);
+      hasMore.value = prefetched.has_more;
+      syncStoredInteractions(postsList.value);
+
+      clientFeedCache.set(cacheKey, {
+        items: [...postsList.value],
+        cursor: currentCursor.value,
+        hasMore: hasMore.value,
+        total: totalCount.value,
+        timestamp: Date.now(),
+      });
+
+      speculativePrefetchNext();
+      return;
+    }
+
+    isLoadingMore.value = true;
+  }
+
   try {
-    const res = await dispatchGateway('forum.threads.list', {
-      id: categoryId || 'ALL',
-      page: page,
-      page_size: size,
-      page_length: size,
+    const res = await dispatchGateway('forum.feed.stream', {
+      category_code: cat,
+      cursor: currentCursor.value,
+      limit: feedLimit.value,
+      sort_by: sort,
     }, { silent: true });
 
-    if (res.ok) {
+    if (res.ok && res.data) {
       const data = res.data;
-      const rawItems = Array.isArray(data) ? data : (data?.items || []);
-      totalCount.value = typeof data?.total === 'number' ? data.total : rawItems.length;
-      totalPages.value = typeof data?.total_pages === 'number' ? data.total_pages : (Math.ceil(totalCount.value / size) || 1);
+      const rawItems = Array.isArray(data.items) ? data.items : [];
+      totalCount.value = typeof data.total === 'number' ? data.total : rawItems.length;
+      hasMore.value = Boolean(data.has_more);
+      currentCursor.value = data.next_cursor !== null && data.next_cursor !== undefined
+        ? data.next_cursor
+        : (currentCursor.value + rawItems.length);
 
       const deletedIds = getDeletedThreadIds();
-      const remotePosts = rawItems
+      const transformed = rawItems
         .filter((t) => !deletedIds.has(String(t.id)))
-        .map((t) => {
-          const existing = DEFAULT_SEEDS_DATA.find((s) => String(s.id) === String(t.id));
-          return {
-            id: t.id,
-            pinned: t.is_pinned ? '置顶' : (existing?.pinned || null),
-            category_code: t.category_code || existing?.category_code || 'DEV',
-            category: categories.find((c) => c.code === t.category_code)?.name || existing?.category || '技术踩坑',
-            title: t.title,
-            snippet: existing?.snippet || (t.content ? (t.content.slice(0, 160) + '...') : ''),
-            content: t.content || existing?.content || '',
-            metrics: existing?.metrics || [],
-            author: t.author_name || existing?.author || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
-            author_id: t.author_id || existing?.author_id || '',
-            ip_location: existing?.ip_location || '来自 浙江',
-            replies: t.comment_count ?? existing?.replies ?? 0,
-            comment_count: t.comment_count ?? existing?.comment_count ?? 0,
-            upvotes: t.upvote_count ?? existing?.upvotes ?? 0,
-            upvote_count: t.upvote_count ?? existing?.upvote_count ?? 0,
-            view_count: t.view_count ?? existing?.view_count ?? 500,
-            is_upvoted: existing?.is_upvoted || false,
-            created_at: t.created_at || existing?.created_at || new Date().toISOString(),
-            updated_at: existing?.updated_at || '刚刚',
-            tags: existing?.tags || [t.category_code || 'DEV'],
-          };
-        });
+        .map(transformThread);
 
-      postsList.value = remotePosts;
+      if (reset) {
+        postsList.value = transformed;
+      } else {
+        const newItems = transformed.filter((p) => !postsList.value.some((ex) => String(ex.id) === String(p.id)));
+        postsList.value.push(...newItems);
+      }
+
       syncStoredInteractions(postsList.value);
+
+      clientFeedCache.set(cacheKey, {
+        items: [...postsList.value],
+        cursor: currentCursor.value,
+        hasMore: hasMore.value,
+        total: totalCount.value,
+        timestamp: Date.now(),
+      });
+
+      speculativePrefetchNext();
     }
   } catch (e) {
     // Graceful fallback to initial seeds filtered by category and deleted
     const deletedIds = getDeletedThreadIds();
     let fallback = DEFAULT_SEEDS_DATA.filter((p) => !deletedIds.has(String(p.id)));
-    if (categoryId && categoryId !== 'ALL') {
-      fallback = fallback.filter((p) => p.category_code === categoryId);
+    if (cat && cat !== 'ALL') {
+      fallback = fallback.filter((p) => p.category_code === cat);
     }
     totalCount.value = fallback.length;
-    totalPages.value = Math.ceil(fallback.length / size) || 1;
-    const start = (page - 1) * size;
-    postsList.value = fallback.slice(start, start + size);
+    const start = currentCursor.value;
+    const end = start + feedLimit.value;
+    const chunk = fallback.slice(start, end);
+    hasMore.value = end < fallback.length;
+    currentCursor.value = end;
+    if (reset) {
+      postsList.value = chunk;
+    } else {
+      postsList.value.push(...chunk);
+    }
   } finally {
-    isLoadingPosts.value = false;
+    isInitialLoading.value = false;
+    isLoadingMore.value = false;
   }
+}
+
+async function speculativePrefetchNext() {
+  if (!hasMore.value || isPrefetching.value) return;
+  const cat = selectedCategoryCode.value || 'ALL';
+  const sort = currentSort.value;
+  const cur = currentCursor.value;
+  const bufferKey = `${cat}:${sort}:${cur}`;
+  if (prefetchBuffer.has(bufferKey)) return;
+
+  isPrefetching.value = true;
+  try {
+    const res = await dispatchGateway('forum.feed.stream', {
+      category_code: cat,
+      cursor: cur,
+      limit: feedLimit.value,
+      sort_by: sort,
+    }, { silent: true });
+    if (res.ok && res.data) {
+      const rawItems = Array.isArray(res.data.items) ? res.data.items : [];
+      const deletedIds = getDeletedThreadIds();
+      const transformed = rawItems
+        .filter((t) => !deletedIds.has(String(t.id)))
+        .map(transformThread);
+      prefetchBuffer.set(bufferKey, {
+        items: transformed,
+        next_cursor: res.data.next_cursor,
+        has_more: Boolean(res.data.has_more),
+      });
+    }
+  } catch (_) {} finally {
+    isPrefetching.value = false;
+  }
+}
+
+function handlePostHover(post) {
+  if (!post || !post.id) return;
+  const tid = String(post.id);
+  if (detailCache.has(tid)) return;
+  clearTimeout(hoverTimer);
+  hoverTimer = setTimeout(async () => {
+    try {
+      const res = await dispatchGateway('forum.threads.get', { thread_id: tid }, { silent: true });
+      if (res.ok && res.data) {
+        detailCache.set(tid, res.data);
+      }
+    } catch (_) {}
+  }, 120);
 }
 
 function handleSelectCategory(catCode) {
   selectedCategoryCode.value = catCode;
-  currentPage.value = 1;
-  fetchThreads(1, pageSize.value, catCode);
+  fetchFeedStream(true);
 }
 
-function handlePageSizeChange(newSize) {
-  const size = parseInt(newSize, 10) || 5;
-  pageSize.value = size;
-  currentPage.value = 1;
-  fetchThreads(1, size, selectedCategoryCode.value);
-}
-
-function goToPage(page) {
-  if (page < 1 || page > totalPages.value || page === currentPage.value) return;
-  fetchThreads(page, pageSize.value, selectedCategoryCode.value);
-  const el = document.querySelector('.zhihu-feed-stream');
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth' });
-  } else {
-    window.scrollTo({ top: 120, behavior: 'smooth' });
+function initScrollObserver() {
+  if (scrollObserver) {
+    scrollObserver.disconnect();
+    scrollObserver = null;
   }
+  if (!infiniteScrollSentinel.value) return;
+
+  scrollObserver = new IntersectionObserver((entries) => {
+    const [entry] = entries;
+    if (entry && entry.isIntersecting && hasMore.value && !isLoadingMore.value && !isInitialLoading.value) {
+      fetchFeedStream(false);
+    }
+  }, {
+    rootMargin: '250px',
+    threshold: 0.01,
+  });
+
+  scrollObserver.observe(infiniteScrollSentinel.value);
 }
 
 // Category counts
@@ -905,6 +989,7 @@ const hotRankPosts = computed(() => {
 
 // Card Select Action (全页面打开文章详情与交流)
 function handleSelectPost(post) {
+  lastScrollY.value = window.scrollY;
   activePost.value = post;
   currentViewMode.value = 'detail';
   if (!window.location.hash.includes(`post_id=${post.id}`)) {
@@ -922,6 +1007,10 @@ function handleBackToList() {
       window.history.replaceState(null, '', `${window.location.pathname}#forum`);
     } catch (e) {}
   }
+  nextTick(() => {
+    window.scrollTo({ top: lastScrollY.value, behavior: 'auto' });
+    initScrollObserver();
+  });
 }
 
 function handleDetailUpvote({ post, isUpvoted, count }) {
@@ -983,6 +1072,9 @@ async function confirmExecuteDelete() {
     });
     if (res.ok) {
       recordDeletedThreadId(post.id);
+      clientFeedCache.clear();
+      prefetchBuffer.clear();
+      detailCache.delete(String(post.id));
       emit('toast', {
         title: '帖子已删除',
         message: `实战帖《${post.title}》已成功移除。`,
@@ -1062,6 +1154,8 @@ function handleOpenCreatePage() {
 
 // New Post Created Callback (发布成功后，全页面居中展示该文章)
 function handleNewPostSuccess(newThread) {
+  clientFeedCache.clear();
+  prefetchBuffer.clear();
   postsList.value.unshift(newThread);
   activePost.value = newThread;
   currentViewMode.value = 'detail';
@@ -1070,6 +1164,8 @@ function handleNewPostSuccess(newThread) {
 
 // Top Bar Post Created Callback (从信息流顶部快速发布后，直接插入流顶部并更新视图)
 function handleTopBarPublishSuccess(newThread) {
+  clientFeedCache.clear();
+  prefetchBuffer.clear();
   // If user was filtering by a specific category that doesn't match, reset to ALL
   if (selectedCategoryCode.value !== 'ALL' && selectedCategoryCode.value !== newThread.category_code) {
     selectedCategoryCode.value = 'ALL';
@@ -1123,15 +1219,29 @@ function onWindowHashChange() {
   checkUrlForPost();
 }
 
-// Lifecycle: Fetch from backend gateway with mandatory pagination (id + page + page_length)
+watch(currentSort, () => {
+  fetchFeedStream(true);
+});
+
+// Lifecycle: Infinite Scroll Feed stream initialization & intersection observer mounting
 onMounted(async () => {
   window.addEventListener('hashchange', onWindowHashChange);
-  await fetchThreads(1, pageSize.value, selectedCategoryCode.value);
+  await fetchFeedStream(true);
+  nextTick(() => {
+    initScrollObserver();
+  });
   checkUrlForPost();
 });
 
 onUnmounted(() => {
   window.removeEventListener('hashchange', onWindowHashChange);
+  if (scrollObserver) {
+    scrollObserver.disconnect();
+    scrollObserver = null;
+  }
+  if (hoverTimer) {
+    clearTimeout(hoverTimer);
+  }
 });
 </script>
 
@@ -1822,129 +1932,55 @@ onUnmounted(() => {
   display: inline-block;
 }
 
-/* ---------------- VisionOS Pagination Controls ---------------- */
-.forum-pagination-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 18px;
-  border-radius: var(--radius-md, 14px);
-  margin-top: 16px;
-  margin-bottom: 24px;
-  gap: 14px;
-  flex-wrap: wrap;
+/* ---------------- Stream Infinite Scroll Loading & End States ---------------- */
+.feed-sentinel-anchor {
+  width: 100%;
+  height: 2px;
+  pointer-events: none;
+  opacity: 0;
 }
 
-.pagination-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.pagination-meta-pill {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent, #0071e3);
-  background: rgba(0, 113, 227, 0.1);
-  border: 1px solid rgba(0, 113, 227, 0.2);
-  border-radius: var(--radius-full);
-  padding: 2px 10px;
-}
-
-.pagination-total-text {
-  font-size: 12px;
-  color: var(--text-tertiary);
-  font-family: var(--font-mono, monospace);
-}
-
-.page-size-selector {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: 6px;
-}
-
-.page-size-label {
-  font-size: 12px;
-  color: var(--text-secondary);
-}
-
-.page-size-select {
-  font-size: 12px;
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: var(--glass-surface-subtle);
-  border: 1px solid var(--glass-border);
-  color: var(--text-primary);
-  cursor: pointer;
-  outline: none;
-}
-
-.pagination-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.btn-page-nav {
-  padding: 5px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.page-pills {
-  display: flex;
-  gap: 4px;
-  align-items: center;
-}
-
-.page-number-btn {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid transparent;
-  background: transparent;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
+.feed-stream-loading {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: all 0.18s;
+  gap: 12px;
+  padding: 16px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-radius: var(--radius-md, 14px);
+  margin-top: 14px;
 }
 
-.page-number-btn:hover:not(:disabled) {
-  background: var(--glass-surface-subtle);
-  color: var(--text-primary);
+.feed-stream-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-md, 14px);
+  margin-top: 20px;
+  margin-bottom: 24px;
+  letter-spacing: 0.02em;
 }
 
-.page-number-btn.active {
+.crystal-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
   background: var(--accent, #0071e3);
-  color: #fff;
-  border-color: var(--accent, #0071e3);
-  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.35);
+  box-shadow: 0 0 6px var(--accent, #0071e3);
+  display: inline-block;
+  opacity: 0.7;
 }
 
-.page-number-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* Dark mode adjustments for pagination */
+/* Dark mode adjustments for stream */
 [data-theme="dark"] .feed-filter-bar,
-[data-theme="dark"] .forum-pagination-bar {
+[data-theme="dark"] .feed-stream-loading,
+[data-theme="dark"] .feed-stream-end {
   background: rgba(26, 29, 36, 0.7);
   border-color: rgba(255, 255, 255, 0.08);
-}
-
-[data-theme="dark"] .page-size-select {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: var(--text-primary);
 }
 </style>

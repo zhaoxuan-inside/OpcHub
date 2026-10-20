@@ -158,11 +158,13 @@ class OrchestrationService:
             "nodes": [
                 {"id": "step_guard", "action_handler": "forum.thread.validate_guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "forum.thread.persist", "type": "STORAGE"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
                 {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
                 {"from": "step_guard", "to": "step_persist"},
-                {"from": "step_persist", "to": "step_telemetry"},
+                {"from": "step_persist", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
             ],
         }
         self.save_dag_config(
@@ -597,6 +599,37 @@ class OrchestrationService:
                 scenario_code="OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE",
                 version="v1.0.0",
                 topology_graph=topo_orch_ops_list,
+                status="ACTIVE",
+            )
+        )
+
+        # 23. Forum Infinite Stream Feed & Multi-tier Cache DAG Pipeline: OPC_FORUM_FEED_STREAM_PIPELINE
+        topo_forum_feed = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.feed.cursor_guard", "type": "GUARD"},
+                {"id": "step_cache", "action_handler": "forum.feed.cache_read", "type": "CACHE"},
+                {"id": "step_fetch", "action_handler": "forum.feed.stream_fetch", "type": "STORAGE"},
+                {"id": "step_enrich", "action_handler": "forum.feed.enrich_prefetch_meta", "type": "BIZ"},
+                {"id": "step_write", "action_handler": "forum.feed.cache_write", "type": "CACHE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_cache"},
+                {"from": "step_cache", "to": "step_fetch"},
+                {"from": "step_fetch", "to": "step_enrich"},
+                {"from": "step_enrich", "to": "step_write"},
+                {"from": "step_write", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_FEED_STREAM_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_feed,
                 status="ACTIVE",
             )
         )

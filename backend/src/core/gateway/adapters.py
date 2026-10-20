@@ -211,6 +211,24 @@ async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
     return res.final_output.get("created_thread") or res.final_output
 
 
+async def forum_feed_stream_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for forum infinite scroll feed and caching."""
+    inputs = dict(p)
+    if not inputs.get("user_id") and (c or {}).get("user_id"):
+        inputs["user_id"] = c["user_id"]
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_FEED_STREAM_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum feed stream pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("feed_result") or res.final_output
+
+
 async def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for forum comment publishing."""
     inputs = dict(p)

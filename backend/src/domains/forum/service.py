@@ -1,6 +1,7 @@
 """Forum service managing threads, materialized-path comments, upvotes, and bookmarks."""
 import uuid
 from datetime import datetime, timezone
+import time
 from typing import Optional, List, Dict, Set, Tuple, Any, Union
 
 from src.domains.forum.models import (
@@ -59,7 +60,35 @@ class ForumService:
         # Key: (user_id, thread_id)
         self._bookmarks: Dict[Tuple[str, str], str] = {}  # maps to folder_name
         self._deleted_thread_ids: Set[str] = set()
+        # Key: cache_key -> (timestamp, data_dict)
+        self._feed_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
         self._init_seeds()
+
+    def invalidate_feed_cache(self, category_code: Optional[str] = None) -> int:
+        """Invalidate feed cache entries for a specific category or globally."""
+        if not category_code or str(category_code).upper() == "ALL":
+            count = len(self._feed_cache)
+            self._feed_cache.clear()
+            return count
+        cat_prefix = str(category_code).upper()
+        keys_to_del = [k for k in self._feed_cache if k.startswith(cat_prefix) or k.startswith("ALL")]
+        for k in keys_to_del:
+            self._feed_cache.pop(k, None)
+        return len(keys_to_del)
+
+    def get_feed_cache(self, cache_key: str, ttl_seconds: float = 180.0) -> Optional[Dict[str, Any]]:
+        """Retrieve cached feed batch if not expired."""
+        entry = self._feed_cache.get(cache_key)
+        if entry:
+            ts, data = entry
+            if time.time() - ts <= ttl_seconds:
+                return data
+            self._feed_cache.pop(cache_key, None)
+        return None
+
+    def set_feed_cache(self, cache_key: str, data: Dict[str, Any]) -> None:
+        """Store feed batch into cache with current timestamp."""
+        self._feed_cache[cache_key] = (time.time(), data)
 
     def _init_seeds(self) -> None:
         for tid, seed in DEFAULT_SEEDS_DICT.items():
@@ -83,6 +112,7 @@ class ForumService:
         self._upvotes.clear()
         self._bookmarks.clear()
         self._deleted_thread_ids.clear()
+        self._feed_cache.clear()
 
     def create_thread(self, payload: ForumThreadCreate) -> ForumThreadResponse:
         """Publish a new forum discussion thread."""
@@ -106,6 +136,7 @@ class ForumService:
         )
         self._threads[thread_id] = thread
         domain_persistence.write("forum.threads", thread_id, thread)
+        self.invalidate_feed_cache(payload.category_code)
         return thread
 
     def get_thread(self, thread_id: str, record_view: bool = True) -> ForumThreadResponse:
@@ -170,6 +201,54 @@ class ForumService:
             "total": total,
             "total_pages": total_pages,
             "has_more": has_more,
+            "items": [t.model_dump() for t in items],
+        }
+
+    def fetch_feed_stream(
+        self,
+        category_code: Optional[str] = "ALL",
+        cursor: int = 0,
+        limit: int = 10,
+        sort_by: str = "latest",
+    ) -> Dict[str, Any]:
+        """Fetch threads as a continuous infinite scroll feed with cursor-based slicing."""
+        target_id = str(category_code or "ALL").upper()
+        size = max(1, min(int(limit or 10), 50))
+        offset = max(0, int(cursor or 0))
+
+        all_matched = [t for t in self._threads.values() if t.id not in self._deleted_thread_ids]
+        if target_id != "ALL":
+            all_matched = [t for t in all_matched if (t.category_code or "").upper() == target_id or str(t.id) == target_id]
+
+        if sort_by == "hot":
+            # Pinned first, then by hot score (upvotes * 3 + comment_count * 5), then creation time
+            all_matched.sort(
+                key=lambda t: (t.is_pinned, (t.upvote_count * 3 + t.comment_count * 5), t.created_at),
+                reverse=True,
+            )
+        elif sort_by == "replies":
+            all_matched.sort(
+                key=lambda t: (t.is_pinned, t.comment_count, t.created_at),
+                reverse=True,
+            )
+        else:
+            # Latest
+            all_matched.sort(key=lambda t: (t.is_pinned, t.created_at), reverse=True)
+
+        total = len(all_matched)
+        end = offset + size
+        items = all_matched[offset:end]
+        has_more = end < total
+        next_cursor = end if has_more else None
+
+        return {
+            "category_code": target_id,
+            "cursor": offset,
+            "limit": size,
+            "sort_by": sort_by,
+            "total": total,
+            "has_more": has_more,
+            "next_cursor": next_cursor,
             "items": [t.model_dump() for t in items],
         }
 
@@ -381,6 +460,7 @@ class ForumService:
             for cid in to_delete:
                 del self._comments[cid]
                 domain_persistence.delete("forum.comments", cid)
+            self.invalidate_feed_cache()
             return True
         return False
 

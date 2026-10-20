@@ -194,6 +194,13 @@ gateway:
     # --------------------------------------------------------------------------
     # 6. Forum & Brainstorm (头脑风暴社区)
     # --------------------------------------------------------------------------
+    - scenario: "forum.feed.stream"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "流式无限滚动检索头脑风暴社区讨论帖 (微内核 DAG + 缓存 + 预加载驱动)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_feed_stream_adapter"
+
     - scenario: "forum.threads.list"
       version: "v1.0.0"
       domain: "forum"
