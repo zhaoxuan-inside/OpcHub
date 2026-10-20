@@ -1,0 +1,173 @@
+# OpcHub 全局统一定义词典与防歧义词典 (_02_project_word.dict.yaml)
+# Version: 1.1.0
+# Complies with hs-dev-skill verify_consistency schema
+
+terms:
+  - term: "创客"
+    en_name: "Maker"
+    description: "平台的核心服务主体，一人公司（One-Person Company）创办者或独立开发者"
+    forbidden_alias: ["end_user", "consumer", "client_person"]
+
+  - term: "收费权益"
+    en_name: "Entitlement"
+    description: "用户账户强绑定的功能与服务调用权限凭据，用于门禁鉴权与按量计费"
+    forbidden_alias: ["vip_flag", "permission_ticket", "reward_point"]
+
+  - term: "扶持政策"
+    en_name: "Policy"
+    description: "政府公开的免税、算力券、研发费用加计扣除等扶持补贴条目"
+    forbidden_alias: ["government_order", "subsidy_doc"]
+
+  - term: "生态特权"
+    en_name: "Perk"
+    description: "云厂商、大模型平台、离岸支付工具提供给创客的专属额度与折扣"
+    forbidden_alias: ["welfare_pack", "coupon_gift"]
+
+  - term: "需求委托"
+    en_name: "Demand"
+    description: "企业客户发布的技术外包、合规辅导或定制开发需求"
+    forbidden_alias: ["work_order", "gig_item"]
+
+  - term: "微内核编排链路"
+    en_name: "DAGPipeline"
+    description: "后端通过有向无环图串联门禁、算子与存储的执行拓扑流程"
+    forbidden_alias: ["script_chain", "raw_workflow"]
+
+  - term: "头脑风暴"
+    en_name: "Brainstorm"
+    description: "创客灵感碰撞、实战经验沉淀与多级问答互助的社区板块（原贴吧问答）"
+    forbidden_alias: ["贴吧问答", "创客贴吧"]
+
+  - term: "论坛讨论帖"
+    en_name: "ForumThread"
+    description: "头脑风暴社区中发布的实战经验、踩坑记录或出海商业主题帖"
+    forbidden_alias: ["main_post", "topic_entity", "article_item"]
+
+  - term: "多级问答回复"
+    en_name: "ForumComment"
+    description: "对讨论帖的回答或对回答的楼中楼二级/多级嵌套回复（基于物化路径模型）"
+    forbidden_alias: ["reply_entity", "sub_talk", "talk_item"]
+
+  - term: "认同点赞"
+    en_name: "Upvote"
+    description: "对帖子或问答回复的投票认同机制，一人一票防重"
+    forbidden_alias: ["like_action", "thumb_up", "agree_vote"]
+
+  - term: "收藏归档"
+    en_name: "Bookmark"
+    description: "创客将优质实战经验或出海指南加入个人收藏夹"
+    forbidden_alias: ["favorite_mark", "star_item"]
+
+  - term: "流程文书模板"
+    en_name: "SOPTemplate"
+    description: "预置的设立登记、章程、软著等标准申报模板，含变量占位符与必填字段定义"
+    forbidden_alias: ["doc_template", "raw_model"]
+
+  - term: "生成申报材料"
+    en_name: "SOPDocument"
+    description: "结合创客填报字段经后端微内核模板引擎渲染并持久化保存的合规申报文书实例"
+    forbidden_alias: ["filled_paper", "output_pdf"]
+
+  - term: "独立产品橱窗"
+    en_name: "ProductShowcase"
+    description: "超级个体创客独立研发的商业化应用、SaaS工具或智能体服务展示项"
+    forbidden_alias: ["tool_item", "show_box"]
+
+  - term: "需求竞标出价"
+    en_name: "DemandBid"
+    description: "创客对企业发布的委托需求提交的实施方案与报价条目"
+    forbidden_alias: ["bid_offer", "price_quote"]
+
+  - term: "内容治理下架"
+    en_name: "ContentModeration"
+    description: "管理员对发现的违法违规言论、灌水营销或违规帖子进行审查并执行下架处置"
+    forbidden_alias: ["delete_talk", "remove_post_flag"]
+
+  - term: "合法合规治理体系"
+    en_name: "LegalCompliance"
+    description: "全域覆盖隐私协议、敏感词过滤、发帖实名、言论下架与180天日志留痕的法务安全防线"
+    forbidden_alias: ["law_check", "police_rule"]
+
+  - term: "政策采集规约"
+    en_name: "PolicyScrapingRule"
+    description: "仅采集gov.cn官方政务公文、严禁抓取第三方商业数据库、低频错峰采集的合规准则"
+    forbidden_alias: ["spider_hack", "raw_crawl"]
+
+  - term: "发帖IP属地"
+    en_name: "IPLocation"
+    description: "依国家规定在头脑风暴社区与评论区前台公开展示的发帖人境内省份或境外国家属地信息"
+    forbidden_alias: ["user_city", "geo_flag"]
+
+  - term: "审计日志留存"
+    en_name: "AuditLogRetention"
+    description: "根据网络安全法规定对用户访问记录、发帖历史与操作行为加密留存不少于180天的法定机制"
+    forbidden_alias: ["save_log", "log_dump"]
+
+  - term: "合规指南"
+    en_name: "ComplianceGuide"
+    description: "系统呈现的产品开发六维合规防线、典型避坑案例与上线前自检清单专区"
+    forbidden_alias: ["legal_doc_page", "rules_page"]
+
+  - term: "法律求助"
+    en_name: "LegalHelpDemand"
+    description: "需求集市中专为独立创客设立的法务咨询、资质代办与合规审查委托类别"
+    forbidden_alias: ["lawyer_post", "court_ask"]
+
+  - term: "双模调度器"
+    en_name: "DualModeDispatcher"
+    description: "微内核调度执行器，支持单体进程内直接方法调用与微服务远程HTTP请求双模适配"
+    forbidden_alias: ["rpc_switch", "call_hub"]
+
+  - term: "低代码服务组合"
+    en_name: "LowCodeServiceComposition"
+    description: "通过低代码平台将各模块原子算子自由编排组装为业务场景DAG流水线"
+    forbidden_alias: ["script_merge", "hardcode_chain"]
+
+lifecycle_terms:
+  - concept: "DAG Pipeline Lifecycle"
+    command: "execute_pipeline"
+    event: "pipeline.executed"
+    status: "SUCCESS"
+    forbidden_alias: ["run_pipe", "pipeline_ran"]
+
+  - concept: "Entitlement Lifecycle"
+    command: "grant_entitlement"
+    event: "entitlement.activated"
+    status: "ACTIVE"
+    forbidden_alias: ["open_vip", "vip_opened"]
+
+  - concept: "Document Generation Lifecycle"
+    command: "generate_document"
+    event: "document.generated"
+    status: "READY"
+    forbidden_alias: ["create_doc", "doc_created"]
+
+  - concept: "Forum Post Lifecycle"
+    command: "publish_post"
+    event: "post.published"
+    status: "PUBLISHED"
+    forbidden_alias: ["send_msg", "msg_sent"]
+
+  - concept: "Forum Comment Lifecycle"
+    command: "reply_comment"
+    event: "comment.created"
+    status: "ACTIVE"
+    forbidden_alias: ["post_reply", "reply_posted"]
+
+  - concept: "Upvote Lifecycle"
+    command: "toggle_upvote"
+    event: "target.upvoted"
+    status: "UPVOTED"
+    forbidden_alias: ["give_like", "like_given"]
+
+  - concept: "Bookmark Lifecycle"
+    command: "toggle_bookmark"
+    event: "thread.bookmarked"
+    status: "BOOKMARKED"
+    forbidden_alias: ["do_favorite", "fav_done"]
+
+  - concept: "Content Moderation Lifecycle"
+    command: "moderate_content"
+    event: "content.moderated"
+    status: "TAKEN_DOWN"
+    forbidden_alias: ["kill_msg", "ban_post"]

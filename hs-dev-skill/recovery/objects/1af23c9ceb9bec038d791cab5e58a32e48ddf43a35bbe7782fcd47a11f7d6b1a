@@ -1,0 +1,42 @@
+# ==============================================================================
+# OpcHub Platform Environment Variables Template
+# Copy this file to .env and fill in your custom credentials.
+# ==============================================================================
+
+# Server Network Configuration (consumed via config.py server.host / server.port)
+OPCHUB_SERVER_HOST=0.0.0.0
+OPCHUB_SERVER_PORT=8000
+
+# PostgreSQL 16 + pgvector Database Configuration (ADR-002 & ADR-003)
+POSTGRES_HOST=postgres
+POSTGRES_PORT=5432
+POSTGRES_DB=opchub
+POSTGRES_USER=opc
+POSTGRES_PASSWORD=opchub_secret
+DATABASE_URL=postgresql+asyncpg://opc:opchub_secret@postgres:5432/opchub
+
+# SiliconFlow (硅基流动) AI Inference API Key (Optional: Leave empty for local mock)
+SILICONFLOW_API_KEY=
+
+# WeChat Pay V3 Secret Key (Optional: Leave empty for local mock)
+WECHAT_PAY_V3_KEY=
+
+# Stripe Connect Secret Key (Optional: Leave empty for local mock)
+STRIPE_SECRET_KEY=
+
+# Built-in Administrator Bootstrap (RBAC §1.1)
+# The account is provisioned on startup and forced to rotate its password on first login.
+OPCHUB_ADMIN_EMAIL=admin@opchub.cn
+OPCHUB_ADMIN_INITIAL_PASSWORD=OpcHub@Admin#2026
+OPCHUB_ADMIN_NICKNAME=平台超级管理员
+
+# Security Audit & Cold Archive (legal_compliance §80: encrypted retention >= 180 days)
+OPCHUB_AUDIT_RETENTION_DAYS=180
+# Dedicated audit field-encryption secret; falls back to OPCHUB_SECRET_KEY when empty.
+OPCHUB_AUDIT_SECRET=
+OPCHUB_AUDIT_ARCHIVE_BATCH_SIZE=500
+
+# Domain persistence integration tests (opt-in): point the DB integration suite at a live
+# PostgreSQL instance. When unset, tests/test_db_persistence_integration.py is skipped and
+# the platform runs in-memory only.
+# OPCHUB_IT_DATABASE_URL=postgresql+asyncpg://opc:opchub_secret@localhost:5432/opchub

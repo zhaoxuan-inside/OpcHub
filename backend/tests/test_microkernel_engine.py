@@ -90,3 +90,53 @@ async def test_cycle_detection():
 
     assert result.status == ExecutionStatus.CYCLE_DETECTED
     assert "Cyclic dependency" in result.error_message
+
+
+@pytest.mark.asyncio
+async def test_single_entry_and_single_exit_validation():
+    # 1. Valid single entry and single exit DAG
+    valid_config = DAGConfig(
+        version="v1.0.4-valid",
+        scenario_code="test.valid_sink",
+        execution_graph=ExecutionGraph(
+            topology="DAG",
+            entry_node="n1",
+            exit_node="n3",
+            nodes=[
+                NodeDef(id="n1", action_handler="gateway_ingress", type=NodeType.GATEWAY),
+                NodeDef(id="n2", action_handler="auth_guard", type=NodeType.GUARD),
+                NodeDef(id="n3", action_handler="invoice_tax_calc", type=NodeType.BIZ),
+            ],
+            edges=[
+                EdgeDef(from_node="n1", to_node="n2"),
+                EdgeDef(from_node="n2", to_node="n3"),
+            ]
+        )
+    )
+    engine = MicrokernelEngine()
+    result = await engine.execute_dag(valid_config, initial_inputs={"quarterly_income": 100000.0})
+    assert result.status == ExecutionStatus.SUCCESS
+    assert result.entry_node == "n1"
+    assert result.exit_node == "n3"
+
+    # 2. Multi-exit DAG (unconverged branches) must be rejected
+    multi_exit_config = DAGConfig(
+        version="v1.0.4-multi-exit",
+        scenario_code="test.multi_exit",
+        execution_graph=ExecutionGraph(
+            topology="DAG",
+            entry_node="n1",
+            nodes=[
+                NodeDef(id="n1", action_handler="gateway_ingress", type=NodeType.GATEWAY),
+                NodeDef(id="n2_a", action_handler="auth_guard", type=NodeType.GUARD),
+                NodeDef(id="n2_b", action_handler="invoice_tax_calc", type=NodeType.BIZ),
+            ],
+            edges=[
+                EdgeDef(from_node="n1", to_node="n2_a"),
+                EdgeDef(from_node="n1", to_node="n2_b"),  # Both n2_a and n2_b are sinks!
+            ]
+        )
+    )
+    res_multi = await engine.execute_dag(multi_exit_config)
+    assert res_multi.status == ExecutionStatus.CYCLE_DETECTED
+    assert "Graph must have exactly ONE exit point" in res_multi.error_message

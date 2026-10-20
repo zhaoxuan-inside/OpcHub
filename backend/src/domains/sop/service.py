@@ -83,6 +83,22 @@ class SOPService:
         domain_persistence.write("sop.templates", tid, template)
         return template
 
+    def validate_render_payload(self, inputs: dict) -> dict:
+        template_id = inputs.get("template_id", "").strip()
+        if not template_id:
+            raise ValueError("template_id is required for document rendering")
+        template = self.get_template(template_id)
+        form_data = inputs.get("form_data") or {}
+        if not isinstance(form_data, dict):
+            form_data = {}
+        return {
+            "guard_passed": True,
+            "template_id": template_id,
+            "template_name": template.name,
+            "user_id": inputs.get("user_id", ""),
+            "form_data": form_data,
+        }
+
     def render_and_save_document(self, payload: SOPDocumentCreate) -> SOPDocumentResponse:
         """Render document template with maker input data and persist instance to backend."""
         template = self.get_template(payload.template_id)

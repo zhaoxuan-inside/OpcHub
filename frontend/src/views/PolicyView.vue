@@ -55,10 +55,9 @@
     <div class="glass-box" style="padding: 20px 28px; margin-bottom: 24px;">
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-weight: 600; font-size: 15px;">小微与一人公司增值税免征额微内核即时测算</span>
+          <span style="font-weight: 600; font-size: 15px;">小微与一人公司增值税免征额即时测算</span>
           <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759;">免税试算引擎</span>
         </div>
-        <span style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary);">SCENARIO: tax.calculate_vat_exemption</span>
       </div>
       <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
         <div style="flex: 1; min-width: 240px;">

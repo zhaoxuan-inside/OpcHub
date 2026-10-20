@@ -15,7 +15,7 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.domains.user.service import user_service
-from src.domains.user.models import UserRegisterRequest
+from src.domains.user.models import UserRegisterRequest, UserProfileUpdateRequest
 from src.domains.user.verification import (
     captcha_service,
     email_verification_service,
@@ -292,3 +292,43 @@ def test_direct_rest_auth_endpoints():
     })
     assert bad_reg.status_code == 400
     assert "必须阅读并同意" in bad_reg.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_custom_industry_track_registration_and_profile_update():
+    """Verify user can register with a custom industry track and customize/update it later."""
+    email = f"custom_track_{int(time.time() * 1000)}@opchub.cn"
+    user_service.send_verification_code(email)
+    raw_code = email_verification_service.get_last_code(email)
+
+    custom_track = "数字游民与跨境独立工作室"
+    req = UserRegisterRequest(
+        email=email,
+        password="CustomTrack2026#",
+        verification_code=raw_code,
+        agreed_terms=True,
+        account_type="OPC",
+        industry_track=custom_track,
+        company_name="数字游民先锋工作室",
+    )
+    session = await user_service.register_by_email(req)
+    assert session.industry_track == custom_track
+
+    # Profile reflects the custom track
+    prof = user_service.get_profile(session.uid)
+    assert prof.industry_track == custom_track
+    assert prof.account_type == "OPC"
+
+    # User updates their track to another custom track
+    updated_custom_track = "新媒体AI内容工坊与私域变现"
+    update_req = UserProfileUpdateRequest(
+        user_id=session.uid,
+        industry_track=updated_custom_track,
+    )
+    updated_prof = await user_service.update_profile(update_req, token=session.token)
+    assert updated_prof.industry_track == updated_custom_track
+
+    # Retrieve profile again
+    prof_after = user_service.get_profile(session.uid)
+    assert prof_after.industry_track == updated_custom_track
+

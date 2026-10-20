@@ -84,7 +84,6 @@ def test_frontend_console_served():
 def test_frontend_all_views_hydration_via_gateway():
     """Simulate switchView() and syncAllDataFromBackend() across all 12 views."""
     scenarios_to_test = [
-        ("home.overview", {}),
         ("forum.threads.list", {}),
         ("products.list", {}),
         ("policies.list", {}),

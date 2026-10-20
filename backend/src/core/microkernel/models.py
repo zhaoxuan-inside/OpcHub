@@ -30,9 +30,10 @@ class EdgeDef(BaseModel):
 
 
 class ExecutionGraph(BaseModel):
-    """Execution graph topology."""
+    """Execution graph topology with mandatory single-entry and single-exit nodes."""
     topology: str = "DAG"
     entry_node: str = "dnode-1"
+    exit_node: str | None = None
     nodes: list[NodeDef]
     edges: list[EdgeDef]
 
@@ -84,6 +85,7 @@ class ExecutionResult(BaseModel):
     status: ExecutionStatus
     total_duration_ms: float
     entry_node: str
+    exit_node: str | None = None
     node_traces: list[NodeExecutionTrace]
     final_output: dict[str, Any]
     error_message: str | None = None

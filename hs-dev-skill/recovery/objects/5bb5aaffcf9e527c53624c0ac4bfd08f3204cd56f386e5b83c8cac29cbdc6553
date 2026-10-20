@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub (Mercury 创业者双态设计系统 - 支持黑白双模)</title>
+  <style>
+    /* ========================================================
+       MERCURY DESIGN SYSTEM TOKENS (From awesome-design-md)
+       Dual-World Polarity: Night-World & Light-World
+       ======================================================== */
+    
+    /* 1. DARK MODE: NIGHT-WORLD (暗夜极客模式) */
+    html[data-theme="dark"] {
+      --canvas: #12121A;
+      --surface: #1B1B26;
+      --surface-raised: #242433;
+      --surface-subtle: #2C2C3D;
+      --border: rgba(255, 255, 255, 0.08);
+      --border-hover: rgba(82, 102, 235, 0.4);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      
+      --ink: #EDEDF5;
+      --ink-secondary: #B4B4C4;
+      --ink-muted: #7A7A8E;
+
+      --primary: #5266EB;
+      --primary-hover: #4354D4;
+      --primary-tint: rgba(82, 102, 235, 0.15);
+      
+      --accent-badge-bg: rgba(82, 102, 235, 0.15);
+      --accent-badge-text: #9CB4E8;
+      
+      --success-badge-bg: rgba(16, 185, 129, 0.15);
+      --success-badge-text: #6EE7B7;
+
+      --amber-badge-bg: rgba(245, 158, 11, 0.15);
+      --amber-badge-text: #FCD34D;
+
+      --card-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      --hero-glow: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(82, 102, 235, 0.12), transparent 70%);
+      --toggle-bg: #242433;
+      --toggle-border: rgba(255, 255, 255, 0.12);
+    }
+
+    /* 2. LIGHT MODE: LIGHT-WORLD (明澈日间模式) */
+    html[data-theme="light"] {
+      --canvas: #FBFCFD;
+      --surface: #FFFFFF;
+      --surface-raised: #F8F9FD;
+      --surface-subtle: #F0F2FA;
+      --border: #E6E8F0;
+      --border-hover: #5266EB;
+      --border-strong: #CBD0E2;
+      
+      --ink: #1C1930;
+      --ink-secondary: #4F496B;
+      --ink-muted: #827C9E;
+
+      --primary: #5266EB;
+      --primary-hover: #3F52D3;
+      --primary-tint: #EDEFFC;
+      
+      --accent-badge-bg: #EEF1FD;
+      --accent-badge-text: #4354D4;
+      
+      --success-badge-bg: #ECFDF5;
+      --success-badge-text: #059669;
+
+      --amber-badge-bg: #FFFBEB;
+      --amber-badge-text: #B45309;
+
+      --card-shadow: 0 4px 20px rgba(28, 25, 48, 0.04);
+      --hero-glow: radial-gradient(ellipse 60% 40% at 50% 0%, rgba(82, 102, 235, 0.06), transparent 70%);
+      --toggle-bg: #EDEFFC;
+      --toggle-border: #D8DCF5;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--canvas);
+      color: var(--ink-secondary);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+      transition: background-color 0.25s ease, color 0.25s ease;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Fixed Application Header */
+    .app-nav {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(12px);
+      padding: 0 2rem;
+      height: 68px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      transition: background-color 0.25s ease, border-color 0.25s ease;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+      text-decoration: none;
+      color: var(--ink);
+    }
+
+    .brand-symbol {
+      width: 34px;
+      height: 34px;
+      background: var(--primary);
+      color: #FFF;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 1.15rem;
+      box-shadow: 0 4px 12px rgba(82, 102, 235, 0.3);
+    }
+
+    .brand-title {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-tag {
+      font-size: 0.725rem;
+      color: var(--ink-muted);
+      border: 1px solid var(--border);
+      padding: 0.15rem 0.5rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.25rem;
+      height: 100%;
+    }
+
+    .nav-tab-item {
+      display: flex;
+      align-items: center;
+      padding: 0 1rem;
+      height: 100%;
+      font-size: 0.875rem;
+      color: var(--ink-secondary);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s ease;
+      font-weight: 500;
+    }
+
+    .nav-tab-item:hover { color: var(--ink); }
+    .nav-tab-item.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+      font-weight: 700;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 0.85rem;
+    }
+
+    /* Mode Switcher Pill */
+    .mode-toggle-btn {
+      background: var(--toggle-bg);
+      border: 1px solid var(--toggle-border);
+      color: var(--ink);
+      padding: 0.4rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      transition: all 0.2s ease;
+    }
+    .mode-toggle-btn:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .btn-action-pill {
+      background: var(--primary);
+      color: #FFFFFF;
+      border: none;
+      padding: 0.45rem 1.15rem;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 14px rgba(82, 102, 235, 0.3);
+      transition: all 0.15s ease;
+    }
+    .btn-action-pill:hover {
+      background: var(--primary-hover);
+      box-shadow: 0 6px 18px rgba(82, 102, 235, 0.45);
+      transform: translateY(-1px);
+    }
+
+    /* Page Container */
+    .main-wrapper {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 3rem 1.5rem 5rem 1.5rem;
+      position: relative;
+    }
+
+    .hero-glow-bg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 380px;
+      background: var(--hero-glow);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .content-area {
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Hero Section */
+    .hero-header {
+      text-align: center;
+      margin-bottom: 2.75rem;
+    }
+
+    .hero-eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--primary-tint);
+      color: var(--primary);
+      padding: 0.25rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      border: 1px solid var(--border);
+    }
+
+    .hero-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.2;
+      letter-spacing: -0.03em;
+      margin-bottom: 0.85rem;
+    }
+
+    .hero-subtitle {
+      font-size: 1.05rem;
+      color: var(--ink-muted);
+      max-width: 680px;
+      margin: 0 auto;
+      line-height: 1.6;
+    }
+
+    /* Subsidies Calculator Card */
+    .calc-card-mercury {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.75rem 2rem;
+      margin-bottom: 3rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1.5rem;
+      box-shadow: var(--card-shadow);
+      transition: border-color 0.2s ease;
+    }
+
+    .calc-card-mercury:hover { border-color: var(--border-hover); }
+
+    .calc-info h3 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.35rem;
+    }
+    .calc-info p { font-size: 0.85rem; color: var(--ink-muted); }
+
+    .calc-action-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .select-mercury {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      outline: none;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .select-mercury:focus { border-color: var(--primary); }
+
+    /* 2 Column Main Section */
+    .main-columns {
+      display: grid;
+      grid-template-columns: 1.8fr 1.2fr;
+      gap: 2rem;
+    }
+
+    .section-head-mercury {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.25rem;
+    }
+
+    .section-title-mercury {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    /* Cards */
+    .mercury-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1rem;
+      box-shadow: var(--card-shadow);
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .mercury-card:hover {
+      border-color: var(--border-hover);
+      transform: translateY(-2px);
+    }
+
+    .card-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.5rem;
+    }
+
+    .card-heading {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.4;
+      margin-bottom: 0.4rem;
+    }
+
+    .meta-tags {
+      display: flex;
+      gap: 0.85rem;
+      font-size: 0.8rem;
+      color: var(--ink-muted);
+      margin-bottom: 0.85rem;
+    }
+
+    .mercury-quote-block {
+      background: var(--surface-subtle);
+      border-left: 3px solid var(--primary);
+      padding: 0.75rem 1rem;
+      font-size: 0.85rem;
+      color: var(--ink);
+      line-height: 1.55;
+      margin-bottom: 1rem;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .card-bottom-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.825rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.85rem;
+    }
+
+    .pill-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.725rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    .pill-badge.success { background: var(--success-badge-bg); color: var(--success-badge-text); }
+    .pill-badge.indigo { background: var(--accent-badge-bg); color: var(--accent-badge-text); }
+    .pill-badge.amber { background: var(--amber-badge-bg); color: var(--amber-badge-text); }
+
+    .btn-secondary-pill {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-secondary-pill:hover {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-tint);
+    }
+
+    /* Product Gallery Row */
+    .product-box-mercury {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.15rem 1.4rem;
+      margin-bottom: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--card-shadow);
+      transition: all 0.2s ease;
+    }
+
+    .product-box-mercury:hover { border-color: var(--border-hover); }
+
+    .product-left-part { display: flex; align-items: center; gap: 1rem; }
+    .product-avatar-icon {
+      width: 44px;
+      height: 44px;
+      background: var(--surface-raised);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.4rem;
+      border: 1px solid var(--border);
+    }
+    .product-name-txt {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.2rem;
+    }
+    .product-desc-txt { font-size: 0.8rem; color: var(--ink-muted); }
+
+    .upvote-pill-btn {
+      background: var(--surface-raised);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.45rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.825rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .upvote-pill-btn:hover, .upvote-pill-btn.voted {
+      border-color: var(--primary);
+      color: var(--primary);
+      background: var(--primary-tint);
+    }
+
+    /* Toast */
+    .toast-box {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--surface-raised);
+      color: var(--ink);
+      border: 1px solid var(--border-strong);
+      padding: 0.85rem 1.5rem;
+      border-radius: 9999px;
+      font-size: 0.875rem;
+      font-weight: 600;
+      box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
+      z-index: 9999;
+    }
+
+    @media (max-width: 900px) {
+      .main-columns { grid-template-columns: 1fr; }
+      .app-nav { padding: 0 1rem; }
+      .hero-title { font-size: 1.85rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Fixed App Header -->
+<header class="app-nav">
+  <a href="#" class="brand-group">
+    <div class="brand-symbol">M</div>
+    <div>
+      <span class="brand-title">OpcHub</span>
+      <span class="brand-tag">Mercury 创客双态</span>
+    </div>
+  </a>
+
+  <nav class="nav-tabs">
+    <div class="nav-tab-item active">首页概览</div>
+    <div class="nav-tab-item" onclick="triggerMsg('🧭 切换至 流程向导 SOP')">流程向导</div>
+    <div class="nav-tab-item" onclick="triggerMsg('📜 切换至 政策雷达')">政策雷达</div>
+    <div class="nav-tab-item" onclick="triggerMsg('🎁 切换至 算力装备包')">装备包</div>
+    <div class="nav-tab-item" onclick="triggerMsg('🚀 切换至 产品橱窗')">产品橱窗</div>
+  </nav>
+
+  <div class="header-controls">
+    <!-- Day/Night Switcher Button -->
+    <button class="mode-toggle-btn" onclick="toggleLightDark()">
+      <span id="modeIcon">☀️</span>
+      <span id="modeLabel">切换为明澈白</span>
+    </button>
+    <button class="btn-action-pill" onclick="triggerMsg('🚀 呼起产品审核申请收银台...')">+ 发布产品</button>
+  </div>
+</header>
+
+<!-- Main Wrapper -->
+<div class="main-wrapper">
+  <div class="hero-glow-bg"></div>
+
+  <div class="content-area">
+
+    <!-- Hero Title -->
+    <div class="hero-header">
+      <div class="hero-eyebrow">
+        <span>⚡ 专为一人公司打造的数字金融与政策底座</span>
+      </div>
+      <h1 class="hero-title">一人公司，自成一派。</h1>
+      <p class="hero-subtitle">
+        连接高价值免税补贴、直连大模型千万级 Token 优惠券、提供端到端工商合规与首发分发枢纽。
+      </p>
+    </div>
+
+    <!-- Subsidies Calculator (Mercury Style) -->
+    <div class="calc-card-mercury">
+      <div class="calc-info">
+        <h3>🎯 创业扶持资金与免税额度测算器</h3>
+        <p>输入主体性质与城市，系统根据 2026 最新官方目录秒级测算真金补贴</p>
+      </div>
+      <div class="calc-action-bar">
+        <select class="select-mercury" id="citySel">
+          <option>📍 浙江 · 杭州市</option>
+          <option>📍 北京市</option>
+          <option>📍 广东省 · 深圳市</option>
+          <option>📍 上海市</option>
+        </select>
+        <select class="select-mercury" id="entitySel">
+          <option>个体工商户 (极轻推荐)</option>
+          <option>个人独资企业</option>
+          <option>科技型小微企业</option>
+        </select>
+        <button class="btn-action-pill" onclick="runCalc()">⚡ 一键测算</button>
+      </div>
+    </div>
+
+    <!-- 2 Columns Grid -->
+    <div class="main-columns">
+
+      <!-- Left Column: Policies -->
+      <div>
+        <div class="section-head-mercury">
+          <div class="section-title-mercury">
+            <span>📜 政策雷达 (高信噪比提炼)</span>
+            <span class="pill-badge success">🟢 免税直达</span>
+          </div>
+          <span style="font-size:0.8rem; color:var(--primary); font-weight:600; cursor:pointer;" onclick="triggerMsg('查看全网 142 条政策索引')">查看全部 142 条政策 ></span>
+        </div>
+
+        <!-- Policy 1 -->
+        <div class="mercury-card" onclick="triggerMsg('查看《小规模纳税人免税申报指南》官方解读抽屉')">
+          <div class="card-top-row">
+            <span class="card-heading">小规模纳税人季度销售额 30 万元以下免征增值税</span>
+            <span class="pill-badge success">税收减免</span>
+          </div>
+          <div class="meta-tags">
+            <span>🏛️ 财政部 / 国家税务总局</span>
+            <span>📍 全国通用</span>
+            <span>⏳ 长期有效</span>
+          </div>
+          <div class="mercury-quote-block">
+            💡 <strong>白话精要：</strong>单季度开票累计不超过 30 万元（自然月 10 万元），增值税与城市维护建设附加税全额免征，极大充沛一人公司初期的现金流储备。
+          </div>
+          <div class="card-bottom-row">
+            <span style="color:var(--success-badge-text); font-weight:600;">✓ 准入门槛：小规模纳税人主体</span>
+            <button class="btn-secondary-pill">官方解读与申报细则 →</button>
+          </div>
+        </div>
+
+        <!-- Policy 2 -->
+        <div class="mercury-card" onclick="triggerMsg('查看《高校毕业生一次性创业补贴》政务直达链接')">
+          <div class="card-top-row">
+            <span class="card-heading">高校及青年创客一次性创业直补现金 ¥10,000</span>
+            <span class="pill-badge amber">现金直补</span>
+          </div>
+          <div class="meta-tags">
+            <span>🏛️ 杭州市人社局</span>
+            <span>📍 杭州市</span>
+            <span style="color:#F59E0B; font-weight:700;">⏳ 剩 18 天截止申报</span>
+          </div>
+          <div class="mercury-quote-block">
+            💡 <strong>白话精要：</strong>毕业 5 年内创办个体户或小微企业，正常经营连续纳税满 6 个月，直接拨付一万元现金至对公账户。
+          </div>
+          <div class="card-bottom-row">
+            <span style="font-weight:600;">✓ 准入门槛：毕业 5 年内</span>
+            <button class="btn-secondary-pill">进入政务直报系统 →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Perks & Showcase -->
+      <div>
+        <div class="section-head-mercury">
+          <div class="section-title-mercury">
+            <span>🎁 开发者专属装备包 (Perks)</span>
+            <span class="pill-badge indigo">🟠 渠道特权</span>
+          </div>
+          <span style="font-size:0.8rem; color:var(--primary); font-weight:600; cursor:pointer;" onclick="triggerMsg('查看全部 18 家大厂返佣')">全部 18 家 Deals ></span>
+        </div>
+
+        <!-- Perk 1 -->
+        <div class="mercury-card">
+          <div style="font-size:0.75rem; font-weight:700; color:var(--ink-muted); text-transform:uppercase; margin-bottom:0.25rem;">SiliconFlow · 硅基流动</div>
+          <div class="card-heading">2000 万 Token 专属免费额度 + 充值 8 折返佣</div>
+          <div style="font-size:0.85rem; color:var(--ink-secondary); margin-bottom:1rem;">全速直连 DeepSeek-V3 / Qwen 2.5 满血模型，专属兑换码即时开通。</div>
+          <div class="card-bottom-row">
+            <span class="pill-badge amber">渠道分成合作</span>
+            <button class="btn-action-pill" onclick="copyCode('SiliconFlow', 'OPCHUB2026')">复制优惠码 ↗</button>
+          </div>
+        </div>
+
+        <!-- Product Showcase -->
+        <div class="section-head-mercury" style="margin-top:2.25rem;">
+          <div class="section-title-mercury">
+            <span>🚀 优质创客橱窗 (Gallery)</span>
+            <span class="pill-badge indigo">🟣 官方收录</span>
+          </div>
+        </div>
+
+        <div class="product-box-mercury">
+          <div class="product-left-part">
+            <div class="product-avatar-icon">⚡</div>
+            <div>
+              <div class="product-name-txt">DevAgent</div>
+              <div class="product-desc-txt">@alex · 一人营销智能体 · 获客 800+</div>
+            </div>
+          </div>
+          <button class="upvote-pill-btn" onclick="toggleVote(this, 184)">▲ 184</button>
+        </div>
+
+        <div class="product-box-mercury">
+          <div class="product-left-part">
+            <div class="product-avatar-icon">🎨</div>
+            <div>
+              <div class="product-name-txt">IconCraft</div>
+              <div class="product-desc-txt">@sarah · AI 矢量图标生成器</div>
+            </div>
+          </div>
+          <button class="upvote-pill-btn" onclick="toggleVote(this, 96)">▲ 96</button>
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast-box" id="appToast">通知内容</div>
+
+<script>
+  // Dark/Light Dual-World Toggle
+  function toggleLightDark() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = (current === 'dark') ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+
+    const icon = document.getElementById('modeIcon');
+    const label = document.getElementById('modeLabel');
+
+    if (next === 'light') {
+      icon.innerText = '🌙';
+      label.innerText = '切换为暗夜极客';
+      triggerMsg('✨ 已切换为 Mercury 明澈日间模式 (Light-World)');
+    } else {
+      icon.innerText = '☀️';
+      label.innerText = '切换为明澈白';
+      triggerMsg('🌌 已切换为 Mercury 暗夜极客模式 (Night-World)');
+    }
+  }
+
+  function runCalc() {
+    const city = document.getElementById('citySel').value;
+    triggerMsg('⚡ 测算完成：' + city + ' 匹配到 2 条现金直补政策与 3 项专属免税条款！');
+  }
+
+  function copyCode(vendor, code) {
+    navigator.clipboard.writeText(code).catch(() => {});
+    triggerMsg('✅ 已复制 ' + vendor + ' 优惠码 [' + code + ']！即将前往官方通道...');
+  }
+
+  function toggleVote(btn, base) {
+    if (btn.classList.contains('voted')) {
+      btn.classList.remove('voted');
+      btn.innerHTML = '▲ ' + base;
+      triggerMsg('已取消赞同');
+    } else {
+      btn.classList.add('voted');
+      btn.innerHTML = '▲ ' + (base + 1);
+      triggerMsg('🎉 感谢支持！Upvote +1 成功');
+    }
+  }
+
+  let toastTimer = null;
+  function triggerMsg(msg) {
+    const toast = document.getElementById('appToast');
+    toast.innerText = msg;
+    toast.style.display = 'flex';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
+  }
+</script>
+
+</body>
+</html>

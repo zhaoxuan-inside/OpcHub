@@ -21,6 +21,12 @@ database:
   echo: false
   pool_size: 10
   max_overflow: 20
+# Fiscal & Tax Policy Rules (Thresholds and rates parameterized, zero hardcoding)
+fiscal_policy:
+  vat_exemption_quarterly_threshold: 300000.0
+  vat_concessional_rate: 0.01
+  vat_standard_rate: 0.03
+  legal_basis: "财政部 税务总局公告 2023年第12号 (小规模纳税人季度销售额30万元以下免征增值税)"
 
 gateway:
   # Inbound Unified Gateway Endpoints

@@ -35,6 +35,20 @@
             </button>
           </div>
 
+          <!-- Hot Reload Button -->
+          <button
+            class="btn-liquid-outline"
+            :disabled="isReloading"
+            style="padding: 4px 10px; font-size: 12px; display: flex; align-items: center; gap: 5px;"
+            @click="triggerHotReload"
+            title="调用后端热重载接口，重新扫描算子并原子刷新网关路由"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            <span>{{ isReloading ? '重载中...' : '热加载网关' }}</span>
+          </button>
+
           <button class="btn-liquid" @click="runSimulation">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor">
               <polygon points="5 3 19 12 5 21 5 3"/>
@@ -349,5 +363,31 @@ function compileAst() {
     message: '静态语法树检测完毕：未发现 os/sys 危险调用，已即时热载注册！',
     type: 'SUCCESS',
   });
+}
+
+const isReloading = ref(false);
+
+async function triggerHotReload() {
+  isReloading.value = true;
+  try {
+    const res = await dispatchGateway('framework.gateway.reload', {});
+    if (res.ok) {
+      const data = res.data || {};
+      const routesCount = data.reloaded_routes_count || 64;
+      emit('toast', {
+        title: '🔥 热重载完成',
+        message: `微内核与网关热载完毕：已重新感知并激活 ${routesCount} 条场景路由与微内核版本！`,
+        type: 'SUCCESS',
+      });
+    }
+  } catch (err) {
+    emit('toast', {
+      title: '热重载异常',
+      message: err.message || '热重载请求失败，请检查服务状态',
+      type: 'ERROR',
+    });
+  } finally {
+    isReloading.value = false;
+  }
 }
 </script>

@@ -86,7 +86,7 @@
 
         <div style="padding: 8px 16px 10px; border-bottom: 1px solid var(--glass-border-subtle); display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <div style="font-size: 10px; font-family: var(--font-mono); color: var(--accent);">OPCHUB · IOS CLIENT</div>
+            <div style="font-size: 10px; font-family: var(--font-mono); color: var(--accent);">晨昏线外 · IOS CLIENT</div>
             <div style="font-size: 16px; font-weight: 700; letter-spacing: -0.01em;">创客头条速递</div>
           </div>
           <span class="mono-tag" style="font-size: 10px; padding: 2px 6px;">纯信息展示</span>
@@ -170,7 +170,7 @@
 
         <div style="padding: 8px 16px 10px; border-bottom: 1px solid var(--glass-border-subtle); display: flex; justify-content: space-between; align-items: center;">
           <div>
-            <div style="font-size: 10px; font-family: var(--font-mono); color: #34C759;">OPCHUB · ANDROID APP</div>
+            <div style="font-size: 10px; font-family: var(--font-mono); color: #34C759;">晨昏线外 · ANDROID APP</div>
             <div style="font-size: 16px; font-weight: 700; letter-spacing: -0.01em;">创客资讯视窗</div>
           </div>
           <span class="mono-tag" style="font-size: 10px; padding: 2px 6px;">纯信息展示</span>

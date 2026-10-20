@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class ForumThreadCreate(BaseModel):
     category_code: str = Field(default="DEV", description="DEV, BIZ, TAX, AGENTS")
     author_id: str = Field(..., description="UUID of author maker")
+    author_name: Optional[str] = Field(None, description="Display name of author maker")
     title: str = Field(..., min_length=2, max_length=255, description="Thread title")
     content: str = Field(..., min_length=1, description="Thread markdown content")
 
@@ -14,6 +15,7 @@ class ForumThreadResponse(BaseModel):
     id: str
     category_code: str
     author_id: str
+    author_name: Optional[str] = None
     title: str
     content: str
     view_count: int = 0

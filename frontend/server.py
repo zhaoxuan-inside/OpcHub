@@ -69,10 +69,32 @@ async def serve_index():
     )
 
 
-@app.get("/favicon.ico", include_in_schema=False)
-async def serve_favicon():
-    favicon_svg = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#0071E3"/><circle cx="16" cy="16" r="6" fill="#ffffff"/></svg>"""
-    return Response(content=favicon_svg, media_type="image/svg+xml")
+def _get_product_logo_svg() -> str:
+    candidates = [
+        DIST_DIR / "logo.svg",
+        DIST_DIR / "favicon.svg",
+        FRONTEND_DIR / "public" / "logo.svg",
+    ]
+    for p in candidates:
+        if p.is_file():
+            return p.read_text(encoding="utf-8")
+    return ""
+
+
+@app.api_route("/favicon.ico", methods=["GET", "HEAD"], include_in_schema=False)
+@app.api_route("/favicon.svg", methods=["GET", "HEAD"], include_in_schema=False)
+@app.api_route("/logo.svg", methods=["GET", "HEAD"], include_in_schema=False)
+async def serve_brand_icon():
+    svg_content = _get_product_logo_svg()
+    if svg_content:
+        return Response(
+            content=svg_content,
+            media_type="image/svg+xml",
+            headers={
+                "Cache-Control": "no-cache, must-revalidate",
+            },
+        )
+    return Response(status_code=404)
 
 
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])

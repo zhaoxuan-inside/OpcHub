@@ -1,21 +1,23 @@
 <template>
   <header>
     <div class="nav-glass-bar">
-      <!-- 1. Left VisionOS Island: OpcHub OS 2.0 -->
+      <!-- 1. Left VisionOS Island: 晨昏线外 Beyond the Line -->
       <div
         class="brand-island"
         id="brandIsland"
         @click="$emit('switch-tab', currentRole === 'ADMIN' ? 'ops' : 'home')"
-        title="OpcHub OS 2.0 商业操作系统"
+        title="晨昏线外 · Beyond the Line · 点击返回首页"
       >
-        <div class="brand-mark"></div>
-        <span class="brand-name">OpcHub</span>
+        <div class="brand-mark-wrapper">
+          <BrandLogo :size="22" />
+        </div>
+        <span class="brand-name">晨昏线外</span>
         <div class="brand-island-divider"></div>
-        <span class="brand-tag">{{ currentRole === 'ADMIN' ? 'ADMIN' : 'OS 2.0' }}</span>
+        <span class="brand-tag">{{ currentRole === 'ADMIN' ? 'ADMIN' : 'Beyond the Line' }}</span>
       </div>
 
-      <!-- 2. Middle Scrollable Nav Tabs Wrapper -->
-      <div class="nav-tabs-wrapper">
+      <!-- 2. Middle Scrollable Nav Tabs Wrapper (Displayed ONLY after login) -->
+      <div v-if="userSession" class="nav-tabs-wrapper">
         <nav class="nav-tabs" id="mainNavTabs">
           <!-- Maker / User Tabs -->
           <template v-if="currentRole !== 'ADMIN'">
@@ -24,7 +26,7 @@
               :class="{ active: activeTab === 'home' }"
               @click="$emit('switch-tab', 'home')"
             >
-              首页地图
+              首页
             </button>
             <button
               class="nav-tab-btn"
@@ -81,6 +83,13 @@
           <template v-else>
             <button
               class="nav-tab-btn"
+              :class="{ active: activeTab === 'home' }"
+              @click="$emit('switch-tab', 'home')"
+            >
+              平台首页
+            </button>
+            <button
+              class="nav-tab-btn"
               :class="{ active: activeTab === 'backend-orch' }"
               @click="$emit('switch-tab', 'backend-orch')"
             >
@@ -113,9 +122,20 @@
 
       <!-- 3. Right Action Island -->
       <div class="nav-right-actions">
+        <!-- Quick Login / Register pill for unauthenticated visitors -->
+        <button
+          v-if="!userSession"
+          class="btn-liquid nav-login-pill"
+          @click="$emit('open-login')"
+          title="点击登录创客工作台或入驻平台"
+        >
+          <span>登录 / 入驻</span>
+        </button>
+
         <div class="nav-actions-island">
-          <!-- Role Switcher (Maker vs Admin) -->
+          <!-- Role Switcher (Maker vs Admin, only for logged in users) -->
           <button
+            v-if="userSession"
             class="nav-icon-btn"
             :class="{ 'admin-active': currentRole === 'ADMIN' }"
             @click="toggleRole"
@@ -132,7 +152,7 @@
             <span class="nav-role-dot"></span>
           </button>
 
-          <div class="nav-island-divider"></div>
+          <div v-if="userSession" class="nav-island-divider"></div>
 
           <!-- Theme Switcher (Dark vs Light) -->
           <button
@@ -156,30 +176,21 @@
             </svg>
           </button>
 
-          <div class="nav-island-divider"></div>
+          <div v-if="userSession" class="nav-island-divider"></div>
 
-          <!-- User Profile & Entitlements -->
+          <!-- User Profile & Entitlements (Logged in only) -->
           <button
-            class="nav-icon-btn"
-            :class="{ 'logged-in': !!userSession, 'unlogged': !userSession }"
+            v-if="userSession"
+            class="nav-icon-btn logged-in"
             @click="handleUserClick"
-            :title="userSession ? `${userSession.nickname || userSession.email} · 查看创客档案` : '未登录 · 点击登录或注册'"
+            :title="`${userSession.nickname || userSession.email} · 查看创客档案`"
           >
-            <template v-if="userSession">
-              <div
-                style="width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--accent), #5856D6); box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);"
-              >
-                {{ (userSession.nickname || userSession.email || 'M')[0].toUpperCase() }}
-              </div>
-              <span class="nav-user-badge online"></span>
-            </template>
-            <template v-else>
-              <svg viewBox="0 0 24 24">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-              </svg>
-              <span class="nav-user-badge offline"></span>
-            </template>
+            <div
+              style="width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: #fff; background: linear-gradient(135deg, var(--accent), #5856D6); box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);"
+            >
+              {{ (userSession.nickname || userSession.email || 'M')[0].toUpperCase() }}
+            </div>
+            <span class="nav-user-badge online"></span>
           </button>
         </div>
       </div>
@@ -189,11 +200,12 @@
 
 <script setup>
 import { ref } from 'vue';
+import BrandLogo from './BrandLogo.vue';
 
 const props = defineProps({
   activeTab: {
     type: String,
-    default: 'home',
+    default: 'forum',
   },
   userSession: {
     type: Object,
@@ -218,6 +230,10 @@ const emit = defineEmits([
 ]);
 
 function toggleRole() {
+  if (!props.userSession) {
+    emit('open-login');
+    return;
+  }
   emit('toggle-role');
 }
 
@@ -233,3 +249,13 @@ function handleUserClick() {
   }
 }
 </script>
+
+<style scoped>
+.nav-login-pill {
+  padding: 5px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  height: 32px;
+  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.25);
+}
+</style>

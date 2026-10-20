@@ -151,7 +151,7 @@ function handleUpgrade(tier, price) {
   }
   emit('toast', {
     title: '权益激活',
-    message: `已向微内核支付网关提交【${tier}】开通请求（¥${price}），权益凭据已绑定您的创客主体！`,
+    message: `已向安全支付网关提交【${tier}】开通请求（¥${price}），权益凭据已绑定您的创客主体！`,
     type: 'SUCCESS',
   });
 }

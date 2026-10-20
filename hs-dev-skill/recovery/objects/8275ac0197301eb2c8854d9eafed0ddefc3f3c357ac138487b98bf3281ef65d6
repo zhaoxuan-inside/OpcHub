@@ -1,0 +1,1598 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpcHub 一人公司服务平台 · 交互式原型 (Anthropic 风格)</title>
+  <style>
+    :root {
+      /* Anthropic Humanist Palette */
+      --canvas: #FAF7F2;
+      --card-bg: #FFFFFF;
+      --surface-subtle: #F3ECE2;
+      --surface-hover: #EFE8DC;
+      --border: #E5DFD5;
+      --border-dark: #D4CCC0;
+      
+      --ink: #1F1E1D;
+      --body: #3C3A36;
+      --muted: #706D66;
+      --subtle: #99948B;
+
+      /* Anthropic Accents */
+      --coral: #D97757;
+      --coral-hover: #C15F3C;
+      --coral-light: #FBF0EB;
+      --coral-border: #F0D0C4;
+
+      --sage: #4E7060;
+      --sage-light: #EEF4F0;
+      --sage-border: #C8DCD1;
+
+      --amber: #B87B28;
+      --amber-light: #FBF4E8;
+      --amber-border: #EFE0C2;
+
+      --slate-blue: #4B637B;
+      --blue-light: #EFF4F9;
+      --blue-border: #C8D9E8;
+
+      --purple: #785A88;
+      --purple-light: #F6F0F8;
+      --purple-border: #DECDE3;
+      
+      /* Typography */
+      --font-display: "Songti SC", "Noto Serif SC", "STSong", "Newsreader", Georgia, serif;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "Menlo", monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: #1A1918;
+      color: var(--body);
+      font-family: var(--font-sans);
+      line-height: 1.65;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Simulator Bar (Quiet & Dark) */
+    .sim-bar {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      background: #141312;
+      border-bottom: 1px solid #2B2927;
+      padding: 0.65rem 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: #99948B;
+      font-size: 0.8rem;
+    }
+
+    .sim-cluster { display: flex; align-items: center; gap: 0.5rem; }
+    .sim-label { font-weight: 600; color: #DCD6CB; margin-right: 0.25rem; }
+
+    .sim-btn {
+      background: #242220;
+      border: 1px solid #383532;
+      color: #C2BCB2;
+      padding: 0.3rem 0.65rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.775rem;
+      transition: all 0.12s;
+    }
+    .sim-btn:hover { background: #33302D; color: #FFF; }
+    .sim-btn.active { background: var(--coral); border-color: var(--coral); color: #FFF; font-weight: 600; }
+
+    /* Canvas Viewport */
+    .viewport-outer {
+      display: flex;
+      justify-content: center;
+      padding: 2rem 1rem 4rem 1rem;
+      background: #1A1918;
+      min-height: calc(100vh - 46px);
+    }
+
+    .viewport {
+      width: 100%;
+      max-width: 1280px;
+      background: var(--canvas);
+      min-height: 920px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.45);
+      transition: max-width 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-radius 0.25s;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid #2E2B28;
+    }
+
+    .viewport.desktop { max-width: 1280px; border-radius: 6px; }
+    .viewport.tablet { max-width: 768px; border-radius: 12px; }
+    .viewport.mobile { max-width: 390px; border-radius: 20px; }
+
+    /* Anthropic Style App Header */
+    .app-header {
+      background: var(--canvas);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 68px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      text-decoration: none;
+      color: var(--ink);
+    }
+    .brand-mark {
+      width: 32px;
+      height: 32px;
+      background: var(--coral);
+      color: #FFF;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 1.15rem;
+    }
+    .brand-title {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .brand-tag {
+      font-size: 0.7rem;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      padding: 0.1rem 0.4rem;
+      border-radius: 3px;
+      margin-left: 0.25rem;
+    }
+
+    .nav-tabs {
+      display: flex;
+      gap: 0.25rem;
+      height: 100%;
+    }
+
+    .nav-tab {
+      display: flex;
+      align-items: center;
+      padding: 0 0.85rem;
+      height: 100%;
+      font-size: 0.875rem;
+      color: var(--muted);
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.12s;
+      font-weight: 500;
+    }
+    .nav-tab:hover { color: var(--ink); }
+    .nav-tab.active {
+      color: var(--coral);
+      border-bottom-color: var(--coral);
+      font-weight: 600;
+    }
+
+    .header-actions { display: flex; align-items: center; gap: 0.75rem; }
+
+    .search-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      background: #FFF;
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.85rem;
+      border-radius: 5px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: border-color 0.12s;
+    }
+    .search-pill:hover { border-color: var(--coral); }
+    .kbd {
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      padding: 0.1rem 0.35rem;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+    }
+
+    .btn-coral {
+      background: var(--coral);
+      color: #FFF;
+      border: none;
+      padding: 0.45rem 1rem;
+      border-radius: 5px;
+      font-size: 0.825rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.12s;
+    }
+    .btn-coral:hover { background: var(--coral-hover); }
+
+    /* App Content */
+    .app-main {
+      padding: 2.25rem 2rem;
+      flex: 1;
+    }
+
+    /* Editorial Hero Section */
+    .hero-banner {
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 2rem;
+      margin-bottom: 2rem;
+    }
+    .hero-quote {
+      font-family: var(--font-display);
+      font-size: 2.15rem;
+      font-weight: 600;
+      color: var(--ink);
+      line-height: 1.3;
+      margin-bottom: 0.75rem;
+      max-width: 820px;
+    }
+    .hero-sub {
+      font-size: 0.95rem;
+      color: var(--muted);
+      max-width: 680px;
+    }
+
+    /* Calculator Bar - Anthropic Style Card */
+    .calc-card {
+      background: #FFF;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2.25rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+    }
+    .calc-prompt {
+      font-family: var(--font-display);
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+    .calc-filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      align-items: center;
+    }
+    .calc-select {
+      background: var(--canvas);
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.45rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.825rem;
+      outline: none;
+      cursor: pointer;
+      font-family: var(--font-sans);
+    }
+    .calc-select:focus { border-color: var(--coral); }
+
+    /* Badges */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 3px;
+      font-size: 0.725rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+    .badge-free { background: var(--sage-light); color: var(--sage); border: 1px solid var(--sage-border); }
+    .badge-creator { background: var(--purple-light); color: var(--purple); border: 1px solid var(--purple-border); }
+    .badge-vendor { background: var(--amber-light); color: var(--amber); border: 1px solid var(--amber-border); }
+    .badge-trade { background: var(--blue-light); color: var(--slate-blue); border: 1px solid var(--blue-border); }
+
+    /* Grid Layouts */
+    .grid-2col {
+      display: grid;
+      grid-template-columns: 1.8fr 1.2fr;
+      gap: 2rem;
+    }
+    .grid-3col {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .section-title {
+      font-family: var(--font-display);
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 1.1rem;
+    }
+
+    /* Cards */
+    .card {
+      background: #FFF;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.25rem;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+    .card:hover {
+      border-color: var(--border-dark);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--ink);
+      line-height: 1.4;
+      margin-bottom: 0.4rem;
+    }
+    .card-meta {
+      display: flex;
+      gap: 0.75rem;
+      font-size: 0.775rem;
+      color: var(--muted);
+      margin-bottom: 0.65rem;
+    }
+    .card-body {
+      font-size: 0.85rem;
+      color: var(--body);
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+    }
+    .card-body-accent {
+      background: var(--canvas);
+      border-left: 2px solid var(--coral);
+      padding: 0.5rem 0.75rem;
+      font-size: 0.825rem;
+      color: var(--body);
+      margin-bottom: 0.75rem;
+      border-radius: 0 4px 4px 0;
+    }
+    .card-footer {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+      padding-top: 0.65rem;
+      margin-top: 0.5rem;
+    }
+
+    .btn-link {
+      color: var(--coral);
+      font-weight: 600;
+      text-decoration: none;
+      cursor: pointer;
+      font-size: 0.825rem;
+    }
+    .btn-link:hover { text-decoration: underline; }
+
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--ink);
+      padding: 0.35rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.775rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .btn-outline:hover {
+      border-color: var(--coral);
+      color: var(--coral);
+      background: var(--coral-light);
+    }
+
+    /* Product Gallery Item */
+    .gallery-item {
+      background: #FFF;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.15rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.15s;
+    }
+    .gallery-item:hover { border-color: var(--coral); }
+    .gallery-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      margin-bottom: 0.65rem;
+    }
+    .gallery-avatar {
+      width: 44px;
+      height: 44px;
+      border-radius: 6px;
+      background: var(--surface-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.35rem;
+      flex-shrink: 0;
+      border: 1px solid var(--border);
+    }
+    .gallery-meta h4 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.2rem;
+    }
+    .gallery-meta span {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+
+    .upvote-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      border: 1px solid var(--border);
+      background: #FFF;
+      padding: 0.35rem 0.65rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--ink);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .upvote-btn:hover, .upvote-btn.upvoted {
+      border-color: var(--coral);
+      color: var(--coral);
+      background: var(--coral-light);
+    }
+
+    /* SOP Progress Tree */
+    .sop-progress-bar {
+      height: 6px;
+      background: var(--surface-subtle);
+      border-radius: 3px;
+      overflow: hidden;
+      margin-bottom: 1.5rem;
+    }
+    .sop-progress-fill {
+      height: 100%;
+      background: var(--coral);
+      width: 33%;
+      transition: width 0.3s ease;
+    }
+
+    .sop-phase-accordion {
+      background: #FFF;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+    .sop-phase-header {
+      padding: 1rem 1.25rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      background: #FFF;
+      user-select: none;
+      transition: background 0.12s;
+    }
+    .sop-phase-header:hover { background: var(--canvas); }
+    .sop-phase-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .sop-phase-body {
+      padding: 0.75rem 1.25rem 1rem 1.25rem;
+      border-top: 1px solid var(--border);
+      background: #FCFBF9;
+    }
+    .sop-task-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.6rem 0;
+      border-bottom: 1px dashed var(--border);
+      font-size: 0.875rem;
+      color: var(--body);
+    }
+    .sop-task-row:last-child { border-bottom: none; }
+    .sop-task-row input[type="checkbox"] {
+      margin-top: 0.25rem;
+      accent-color: var(--coral);
+      cursor: pointer;
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Filter Pills */
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+    .filter-pill {
+      background: #FFF;
+      border: 1px solid var(--border);
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: var(--muted);
+      cursor: pointer;
+      transition: all 0.12s;
+    }
+    .filter-pill:hover { border-color: var(--muted); color: var(--ink); }
+    .filter-pill.active {
+      background: var(--ink);
+      color: #FFF;
+      border-color: var(--ink);
+      font-weight: 600;
+    }
+
+    /* Modal & Drawer (Anthropic Warm Style) */
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(31, 30, 29, 0.6);
+      backdrop-filter: blur(2px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 2000;
+    }
+    .modal-card {
+      background: var(--canvas);
+      border: 1px solid var(--border-dark);
+      border-radius: 8px;
+      width: 90%;
+      max-width: 540px;
+      padding: 2rem;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+    }
+    .modal-title {
+      font-family: var(--font-display);
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.5rem;
+    }
+
+    .form-group { margin-bottom: 1.15rem; }
+    .form-label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--ink);
+      margin-bottom: 0.35rem;
+    }
+    .form-input {
+      width: 100%;
+      background: #FFF;
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-family: var(--font-sans);
+      color: var(--ink);
+      outline: none;
+    }
+    .form-input:focus { border-color: var(--coral); }
+
+    /* Toast Notification (Anthropic Style) */
+    .toast {
+      position: fixed;
+      bottom: 2rem;
+      right: 2rem;
+      background: var(--ink);
+      color: #FFF;
+      padding: 0.85rem 1.35rem;
+      border-radius: 6px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+      font-size: 0.875rem;
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      z-index: 9999;
+      border: 1px solid #383532;
+    }
+
+    /* Views Switcher */
+    .view-pane { display: none; }
+    .view-pane.active { display: block; animation: fadeIn 0.15s ease-in; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+    @media (max-width: 860px) {
+      .grid-2col, .grid-3col { grid-template-columns: 1fr; }
+      .app-header { padding: 0 1rem; }
+      .nav-tab { padding: 0 0.5rem; font-size: 0.8rem; }
+      .hero-quote { font-size: 1.6rem; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Device & State Simulator Strip -->
+<div class="sim-bar">
+  <div class="sim-cluster">
+    <span class="sim-label">📐 视口切换：</span>
+    <button class="sim-btn active" onclick="setDevice('desktop')">💻 桌面 (1280px)</button>
+    <button class="sim-btn" onclick="setDevice('tablet')">📱 平板 (768px)</button>
+    <button class="sim-btn" onclick="setDevice('mobile')">📱 手机 (390px)</button>
+  </div>
+  <div class="sim-cluster">
+    <span class="sim-label">🎨 页面状态：</span>
+    <button class="sim-btn active" id="btnStatePop" onclick="setState('populated')">🟢 完整数据</button>
+    <button class="sim-btn" id="btnStateEmpty" onclick="setState('empty')">⚪ 空白引导 (FTUE)</button>
+    <button class="sim-btn" id="btnStateLoad" onclick="setState('loading')">⏳ 优雅骨架</button>
+    <button class="sim-btn" id="btnStateErr" onclick="setState('error')">🔴 异常恢复</button>
+  </div>
+</div>
+
+<div class="viewport-outer">
+  <div class="viewport desktop" id="appViewport">
+
+    <!-- Anthropic Editorial Header -->
+    <header class="app-header">
+      <a href="#" class="brand" onclick="navigate('home')">
+        <div class="brand-mark">O</div>
+        <div>
+          <span class="brand-title">OpcHub</span>
+          <span class="brand-tag">一人公司生态</span>
+        </div>
+      </a>
+
+      <nav class="nav-tabs">
+        <div class="nav-tab active" id="tab-home" onclick="navigate('home')">概览</div>
+        <div class="nav-tab" id="tab-sop" onclick="navigate('sop')">🧭 流程向导</div>
+        <div class="nav-tab" id="tab-policy" onclick="navigate('policy')">📜 政策雷达</div>
+        <div class="nav-tab" id="tab-perks" onclick="navigate('perks')">🎁 装备包</div>
+        <div class="nav-tab" id="tab-gallery" onclick="navigate('gallery')">🚀 产品橱窗</div>
+        <div class="nav-tab" id="tab-market" onclick="navigate('market')">🤝 需求集市</div>
+        <div class="nav-tab" id="tab-forum" onclick="navigate('forum')">💡 创客论坛</div>
+      </nav>
+
+      <div class="header-actions">
+        <div class="search-pill" onclick="openSearchModal()">
+          <span>检索政策 / 算力 / 服务</span>
+          <span class="kbd">⌘K</span>
+        </div>
+        <button class="btn-coral" onclick="openSubmitModal()">+ 发布产品/需求</button>
+      </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="app-main">
+
+      <!-- ================= 状态 1: POPULATED (完整数据态) ================= -->
+      <div id="state-populated-box">
+
+        <!-- VIEW 1: HOME 概览首页 -->
+        <section id="view-home" class="view-pane active">
+          <div class="hero-banner">
+            <h1 class="hero-quote">为每一个自成军团的超级个体提供后盾。</h1>
+            <p class="hero-sub">连接真金政策补贴、聚合大模型算力折扣、提供分步合规指引与首发分发网络。</p>
+          </div>
+
+          <!-- 智能补贴测算条 -->
+          <div class="calc-card">
+            <div>
+              <div class="calc-prompt">🎯 测算你的一人公司专属扶持政策与算力礼包</div>
+              <div style="font-size:0.8rem; color:var(--muted); margin-top:0.2rem;">输入画像，系统在 2026 最新官方库中秒级匹配增值税减免与无偿直补。</div>
+            </div>
+            <div class="calc-filters">
+              <select class="calc-select" id="quickCity">
+                <option value="hangzhou">📍 浙江 · 杭州市</option>
+                <option value="beijing">📍 北京市</option>
+                <option value="shenzhen">📍 广东省 · 深圳市</option>
+                <option value="shanghai">📍 上海市</option>
+                <option value="chengdu">📍 四川省 · 成都市</option>
+              </select>
+              <select class="calc-select" id="quickEntity">
+                <option value="getihu">个体工商户 (极轻推荐)</option>
+                <option value="gedu">个人独资企业</option>
+                <option value="xiaowei">科技型小微企业</option>
+                <option value="personal">尚未注册 (个人筹备)</option>
+              </select>
+              <button class="btn-coral" onclick="executeQuickCalc()">⚡ 一键测算</button>
+            </div>
+          </div>
+
+          <!-- 首页核心双列 -->
+          <div class="grid-2col">
+            <!-- 左列：精选政策雷达 -->
+            <div>
+              <div class="section-title">
+                <span>📜 核心政策推荐</span>
+                <span class="badge badge-free">🟢 免费白话解读</span>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:1rem;">
+                <div class="card" onclick="openPolicyDetail('p1')">
+                  <div class="card-title">小规模纳税人季度销售额 30 万元以下免征增值税</div>
+                  <div class="card-meta">
+                    <span>🏛️ 财政部 / 国家税务总局</span>
+                    <span>📍 全国通用</span>
+                    <span>⏳ 长期有效</span>
+                  </div>
+                  <div class="card-body-accent">
+                    💡 <strong>100字白话：</strong>一人公司按季度开票销售额不超过 30 万元，全额免征增值税及城建附加税，极大释放初期研发现金流。
+                  </div>
+                  <div class="card-footer">
+                    <span style="color:var(--sage); font-weight:600;">✓ 门槛：小规模纳税人主体</span>
+                    <span class="btn-link">查看完整官方文件与申报指南 →</span>
+                  </div>
+                </div>
+
+                <div class="card" onclick="openPolicyDetail('p2')">
+                  <div class="card-title">大学生及青年创业一次性现金直补 ¥10,000</div>
+                  <div class="card-meta">
+                    <span>🏛️ 杭州市人社局</span>
+                    <span>📍 杭州市</span>
+                    <span style="color:#C15F3C; font-weight:600;">⏳ 离申报截止还剩 18 天</span>
+                  </div>
+                  <div class="card-body-accent">
+                    💡 <strong>100字白话：</strong>毕业 5 年内创办个体工商户或科技企业，正常经营连续纳税满 6 个月即可直接申领 10,000 元现金补贴。
+                  </div>
+                  <div class="card-footer">
+                    <span style="color:var(--sage); font-weight:600;">✓ 门槛：毕业5年内</span>
+                    <span class="btn-link">进入政务直报通道 →</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 右列：独家装备包与产品推荐 -->
+            <div>
+              <div class="section-title">
+                <span>🎁 算力装备包</span>
+                <span class="badge badge-vendor">🟠 厂商特权合作</span>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:1rem; margin-bottom:2rem;">
+                <div class="card">
+                  <div style="font-size:0.75rem; font-weight:700; color:var(--muted); text-transform:uppercase;">SiliconFlow · 硅基流动</div>
+                  <div class="card-title">2000 万 Token 专属免费额度 + 充值 8 折返佣</div>
+                  <div class="card-body">极速接入 DeepSeek V3 / Qwen 模型，OPC 专属渠道即时生效。</div>
+                  <div class="card-footer">
+                    <span class="badge badge-vendor">🟠 渠道流水返佣</span>
+                    <button class="btn-coral" onclick="copyPerkCode('SiliconFlow', 'OPCHUB2026')">复制优惠码并前往 ↗</button>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div style="font-size:0.75rem; font-weight:700; color:var(--muted); text-transform:uppercase;">阿里云 · 初创计划</div>
+                  <div class="card-title">2核4G 云服务器低至 ¥68/年，送 OSS 存储券</div>
+                  <div class="card-body">超级个体托管轻量后端与 API 最佳性价比选型。</div>
+                  <div class="card-footer">
+                    <span class="badge badge-vendor">🟠 官方返佣合作</span>
+                    <button class="btn-outline" onclick="copyPerkCode('阿里云', 'ALI-OPC-DEAL')">领取代金券 ↗</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 精选产品展示 -->
+              <div class="section-title">
+                <span>🚀 精选产品橱窗</span>
+                <span class="badge badge-creator">🟣 官方权威收录</span>
+              </div>
+              <div class="gallery-item">
+                <div class="gallery-header">
+                  <div class="gallery-avatar">⚡</div>
+                  <div class="gallery-meta">
+                    <h4>DevAgent: 一人营销智能体</h4>
+                    <span>创始人: @alex · ⭐ 184 创客推荐</span>
+                  </div>
+                </div>
+                <div style="font-size:0.825rem; color:var(--body); margin-bottom:0.75rem;">一键解析 GitHub 仓库自动生成 Twitter/即刻短视频文案。</div>
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <button class="upvote-btn" onclick="toggleUpvote(this, 184)">▲ 赞同 184</button>
+                  <a href="#" class="btn-link" onclick="showToast('正在前往 DevAgent 官网...')">访问官网 ↗</a>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: 🧭 流程向导 (SOP) -->
+        <section id="view-sop" class="view-pane">
+          <div class="section-title">
+            <span>🧭 一人公司从 0 到 1 全生命周期向导 (SOP)</span>
+            <span class="badge badge-free">🟢 交互式完成度追踪</span>
+          </div>
+          <p style="font-size:0.875rem; color:var(--muted); margin-bottom:1rem;">勾选已完成任务，系统将动态持久化保存你的创业推进历程。</p>
+
+          <div class="sop-progress-bar">
+            <div class="sop-progress-fill" id="sopProgressFill" style="width: 33%;"></div>
+          </div>
+
+          <!-- 阶段 1 -->
+          <div class="sop-phase-accordion">
+            <div class="sop-phase-header" onclick="toggleAccordion('p1')">
+              <div class="sop-phase-title">
+                <span>01. 商业构思与低成本验证</span>
+                <span class="badge badge-free">🟢 验证中</span>
+              </div>
+              <span style="font-size:0.8rem; color:var(--muted);" id="p1-counter">2 / 2 完成</span>
+            </div>
+            <div class="sop-phase-body" id="p1-body">
+              <div class="sop-task-row">
+                <input type="checkbox" checked onchange="updateSopProgress()">
+                <div>
+                  <strong>痛点验证发帖：</strong>在 V2EX、即刻、Twitter 发布极简方案设想，收集至少 20 条真实用户反馈。
+                </div>
+              </div>
+              <div class="sop-task-row">
+                <input type="checkbox" checked onchange="updateSopProgress()">
+                <div>
+                  <strong>落地页上线 (Landing Page)：</strong>利用轻量模板搭建等待名单（Waitlist），获取前 30 位种子意向邮箱。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 阶段 2 -->
+          <div class="sop-phase-accordion">
+            <div class="sop-phase-header" onclick="toggleAccordion('p2')">
+              <div class="sop-phase-title">
+                <span>02. 工商合规与财税架构搭建</span>
+                <span class="badge badge-trade">🔵 避坑高发期</span>
+              </div>
+              <span style="font-size:0.8rem; color:var(--muted);" id="p2-counter">1 / 2 完成</span>
+            </div>
+            <div class="sop-phase-body" id="p2-body">
+              <div class="sop-task-row">
+                <input type="checkbox" checked onchange="updateSopProgress()">
+                <div>
+                  <strong>个体工商户核名注册：</strong>在当地政务服务网完成线上个体户自主核名，申领电子营业执照（全程免工本费）。
+                </div>
+              </div>
+              <div class="sop-task-row">
+                <input type="checkbox" onchange="updateSopProgress()">
+                <div>
+                  <strong>税务开业与零申报：</strong>在电子税务局完成登记，或前往集市对接认证财税所办理月度代理申报。
+                  <span class="badge badge-trade">🔵 集市代办</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 阶段 3 -->
+          <div class="sop-phase-accordion">
+            <div class="sop-phase-header" onclick="toggleAccordion('p3')">
+              <div class="sop-phase-title">
+                <span>03. 算力与开发基础设施接入</span>
+                <span class="badge badge-vendor">🟠 装备包打折</span>
+              </div>
+              <span style="font-size:0.8rem; color:var(--muted);" id="p3-counter">0 / 2 完成</span>
+            </div>
+            <div class="sop-phase-body" id="p3-body">
+              <div class="sop-task-row">
+                <input type="checkbox" onchange="updateSopProgress()">
+                <div>
+                  <strong>大模型 API 接入：</strong>申领 SiliconFlow / OpenRouter 专属 2000 万免费 Token 额度。
+                </div>
+              </div>
+              <div class="sop-task-row">
+                <input type="checkbox" onchange="updateSopProgress()">
+                <div>
+                  <strong>云服务器与数据库搭建：</strong>采购阿里云/腾讯云轻量应用服务器，配置自动化备份策略。
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 阶段 4 -->
+          <div class="sop-phase-accordion">
+            <div class="sop-phase-header" onclick="toggleAccordion('p4')">
+              <div class="sop-phase-title">
+                <span>04. 产品首发与冷启动分发</span>
+                <span class="badge badge-creator">🟣 橱窗入驻</span>
+              </div>
+              <span style="font-size:0.8rem; color:var(--muted);" id="p4-counter">0 / 2 完成</span>
+            </div>
+            <div class="sop-phase-body" id="p4-body">
+              <div class="sop-task-row">
+                <input type="checkbox" onchange="updateSopProgress()">
+                <div>
+                  <strong>Product Gallery 官方橱窗申请：</strong>入驻官方展厅，获取高质量 DoFollow 官网外链与 SEO 权重。
+                </div>
+              </div>
+              <div class="sop-task-row">
+                <input type="checkbox" onchange="updateSopProgress()">
+                <div>
+                  <strong>流量互助微件部署：</strong>在产品网站底部嵌入 Cross-Promo 组件，加入去中心化流量交换池。
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 3: 📜 政策雷达 (POLICY RADAR) -->
+        <section id="view-policy" class="view-pane">
+          <div class="section-title">
+            <span>📜 政策雷达与官方白话智库</span>
+            <span class="badge badge-free">🟢 结构化数据全量索引</span>
+          </div>
+
+          <!-- 维度筛选 -->
+          <div class="filter-group">
+            <span class="filter-pill active" onclick="filterPolicy(this, 'all')">全部政策 (142)</span>
+            <span class="filter-pill" onclick="filterPolicy(this, 'hangzhou')">杭州市 (28)</span>
+            <span class="filter-pill" onclick="filterPolicy(this, 'beijing')">北京市 (34)</span>
+            <span class="filter-pill" onclick="filterPolicy(this, 'shenzhen')">深圳市 (26)</span>
+            <span class="filter-pill" onclick="filterPolicy(this, 'tax')">税收减免</span>
+            <span class="filter-pill" onclick="filterPolicy(this, 'cash')">真金补贴</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:1rem;" id="policyDirectory">
+            <!-- 政策 1 -->
+            <div class="card" data-city="all" data-type="tax">
+              <div class="card-title">小规模纳税人季度销售额 30 万元以下免征增值税</div>
+              <div class="card-meta">
+                <span>🏛️ 财政部 / 国家税务总局</span>
+                <span>📍 全国通用</span>
+                <span>🏷️ 增值税减免</span>
+              </div>
+              <div class="card-body-accent">
+                💡 <strong>白话精要：</strong>小规模纳税人开具普通发票，单季度 30 万元（自然月 10 万元）以内无需缴纳 1% 或 3% 增值税及附加税。
+              </div>
+              <div class="card-footer">
+                <span style="font-size:0.75rem; color:var(--muted);">官方文号：财税〔2023〕19号</span>
+                <button class="btn-outline" onclick="openPolicyDetail('p1')">查看申报细则与原文 →</button>
+              </div>
+            </div>
+
+            <!-- 政策 2 -->
+            <div class="card" data-city="hangzhou" data-type="cash">
+              <div class="card-title">高校毕业生一次性创业无偿直补 ¥10,000</div>
+              <div class="card-meta">
+                <span>🏛️ 杭州市人力资源和社会保障局</span>
+                <span>📍 杭州市</span>
+                <span>🏷️ 现金直补</span>
+              </div>
+              <div class="card-body-accent">
+                💡 <strong>白话精要：</strong>毕业 5 年内大学生创办个体工商户或小微企业，正常经营满 6 个月且缴纳社保，直接划拨一万元无偿补贴至对公账户。
+              </div>
+              <div class="card-footer">
+                <span style="color:#C15F3C; font-weight:600;">⏳ 2026年11月15日申报截止</span>
+                <button class="btn-outline" onclick="openPolicyDetail('p2')">查看申报细则与原文 →</button>
+              </div>
+            </div>
+
+            <!-- 政策 3 -->
+            <div class="card" data-city="beijing" data-type="tax">
+              <div class="card-title">中关村科技型中小企业“科技创新券”最高兑现 ¥200,000</div>
+              <div class="card-meta">
+                <span>🏛️ 北京市科委</span>
+                <span>📍 北京市</span>
+                <span>🏷️ 算力与检测补贴</span>
+              </div>
+              <div class="card-body-accent">
+                💡 <strong>白话精要：</strong>用于采购大型科研仪器、AI 智算集群算力等研发服务，政府按实际发生额 50% 提供创新券抵扣。
+              </div>
+              <div class="card-footer">
+                <span style="font-size:0.75rem; color:var(--muted);">支持主体：具备自主知识产权的科技初创</span>
+                <button class="btn-outline" onclick="openPolicyDetail('p3')">查看申报细则与原文 →</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 4: 🎁 装备包 (PERKS & DEALS) -->
+        <section id="view-perks" class="view-pane">
+          <div class="section-title">
+            <span>🎁 开发者专属装备包 (Perks)</span>
+            <span class="badge badge-vendor">🟠 B端渠道专属折扣</span>
+          </div>
+          <p style="font-size:0.875rem; color:var(--muted); margin-bottom:1.5rem;">与顶尖厂商直接合作，为一人公司争取大企业同等采购折扣，所有权益真实有效。</p>
+
+          <div class="grid-3col">
+            <div class="card">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--muted);">大模型算力</div>
+              <div class="card-title">SiliconFlow 硅基流动</div>
+              <div style="font-size:0.85rem; color:var(--coral); font-weight:700; margin-bottom:0.5rem;">送 2000 万 Token + 8折返佣</div>
+              <div class="card-body">稳定调用 DeepSeek-V3 / Qwen 2.5 满血模型，高并发企业级 API 直连。</div>
+              <div class="card-footer">
+                <span class="badge badge-vendor">🟠 渠道流水返佣</span>
+                <button class="btn-coral" onclick="copyPerkCode('SiliconFlow', 'OPCHUB2026')">领码直通车 ↗</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--muted);">云服务器与存储</div>
+              <div class="card-title">阿里云开发者扶持</div>
+              <div style="font-size:0.85rem; color:var(--coral); font-weight:700; margin-bottom:0.5rem;">2核4G 服务器 ¥68/年起</div>
+              <div class="card-body">赠送 100GB 对象存储流量包与免费 SSL 证书，支持微型服务一键拉起。</div>
+              <div class="card-footer">
+                <span class="badge badge-vendor">🟠 官方特权</span>
+                <button class="btn-coral" onclick="copyPerkCode('阿里云', 'ALI-OPC-SPECIAL')">领码直通车 ↗</button>
+              </div>
+            </div>
+
+            <div class="card">
+              <div style="font-size:0.75rem; font-weight:700; color:var(--muted);">出海与跨境收单</div>
+              <div class="card-title">Stripe Atlas 离岸通道</div>
+              <div style="font-size:0.85rem; color:var(--coral); font-weight:700; margin-bottom:0.5rem;">特惠开通 + 送 $5,000 免费额度</div>
+              <div class="card-body">特约合作绿色开户通道，协助完成特拉华 C-Corp 设立与合规收单。</div>
+              <div class="card-footer">
+                <span class="badge badge-vendor">🟠 渠道分成</span>
+                <button class="btn-coral" onclick="copyPerkCode('Stripe Atlas', 'ATLAS-OPC')">领码直通车 ↗</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 5: 🚀 产品橱窗 (PRODUCT GALLERY) -->
+        <section id="view-gallery" class="view-pane">
+          <div class="section-title">
+            <span>🚀 优质创客产品橱窗 (Product Gallery)</span>
+            <span class="badge badge-creator">🟣 官方收录 · 获客展位</span>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.25rem;">
+            <div class="filter-group" style="margin-bottom:0;">
+              <span class="filter-pill active">全部产品 (89)</span>
+              <span class="filter-pill">AI 与 Agent</span>
+              <span class="filter-pill">出海与跨境</span>
+              <span class="filter-pill">设计与内容</span>
+            </div>
+            <button class="btn-coral" onclick="openSubmitModal()">+ 申请收录我的产品</button>
+          </div>
+
+          <div class="grid-3col">
+            <!-- 产品卡 1 -->
+            <div class="gallery-item">
+              <div>
+                <div class="gallery-header">
+                  <div class="gallery-avatar">⚡</div>
+                  <div class="gallery-meta">
+                    <h4>DevAgent</h4>
+                    <span>作者: @alex · 🏷️ AI营销</span>
+                  </div>
+                </div>
+                <div style="font-size:0.85rem; color:var(--body); margin-bottom:1rem;">一人全栈营销智能体，自动抓取 GitHub Commit 生成推文与新闻稿。</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:0.65rem;">
+                <button class="upvote-btn" onclick="toggleUpvote(this, 184)">▲ 赞同 184</button>
+                <a href="#" class="btn-link" onclick="showToast('正在前往产品官网...')">官网直达 ↗</a>
+              </div>
+            </div>
+
+            <!-- 产品卡 2 -->
+            <div class="gallery-item">
+              <div>
+                <div class="gallery-header">
+                  <div class="gallery-avatar">🎨</div>
+                  <div class="gallery-meta">
+                    <h4>IconCraft</h4>
+                    <span>作者: @sarah · 🏷️ 矢量设计</span>
+                  </div>
+                </div>
+                <div style="font-size:0.85rem; color:var(--body); margin-bottom:1rem;">一句话 Prompt 生成高质量 SVG 扁平图标，被 1,200+ 开发者使用。</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:0.65rem;">
+                <button class="upvote-btn" onclick="toggleUpvote(this, 96)">▲ 赞同 96</button>
+                <a href="#" class="btn-link" onclick="showToast('正在前往产品官网...')">官网直达 ↗</a>
+              </div>
+            </div>
+
+            <!-- 产品卡 3 -->
+            <div class="gallery-item">
+              <div>
+                <div class="gallery-header">
+                  <div class="gallery-avatar">💳</div>
+                  <div class="gallery-meta">
+                    <h4>PayNest</h4>
+                    <span>作者: @chen · 🏷️ 聚合支付</span>
+                  </div>
+                </div>
+                <div style="font-size:0.85rem; color:var(--body); margin-bottom:1rem;">面向国内独立开发者的微信与支付宝个人合规即时到账解决方案。</div>
+              </div>
+              <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:0.65rem;">
+                <button class="upvote-btn" onclick="toggleUpvote(this, 230)">▲ 赞同 230</button>
+                <a href="#" class="btn-link" onclick="showToast('正在前往产品官网...')">官网直达 ↗</a>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 6: 🤝 需求集市 (MARKETPLACE) -->
+        <section id="view-market" class="view-pane">
+          <div class="section-title">
+            <span>🤝 依赖服务集市与需求对接 (Marketplace)</span>
+            <span class="badge badge-trade">🔵 资质认证 · 撮合交易</span>
+          </div>
+
+          <div class="grid-2col">
+            <!-- 创客外包需求池 -->
+            <div>
+              <div style="font-weight:700; font-size:1rem; margin-bottom:0.75rem; color:var(--ink);">📋 创客外包需求池 (最新发布)</div>
+              
+              <div style="display:flex; flex-direction:column; gap:0.85rem;">
+                <div class="card">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div class="card-title">个体工商户月度代理记账与季报代办</div>
+                    <span class="badge badge-free">🟢 需求公开</span>
+                  </div>
+                  <div class="card-body">需求方：杭州 AI 工具创始人 · 预算区间：按年付费 · 需求：个体户年报与零申报处理。</div>
+                  <div class="card-footer">
+                    <span style="font-size:0.75rem; color:var(--muted);">发布于 2 小时前</span>
+                    <button class="btn-coral" onclick="showToast('已向需求方发送对接意向申请！')">申请对接 (线索匹配) ↗</button>
+                  </div>
+                </div>
+
+                <div class="card">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                    <div class="card-title">出海 SaaS 英文落地页 Figma UI 视觉设计</div>
+                    <span class="badge badge-free">🟢 需求公开</span>
+                  </div>
+                  <div class="card-body">需求方：独立极客 · 预算：面议 · 风格参考 Linear 简洁极客风，周期 3 天内。</div>
+                  <div class="card-footer">
+                    <span style="font-size:0.75rem; color:var(--muted);">发布于 5 小时前</span>
+                    <button class="btn-coral" onclick="showToast('已向需求方发送对接意向申请！')">申请对接 (线索匹配) ↗</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 平台官方认证服务商 -->
+            <div>
+              <div style="font-weight:700; font-size:1rem; margin-bottom:0.75rem; color:var(--ink);">🛡️ 官方认证服务商 (Verified Vendors)</div>
+
+              <div style="display:flex; flex-direction:column; gap:0.85rem;">
+                <div class="card">
+                  <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+                    <span style="font-weight:700; color:var(--ink);">君合财税事务所</span>
+                    <span class="badge badge-vendor">🟠 官方认证</span>
+                  </div>
+                  <div style="font-size:0.825rem; color:var(--muted); margin-bottom:0.5rem;">专精：科技型初创主体架构搭建、核定征收合规咨询、海外税表代填。</div>
+                  <div style="font-size:0.8rem; color:var(--sage); font-weight:600;">已服务 120+ 位 OPC 创客</div>
+                </div>
+
+                <div class="card">
+                  <div style="display:flex; align-items:center; gap:0.5rem; margin-bottom:0.35rem;">
+                    <span style="font-weight:700; color:var(--ink);">PixelStudio 独立设计室</span>
+                    <span class="badge badge-vendor">🟠 官方认证</span>
+                  </div>
+                  <div style="font-size:0.825rem; color:var(--muted); margin-bottom:0.5rem;">专精：出海落地页、移动端原型、Tailwind 设计系统输出。</div>
+                  <div style="font-size:0.8rem; color:var(--sage); font-weight:600;">已交付 45 款独立产品</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW 7: 💡 创客论坛 (FORUM) -->
+        <section id="view-forum" class="view-pane">
+          <div class="section-title">
+            <span>💡 创客论坛与实战复盘 (Forum)</span>
+            <span class="badge badge-free">🟢 纯净无广告经验库</span>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:1rem;">
+            <div class="card">
+              <div class="card-title">【复盘】一人开发 AI 翻译插件，第 3 个月如何做到月入 $1,500 MRR</div>
+              <div class="card-meta">
+                <span>作者: @solo_hacker</span>
+                <span>分类: 收入公开</span>
+                <span>💬 38 条讨论 · ❤️ 92 赞同</span>
+              </div>
+              <div class="card-body">
+                分享冷启动阶段在 Reddit 和 Product Hunt 的发帖模板，以及为什么一开始不要把 Stripe 和微信支付混在一起踩的坑...
+              </div>
+              <div class="card-footer">
+                <span class="badge badge-free">🟢 收入已验证</span>
+                <span class="btn-link" onclick="showToast('正在加载全文及 38 条优质讨论...')">阅读全文与讨论 →</span>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-title">【避坑】个人独资企业 vs 个体工商户，2026年到底该怎么选？</div>
+              <div class="card-meta">
+                <span>作者: @tax_expert</span>
+                <span>分类: 财税合规</span>
+                <span>💬 54 条讨论 · ❤️ 148 赞同</span>
+              </div>
+              <div class="card-body">
+                从开票上限、核定征收政策变动、银行对公账户管理费等三个真实维度，说透一人公司的合规底线。
+              </div>
+              <div class="card-footer">
+                <span class="badge badge-free">🟢 精华干货</span>
+                <span class="btn-link" onclick="showToast('正在加载全文及 54 条优质讨论...')">阅读全文与讨论 →</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ================= 状态 2: EMPTY (空白引导态) ================= -->
+      <div id="state-empty-box" style="display:none;">
+        <div style="background:#FFF; border:1px dashed var(--border); border-radius:8px; padding:4.5rem 2rem; text-align:center;">
+          <div style="font-size:2.5rem; margin-bottom:1rem;">📖</div>
+          <h3 style="font-family:var(--font-display); font-size:1.35rem; color:var(--ink); margin-bottom:0.5rem;">尚未建立你的创客画像</h3>
+          <p style="color:var(--muted); font-size:0.9rem; max-width:440px; margin:0 auto 1.5rem auto;">
+            只需选择你的所在地与商业目标，OpcHub 算法引擎将即时为你计算适配的减税政策与专属装备包。
+          </p>
+          <button class="btn-coral" onclick="setState('populated')">立即开启 30 秒快速测算</button>
+        </div>
+      </div>
+
+      <!-- ================= 状态 3: LOADING (优雅骨架屏) ================= -->
+      <div id="state-loading-box" style="display:none;">
+        <div style="background:#FFF; border:1px solid var(--border); border-radius:6px; padding:1.5rem; margin-bottom:1.5rem;">
+          <div style="height:24px; width:45%; background:var(--surface-subtle); border-radius:4px; margin-bottom:0.75rem;"></div>
+          <div style="height:14px; width:75%; background:var(--surface-subtle); border-radius:4px;"></div>
+        </div>
+        <div class="grid-2col">
+          <div style="background:#FFF; border:1px solid var(--border); border-radius:6px; padding:1.5rem;">
+            <div style="height:20px; width:50%; background:var(--surface-subtle); border-radius:4px; margin-bottom:1rem;"></div>
+            <div style="height:14px; width:100%; background:var(--surface-subtle); border-radius:4px; margin-bottom:0.5rem;"></div>
+            <div style="height:14px; width:90%; background:var(--surface-subtle); border-radius:4px; margin-bottom:0.5rem;"></div>
+            <div style="height:14px; width:40%; background:var(--surface-subtle); border-radius:4px;"></div>
+          </div>
+          <div style="background:#FFF; border:1px solid var(--border); border-radius:6px; padding:1.5rem;">
+            <div style="height:20px; width:40%; background:var(--surface-subtle); border-radius:4px; margin-bottom:1rem;"></div>
+            <div style="height:14px; width:100%; background:var(--surface-subtle); border-radius:4px; margin-bottom:0.5rem;"></div>
+            <div style="height:14px; width:80%; background:var(--surface-subtle); border-radius:4px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= 状态 4: ERROR (异常恢复态) ================= -->
+      <div id="state-error-box" style="display:none;">
+        <div style="background:#FFF; border:1px dashed #D4A396; border-radius:8px; padding:4.5rem 2rem; text-align:center;">
+          <div style="font-size:2.5rem; margin-bottom:1rem;">☕</div>
+          <h3 style="font-family:var(--font-display); font-size:1.35rem; color:#A84832; margin-bottom:0.5rem;">政务公开接口同步暂缓</h3>
+          <p style="color:var(--muted); font-size:0.9rem; max-width:440px; margin:0 auto 1.5rem auto;">
+            政务数据节点正在进行定点安全维护，已为你保留上一次本地缓存的合规记录。
+          </p>
+          <button class="btn-coral" onclick="setState('populated')">重新连接政策数据库</button>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<!-- Slide-over Drawer: Policy Detail -->
+<div class="modal-backdrop" id="policyDrawer" onclick="closePolicyDetail(event)">
+  <div class="modal-card" style="max-width: 620px;" onclick="event.stopPropagation()">
+    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:1rem;">
+      <h3 class="modal-title" id="drawerTitle">政策细则与申报指引</h3>
+      <button style="border:none; background:transparent; font-size:1.5rem; cursor:pointer; color:var(--muted);" onclick="closePolicyDrawer()">×</button>
+    </div>
+    <div class="card-meta" id="drawerMeta">
+      <span>🏛️ 官方主管单位</span>
+      <span>📍 适用范围</span>
+    </div>
+    <div class="card-body-accent" id="drawerSummary">
+      政策大白话解读内容...
+    </div>
+    <div style="font-size:0.875rem; color:var(--body); line-height:1.6; margin-bottom:1.25rem;" id="drawerBody">
+      详细申报流程要求与材料清单...
+    </div>
+    <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+      <button class="btn-outline" onclick="closePolicyDrawer()">关闭</button>
+      <button class="btn-coral" onclick="showToast('正在跳转政务服务网官方直报系统...')">前往官方政务直报系统 ↗</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Submit Product to Gallery -->
+<div class="modal-backdrop" id="submitModal" onclick="closeSubmitModal(event)">
+  <div class="modal-card" onclick="event.stopPropagation()">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+      <h3 class="modal-title">🚀 提交产品至 Product Gallery</h3>
+      <button style="border:none; background:transparent; font-size:1.5rem; cursor:pointer; color:var(--muted);" onclick="closeSubmitModal()">×</button>
+    </div>
+    <p style="font-size:0.85rem; color:var(--muted); margin-bottom:1.25rem;">
+      经官方审核通过后，产品将永久收录于官方橱窗，附带高质量 DoFollow 官网外链与全网首发创客流量。
+    </p>
+
+    <div class="form-group">
+      <label class="form-label">产品名称</label>
+      <input type="text" class="form-input" placeholder="例如：DevAgent 一人营销智能体" id="inpProductName">
+    </div>
+    <div class="form-group">
+      <label class="form-label">产品官网 / 体验链接</label>
+      <input type="text" class="form-input" placeholder="https://yourproduct.com" id="inpProductUrl">
+    </div>
+    <div class="form-group">
+      <label class="form-label">分类标签</label>
+      <select class="form-input">
+        <option>AI 与 Agent 工具</option>
+        <option>出海与跨境服务</option>
+        <option>开发者效率工具</option>
+        <option>内容与设计辅助</option>
+      </select>
+    </div>
+
+    <div style="background:var(--purple-light); border:1px solid var(--purple-border); padding:0.65rem 0.85rem; border-radius:4px; margin-bottom:1.5rem;">
+      <span class="badge badge-creator">🟣 收费点 · 创客付费审核</span>
+      <span style="font-size:0.775rem; color:var(--purple); margin-left:0.5rem;">若审核未通过，费用全额原路退还</span>
+    </div>
+
+    <div style="display:flex; justify-content:flex-end; gap:0.6rem;">
+      <button class="btn-outline" onclick="closeSubmitModal()">取消</button>
+      <button class="btn-coral" onclick="submitProductAction()">确认提交并支付审核</button>
+    </div>
+  </div>
+</div>
+
+<!-- Search Modal (Cmd+K) -->
+<div class="modal-backdrop" id="searchModal" onclick="closeSearchModal(event)">
+  <div class="modal-card" style="max-width: 580px;" onclick="event.stopPropagation()">
+    <div style="display:flex; align-items:center; gap:0.6rem; margin-bottom:1rem; border-bottom:1px solid var(--border); padding-bottom:0.75rem;">
+      <span style="font-size:1.1rem; color:var(--muted);">🔍</span>
+      <input type="text" placeholder="全局搜索政策、Token优惠、外包需求..." id="globalSearchInput" oninput="doGlobalSearch(this.value)" style="border:none; width:100%; font-size:1rem; font-family:var(--font-sans); outline:none; background:transparent;">
+      <span class="kbd">ESC</span>
+    </div>
+    <div id="searchResults" style="display:flex; flex-direction:column; gap:0.5rem; max-height:280px; overflow-y:auto;">
+      <div style="font-size:0.8rem; color:var(--muted); padding:0.5rem 0;">输入关键词（如：免税、Token、杭州、代账）极速定位...</div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Box -->
+<div class="toast" id="appToast">
+  <span id="toastMsg">通知内容</span>
+</div>
+
+<script>
+  // Device Switcher
+  function setDevice(device) {
+    const vp = document.getElementById('appViewport');
+    vp.className = 'viewport ' + device;
+    document.querySelectorAll('.sim-bar .sim-btn').forEach(btn => {
+      if (btn.innerText.includes('桌面') && device === 'desktop') btn.classList.add('active');
+      else if (btn.innerText.includes('平板') && device === 'tablet') btn.classList.add('active');
+      else if (btn.innerText.includes('手机') && device === 'mobile') btn.classList.add('active');
+      else if (btn.innerText.includes('桌面') || btn.innerText.includes('平板') || btn.innerText.includes('手机')) btn.classList.remove('active');
+    });
+    showToast('已切换至 ' + device.toUpperCase() + ' 视口模式');
+  }
+
+  // State Switcher (Four States)
+  function setState(state) {
+    ['populated', 'empty', 'loading', 'error'].forEach(s => {
+      document.getElementById('state-' + s + '-box').style.display = (s === state) ? 'block' : 'none';
+      const btn = document.getElementById('btnState' + s.charAt(0).toUpperCase() + s.slice(1, 3));
+      if (btn) btn.classList.toggle('active', s === state);
+    });
+    showToast('已切换仿真状态为：' + state);
+  }
+
+  // Tab Navigation
+  function navigate(tabName) {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    const targetTab = document.getElementById('tab-' + tabName);
+    if (targetTab) targetTab.classList.add('active');
+
+    document.querySelectorAll('.view-pane').forEach(v => v.classList.remove('active'));
+    const targetView = document.getElementById('view-' + tabName);
+    if (targetView) targetView.classList.add('active');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // SOP Progress Logic
+  function updateSopProgress() {
+    const all = document.querySelectorAll('.sop-task-row input[type="checkbox"]');
+    const checked = document.querySelectorAll('.sop-task-row input[type="checkbox"]:checked');
+    const pct = Math.round((checked.length / all.length) * 100);
+    document.getElementById('sopProgressFill').style.width = pct + '%';
+    showToast('SOP 进度更新：已完成 ' + checked.length + '/' + all.length + ' 项 (' + pct + '%)');
+  }
+
+  function toggleAccordion(phaseId) {
+    const body = document.getElementById(phaseId + '-body');
+    body.style.display = body.style.display === 'none' ? 'block' : 'none';
+  }
+
+  // Quick Calculator
+  function executeQuickCalc() {
+    const city = document.getElementById('quickCity').selectedOptions[0].text;
+    const ent = document.getElementById('quickEntity').selectedOptions[0].text;
+    showToast('正在测算 ' + city + ' · ' + ent + ' ...');
+    setTimeout(() => {
+      showToast('🎉 测算完成：精准匹配到 2 条现金直补政策与 3 项专属免税红利！');
+    }, 500);
+  }
+
+  // Claim Perks
+  function copyPerkCode(vendor, code) {
+    navigator.clipboard.writeText(code).catch(() => {});
+    showToast('✅ 已复制 ' + vendor + ' 专属优惠码 [' + code + ']！正在跳转至官方通道...');
+  }
+
+  // Upvote Logic
+  function toggleUpvote(btn, baseCount) {
+    if (btn.classList.contains('upvoted')) {
+      btn.classList.remove('upvoted');
+      btn.innerHTML = '▲ 赞同 ' + baseCount;
+      showToast('已取消赞同');
+    } else {
+      btn.classList.add('upvoted');
+      btn.innerHTML = '▲ 已赞同 ' + (baseCount + 1);
+      showToast('🎉 感谢支持！Upvote +1 成功');
+    }
+  }
+
+  // Policy Filter
+  function filterPolicy(pill, filter) {
+    document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+    
+    const cards = document.querySelectorAll('#policyDirectory .card');
+    cards.forEach(c => {
+      if (filter === 'all') c.style.display = 'block';
+      else if (filter === 'hangzhou' && c.dataset.city === 'hangzhou') c.style.display = 'block';
+      else if (filter === 'beijing' && c.dataset.city === 'beijing') c.style.display = 'block';
+      else if (filter === 'tax' && c.dataset.type === 'tax') c.style.display = 'block';
+      else if (filter === 'cash' && c.dataset.type === 'cash') c.style.display = 'block';
+      else c.style.display = 'none';
+    });
+  }
+
+  // Policy Drawer
+  const policyData = {
+    p1: {
+      title: "小规模纳税人季度销售额 30 万元以下免征增值税",
+      meta: "🏛️ 财政部 / 国家税务总局 · 全国通用 · 长期有效",
+      summary: "💡 白话解读：单季度累计开票金额在 30 万元以内的所有增值税普通发票，享受 100% 免税政策，极大充实一人公司的初期现金流储备。",
+      body: "<strong>申报要点：</strong><br>1. 纳税主体须为增值税小规模纳税人（个体工商户或个人独资企业均适用）；<br>2. 季度开具专票部分照常纳税，普票部分在申报表免税销售额栏如实填报即可系统自动减免。<br>3. 关联优惠：附征的城市维护建设税、教育费附加、地方教育附加同步减半或全额减征。"
+    },
+    p2: {
+      title: "高校毕业生一次性创业无偿直补 ¥10,000",
+      meta: "🏛️ 杭州市人力资源和社会保障局 · 杭州市 · 离截止还剩 18 天",
+      summary: "💡 白话解读：高校毕业 5 年内在杭设立初创实体，连续正常纳税并经营满 6 个月，由财政资金直接无偿补助 10,000 元至对公账户。",
+      body: "<strong>申报材料清单：</strong><br>1. 申请人身份证及学信网学历证书；<br>2. 营业执照正副本扫描件；<br>3. 连续 6 个月正常经营纳税记录或流水凭单；<br>4. 在浙江政务服务网完成'青年创业一次性补贴'线上填报。"
+    },
+    p3: {
+      title: "中关村科技型中小企业“科技创新券”最高兑现 ¥200,000",
+      meta: "🏛️ 北京市科委 · 北京市 · 算力与检测补贴",
+      summary: "💡 白话解读：支持超级个体与科技初创采购大模型算力与第三方测试研发服务，财政给予 50% 资金抵扣。",
+      body: "<strong>申领条件：</strong><br>在京注册成立、研发团队在 10 人以内、具备自主研发知识产权的小微创新主体均可常年申报申请。"
+    }
+  };
+
+  function openPolicyDetail(id) {
+    const p = policyData[id];
+    if (!p) return;
+    document.getElementById('drawerTitle').innerText = p.title;
+    document.getElementById('drawerMeta').innerHTML = p.meta;
+    document.getElementById('drawerSummary').innerHTML = p.summary;
+    document.getElementById('drawerBody').innerHTML = p.body;
+    document.getElementById('policyDrawer').style.display = 'flex';
+  }
+
+  function closePolicyDrawer() {
+    document.getElementById('policyDrawer').style.display = 'none';
+  }
+
+  function closePolicyDetail(e) {
+    if (e.target.id === 'policyDrawer') closePolicyDrawer();
+  }
+
+  // Submit Modal
+  function openSubmitModal() {
+    document.getElementById('submitModal').style.display = 'flex';
+  }
+  function closeSubmitModal(e) {
+    if (!e || e.target.id === 'submitModal') {
+      document.getElementById('submitModal').style.display = 'none';
+    }
+  }
+  function submitProductAction() {
+    const name = document.getElementById('inpProductName').value;
+    if (!name) {
+      alert('请填写产品名称');
+      return;
+    }
+    document.getElementById('submitModal').style.display = 'none';
+    showToast('🎉 产品 [' + name + '] 提交成功！已生成审核流水号 #OPC-9042，工作人员 24h 内完成收录。');
+    document.getElementById('inpProductName').value = '';
+  }
+
+  // Global Search
+  function openSearchModal() {
+    document.getElementById('searchModal').style.display = 'flex';
+    document.getElementById('globalSearchInput').focus();
+  }
+  function closeSearchModal(e) {
+    if (!e || e.target.id === 'searchModal') {
+      document.getElementById('searchModal').style.display = 'none';
+    }
+  }
+
+  const searchIndex = [
+    { type: "政策", title: "小规模纳税人季度 30 万免增值税", desc: "财政部政策，普票全额免收增值税", action: () => { closeSearchModal(); navigate('policy'); openPolicyDetail('p1'); } },
+    { type: "政策", title: "大学生创业一次性直补 ¥10,000", desc: "杭州市人社局补贴，经营满半年直拨", action: () => { closeSearchModal(); navigate('policy'); openPolicyDetail('p2'); } },
+    { type: "装备包", title: "SiliconFlow 2000万 Token 免费领", desc: "DeepSeek API 高速通道", action: () => { closeSearchModal(); navigate('perks'); } },
+    { type: "装备包", title: "阿里云 2核4G 云服务器 ¥68/年", desc: "初创微服务托管机型", action: () => { closeSearchModal(); navigate('perks'); } },
+    { type: "产品", title: "DevAgent: 一人全栈营销助手", desc: "自动抓取 Commit 生成推文", action: () => { closeSearchModal(); navigate('gallery'); } },
+    { type: "需求", title: "个体工商户月度代理记账报税", desc: "集市认证服务商撮合", action: () => { closeSearchModal(); navigate('market'); } }
+  ];
+
+  function doGlobalSearch(kw) {
+    const resBox = document.getElementById('searchResults');
+    if (!kw.trim()) {
+      resBox.innerHTML = '<div style="font-size:0.8rem; color:var(--muted); padding:0.5rem 0;">输入关键词极速定位...</div>';
+      return;
+    }
+    const filtered = searchIndex.filter(item => item.title.includes(kw) || item.desc.includes(kw) || item.type.includes(kw));
+    if (filtered.length === 0) {
+      resBox.innerHTML = '<div style="font-size:0.85rem; color:var(--muted); padding:1rem 0; text-align:center;">未找到与 "' + kw + '" 相关的条目</div>';
+      return;
+    }
+    resBox.innerHTML = filtered.map((item, idx) => `
+      <div style="padding:0.6rem 0.85rem; background:#FFF; border:1px solid var(--border); border-radius:4px; cursor:pointer; display:flex; justify-content:space-between; align-items:center;" onclick="searchIndex[${searchIndex.indexOf(item)}].action()">
+        <div>
+          <div style="font-size:0.875rem; font-weight:700; color:var(--ink);">${item.title}</div>
+          <div style="font-size:0.775rem; color:var(--muted);">${item.desc}</div>
+        </div>
+        <span class="badge badge-free">${item.type}</span>
+      </div>
+    `).join('');
+  }
+
+  // Keyboard shortcut listener
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      e.preventDefault();
+      openSearchModal();
+    }
+    if (e.key === 'Escape') {
+      closeSearchModal();
+      closePolicyDrawer();
+      closeSubmitModal();
+    }
+  });
+
+  // Toast Function
+  let toastTimer = null;
+  function showToast(msg) {
+    const toast = document.getElementById('appToast');
+    const toastMsg = document.getElementById('toastMsg');
+    toastMsg.innerText = msg;
+    toast.style.display = 'flex';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toast.style.display = 'none'; }, 2600);
+  }
+</script>
+
+</body>
+</html>

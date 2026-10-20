@@ -42,19 +42,23 @@ class PolicyService:
 
     def match_policies(self, req: PolicyMatchRequest) -> PolicyMatchResponse:
         """Evaluate maker income against policy thresholds and calculate tax savings with semantic relevance ranking."""
+        from src.core.config import settings
         matched: List[PolicyResponse] = []
-        is_vat_free = req.quarterly_income <= 300000.0
+        threshold = settings.vat_exemption_quarterly_threshold
+        std_rate = settings.vat_standard_rate
+        threshold_desc = f"{int(threshold / 10000)} 万元"
+        is_vat_free = req.quarterly_income <= threshold
 
         if is_vat_free:
             applicable_rate = 0.0
-            tax_savings = req.quarterly_income * 0.03  # 3% standard small-scale rate
-            explanation = f"恭喜！您本季度申报销售额 ¥{req.quarterly_income:,.2f} 未超过 30 万元免征红线，享受国家小规模纳税人增值税全额免征，预计直接减免税额 ¥{tax_savings:,.2f}。"
+            tax_savings = req.quarterly_income * std_rate
+            explanation = f"恭喜！您本季度申报销售额 ¥{req.quarterly_income:,.2f} 未超过 {threshold_desc}免征红线，享受国家小规模纳税人增值税全额免征，预计直接减免税额 ¥{tax_savings:,.2f}。"
             if "pol_vat_exemption_2026" in self._policies:
                 matched.append(self._policies["pol_vat_exemption_2026"])
         else:
-            applicable_rate = 0.03
+            applicable_rate = std_rate
             tax_savings = 0.0
-            explanation = f"提示：您本季度申报销售额 ¥{req.quarterly_income:,.2f} 已超出 30 万元免税门槛，全额按 3% 简易计税缴纳增值税，应纳增值税额约 ¥{req.quarterly_income * 0.03:,.2f}。"
+            explanation = f"提示：您本季度申报销售额 ¥{req.quarterly_income:,.2f} 已超出 {threshold_desc}免税门槛，全额按 {int(std_rate * 100)}% 简易计税缴纳增值税，应纳增值税额约 ¥{req.quarterly_income * std_rate:,.2f}。"
 
         # If Region is Hangzhou, add local AI compute voucher
         if "杭州" in req.region and "pol_ai_compute_voucher_hz" in self._policies:

@@ -1,0 +1,92 @@
+# ==============================================================================
+# OpcHub Platform Application Configuration
+# All configurations are loaded dynamically from this file, zero hardcoding in code.
+# ==============================================================================
+app:
+  name: "OpcHub Microkernel Platform"
+  version: "v1.0.4-live"
+  api_prefix: "/api/v1"
+  docs_url: "/docs"
+  redoc_url: "/redoc"
+  cors_origins:
+    - "*"
+
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# PostgreSQL 16 + pgvector Core Relational & Vector Storage (ADR-002 & ADR-003)
+database:
+  url: "postgresql+asyncpg://opc:opchub_secret@localhost:5432/opchub"
+  echo: false
+  pool_size: 10
+  max_overflow: 20
+
+gateway:
+  # Inbound Unified Gateway Endpoints
+  endpoints:
+    - "/api/welcom/opc_world"
+    - "/api/welcome/opc_world"
+    - "/api/v1/dispatch"
+    - "/api/v1/gateway/dispatch"
+  
+  # Metadata & Rules Introspection Endpoints
+  metadata_endpoints:
+    - "/api/welcom/opc_world/rules"
+    - "/api/welcome/opc_world/rules"
+    - "/api/v1/gateway/rules"
+
+  # Path to external scenario routing & version governance configuration
+  routes_config_file: "config/gateway_routes.yaml"
+
+# ==============================================================================
+# Outbound External Ecosystem Gateways (Anti-corruption Layer)
+# ==============================================================================
+external_gateway:
+  # SiliconFlow (硅基流动) Large Language Model Gateway
+  siliconflow:
+    base_url: "https://api.siliconflow.cn/v1"
+    api_key_env: "SILICONFLOW_API_KEY"
+    default_model: "deepseek-ai/DeepSeek-V3"
+    timeout_seconds: 30
+    mock_mode: true
+
+  # Licensed Payment Split & Anti-Fund-Pooling Channels
+  payment:
+    wechat:
+      mch_id: "1900000109"
+      base_url: "https://api.mch.weixin.qq.com"
+      api_key_env: "WECHAT_PAY_V3_KEY"
+      profit_sharing_ratio_max: 0.30
+      mock_mode: true
+    stripe:
+      base_url: "https://api.stripe.com"
+      api_key_env: "STRIPE_SECRET_KEY"
+      default_currency: "cny"
+      mock_mode: true
+
+  # Official Government Public Policy Crawler (Strict rate limiting, gov.cn only)
+  gov_crawler:
+    base_url: "https://www.gov.cn"
+    sat_base_url: "https://www.chinatax.gov.cn"
+    rate_limit_per_second: 2.0
+    timeout_seconds: 15
+    mock_mode: true
+
+  # SMS & Real-name Identity Verification Gateway (Aliyun SMS / corp entity check)
+  sms_auth:
+    base_url: "https://dysmsapi.aliyuncs.com"
+    api_key_env: "ALIYUN_SMS_ACCESS_KEY"
+    mock_mode: true
+
+  # Aliyun Content Moderation (Green) Anti-Spam & Sensitive Keyword Scan Gateway
+  content_moderation:
+    base_url: "http://127.0.0.1:8099"
+    api_key_env: "ALIYUN_GREEN_API_KEY"
+    timeout_seconds: 5.0
+
+  # Lightweight SQLite Vector Store & RAG Engine
+  rag:
+    embedding_model: "BAAI/bge-large-zh-v1.5"
+    vector_dim: 128
+    db_path: "data/rag_vectors.sqlite"

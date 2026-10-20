@@ -164,7 +164,7 @@ function handlePublish() {
     emit('open-register');
     return;
   }
-  emit('toast', { title: '发布通道', message: '作品发布微内核审核流水线准备就绪！', type: 'INFO' });
+  emit('toast', { title: '发布通道', message: '作品发布审核通道准备就绪！', type: 'INFO' });
 }
 
 onMounted(() => {

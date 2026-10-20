@@ -20,6 +20,8 @@ class MakerProfileResponse(BaseModel):
     company_name: str
     credit_code: str
     tier_name: str
+    account_type: Optional[str] = "MAKER"
+    industry_track: Optional[str] = ""
     phone: Optional[str] = ""
     email: Optional[str] = ""
     entitlements: List[EntitlementItem]
@@ -31,6 +33,8 @@ class UserProfileUpdateRequest(BaseModel):
     phone: Optional[str] = None
     company_name: Optional[str] = None
     credit_code: Optional[str] = None
+    industry_track: Optional[str] = None
+
 
 
 class EntitlementActivateRequest(BaseModel):
@@ -112,8 +116,12 @@ class PasswordStrengthResponse(BaseModel):
 
 
 class UserLoginRequest(BaseModel):
-    email: str
-    password: str
+    email: Optional[str] = None
+    account: Optional[str] = None
+    password: Optional[str] = None
+    verification_code: Optional[str] = None
+    code: Optional[str] = None
+    login_type: Optional[str] = None  # "account_password" | "email_code" | "email_password"
 
 
 class AuthSessionResponse(BaseModel):

@@ -79,6 +79,63 @@ class DemandService:
     def get_demand(self, demand_id: str) -> Optional[DemandResponse]:
         return self._demands.get(demand_id)
 
+    def validate_publish_payload(self, inputs: dict) -> dict:
+        title = inputs.get("title", "").strip()
+        desc = inputs.get("description", "").strip()
+        budget = float(inputs.get("budget_cny", 0.0))
+        category = inputs.get("category", "DEV").upper()
+        deadline_days = int(inputs.get("deadline_days", 14))
+        creator_id = inputs.get("creator_id", "")
+
+        if len(title) < 2:
+            raise ValueError("Demand title must be at least 2 characters long")
+        if len(desc) < 5:
+            raise ValueError("Demand description must be at least 5 characters long")
+        if budget < 0:
+            raise ValueError("Demand budget cannot be negative")
+        if category not in {"DEV", "AI", "TAX", "LEGAL", "BIZ"}:
+            category = "DEV"
+        if deadline_days < 1:
+            deadline_days = 14
+        return {
+            "guard_passed": True,
+            "title": title,
+            "description": desc,
+            "budget_cny": budget,
+            "category": category,
+            "deadline_days": deadline_days,
+            "creator_id": creator_id,
+        }
+
+    def validate_bid_payload(self, inputs: dict) -> dict:
+        demand_id = inputs.get("demand_id", "").strip()
+        bidder_id = inputs.get("bidder_id", "").strip()
+        amount = float(inputs.get("bid_amount_cny", 0.0))
+        delivery_days = int(inputs.get("delivery_days", 7))
+        proposal = inputs.get("proposal_text", "").strip()
+
+        if not demand_id:
+            raise ValueError("demand_id is required for bidding")
+        demand = self.get_demand(demand_id)
+        if not demand:
+            raise KeyError(f"Demand with ID {demand_id} not found")
+        if demand.status != "OPEN":
+            raise ValueError(f"Demand {demand_id} is not open for bidding (status: {demand.status})")
+        if amount < 0:
+            raise ValueError("bid_amount_cny cannot be negative")
+        if delivery_days < 1:
+            raise ValueError("delivery_days must be at least 1")
+        if len(proposal) < 5:
+            raise ValueError("proposal_text must be at least 5 characters long")
+        return {
+            "guard_passed": True,
+            "demand_id": demand_id,
+            "bidder_id": bidder_id,
+            "bid_amount_cny": amount,
+            "delivery_days": delivery_days,
+            "proposal_text": proposal,
+        }
+
     def delete_demand(self, demand_id: str) -> bool:
         if demand_id in self._demands:
             del self._demands[demand_id]

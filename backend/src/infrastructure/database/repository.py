@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import delete as sa_delete, select
+from sqlalchemy import delete as sa_delete, select, or_
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from src.core.database import get_async_engine, get_async_sessionmaker, check_database_health
@@ -71,6 +71,24 @@ class DatabaseRepository:
             stmt = select(User).where(User.email == email.strip().lower())
             result = await session.execute(stmt)
             return result.scalar_one_or_none()
+
+    async def get_user_by_account(self, account: str) -> Optional[User]:
+        """Fetch a user by email, uid, or nickname."""
+        if not await self.is_ready():
+            return None
+        session_maker = get_async_sessionmaker()
+        clean = (account or "").strip()
+        clean_lower = clean.lower()
+        async with session_maker() as session:
+            stmt = select(User).where(
+                or_(
+                    User.email == clean_lower,
+                    User.uid == clean,
+                    User.nickname == clean,
+                )
+            )
+            result = await session.execute(stmt)
+            return result.scalars().first()
 
     async def create_user(
         self,

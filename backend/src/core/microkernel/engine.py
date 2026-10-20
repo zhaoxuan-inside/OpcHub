@@ -18,10 +18,14 @@ class MicrokernelEngine:
         self.registry = atomic_registry or registry
         self.dispatcher = dispatcher_inst or dispatcher
 
-    def topological_sort(self, config: DAGConfig) -> list[str]:
-        """Kahn's algorithm to sort nodes and detect cycles."""
+    def validate_and_sort(self, config: DAGConfig) -> tuple[list[str], str, str]:
+        """Kahn's algorithm to sort nodes, detect cycles, and strictly validate single-entry & single-exit."""
         nodes = {n.id: n for n in config.execution_graph.nodes}
+        if not nodes:
+            raise ValueError("Execution graph cannot be empty!")
+
         in_degree = {nid: 0 for nid in nodes}
+        out_degree = {nid: 0 for nid in nodes}
         adj: dict[str, list[str]] = {nid: [] for nid in nodes}
 
         for edge in config.execution_graph.edges:
@@ -30,8 +34,35 @@ class MicrokernelEngine:
             if from_n in adj and to_n in in_degree:
                 adj[from_n].append(to_n)
                 in_degree[to_n] += 1
+                out_degree[from_n] += 1
 
-        queue = [nid for nid, deg in in_degree.items() if deg == 0]
+        # Check entry nodes (in_degree == 0)
+        source_nodes = [nid for nid, deg in in_degree.items() if deg == 0]
+        if len(source_nodes) == 0:
+            raise ValueError("Cyclic dependency detected in execution graph: no entry node found!")
+        if len(source_nodes) > 1:
+            raise ValueError(f"Graph must have exactly ONE entry point, found {len(source_nodes)}: {source_nodes}")
+
+        entry_node = source_nodes[0]
+        if config.execution_graph.entry_node and config.execution_graph.entry_node != entry_node:
+            raise ValueError(f"Declared entry_node '{config.execution_graph.entry_node}' does not match topological source '{entry_node}'")
+
+        # Check exit nodes (out_degree == 0)
+        sink_nodes = [nid for nid, deg in out_degree.items() if deg == 0]
+        if len(sink_nodes) == 0:
+            raise ValueError("No exit node found: graph contains cycles or has no sink!")
+        if len(sink_nodes) > 1:
+            raise ValueError(f"Graph must have exactly ONE exit point, found {len(sink_nodes)}: {sink_nodes}")
+
+        exit_node = sink_nodes[0]
+        if config.execution_graph.exit_node and config.execution_graph.exit_node != exit_node:
+            raise ValueError(f"Declared exit_node '{config.execution_graph.exit_node}' does not match topological sink '{exit_node}'")
+
+        # Ensure both are set on execution_graph
+        config.execution_graph.entry_node = entry_node
+        config.execution_graph.exit_node = exit_node
+
+        queue = [entry_node]
         sorted_nodes = []
 
         while queue:
@@ -43,8 +74,12 @@ class MicrokernelEngine:
                     queue.append(neighbor)
 
         if len(sorted_nodes) != len(nodes):
-            raise ValueError("Cyclic dependency detected in execution graph!")
+            raise ValueError("Cyclic dependency or disconnected unreachable nodes detected in execution graph!")
 
+        return sorted_nodes, entry_node, exit_node
+
+    def topological_sort(self, config: DAGConfig) -> list[str]:
+        sorted_nodes, _, _ = self.validate_and_sort(config)
         return sorted_nodes
 
     async def execute_dag(
@@ -67,7 +102,7 @@ class MicrokernelEngine:
         }
 
         try:
-            order = self.topological_sort(config)
+            order, entry_node, exit_node = self.validate_and_sort(config)
         except ValueError as e:
             total_dur = (time.perf_counter() - start_time) * 1000
             return ExecutionResult(
@@ -78,6 +113,7 @@ class MicrokernelEngine:
                 status=ExecutionStatus.CYCLE_DETECTED,
                 total_duration_ms=round(total_dur, 2),
                 entry_node=config.execution_graph.entry_node,
+                exit_node=config.execution_graph.exit_node,
                 node_traces=[],
                 final_output={},
                 error_message=str(e),
@@ -190,6 +226,7 @@ class MicrokernelEngine:
                     status=final_status,
                     total_duration_ms=round(total_dur, 2),
                     entry_node=config.execution_graph.entry_node,
+                    exit_node=config.execution_graph.exit_node,
                     node_traces=traces,
                     final_output=final_output,
                     error_message=f"Guard check failed: {e}",
@@ -226,6 +263,7 @@ class MicrokernelEngine:
                     status=final_status,
                     total_duration_ms=round(total_dur, 2),
                     entry_node=config.execution_graph.entry_node,
+                    exit_node=config.execution_graph.exit_node,
                     node_traces=traces,
                     final_output=final_output,
                     error_message=f"Node {nid} execution error: {e}",
@@ -241,6 +279,7 @@ class MicrokernelEngine:
             status=ExecutionStatus.SUCCESS,
             total_duration_ms=round(total_dur, 2),
             entry_node=config.execution_graph.entry_node,
+            exit_node=config.execution_graph.exit_node,
             node_traces=traces,
             final_output=final_output,
             compensation_traces=[],

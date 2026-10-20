@@ -1,0 +1,45 @@
+INFO:     Started server process [216643]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:3000 (Press CTRL+C to quit)
+INFO:     127.0.0.1:38176 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38178 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49882 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49886 - "HEAD /assets/index-C97L2uzX.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49894 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42132 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42132 - "GET /assets/index-C97L2uzX.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "GET /assets/index-DjZlDhop.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42132 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58032 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:42142 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58026 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35338 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35338 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35348 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35348 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35348 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38214 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38218 - "HEAD /assets/index-CFkT05Z-.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:38232 - "HEAD /assets/index-BQP9O2dW.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54638 - "GET /api/v1/auth/captcha HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54646 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:47206 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41232 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41232 - "GET /assets/index-nCBbOX4x.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41242 - "GET /assets/index-CFkT05Z-.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41242 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41232 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:41232 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:44276 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39476 - "GET / HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39476 - "GET /assets/index-sSL6y8AG.js HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "GET /assets/index-CFkT05Z-.css HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39476 - "GET /favicon.ico HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:39490 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54354 - "POST /api/welcom/opc_world HTTP/1.1" 200 OK

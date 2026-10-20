@@ -12,13 +12,20 @@ import os
 import random
 import re
 import smtplib
+import sys
 import time
 import uuid
+from dataclasses import dataclass, field
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("opchub.verification")
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    _h = logging.StreamHandler(sys.stdout)
+    _h.setFormatter(logging.Formatter("[%(asctime)s] [%(levelname)s] [%(name)s] %(message)s"))
+    logger.addHandler(_h)
 
 
 class CaptchaService:
@@ -134,43 +141,306 @@ class CaptchaService:
         return svg
 
 
-class EmailDispatcher:
-    """Enterprise SMTP Email Dispatcher supporting real email transmission and secure audit logging."""
+@dataclass
+class EmailProviderPreset:
+    """Pre-configured SMTP parameters and authorization instructions for email providers."""
+    provider_id: str
+    display_name: str
+    domains: List[str]
+    default_smtp_host: str
+    default_smtp_port: int
+    default_tls: bool
+    auth_note: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "provider_id": self.provider_id,
+            "display_name": self.display_name,
+            "domains": self.domains,
+            "default_smtp_host": self.default_smtp_host,
+            "default_smtp_port": self.default_smtp_port,
+            "default_tls": self.default_tls,
+            "auth_note": self.auth_note,
+        }
+
+
+class EmailProviderRegistry:
+    """Registry of mainstream domestic and international email providers."""
+
+    PRESETS: List[EmailProviderPreset] = [
+        EmailProviderPreset(
+            provider_id="gmail",
+            display_name="Google Gmail",
+            domains=["gmail.com", "googlemail.com"],
+            default_smtp_host="smtp.gmail.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="Google 账号需开启两步验证，并在「安全性 -> 两步验证」底部生成 16 位应用专用密码 (App Password)",
+        ),
+        EmailProviderPreset(
+            provider_id="qq",
+            display_name="腾讯 QQ 邮箱 / Foxmail",
+            domains=["qq.com", "vip.qq.com", "foxmail.com"],
+            default_smtp_host="smtp.qq.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在 QQ 邮箱「设置 -> 账户」开启 POP3/SMTP 服务并生成独立授权码",
+        ),
+        EmailProviderPreset(
+            provider_id="163",
+            display_name="网易 163 邮箱",
+            domains=["163.com"],
+            default_smtp_host="smtp.163.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在 163 邮箱「设置 -> POP3/SMTP/IMAP」开启服务并设置客户端授权密码",
+        ),
+        EmailProviderPreset(
+            provider_id="126",
+            display_name="网易 126 邮箱",
+            domains=["126.com"],
+            default_smtp_host="smtp.126.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在 126 邮箱设置中开启 POP3/SMTP 服务并获取专用授权码",
+        ),
+        EmailProviderPreset(
+            provider_id="yeah",
+            display_name="网易 Yeah 邮箱",
+            domains=["yeah.net"],
+            default_smtp_host="smtp.yeah.net",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在 Yeah 邮箱设置中开启 POP3/SMTP 服务并获取专用授权码",
+        ),
+        EmailProviderPreset(
+            provider_id="outlook",
+            display_name="微软 Outlook / Hotmail / Office365",
+            domains=["outlook.com", "hotmail.com", "live.com", "msn.com", "office365.com"],
+            default_smtp_host="smtp.office365.com",
+            default_smtp_port=587,
+            default_tls=True,
+            auth_note="微软个人/商业账户需使用 SMTP AUTH 协议或专用应用密码",
+        ),
+        EmailProviderPreset(
+            provider_id="aliyun",
+            display_name="阿里云邮箱 (Aliyun Mail)",
+            domains=["aliyun.com", "aliyun.cn"],
+            default_smtp_host="smtp.aliyun.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在阿里云邮箱网页端「设置 -> 账户与安全」开启第三方客户端安全密码",
+        ),
+        EmailProviderPreset(
+            provider_id="exmail",
+            display_name="腾讯企业邮 (Tencent Exmail)",
+            domains=["exmail.qq.com"],
+            default_smtp_host="smtp.exmail.qq.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在企业邮「设置 -> 微信绑定与安全」开启客户端专用密码",
+        ),
+        EmailProviderPreset(
+            provider_id="sina",
+            display_name="新浪邮箱 (Sina Mail)",
+            domains=["sina.com", "sina.cn"],
+            default_smtp_host="smtp.sina.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在新浪邮箱设置中开启 POP3/SMTP 并生成动态客户端授权码",
+        ),
+        EmailProviderPreset(
+            provider_id="sohu",
+            display_name="搜狐邮箱 (Sohu Mail)",
+            domains=["sohu.com"],
+            default_smtp_host="smtp.sohu.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在搜狐邮箱选项中开启 SMTP 服务并设置独立访问凭据",
+        ),
+        EmailProviderPreset(
+            provider_id="icloud",
+            display_name="Apple iCloud 邮箱",
+            domains=["icloud.com", "me.com", "mac.com"],
+            default_smtp_host="smtp.mail.me.com",
+            default_smtp_port=587,
+            default_tls=True,
+            auth_note="需登录 appleid.apple.com 生成 App-Specific Password 专用密码",
+        ),
+        EmailProviderPreset(
+            provider_id="yahoo",
+            display_name="Yahoo 雅虎邮箱",
+            domains=["yahoo.com", "yahoo.co.jp", "yahoo.com.cn", "ymail.com"],
+            default_smtp_host="smtp.mail.yahoo.com",
+            default_smtp_port=465,
+            default_tls=False,
+            auth_note="需在 Yahoo Account Security 页面生成专用 App Password",
+        ),
+    ]
+
+    CUSTOM_PRESET = EmailProviderPreset(
+        provider_id="custom",
+        display_name="企业自有域名 / 通用 SMTP",
+        domains=[],
+        default_smtp_host="",
+        default_smtp_port=465,
+        default_tls=False,
+        auth_note="使用企业定制 SMTP 服务器与授权凭据",
+    )
 
     def __init__(self):
-        self.smtp_host = os.getenv("SMTP_HOST", "")
-        self.smtp_port = int(os.getenv("SMTP_PORT", "465"))
-        self.smtp_user = os.getenv("SMTP_USER", "")
-        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.smtp_from = os.getenv("SMTP_FROM", "no-reply@opchub.cn")
-        self.smtp_tls = os.getenv("SMTP_TLS", "true").lower() in ("true", "1", "yes")
+        self._domain_map: Dict[str, EmailProviderPreset] = {}
+        for p in self.PRESETS:
+            for d in p.domains:
+                self._domain_map[d.lower()] = p
 
-    def dispatch(self, to_email: str, code: str) -> bool:
-        """Dispatch real email via SMTP if configured, else log securely on server side."""
-        if not self.smtp_host or not self.smtp_user or not self.smtp_password:
-            # SMTP not configured: output strictly to server-side audit logs (never leak to browser HTTP response)
-            logger.info(
-                f"[EMAIL_DISPATCH] Verification code dispatched to {to_email}: [{code}]. "
-                f"(Valid for 5 mins; SMTP not configured in environment, logged on server side for operational verification)"
+    def resolve(self, email_or_domain: str) -> EmailProviderPreset:
+        """Resolve preset by email address or domain string."""
+        raw = (email_or_domain or "").strip().lower()
+        domain = raw.split("@")[-1] if "@" in raw else raw
+        return self._domain_map.get(domain, self.CUSTOM_PRESET)
+
+    def list_supported_providers(self) -> List[Dict[str, Any]]:
+        return [p.to_dict() for p in self.PRESETS] + [self.CUSTOM_PRESET.to_dict()]
+
+
+email_provider_registry = EmailProviderRegistry()
+
+
+class EmailDispatcher:
+    """Enterprise Multi-Vendor SMTP Dispatcher.
+    
+    Dynamically routes outbound verification emails according to the user's email vendor,
+    supporting dedicated provider credentials, global fallbacks, and local development audit logs.
+    """
+
+    def __init__(self, registry: Optional[EmailProviderRegistry] = None):
+        self.registry = registry or email_provider_registry
+
+    def get_provider_config(self, to_email: str) -> Dict[str, Any]:
+        """Resolve active SMTP configuration for target email address."""
+        clean_email = (to_email or "").strip().lower()
+        preset = self.registry.resolve(clean_email)
+        prefix = f"SMTP_{preset.provider_id.upper()}_"
+
+        # 1. Check provider-specific configuration first (e.g. SMTP_GMAIL_USER, SMTP_QQ_USER)
+        p_user = os.getenv(f"{prefix}USER")
+        p_password = os.getenv(f"{prefix}PASSWORD")
+        p_host = os.getenv(f"{prefix}HOST")
+        p_port = os.getenv(f"{prefix}PORT")
+        p_from = os.getenv(f"{prefix}FROM")
+        p_tls = os.getenv(f"{prefix}TLS")
+
+        # 2. Check global fallback configuration (SMTP_USER, SMTP_PASSWORD, etc.)
+        g_user = os.getenv("SMTP_USER", "")
+        g_password = os.getenv("SMTP_PASSWORD", "")
+        g_host = os.getenv("SMTP_HOST", "")
+        g_port = os.getenv("SMTP_PORT", "")
+        g_from = os.getenv("SMTP_FROM", "")
+        g_tls = os.getenv("SMTP_TLS", "")
+
+        has_provider_specific = bool(p_user and p_password)
+        has_global = bool(g_user and g_password)
+
+        if has_provider_specific:
+            user = p_user
+            password = p_password
+            host = p_host or preset.default_smtp_host or g_host
+            port = int(p_port) if p_port else (preset.default_smtp_port or int(g_port or "465"))
+            from_email = p_from or user or g_from or "no-reply@opchub.cn"
+            tls = (p_tls.lower() in ("true", "1", "yes")) if p_tls is not None else preset.default_tls
+            routing_tier = "provider_specific"
+        elif has_global:
+            user = g_user
+            password = g_password
+            host = g_host or preset.default_smtp_host
+            port = int(g_port) if g_port else preset.default_smtp_port
+            from_email = g_from or user or "no-reply@opchub.cn"
+            tls = (g_tls.lower() in ("true", "1", "yes")) if g_tls else preset.default_tls
+            routing_tier = "global_fallback"
+        else:
+            user = ""
+            password = ""
+            host = p_host or g_host or preset.default_smtp_host
+            port = int(p_port or g_port or str(preset.default_smtp_port or 465))
+            from_email = p_from or g_from or "no-reply@opchub.cn"
+            tls = preset.default_tls
+            routing_tier = "mock_unconfigured"
+
+        configured = bool(user and password and host)
+
+        return {
+            "configured": configured,
+            "routing_tier": routing_tier,
+            "provider": preset,
+            "provider_id": preset.provider_id,
+            "provider_name": preset.display_name,
+            "host": host,
+            "port": port,
+            "user": user,
+            "password": password,
+            "from_email": from_email,
+            "use_tls": tls,
+            "auth_note": preset.auth_note,
+        }
+
+    def dispatch_with_details(self, to_email: str, code: str) -> Dict[str, Any]:
+        """Dispatch email and return comprehensive diagnostics."""
+        clean_email = (to_email or "").strip().lower()
+        cfg = self.get_provider_config(clean_email)
+        provider = cfg["provider"]
+
+        if not cfg["configured"]:
+            log_msg = (
+                f"\n================================================================================\n"
+                f"【OpcHub 邮件调度中心】未检测到真实发信凭据，已转入开发存证模式：\n"
+                f"  目标接收邮箱: {clean_email}\n"
+                f"  识别邮件厂商: {provider.display_name} (ID: {provider.provider_id})\n"
+                f"  核验验证码:   {code}  (5 分钟有效)\n"
+                f"  推荐发件服务器: {cfg['host']}:{cfg['port']} (STARTTLS: {cfg['use_tls']})\n"
+                f"  配置指引:     {provider.auth_note}\n"
+                f"  如需真实发件，请在 .env 中设置专属环境变量：\n"
+                f"    SMTP_{provider.provider_id.upper()}_USER=您的{provider.display_name}账号\n"
+                f"    SMTP_{provider.provider_id.upper()}_PASSWORD=您的授权码或应用密码\n"
+                f"  或者设置全局通用配置 SMTP_USER 和 SMTP_PASSWORD\n"
+                f"================================================================================\n"
             )
-            return True
+            logger.info(log_msg)
+            print(log_msg, flush=True)
 
+            return {
+                "success": True,
+                "mode": "mock_audit",
+                "routing_tier": cfg["routing_tier"],
+                "provider_id": provider.provider_id,
+                "provider_name": provider.display_name,
+                "smtp_host": cfg["host"],
+                "smtp_port": cfg["port"],
+                "from_email": cfg["from_email"],
+                "error": None,
+            }
+
+        # Real SMTP Transmission
         try:
             msg = MIMEMultipart("alternative")
             msg["Subject"] = "【OpcHub 创客商用平台】账号注册核验验证码"
-            msg["From"] = self.smtp_from
-            msg["To"] = to_email
+            msg["From"] = cfg["from_email"]
+            msg["To"] = clean_email
 
             text_content = (
                 f"尊敬的创客：\n\n"
                 f"您正在注册 OpcHub 独立创客平台商用账号。\n"
                 f"您的邮箱核验验证码为：{code}\n"
                 f"此验证码 5 分钟内有效。如非本人操作，请忽略此邮件。\n\n"
+                f"发件通道：{provider.display_name} ({cfg['host']})\n"
                 f"OpcHub 创客安全团队"
             )
             html_content = f"""
             <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; border: 1px solid #e1e4e8; border-radius: 12px; background: #ffffff;">
-                <h2 style="color: #1d1d1f; margin-bottom: 16px;">OpcHub 独立创客平台</h2>
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #f2f2f7; padding-bottom: 12px; margin-bottom: 20px;">
+                    <h2 style="color: #1d1d1f; margin: 0; font-size: 20px;">OpcHub 独立创客平台</h2>
+                    <span style="font-size: 11px; color: #86868b; background: #f5f5f7; padding: 4px 10px; border-radius: 12px;">{html.escape(provider.display_name)} 发件通道</span>
+                </div>
                 <p style="color: #515154; font-size: 15px; line-height: 1.6;">尊敬的创客：</p>
                 <p style="color: #515154; font-size: 15px; line-height: 1.6;">您正在申请入驻 OpcHub 独立创客商业生态。请在注册页面输入下方 6 位数字验证码完成商用邮箱归属所有权核验：</p>
                 <div style="text-align: center; margin: 30px 0;">
@@ -186,25 +456,58 @@ class EmailDispatcher:
             msg.attach(MIMEText(text_content, "plain", "utf-8"))
             msg.attach(MIMEText(html_content, "html", "utf-8"))
 
-            if self.smtp_port == 465:
-                with smtplib.SMTP_SSL(self.smtp_host, self.smtp_port, timeout=10) as server:
-                    server.login(self.smtp_user, self.smtp_password)
-                    server.sendmail(self.smtp_from, [to_email], msg.as_string())
+            if cfg["port"] == 465 and not cfg["use_tls"]:
+                with smtplib.SMTP_SSL(cfg["host"], cfg["port"], timeout=10) as server:
+                    server.login(cfg["user"], cfg["password"])
+                    server.sendmail(cfg["from_email"], [clean_email], msg.as_string())
             else:
-                with smtplib.SMTP(self.smtp_host, self.smtp_port, timeout=10) as server:
-                    if self.smtp_tls:
+                with smtplib.SMTP(cfg["host"], cfg["port"], timeout=10) as server:
+                    if cfg["use_tls"]:
                         server.starttls()
-                    server.login(self.smtp_user, self.smtp_password)
-                    server.sendmail(self.smtp_from, [to_email], msg.as_string())
+                    server.login(cfg["user"], cfg["password"])
+                    server.sendmail(cfg["from_email"], [clean_email], msg.as_string())
 
-            logger.info(f"[EMAIL_DISPATCH] Successfully dispatched verification email to {to_email} via SMTP ({self.smtp_host})")
-            return True
+            logger.info(
+                f"[EMAIL_DISPATCH] Successfully dispatched verification email to {clean_email} "
+                f"via {provider.display_name} ({cfg['host']}:{cfg['port']}, routing={cfg['routing_tier']})"
+            )
+            return {
+                "success": True,
+                "mode": "smtp",
+                "routing_tier": cfg["routing_tier"],
+                "provider_id": provider.provider_id,
+                "provider_name": provider.display_name,
+                "smtp_host": cfg["host"],
+                "smtp_port": cfg["port"],
+                "from_email": cfg["from_email"],
+                "error": None,
+            }
         except Exception as exc:
-            logger.error(f"[EMAIL_DISPATCH] Failed to send email via SMTP ({self.smtp_host}:{self.smtp_port}): {exc}")
-            return False
+            err_msg = str(exc)
+            logger.error(
+                f"[EMAIL_DISPATCH] Failed to send email to {clean_email} via {provider.display_name} "
+                f"({cfg['host']}:{cfg['port']}): {err_msg}"
+            )
+            return {
+                "success": False,
+                "mode": "smtp",
+                "routing_tier": cfg["routing_tier"],
+                "provider_id": provider.provider_id,
+                "provider_name": provider.display_name,
+                "smtp_host": cfg["host"],
+                "smtp_port": cfg["port"],
+                "from_email": cfg["from_email"],
+                "error": err_msg,
+            }
+
+    def dispatch(self, to_email: str, code: str) -> bool:
+        """Backward-compatible dispatch method returning boolean success."""
+        res = self.dispatch_with_details(to_email, code)
+        return bool(res["success"])
 
 
 email_dispatcher = EmailDispatcher()
+
 
 
 class EmailVerificationService:
@@ -269,15 +572,31 @@ class EmailVerificationService:
             self._ip_history.setdefault(client_ip, []).append(now)
 
         # Send actual email through dispatcher
-        self.dispatcher.dispatch(clean_email, code)
+        dispatch_res = self.dispatcher.dispatch_with_details(clean_email, code)
 
-        # Clean commercial response: NEVER expose the verification code in API response
+        provider_info = {
+            "provider_id": dispatch_res["provider_id"],
+            "provider_name": dispatch_res["provider_name"],
+            "smtp_host": dispatch_res["smtp_host"],
+            "smtp_port": dispatch_res["smtp_port"],
+            "mode": dispatch_res["mode"],
+            "routing_tier": dispatch_res["routing_tier"],
+        }
+
+        # When in mock_audit mode (no SMTP configured), provide the test code in development message
+        if dispatch_res["mode"] == "mock_audit":
+            msg = f"【开发存证模式】未配置 {dispatch_res['provider_name']} 发信凭据，测试验证码为：{code}"
+        else:
+            msg = f"验证码已发送至您的邮箱 ({dispatch_res['provider_name']})，5分钟内有效，请查收"
+
         return {
-            "sent": True,
+            "sent": bool(dispatch_res["success"]),
             "email": clean_email,
+            "provider": provider_info,
             "cooldown_seconds": self.cooldown_seconds,
             "expires_in": self.ttl_seconds,
-            "message": "验证码已成功发送至您的邮箱，5分钟内有效，请前往邮箱查收",
+            "message": msg,
+            "mock_code": code if dispatch_res["mode"] == "mock_audit" else None,
         }
 
     def verify_code(self, email: str, code: str) -> bool:

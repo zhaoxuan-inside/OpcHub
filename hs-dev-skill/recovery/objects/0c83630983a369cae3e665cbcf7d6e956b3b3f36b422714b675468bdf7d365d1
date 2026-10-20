@@ -1,0 +1,28 @@
+{
+  "values": {
+    "execution": {
+      "mode": "stage"
+    },
+    "index": {
+      "memory_bytes": 200000000,
+      "lru_bytes": 48000000,
+      "resident_bytes": 16000000,
+      "sqlite_cache_kib": 24000,
+      "max_file_bytes": 2000000,
+      "max_results": 100
+    },
+    "retention": {
+      "hours": 48,
+      "tasks": 5,
+      "snapshots": 5
+    },
+    "trace": {
+      "enabled": false
+    }
+  },
+  "sources": {
+    "execution.mode": "project"
+  },
+  "task_id": "20261018_115550_668601",
+  "resolved_at": "2026-10-18T11:55:50.676076Z"
+}

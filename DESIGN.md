@@ -1,4 +1,4 @@
-# OpcHub Project Design Charter (DESIGN.md)
+# 晨昏线外 (Beyond Terminator) Design Charter (DESIGN.md)
 
 > **Document Type**: Project-level Macro Product Taste & Design System Charter  
 > **Aesthetic Direction**: **Apple VisionOS Liquid Glass & iA Writer Minimalist Editorial** (晶莹液态玻璃折射、空间呼吸弥散、极简排版、零廉价图标、克制高信噪比)  

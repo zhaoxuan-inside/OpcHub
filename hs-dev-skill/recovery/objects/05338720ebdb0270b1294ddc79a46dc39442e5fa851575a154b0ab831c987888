@@ -1,0 +1,29 @@
+# ==============================================================================
+# OpcHub Environment Variables Template
+# Copy this file to .env and fill in your custom credentials.
+# ==============================================================================
+
+# Server Network Configuration (consumed via config.py server.host / server.port)
+OPCHUB_SERVER_HOST=0.0.0.0
+OPCHUB_SERVER_PORT=8000
+
+# SiliconFlow (硅基流动) AI Inference API Key (Optional: Leave empty for local mock)
+SILICONFLOW_API_KEY=
+
+# WeChat Pay V3 Secret Key (Optional: Leave empty for local mock)
+WECHAT_PAY_V3_KEY=
+
+# Stripe Connect Secret Key (Optional: Leave empty for local mock)
+STRIPE_SECRET_KEY=
+
+# Database Configuration (PostgreSQL 18 - pgsql-18)
+POSTGRES_HOST=127.0.0.1
+POSTGRES_PORT=5432
+POSTGRES_DB=opchub
+POSTGRES_USER=opchub
+POSTGRES_PASSWORD=1qaz@WSX
+# Note: '@' in password is URL-encoded as '%40' for asyncpg/SQLAlchemy connection URLs
+DATABASE_URL=postgresql+asyncpg://opchub:1qaz%40WSX@127.0.0.1:5432/opchub
+
+# Aliyun Content Moderation (Green) Endpoint (Points to dedicated HTTP Mock Service in dev/test)
+ALIYUN_GREEN_ENDPOINT=http://127.0.0.1:8099

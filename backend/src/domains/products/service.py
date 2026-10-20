@@ -39,6 +39,29 @@ class ProductService:
         domain_persistence.write("products.items", pid, product)
         return product
 
+    def validate_publish_payload(self, inputs: dict) -> dict:
+        title = inputs.get("title", "").strip()
+        tagline = inputs.get("tagline", "").strip()
+        desc = inputs.get("description", "").strip()
+        price = float(inputs.get("price_cny", 0.0))
+        if len(title) < 2:
+            raise ValueError("Product title must be at least 2 characters long")
+        if len(tagline) < 5 and len(desc) < 5:
+            raise ValueError("Product tagline or description must be at least 5 characters long")
+        if price < 0:
+            raise ValueError("Product price cannot be negative")
+        return {
+            "guard_passed": True,
+            "title": title,
+            "tagline": tagline,
+            "description": desc or tagline,
+            "category": inputs.get("category", "DEV"),
+            "pricing_model": inputs.get("pricing_model", "FREE" if price == 0 else "ONE_TIME"),
+            "price_cny": price,
+            "demo_url": inputs.get("demo_url", ""),
+            "author_id": inputs.get("author_id", ""),
+        }
+
     def list_products(self, category: Optional[str] = None) -> List[ProductResponse]:
         products = list(self._products.values())
         if category:

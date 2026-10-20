@@ -1339,25 +1339,13 @@
          VIEW 2: 交流论坛 (Forum / Tieba Style)
          ========================================== -->
     <div id="view-forum" class="view-panel">
-      <div class="glass-box" style="padding: 24px 32px 16px;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">头脑风暴</h1>
-            <p style="font-size: 13px; color: var(--text-secondary);">超级个体灵感碰撞 · 独立出海答疑 · 经验踩坑互助</p>
-          </div>
-          <div style="display: flex; align-items: center; gap: 12px;">
-            <span id="forumThreadPipelineBadge" class="mono-tag" style="background: var(--accent-glass); color: var(--accent);">实战交流讨论区</span>
-            <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在头脑风暴发起新实战经验与商业讨论帖">
-              <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
-              <span>发帖</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
       <div class="forum-container">
         <!-- Left: Brainstorm Categories -->
         <div class="glass-box" style="padding: 20px;">
+          <button class="btn-liquid" onclick="openPostModal()" data-tooltip="在头脑风暴发起新实战经验与商业讨论帖" style="width: 100%; margin-bottom: 16px; justify-content: center;">
+            <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+            <span>发起新风暴</span>
+          </button>
           <div style="font-size: 12px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 12px;">BRAINSTORM THEMES</div>
           <div class="bar-list-item active">全部风暴区 <span>1,280</span></div>
           <div class="bar-list-item">工商财税 <span>420</span></div>
@@ -3663,13 +3651,25 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
 
         <!-- Industry Track Selection -->
         <div>
-          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">意向业务赛道 (有助于定制工作台)</label>
+          <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">意向业务赛道</label>
           <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             <span class="track-pill active" onclick="selectTrack(this, 'AI原生应用与智能体')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--accent-glass); border: 1px solid var(--accent); color: var(--text-primary); cursor: pointer;">AI 原生应用与智能体</span>
             <span class="track-pill" onclick="selectTrack(this, '出海SaaS与独立开发')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">出海 SaaS 与独立开发</span>
             <span class="track-pill" onclick="selectTrack(this, '跨境电商与数字贸易')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">跨境电商与数字贸易</span>
             <span class="track-pill" onclick="selectTrack(this, '智能软硬件与IoT')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">智能软硬件与 IoT</span>
             <span class="track-pill" onclick="selectTrack(this, '咨询与数字创意服务')" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">咨询与数字创意服务</span>
+            <span id="customTrackPill" class="track-pill" onclick="enableCustomTrack(this)" style="font-size: 11px; padding: 3px 9px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary); cursor: pointer;">+ 自定义</span>
+          </div>
+          <div id="regCustomTrackContainer" style="display: none; margin-top: 8px;">
+            <input
+              type="text"
+              id="regCustomTrackInput"
+              class="glass-input"
+              placeholder="请输入自定义业务赛道名称（如：数字游民、私域电商、独立游戏等）"
+              maxlength="40"
+              style="width: 100%; box-sizing: border-box; font-size: 12px; padding: 6px 10px;"
+              oninput="onCustomTrackInput(this)"
+            />
           </div>
         </div>
 
@@ -3784,7 +3784,6 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       <div style="margin-top: 20px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
           <h3 style="font-size: 16px; font-weight: 600; margin: 0;">多级嵌套问答 (<span id="detailCommentCount">0</span>)</h3>
-          <span style="font-size: 11.5px; color: var(--text-tertiary); font-family: var(--font-mono);">物化路径树 Materialized Path</span>
         </div>
         <div id="threadCommentsTreeContainer" style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 18px;">
           <!-- Rendered dynamically -->
@@ -3798,7 +3797,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           </div>
           <textarea class="glass-textarea" id="newCommentInput" rows="2" placeholder="发表实战见解或追问细节..."></textarea>
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
-            <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">微内核自动执行敏感词防御与入库</span>
+            <span style="font-size: 11px; color: var(--text-tertiary);">社区合规与内容安全保护</span>
             <button class="btn-liquid" onclick="submitCommentFromModal()" data-tooltip="发表评论"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>回复</button>
           </div>
         </div>
@@ -4425,8 +4424,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
               <div style="font-size: 13px; color: var(--text-secondary); line-height: 1.5; margin-bottom: 8px;">
                 ${escapeHtml(node.content)}
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11.5px; font-family: var(--font-mono); color: var(--text-tertiary);">
-                <span>物化路径: ${escapeHtml(node.materialized_path || '')}</span>
+              <div style="display: flex; justify-content: flex-end; align-items: center; font-size: 11.5px; font-family: var(--font-mono); color: var(--text-tertiary);">
                 <button class="btn-liquid-outline" style="padding: 2px 8px; font-size: 11px;" onclick="replyToComment('${node.id}', '${escapeHtml(node.author_id)}')">
                   回复
                 </button>
@@ -5921,8 +5919,14 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       }
     }
 
+    let regIsCustomTrack = false;
+
     function selectTrack(el, trackName) {
+      regIsCustomTrack = false;
       regSelectedIndustryTrack = trackName;
+      const customContainer = document.getElementById('regCustomTrackContainer');
+      if (customContainer) customContainer.style.display = 'none';
+
       document.querySelectorAll('.track-pill').forEach(pill => {
         pill.style.background = 'var(--glass-surface-subtle)';
         pill.style.border = '1px solid var(--glass-border-subtle)';
@@ -5932,6 +5936,34 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         el.style.background = 'var(--accent-glass)';
         el.style.border = '1px solid var(--accent)';
         el.style.color = 'var(--text-primary)';
+      }
+    }
+
+    function enableCustomTrack(el) {
+      regIsCustomTrack = true;
+      const customContainer = document.getElementById('regCustomTrackContainer');
+      const customInput = document.getElementById('regCustomTrackInput');
+      if (customContainer) customContainer.style.display = 'block';
+
+      document.querySelectorAll('.track-pill').forEach(pill => {
+        pill.style.background = 'var(--glass-surface-subtle)';
+        pill.style.border = '1px solid var(--glass-border-subtle)';
+        pill.style.color = 'var(--text-secondary)';
+      });
+      if (el) {
+        el.style.background = 'var(--accent-glass)';
+        el.style.border = '1px solid var(--accent)';
+        el.style.color = 'var(--text-primary)';
+      }
+      if (customInput) {
+        regSelectedIndustryTrack = customInput.value.trim();
+        customInput.focus();
+      }
+    }
+
+    function onCustomTrackInput(input) {
+      if (regIsCustomTrack) {
+        regSelectedIndustryTrack = input.value.trim();
       }
     }
 
@@ -6246,6 +6278,15 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       if ((regSelectedAccountType === 'OPC' || regSelectedAccountType === 'ENTERPRISE') && !company) {
         if (errBox) {
           errBox.textContent = '一人公司或企业主体入驻，请填写完整的工作室或企业名称';
+          errBox.style.display = 'block';
+        }
+        return;
+      }
+
+      // 6. Custom track validation
+      if (regIsCustomTrack && !regSelectedIndustryTrack) {
+        if (errBox) {
+          errBox.textContent = '请填写您的自定义业务赛道名称';
           errBox.style.display = 'block';
         }
         return;

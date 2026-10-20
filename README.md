@@ -1,4 +1,5 @@
-# opchub
+# 晨昏线外 (Beyond Terminator)
+> 一人公司与超级个体商业操作系统 · One Person Company (OPC) Commercial OS
 
 ### 2026-10-16 初版想法实现
 

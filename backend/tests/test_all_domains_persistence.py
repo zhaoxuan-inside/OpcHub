@@ -141,11 +141,9 @@ def seed_persistence_dependencies():
 async def test_home_overview_api():
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        data = await _data(ac, "home.overview", {})
-        assert "active_makers_count" in data
-        assert data["active_makers_count"] >= 0
-        assert "active_dags_count" in data
-        assert len(data["quick_links"]) >= 6
+        res = await _gw(ac, "home.overview", {})
+        body = res.json()
+        assert body["code"] == 404
 
 
 @pytest.mark.asyncio

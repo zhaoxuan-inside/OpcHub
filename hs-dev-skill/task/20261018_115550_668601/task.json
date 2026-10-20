@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "task_id": "20261018_115550_668601",
+  "title": "增强框架热重载与版本化动态加载能力",
+  "created_at": "2026-10-18T11:55:50.672560Z",
+  "status": "ACTIVE",
+  "activities": [
+    "A1",
+    "B1",
+    "E1",
+    "G1",
+    "G2",
+    "G3",
+    "G4"
+  ],
+  "current_activity": "A1",
+  "approvals": {},
+  "verification": null,
+  "mode": "stage",
+  "updated_at": "2026-10-18T11:56:31.683457Z",
+  "snapshot_id": "20261018_115550_927150"
+}

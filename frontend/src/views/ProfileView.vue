@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="view-panel active" style="width: 100%;">
     <div style="margin-bottom: 24px;">
       <h1 style="font-size: 26px; font-weight: 800; color: var(--text-primary); margin-bottom: 6px;">
         创客商用档案与独立工作台
@@ -24,6 +24,15 @@
         <div style="display: inline-block; padding: 4px 12px; border-radius: 12px; background: rgba(0, 113, 227, 0.15); color: #0071E3; font-size: 12px; font-weight: 600;">
           {{ profile.tier_name || '标准创客' }} · {{ profile.account_type || 'MAKER' }}
         </div>
+        <div style="margin-top: 18px;">
+          <button
+            class="btn-liquid-outline"
+            style="width: 100%; font-size: 12px; color: #ff453a; border-color: rgba(255, 69, 58, 0.3);"
+            @click="$emit('logout')"
+          >
+            退出创客登录
+          </button>
+        </div>
       </div>
 
       <!-- Commercial Credentials -->
@@ -45,9 +54,67 @@
             </div>
           </div>
           <div>
-            <span style="color: var(--text-tertiary);">主营业务赛道:</span>
-            <div style="font-weight: 600; color: var(--text-primary); margin-top: 2px;">
-              {{ profile.industry_track || '独立软件全栈开发' }}
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+              <span style="color: var(--text-tertiary);">主营业务赛道:</span>
+              <button
+                class="btn-liquid-outline"
+                style="padding: 2px 8px; font-size: 11px; height: 22px;"
+                @click="toggleEditTrack"
+              >
+                {{ isEditingTrack ? '取消' : '修改赛道' }}
+              </button>
+            </div>
+
+            <div v-if="!isEditingTrack" style="font-weight: 600; color: var(--text-primary); margin-top: 4px;">
+              {{ profile.industry_track || '未设置 (默认: 独立软件全栈开发)' }}
+            </div>
+
+            <div v-else style="margin-top: 8px; padding: 10px; border-radius: 8px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle);">
+              <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 6px;">选择预设或输入自定义赛道：</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px;">
+                <span
+                  v-for="t in presetTracks"
+                  :key="t"
+                  class="track-pill"
+                  :style="editTrack === t && !editIsCustom ? { background: 'var(--accent-glass)', border: '1px solid var(--accent)', color: 'var(--text-primary)' } : { background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border-subtle)', color: 'var(--text-secondary)' }"
+                  style="font-size: 10.5px; padding: 2px 7px; border-radius: 10px; cursor: pointer; transition: all 0.2s;"
+                  @click="selectEditPreset(t)"
+                >
+                  {{ t }}
+                </span>
+                <span
+                  class="track-pill"
+                  :style="editIsCustom ? { background: 'var(--accent-glass)', border: '1px solid var(--accent)', color: 'var(--text-primary)' } : { background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border-subtle)', color: 'var(--text-secondary)' }"
+                  style="font-size: 10.5px; padding: 2px 7px; border-radius: 10px; cursor: pointer; transition: all 0.2s;"
+                  @click="enableEditCustom"
+                >
+                  + 自定义
+                </span>
+              </div>
+              <div v-if="editIsCustom" style="margin-bottom: 8px;">
+                <input
+                  v-model="editCustomInput"
+                  type="text"
+                  class="glass-input"
+                  placeholder="请输入您的自定义赛道名称"
+                  maxlength="40"
+                  style="width: 100%; box-sizing: border-box; font-size: 11.5px; padding: 4px 8px;"
+                  @input="editTrack = editCustomInput.trim()"
+                />
+              </div>
+              <div v-if="trackSaveMsg" :style="{ color: trackSaveError ? '#ff453a' : '#30d158' }" style="font-size: 11px; margin-bottom: 6px;">
+                {{ trackSaveMsg }}
+              </div>
+              <div style="display: flex; gap: 6px;">
+                <button
+                  class="btn-liquid"
+                  style="padding: 3px 10px; font-size: 11px;"
+                  :disabled="savingTrack"
+                  @click="saveProfileTrack"
+                >
+                  {{ savingTrack ? '保存中...' : '保存赛道' }}
+                </button>
+              </div>
             </div>
           </div>
           <div>
@@ -69,7 +136,91 @@
 import { ref, onMounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 
+const emit = defineEmits(['toast', 'logout']);
+
 const profile = ref(null);
+const isEditingTrack = ref(false);
+const editTrack = ref('');
+const editIsCustom = ref(false);
+const editCustomInput = ref('');
+const savingTrack = ref(false);
+const trackSaveMsg = ref('');
+const trackSaveError = ref(false);
+
+const presetTracks = [
+  'AI 原生应用与智能体',
+  '出海 SaaS 与独立开发',
+  '跨境电商与数字贸易',
+  '智能软硬件与 IoT',
+  '咨询与数字创意服务',
+];
+
+function toggleEditTrack() {
+  isEditingTrack.value = !isEditingTrack.value;
+  trackSaveMsg.value = '';
+  if (isEditingTrack.value) {
+    const current = profile.value?.industry_track || '';
+    if (presetTracks.includes(current)) {
+      editTrack.value = current;
+      editIsCustom.value = false;
+      editCustomInput.value = '';
+    } else if (current) {
+      editTrack.value = current;
+      editIsCustom.value = true;
+      editCustomInput.value = current;
+    } else {
+      editTrack.value = presetTracks[0];
+      editIsCustom.value = false;
+      editCustomInput.value = '';
+    }
+  }
+}
+
+function selectEditPreset(t) {
+  editIsCustom.value = false;
+  editTrack.value = t;
+}
+
+function enableEditCustom() {
+  editIsCustom.value = true;
+  editTrack.value = editCustomInput.value.trim();
+}
+
+async function saveProfileTrack() {
+  trackSaveMsg.value = '';
+  trackSaveError.value = false;
+  const targetTrack = editIsCustom.value ? editCustomInput.value.trim() : editTrack.value.trim();
+  if (!targetTrack) {
+    trackSaveMsg.value = '赛道名称不能为空';
+    trackSaveError.value = true;
+    return;
+  }
+
+  savingTrack.value = true;
+  try {
+    const res = await dispatchGateway('user.profile.update', {
+      industry_track: targetTrack,
+    });
+    if (res.ok && res.data) {
+      if (profile.value) {
+        profile.value.industry_track = res.data.industry_track || targetTrack;
+      }
+      trackSaveMsg.value = '✓ 业务赛道已成功更新并持久化落盘！';
+      setTimeout(() => {
+        isEditingTrack.value = false;
+        trackSaveMsg.value = '';
+      }, 1200);
+    } else {
+      trackSaveMsg.value = res.error || '更新失败，请重试';
+      trackSaveError.value = true;
+    }
+  } catch (err) {
+    trackSaveMsg.value = '网络请求异常，保存失败';
+    trackSaveError.value = true;
+  } finally {
+    savingTrack.value = false;
+  }
+}
 
 async function loadProfile() {
   try {

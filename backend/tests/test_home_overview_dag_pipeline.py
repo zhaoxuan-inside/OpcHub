@@ -9,7 +9,7 @@ client = TestClient(app)
 
 
 def test_home_overview_dispatched_via_gateway():
-    """Verify that POST /api/welcom/opc_world for scenario 'home.overview' returns DAG orchestrated data."""
+    """Verify that scenario 'home.overview' is no longer registered in gateway routes and returns 404."""
     req = {
         "scenario": "home.overview",
         "version": "v1.0.0",
@@ -19,23 +19,8 @@ def test_home_overview_dispatched_via_gateway():
     resp = client.post("/api/welcom/opc_world", json=req)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["code"] == 200
-    assert data["scenario"] == "home.overview"
-    assert data["trace_id"] == "trc_test_home_001"
-
-    res_data = data["data"]
-    assert res_data["orchestrated_by"] == "OPC_HOME_OVERVIEW_PIPELINE"
-    assert "active_makers_count" in res_data
-    assert "quick_links" in res_data
-    assert len(res_data["quick_links"]) >= 7
-
-    # Check quick links contents
-    routes = [ql["route"] for ql in res_data["quick_links"]]
-    assert "forum" in routes
-    assert "product" in routes
-    assert "policy" in routes
-    assert "demand" in routes
-    assert "sop" in routes
+    assert data["code"] == 404
+    assert "Unknown scenario 'home.overview'" in data["message"]
 
 
 @pytest.mark.asyncio

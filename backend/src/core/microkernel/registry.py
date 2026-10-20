@@ -94,16 +94,17 @@ class AtomicRegistry:
 
         # 3. Invoice Tax Calculator
         async def invoice_tax_calc(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.core.config import settings
             income = float(inputs.get("quarterly_income", 0.0))
-            exempt = income <= 300000.0
-            tax_rate = 0.0 if exempt else 0.01
+            exempt = income <= settings.vat_exemption_quarterly_threshold
+            tax_rate = 0.0 if exempt else settings.vat_concessional_rate
             tax_payable = 0.0 if exempt else income * tax_rate
             return {
                 "quarterly_income": income,
                 "vat_exemption_eligible": exempt,
                 "applicable_tax_rate": tax_rate,
                 "estimated_tax_payable": tax_payable,
-                "legal_basis": "财政部 税务总局公告 2023年第12号 (小规模纳税人季度销售额30万元以下免征增值税)",
+                "legal_basis": settings.vat_legal_basis,
             }
         self.register("invoice_tax_calc", invoice_tax_calc, domain="policy", description="增值税小规模免征智能测算")
 
@@ -158,43 +159,40 @@ class AtomicRegistry:
         self.register("policy.qualify_guard", policy_qualify_guard, domain="policy", description="政策测算资质准入与参数归一化门禁")
 
         async def policy_calculate_tax(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.core.config import settings
             income = float(inputs.get("quarterly_income", 0.0))
-            is_exempt = income <= 300000.0
-            rate = 0.0 if is_exempt else 0.01
+            is_exempt = income <= settings.vat_exemption_quarterly_threshold
+            rate = 0.0 if is_exempt else settings.vat_concessional_rate
             tax = 0.0 if is_exempt else income * rate
             return {
                 "tax_calculated": True,
                 "is_vat_exempt": is_exempt,
                 "applicable_tax_rate": rate,
                 "estimated_tax_amount": tax,
-                "policy_citation": "财政部 税务总局公告 2023年第12号",
+                "policy_citation": settings.vat_legal_basis,
             }
         self.register("policy.calculate_tax", policy_calculate_tax, domain="policy", description="高精度增值税及综合税负试算算子")
 
-        async def policy_match_subsidies(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def match_subsidies_by_region(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：按创客主体与城市匹配政策扶持补贴"""
             from src.domains.policies.service import policy_service
             from src.domains.policies.models import PolicyMatchRequest
-            city = inputs.get("region") or inputs.get("city", "杭州")
-            maker_type = "INDIVIDUAL" if "INDIVIDUAL" in inputs.get("maker_type", "INDIVIDUAL") or "个体" in inputs.get("entity_type", "") else "OPC"
-            income = float(inputs.get("quarterly_income", 100000.0))
+            m_type = "INDIVIDUAL" if "INDIVIDUAL" in inputs.get("maker_type", "INDIVIDUAL") or "个体" in inputs.get("entity_type", "") else "OPC"
             req = PolicyMatchRequest(
-                quarterly_income=income,
-                maker_type=maker_type,
-                region=city,
+                quarterly_income=float(inputs.get("quarterly_income", 100000.0)),
+                maker_type=m_type,
+                region=inputs.get("region") or inputs.get("city", "杭州"),
             )
-            matched_resp = policy_service.match_policies(req)
+            resp = policy_service.match_policies(req)
+            policies = [p.model_dump() for p in resp.matched_policies]
             return {
-                "subsidies_matched": True,
-                "matched_count": len(matched_resp.matched_policies),
-                "matched_subsidies": [p.model_dump() for p in matched_resp.matched_policies],
-                "matched_policies": [p.model_dump() for p in matched_resp.matched_policies],
-                "estimated_tax_savings": matched_resp.estimated_tax_savings,
-                "explanation": matched_resp.explanation,
-                "eligible": matched_resp.eligible,
-                "applicable_tax_rate": matched_resp.applicable_tax_rate,
-                "legal_basis": matched_resp.legal_basis,
+                "subsidies_matched": True, "matched_count": len(policies),
+                "matched_subsidies": policies, "matched_policies": policies,
+                "estimated_tax_savings": resp.estimated_tax_savings, "explanation": resp.explanation,
+                "eligible": resp.eligible, "applicable_tax_rate": resp.applicable_tax_rate, "legal_basis": resp.legal_basis,
             }
-        self.register("policy.match_subsidies", policy_match_subsidies, domain="policy", description="根据地域主体匹配扶持补贴算子")
+        self.register("policy.match_subsidies", match_subsidies_by_region, domain="policy", description="根据地域主体匹配扶持补贴算子")
+        self.register("match_subsidies_by_region", match_subsidies_by_region, domain="policy", description="根据地域主体匹配扶持补贴算子")
 
         async def policy_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             if inputs.get("simulate_downstream_failure", False):
@@ -208,32 +206,25 @@ class AtomicRegistry:
         self.register("policy.telemetry.incr", policy_telemetry_incr, domain="policy", description="政策雷达智能测算与撮合检索度量打点算子")
 
         # Policy Publishing Operators
-        async def policy_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            title = inputs.get("title", "").strip()
-            summary = inputs.get("summary", "").strip()
-            legal_basis = inputs.get("legal_basis", "").strip()
-            if len(title) < 2:
-                raise ValueError("Policy title must be at least 2 characters long")
-            if len(summary) < 5:
-                raise ValueError("Policy summary must be at least 5 characters long")
-            if not legal_basis:
-                raise ValueError("legal_basis is required for government policy")
-            
-            # Moderation check via external HTTP moderation gateway
+        async def validate_publish_policy(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验发布政策合法性并做公文文本合规审查"""
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(f"{title} {summary} {legal_basis}", field_name="policy publish")
-            
+            t, s, l = inputs.get("title", "").strip(), inputs.get("summary", "").strip(), inputs.get("legal_basis", "").strip()
+            if len(t) < 2:
+                raise ValueError("Policy title must be at least 2 characters long")
+            if len(s) < 5:
+                raise ValueError("Policy summary must be at least 5 characters long")
+            if not l:
+                raise ValueError("legal_basis is required for government policy")
+            await check_content_safety(f"{t} {s} {l}", field_name="policy publish")
             return {
-                "guard_passed": True,
-                "title": title,
-                "summary": summary,
-                "legal_basis": legal_basis,
-                "policy_level": inputs.get("policy_level", "国家级"),
-                "category": inputs.get("category", "TAX"),
+                "guard_passed": True, "title": t, "summary": s, "legal_basis": l,
+                "policy_level": inputs.get("policy_level", "国家级"), "category": inputs.get("category", "TAX"),
                 "subsidy_amount_max": float(inputs.get("subsidy_amount_max", 0.0)),
                 "eligible_conditions": inputs.get("eligible_conditions", []),
             }
-        self.register("policy.publish.guard", policy_publish_guard, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
+        self.register("policy.publish.guard", validate_publish_policy, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
+        self.register("validate_publish_policy", validate_publish_policy, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
 
         async def policy_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.policies.service import policy_service
@@ -272,59 +263,32 @@ class AtomicRegistry:
 
 
         # Domain 2: SOP Document Domain (商事登记与合规文书生成微内核算子与 Saga 补偿)
-        async def sop_document_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def validate_sop_document_params(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验生成文书所需的模版有效性及表单数据敏感词合规"""
             from src.domains.sop.service import sop_service
-            template_id = inputs.get("template_id", "").strip()
-            if not template_id:
-                raise ValueError("template_id is required for document rendering")
-            try:
-                template = sop_service.get_template(template_id)
-            except KeyError:
-                raise KeyError(f"SOP template with ID {template_id} not found")
-
-            form_data = inputs.get("form_data") or {}
-            if not isinstance(form_data, dict):
-                form_data = {}
-
-            # Content moderation check on form data via external HTTP moderation gateway
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            full_text = " ".join(str(v) for v in form_data.values())
+            res = sop_service.validate_render_payload(inputs)
+            full_text = " ".join(str(v) for v in res["form_data"].values())
             await check_content_safety(full_text, field_name="SOP document form data")
+            return res
+        self.register("sop.document.validate_guard", validate_sop_document_params, domain="sop", description="合规文书模版准入与表单合规风控门禁")
+        self.register("validate_sop_document_params", validate_sop_document_params, domain="sop", description="合规文书模版准入与表单合规风控门禁")
 
-            return {
-                "guard_passed": True,
-                "template_id": template_id,
-                "template_name": template.name,
-                "user_id": inputs.get("user_id", ""),
-                "form_data": form_data,
-            }
-        self.register("sop.document.validate_guard", sop_document_validate_guard, domain="sop", description="合规文书模版准入与表单合规风控门禁")
-
-        async def sop_document_render_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def render_and_save_sop_document(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：仅负责按模版渲染并持久化合规文书"""
             from src.domains.sop.service import sop_service
             from src.domains.sop.models import SOPDocumentCreate
-            template_id = inputs.get("template_id", "").strip()
-            if not template_id:
-                raise ValueError("template_id is required for document rendering")
-            user_id = inputs.get("user_id", "")
-            form_data = inputs.get("form_data", {})
-            doc = sop_service.render_and_save_document(
-                SOPDocumentCreate(
-                    template_id=template_id,
-                    user_id=user_id,
-                    form_data=form_data,
-                )
+            payload = SOPDocumentCreate(
+                template_id=inputs.get("template_id", "").strip(),
+                user_id=inputs.get("user_id", ""),
+                form_data=inputs.get("form_data", {}),
             )
+            doc = sop_service.render_and_save_document(payload)
             return {
-                "sop_document_id": doc.id,
-                "doc_id": doc.id,
-                "document_title": doc.document_title,
-                "generated_text": doc.rendered_content,
-                "rendered_content": doc.rendered_content,
-                "compliance_passed": doc.compliance_passed,
-                "status": "READY",
-                "created_at": doc.created_at,
-                "created_doc": doc.model_dump(),
+                "sop_document_id": doc.id, "doc_id": doc.id, "document_title": doc.document_title,
+                "generated_text": doc.rendered_content, "rendered_content": doc.rendered_content,
+                "compliance_passed": doc.compliance_passed, "status": "READY",
+                "created_at": doc.created_at, "created_doc": doc.model_dump(),
             }
 
         async def sop_document_render_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -337,15 +301,21 @@ class AtomicRegistry:
 
         self.register(
             "sop.document.render_persist",
-            sop_document_render_persist,
+            render_and_save_sop_document,
             domain="sop",
             description="合规文书根据表单插值渲染并持久化存储算子",
             compensator=sop_document_render_compensate,
         )
-        # Register legacy handler alias
         self.register(
             "sop.render_document",
-            sop_document_render_persist,
+            render_and_save_sop_document,
+            domain="sop",
+            description="企业商事登记公文组装与流水号签发算子",
+            compensator=sop_document_render_compensate,
+        )
+        self.register(
+            "render_and_save_sop_document",
+            render_and_save_sop_document,
             domain="sop",
             description="企业商事登记公文组装与流水号签发算子",
             compensator=sop_document_render_compensate,
@@ -376,25 +346,20 @@ class AtomicRegistry:
             }
         self.register("compliance.audit.guard", compliance_audit_guard, domain="compliance", description="合规自检参数归一化与前置校验门禁")
 
-        async def compliance_evaluate_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def evaluate_compliance_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：调用合规服务计算六维防线评分报告"""
             from src.domains.compliance.service import compliance_service
             from src.domains.compliance.models import AuditEvaluateRequest
-            checked_ids = inputs.get("checked_ids") or inputs.get("passed_item_ids", [])
-            report = compliance_service.evaluate_audit(AuditEvaluateRequest(passed_item_ids=checked_ids))
-            if report.grade == "CRITICAL" and inputs.get("strict_mode", False):
-                raise PermissionError(f"Compliance strict guard blocked: score is {report.score} (CRITICAL)")
+            req = AuditEvaluateRequest(passed_item_ids=inputs.get("checked_ids") or inputs.get("passed_item_ids", []))
+            r = compliance_service.evaluate_audit(req)
+            if r.grade == "CRITICAL" and inputs.get("strict_mode", False):
+                raise PermissionError(f"Compliance strict guard blocked: score is {r.score} (CRITICAL)")
             return {
-                "score": report.score,
-                "grade": report.grade,
-                "compliance_score": report.score,
-                "compliance_grade": report.grade,
-                "total_items": report.total_items,
-                "passed_items_count": report.passed_items_count,
-                "failed_items_count": report.failed_items_count,
-                "risk_items": [item.model_dump() for item in report.risk_items],
-                "remedy_suggestions": report.remedy_suggestions,
-                "legal_help_recommendation": report.legal_help_recommendation,
-                "audit_report": report.model_dump(),
+                "score": r.score, "grade": r.grade, "compliance_score": r.score, "compliance_grade": r.grade,
+                "total_items": r.total_items, "passed_items_count": r.passed_items_count, "failed_items_count": r.failed_items_count,
+                "risk_items": [item.model_dump() for item in r.risk_items],
+                "remedy_suggestions": r.remedy_suggestions, "legal_help_recommendation": r.legal_help_recommendation,
+                "audit_report": r.model_dump(),
             }
 
         async def compliance_audit_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -406,7 +371,14 @@ class AtomicRegistry:
 
         self.register(
             "compliance.evaluate_audit",
-            compliance_evaluate_audit,
+            evaluate_compliance_audit,
+            domain="compliance",
+            description="六维合规防线自检打分与风险阻断算子",
+            compensator=compliance_audit_compensate,
+        )
+        self.register(
+            "evaluate_compliance_audit",
+            evaluate_compliance_audit,
             domain="compliance",
             description="六维合规防线自检打分与风险阻断算子",
             compensator=compliance_audit_compensate,
@@ -440,55 +412,41 @@ class AtomicRegistry:
             }
         self.register("moderation.inspect_content", moderation_inspect_content, domain="moderation", description="UGC文本敏感词审查与违规处置算子")
 
-        async def moderation_takedown_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def validate_takedown_request(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验下架操作的 item_id 与 reason 有效性"""
             from src.domains.moderation.service import moderation_service
             item_id = inputs.get("item_id", "").strip()
             reason = inputs.get("reason") or inputs.get("takedown_reason", "").strip()
-            moderator_id = inputs.get("moderator_id") or inputs.get("operator_id", "admin_001")
-            ban_author = bool(inputs.get("ban_author", False))
-
-            if not item_id:
-                raise ValueError("item_id is required for takedown")
-            if not reason:
-                raise ValueError("takedown reason is required and cannot be empty")
-
+            if not item_id or not reason:
+                raise ValueError("item_id and non-empty takedown reason are required")
             item = moderation_service.get_item(item_id)
             if not item:
                 raise ValueError(f"Moderation item {item_id} not found")
-
             return {
-                "guard_passed": True,
-                "item_id": item_id,
-                "reason": reason,
-                "moderator_id": moderator_id,
-                "ban_author": ban_author,
-                "prev_status": item.status,
+                "guard_passed": True, "item_id": item_id, "reason": reason,
+                "moderator_id": inputs.get("moderator_id") or inputs.get("operator_id", "admin_001"),
+                "ban_author": bool(inputs.get("ban_author", False)), "prev_status": item.status,
             }
-        self.register("moderation.takedown.guard", moderation_takedown_guard, domain="moderation", description="内容治理违规下架前置守卫校验算子")
+        self.register("moderation.takedown.guard", validate_takedown_request, domain="moderation", description="内容治理违规下架前置守卫校验算子")
+        self.register("validate_takedown_request", validate_takedown_request, domain="moderation", description="内容治理违规下架前置守卫校验算子")
 
-        async def moderation_takedown_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def takedown_moderation_item(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：调用审核服务执行违规内容下架"""
             from src.domains.moderation.service import moderation_service
             from src.domains.moderation.models import TakedownRequest
-
-            item_id = inputs.get("item_id")
-            reason = inputs.get("reason", "违规言论全网下架")
-            moderator_id = inputs.get("moderator_id", "admin_001")
-            ban_author = inputs.get("ban_author", False)
-            prev_status = inputs.get("prev_status", "FLAGGED")
-
             req = TakedownRequest(
-                item_id=item_id,
-                reason=reason,
-                moderator_id=moderator_id,
-                ban_author=ban_author,
+                item_id=inputs.get("item_id"),
+                reason=inputs.get("reason", "违规言论全网下架"),
+                moderator_id=inputs.get("moderator_id", "admin_001"),
+                ban_author=inputs.get("ban_author", False),
             )
-            action_res = moderation_service.takedown(req)
+            res = moderation_service.takedown(req)
             return {
-                "item_id": action_res.item_id,
-                "status": action_res.status,
-                "moderated_at": action_res.moderated_at,
-                "note": action_res.note,
-                "prev_status": prev_status,
+                "item_id": res.item_id,
+                "status": res.status,
+                "moderated_at": res.moderated_at,
+                "note": res.note,
+                "prev_status": inputs.get("prev_status", "FLAGGED"),
                 "orchestrated_by": "OPC_MODERATION_TAKEDOWN_PIPELINE",
             }
 
@@ -503,7 +461,14 @@ class AtomicRegistry:
 
         self.register(
             "moderation.takedown.persist",
-            moderation_takedown_persist,
+            takedown_moderation_item,
+            domain="moderation",
+            description="内容治理违规言论下架持久化算子",
+            compensator=moderation_takedown_persist_compensate,
+        )
+        self.register(
+            "takedown_moderation_item",
+            takedown_moderation_item,
             domain="moderation",
             description="内容治理违规言论下架持久化算子",
             compensator=moderation_takedown_persist_compensate,
@@ -599,76 +564,20 @@ class AtomicRegistry:
             }
         self.register("home.metrics.collector", home_metrics_collector, domain="home", description="首页全域宏观核心指标聚合算子")
 
-        async def home_sitemap_builder(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def build_home_sitemap(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """极简算子：仅负责拉取论坛条数并委托 sitemap 构造器"""
             from src.domains.forum.service import forum_service
+            from src.domains.sitemap_builder import build_sitemap_quick_links
             threads_count = len(forum_service.list_threads())
-            quick_links = [
-                {
-                    "name": "头脑风暴",
-                    "route": "forum",
-                    "count_desc": f"{threads_count} 篇讨论",
-                    "tag": "社区",
-                    "description": "灵感碰撞交流、出海实战答疑、经验置顶与干货讨论区。",
-                },
-                {
-                    "name": "产品橱窗",
-                    "route": "product",
-                    "count_desc": f"{inputs.get('products_count', 0)} 款独立商用作品",
-                    "tag": "商机",
-                    "description": "独立创客产品画廊，支持点赞打榜、产品收录与出海获客。",
-                },
-                {
-                    "name": "政策雷达",
-                    "route": "policy",
-                    "count_desc": f"{inputs.get('matched_policies_count', 0)} 条扶持减免红利",
-                    "tag": "政策",
-                    "description": "全网政策白话提炼，税收减免、算力返还与地方补贴精准匹配。",
-                },
-                {
-                    "name": "需求集市",
-                    "route": "demand",
-                    "count_desc": f"{inputs.get('demands_orders_count', 0)} 笔外包寻源委托",
-                    "tag": "委托",
-                    "description": "真实企业寻源商机、AI Agent 外包撮合与资金托管担保。",
-                },
-                {
-                    "name": "流程文书",
-                    "route": "sop",
-                    "count_desc": "4 阶段合规材料即时生成",
-                    "tag": "文书",
-                    "description": "工商设立到离岸资金流全阶段表单收集，一键导出标准申报材料。",
-                },
-                {
-                    "name": "生态特权",
-                    "route": "perks",
-                    "count_desc": "最高 $5,000 算力补贴券",
-                    "tag": "福利",
-                    "description": "云厂商激活特权、Token 优惠券、Stripe 结汇通道及工具折扣。",
-                },
-                {
-                    "name": "合规指南",
-                    "route": "compliance",
-                    "count_desc": "6 大防线自检避坑雷达",
-                    "tag": "防线",
-                    "description": "六维合规防线、典型避坑案例库与上线前自检雷达。",
-                },
-                {
-                    "name": "创客档案",
-                    "route": "user",
-                    "count_desc": "权益凭据与会员中心",
-                    "tag": "主体",
-                    "description": "多级会员凭证强绑定、按量功能开关与支付鉴权控制中心。",
-                },
-                {
-                    "name": "后端编排",
-                    "route": "backend-orch",
-                    "count_desc": "微内核 DAG 可视化引擎",
-                    "tag": "架构",
-                    "description": "Python 脚本热上传、AST 安全沙箱验证与微内核 Scenario 路由编排。",
-                },
-            ]
+            quick_links = build_sitemap_quick_links(
+                threads_count=threads_count,
+                products_count=inputs.get("products_count", 0),
+                policies_count=inputs.get("matched_policies_count", 0),
+                demands_count=inputs.get("demands_orders_count", 0),
+            )
             return {"quick_links": quick_links}
-        self.register("home.sitemap.builder", home_sitemap_builder, domain="home", description="首页全景功能空间地图装配算子")
+        self.register("home.sitemap.builder", build_home_sitemap, domain="home", description="首页全景功能空间地图装配算子")
+        self.register("build_home_sitemap", build_home_sitemap, domain="home", description="首页全景功能空间地图装配算子")
 
         async def home_overview_aggregator(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from datetime import datetime, timezone
@@ -710,9 +619,12 @@ class AtomicRegistry:
         async def forum_thread_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.forum.service import forum_service
             from src.domains.forum.models import ForumThreadCreate
+            author_id = inputs.get("author_id") or (context or {}).get("user_id") or ""
+            author_name = inputs.get("author_name") or (context or {}).get("nickname") or (context or {}).get("username")
             payload = ForumThreadCreate(
                 category_code=inputs.get("category_code", "GENERAL"),
-                author_id=inputs.get("author_id", ""),
+                author_id=author_id,
+                author_name=author_name,
                 title=inputs.get("title", ""),
                 content=inputs.get("content", ""),
             )
@@ -739,33 +651,15 @@ class AtomicRegistry:
             compensator=forum_thread_persist_compensate,
         )
 
-        async def forum_comment_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def validate_create_comment(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验发评论参数合法性并进行文本合规审查"""
             from src.domains.forum.service import forum_service
-            thread_id = inputs.get("thread_id", "")
-            content = inputs.get("content", "").strip()
-            parent_id = inputs.get("parent_id")
-            if not thread_id:
-                raise ValueError("thread_id is required for forum comment")
-            if not content:
-                raise ValueError("Forum comment content cannot be empty")
-            if thread_id not in forum_service._threads:
-                raise KeyError(f"Forum thread with ID {thread_id} not found")
-            if parent_id and parent_id not in forum_service._comments:
-                raise KeyError(f"Parent comment with ID {parent_id} not found")
-            
-            # Content moderation check via external HTTP moderation gateway
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(content, field_name="forum comment")
-            
-            return {
-                "guard_passed": True,
-                "thread_id": thread_id,
-                "content": content,
-                "parent_id": parent_id,
-                "author_id": inputs.get("author_id", ""),
-                "reply_to_user_id": inputs.get("reply_to_user_id"),
-            }
-        self.register("forum.comment.validate_guard", forum_comment_validate_guard, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
+            res = forum_service.validate_create_comment_payload(inputs)
+            await check_content_safety(res["content"], field_name="forum comment")
+            return res
+        self.register("forum.comment.validate_guard", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
+        self.register("validate_create_comment", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
 
         async def forum_comment_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.forum.service import forum_service
@@ -817,34 +711,15 @@ class AtomicRegistry:
         self.register("forum.telemetry.incr", forum_telemetry_incr, domain="forum", description="头脑风暴社区互动度量指标递增算子")
 
         # Domain 7: Product Showcase Domain (产品橱窗微内核算子与 Saga 补偿)
-        async def product_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            title = inputs.get("title", "").strip()
-            tagline = inputs.get("tagline", "").strip()
-            desc = inputs.get("description", "").strip()
-            price = float(inputs.get("price_cny", 0.0))
-            if len(title) < 2:
-                raise ValueError("Product title must be at least 2 characters long")
-            if len(tagline) < 5 and len(desc) < 5:
-                raise ValueError("Product tagline or description must be at least 5 characters long")
-            if price < 0:
-                raise ValueError("Product price cannot be negative")
-            
-            # Content moderation check via external HTTP moderation gateway
+        async def validate_publish_product(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验独立商用作品发布入参合法性并做文本合规审查"""
+            from src.domains.products.service import product_service
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(f"{title} {tagline} {desc}", field_name="product showcase")
-            
-            return {
-                "guard_passed": True,
-                "title": title,
-                "tagline": tagline,
-                "description": desc or tagline,
-                "category": inputs.get("category", "DEV"),
-                "pricing_model": inputs.get("pricing_model", "FREE" if price == 0 else "ONE_TIME"),
-                "price_cny": price,
-                "demo_url": inputs.get("demo_url", ""),
-                "author_id": inputs.get("author_id", ""),
-            }
-        self.register("product.validate_guard", product_validate_guard, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
+            res = product_service.validate_publish_payload(inputs)
+            await check_content_safety(f"{res['title']} {res['tagline']} {res['description']}", field_name="product showcase")
+            return res
+        self.register("product.validate_guard", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
+        self.register("validate_publish_product", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
 
         async def product_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.products.service import product_service
@@ -896,40 +771,15 @@ class AtomicRegistry:
         self.register("product.telemetry.incr", product_telemetry_incr, domain="product", description="产品橱窗作品收录与度量打点算子")
 
         # Domain 8: Demands & Bidding Market Domain (需求集市与创客竞标微内核算子与 Saga 补偿)
-        async def demand_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            title = inputs.get("title", "").strip()
-            desc = inputs.get("description", "").strip()
-            budget = float(inputs.get("budget_cny", 0.0))
-            category = inputs.get("category", "DEV").upper()
-            deadline_days = int(inputs.get("deadline_days", 14))
-            creator_id = inputs.get("creator_id", "")
-
-            if len(title) < 2:
-                raise ValueError("Demand title must be at least 2 characters long")
-            if len(desc) < 5:
-                raise ValueError("Demand description must be at least 5 characters long")
-            if budget < 0:
-                raise ValueError("Demand budget cannot be negative")
-            valid_cats = {"DEV", "AI", "TAX", "LEGAL", "BIZ"}
-            if category not in valid_cats:
-                category = "DEV"
-            if deadline_days < 1:
-                deadline_days = 14
-
-            # Moderation check via external HTTP moderation gateway
+        async def validate_publish_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验发布需求入参合法性并进行敏感词风控审查"""
+            from src.domains.demands.service import demand_service
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(f"{title} {desc}", field_name="demand publish")
-
-            return {
-                "guard_passed": True,
-                "title": title,
-                "description": desc,
-                "budget_cny": budget,
-                "category": category,
-                "deadline_days": deadline_days,
-                "creator_id": creator_id,
-            }
-        self.register("demand.publish.guard", demand_publish_guard, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
+            res = demand_service.validate_publish_payload(inputs)
+            await check_content_safety(f"{res['title']} {res['description']}", field_name="demand publish")
+            return res
+        self.register("demand.publish.guard", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
+        self.register("validate_publish_demand", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
 
         async def demand_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.demands.service import demand_service
@@ -965,41 +815,15 @@ class AtomicRegistry:
             compensator=demand_publish_persist_compensate,
         )
 
-        async def demand_bid_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def validate_bid_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验创客竞标方案合法性并审查提案内容安全"""
             from src.domains.demands.service import demand_service
-            demand_id = inputs.get("demand_id", "").strip()
-            bidder_id = inputs.get("bidder_id", "").strip()
-            amount = float(inputs.get("bid_amount_cny", 0.0))
-            delivery_days = int(inputs.get("delivery_days", 7))
-            proposal = inputs.get("proposal_text", "").strip()
-
-            if not demand_id:
-                raise ValueError("demand_id is required for bidding")
-            demand = demand_service.get_demand(demand_id)
-            if not demand:
-                raise KeyError(f"Demand with ID {demand_id} not found")
-            if demand.status != "OPEN":
-                raise ValueError(f"Demand {demand_id} is not open for bidding (status: {demand.status})")
-            if amount < 0:
-                raise ValueError("bid_amount_cny cannot be negative")
-            if delivery_days < 1:
-                raise ValueError("delivery_days must be at least 1")
-            if len(proposal) < 5:
-                raise ValueError("proposal_text must be at least 5 characters long")
-
-            # Moderation check via external HTTP moderation gateway
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(proposal, field_name="demand bid proposal")
-
-            return {
-                "guard_passed": True,
-                "demand_id": demand_id,
-                "bidder_id": bidder_id,
-                "bid_amount_cny": amount,
-                "delivery_days": delivery_days,
-                "proposal_text": proposal,
-            }
-        self.register("demand.bid.guard", demand_bid_guard, domain="demands", description="需求集市创客竞标方案准入审查门禁")
+            res = demand_service.validate_bid_payload(inputs)
+            await check_content_safety(res["proposal_text"], field_name="demand bid proposal")
+            return res
+        self.register("demand.bid.guard", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
+        self.register("validate_bid_demand", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
 
         async def demand_bid_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.demands.service import demand_service
@@ -1102,35 +926,15 @@ class AtomicRegistry:
             compensator=perk_claim_persist_compensate,
         )
 
-        async def perk_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            name = inputs.get("name", "").strip()
-            provider = inputs.get("provider", "").strip()
-            val = float(inputs.get("value_cny", 0.0))
-            summary = inputs.get("summary", "").strip()
-
-            if len(name) < 2:
-                raise ValueError("Perk name must be at least 2 characters long")
-            if len(provider) < 2:
-                raise ValueError("Perk provider must be at least 2 characters long")
-            if val < 0:
-                raise ValueError("Perk value_cny cannot be negative")
-            if len(summary) < 5:
-                raise ValueError("Perk summary must be at least 5 characters long")
-
-            # Moderation check via external HTTP moderation gateway
+        async def validate_publish_perk(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验生态特权福利上线合法性并进行文本合规审查"""
+            from src.domains.perks.service import perk_service
             from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(f"{name} {provider} {summary}", field_name="perk publish")
-
-            return {
-                "guard_passed": True,
-                "name": name,
-                "provider": provider,
-                "value_cny": val,
-                "category": inputs.get("category", "CLOUD"),
-                "summary": summary,
-                "quota_remaining": int(inputs.get("quota_remaining", 100)),
-            }
-        self.register("perk.publish.guard", perk_publish_guard, domain="perks", description="生态特权提报上线准入与风控审查门禁")
+            res = perk_service.validate_publish_payload(inputs)
+            await check_content_safety(f"{res['name']} {res['provider']} {res['summary']}", field_name="perk publish")
+            return res
+        self.register("perk.publish.guard", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
+        self.register("validate_publish_perk", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
 
         async def perk_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.perks.service import perk_service
@@ -1215,29 +1019,24 @@ class AtomicRegistry:
         self.register("external.crawler.fetch_policy", external_crawler_fetch_policy, domain="external", description="统一外部网关低速合规采集政务公文")
 
         # 3. Payment Gateway
-        async def external_payment_split_order(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def split_payment_order(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：仅透传参数调用持牌支付网关执行分账"""
             from src.infrastructure.external_gateway import payment_gateway
-            order_id = inputs.get("order_id", "")
-            amount = float(inputs.get("amount", 0.0))
-            channel = inputs.get("channel", "WECHAT")
-            merchant_account = inputs.get("merchant_account", "")
-            maker_account = inputs.get("maker_account", "")
             res = await payment_gateway.create_split_order(
-                order_id=order_id,
-                amount_cny=amount,
-                merchant_account=merchant_account,
-                maker_account=maker_account,
-                channel=channel,
+                order_id=inputs.get("order_id", ""),
+                amount_cny=float(inputs.get("amount", 0.0)),
+                merchant_account=inputs.get("merchant_account", ""),
+                maker_account=inputs.get("maker_account", ""),
+                channel=inputs.get("channel", "WECHAT"),
             )
             return {
                 "split_order_executed": res.get("status") == "SUCCESS",
-                "platform_fee": res.get("platform_fee"),
-                "maker_amount": res.get("maker_share"),
-                "clearing_status": res.get("status"),
-                "transaction_no": res.get("transaction_no"),
+                "platform_fee": res.get("platform_fee"), "maker_amount": res.get("maker_share"),
+                "clearing_status": res.get("status"), "transaction_no": res.get("transaction_no"),
                 "escrow_verified": res.get("escrow_verified", False),
             }
-        self.register("external.payment.split_order", external_payment_split_order, domain="external", description="统一外部网关持牌分账结算指令")
+        self.register("external.payment.split_order", split_payment_order, domain="external", description="统一外部网关持牌分账结算指令")
+        self.register("split_payment_order", split_payment_order, domain="external", description="统一外部网关持牌分账结算指令")
 
         # 4. SMS Gateway
         async def external_sms_send_auth_code(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
@@ -1288,26 +1087,21 @@ class AtomicRegistry:
         # In-memory audit tracking for Saga compensation
         _ops_audit_log = {}
 
-        async def telemetry_dashboard_audit(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def audit_ops_dashboard_access(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：仅为大盘调阅写入一条审计存证记录"""
             import uuid
             from datetime import datetime, timezone
-            audit_id = f"aud_ops_{uuid.uuid4().hex[:8]}"
-            dashboard = inputs.get("dashboard", {})
-            operator_id = inputs.get("operator_id", "admin_001")
-            record = {
-                "audit_id": audit_id,
-                "operator_id": operator_id,
+            aid = f"aud_ops_{uuid.uuid4().hex[:8]}"
+            _ops_audit_log[aid] = {
+                "audit_id": aid,
+                "operator_id": inputs.get("operator_id", "admin_001"),
                 "timestamp": datetime.now(timezone.utc).isoformat(),
                 "status": "RECORDED",
                 "watermark": "SECURE_ADMIN_HASH_2026",
             }
-            _ops_audit_log[audit_id] = record
-            # Flatten dashboard data to top-level output for transparent gateway consumption
-            result = dict(dashboard)
-            result["audit_id"] = audit_id
-            result["audit_status"] = "RECORDED"
-            result["simulate_downstream_failure"] = inputs.get("simulate_downstream_failure", False)
-            return result
+            res = dict(inputs.get("dashboard", {}))
+            res.update({"audit_id": aid, "audit_status": "RECORDED", "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False)})
+            return res
 
         async def telemetry_dashboard_audit_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             audit_id = inputs.get("audit_id")
@@ -1318,7 +1112,14 @@ class AtomicRegistry:
 
         self.register(
             "telemetry.dashboard.audit",
-            telemetry_dashboard_audit,
+            audit_ops_dashboard_access,
+            domain="telemetry",
+            description="运营大盘调阅脱敏水印签发与安全审计持久化算子",
+            compensator=telemetry_dashboard_audit_compensate,
+        )
+        self.register(
+            "audit_ops_dashboard_access",
+            audit_ops_dashboard_access,
             domain="telemetry",
             description="运营大盘调阅脱敏水印签发与安全审计持久化算子",
             compensator=telemetry_dashboard_audit_compensate,
@@ -1456,32 +1257,21 @@ class AtomicRegistry:
             }
         self.register("orchestration.control.guard", orchestration_control_guard, domain="orchestration", description="微内核DAG编排部署守卫校验算子")
 
-        async def orchestration_control_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+        async def save_dag_config_record(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：调用编排服务持久化 DAG 拓扑配置"""
             from src.domains.orchestration.service import orchestration_service
             from src.domains.orchestration.models import DAGConfigSaveRequest
-
-            scenario_code = inputs.get("scenario_code")
-            version = inputs.get("version")
-            topo = inputs.get("topology_graph", {})
+            topo = dict(inputs.get("topology_graph") or {})
             if "topology" not in topo and "topology" in inputs:
                 topo["topology"] = inputs["topology"]
-
             req = DAGConfigSaveRequest(
-                scenario_code=scenario_code,
-                version=version,
-                topology_graph=topo,
-                status=inputs.get("status", "ACTIVE"),
+                scenario_code=inputs.get("scenario_code"), version=inputs.get("version"),
+                topology_graph=topo, status=inputs.get("status", "ACTIVE"),
                 created_by=inputs.get("created_by", "usr_admin_001"),
             )
-            saved_rec = orchestration_service.save_dag_config(req)
-            res_dict = saved_rec.model_dump()
-            res_dict["orchestrated_by"] = "OPC_ORCHESTRATION_CONTROL_PIPELINE"
-            return {
-                "dag_record": res_dict,
-                "scenario_code": scenario_code,
-                "version": version,
-                "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
-            }
+            saved = orchestration_service.save_dag_config(req).model_dump()
+            saved["orchestrated_by"] = "OPC_ORCHESTRATION_CONTROL_PIPELINE"
+            return {"dag_record": saved, "scenario_code": inputs.get("scenario_code"), "version": inputs.get("version"), "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False)}
 
         async def orchestration_control_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.orchestration.service import orchestration_service
@@ -1494,7 +1284,14 @@ class AtomicRegistry:
 
         self.register(
             "orchestration.control.persist",
-            orchestration_control_persist,
+            save_dag_config_record,
+            domain="orchestration",
+            description="微内核DAG编排拓扑配置原子持久化与热载算子",
+            compensator=orchestration_control_persist_compensate,
+        )
+        self.register(
+            "save_dag_config_record",
+            save_dag_config_record,
             domain="orchestration",
             description="微内核DAG编排拓扑配置原子持久化与热载算子",
             compensator=orchestration_control_persist_compensate,

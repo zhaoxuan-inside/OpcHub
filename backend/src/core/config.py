@@ -43,11 +43,18 @@ _STRIPE_SECTION = _PAYMENT_SECTION.get("stripe", {})
 _CRAWLER_SECTION = _EXT_SECTION.get("gov_crawler", {})
 _SMS_SECTION = _EXT_SECTION.get("sms_auth", {})
 _RAG_SECTION = _EXT_SECTION.get("rag", {})
+_FISCAL_SECTION = _YAML_DATA.get("fiscal_policy", {})
 _DB_SECTION = _YAML_DATA.get("database", {})
 
 
 class Settings(BaseSettings):
     """Application global settings loaded from configuration files."""
+    # Fiscal & Tax Policy Rules (Zero hardcoding in calculation code)
+    vat_exemption_quarterly_threshold: float = float(_FISCAL_SECTION.get("vat_exemption_quarterly_threshold", 300000.0))
+    vat_concessional_rate: float = float(_FISCAL_SECTION.get("vat_concessional_rate", 0.01))
+    vat_standard_rate: float = float(_FISCAL_SECTION.get("vat_standard_rate", 0.03))
+    vat_legal_basis: str = _FISCAL_SECTION.get("legal_basis", "财政部 税务总局公告 2023年第12号 (小规模纳税人季度销售额30万元以下免征增值税)")
+
     app_name: str = _APP_SECTION.get("name", "OpcHub Microkernel Platform")
     app_version: str = _APP_SECTION.get("version", "v1.0.4-live")
     api_prefix: str = _APP_SECTION.get("api_prefix", "/api/v1")

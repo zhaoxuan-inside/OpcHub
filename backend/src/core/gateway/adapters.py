@@ -191,7 +191,13 @@ async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
     inputs = dict(p)
     if "thread_payload" in inputs and isinstance(inputs["thread_payload"], dict):
         inputs.update(inputs["thread_payload"])
-    
+
+    # Bind authenticated user identity if author_id is not explicitly provided
+    if not inputs.get("author_id") and (c or {}).get("user_id"):
+        inputs["author_id"] = c["user_id"]
+    if not inputs.get("author_name"):
+        inputs["author_name"] = (c or {}).get("nickname") or (c or {}).get("username")
+
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_FORUM_THREAD_PUBLISH",
@@ -338,6 +344,7 @@ async def user_profile_update_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
         phone=p.get("phone"),
         company_name=p.get("company_name"),
         credit_code=p.get("credit_code"),
+        industry_track=p.get("industry_track"),
     )
     profile = await user_service.update_profile(req=req, token=token)
     return profile.model_dump()
@@ -569,6 +576,15 @@ async def auth_legal_agreements_adapter(p: Dict[str, Any], c: Dict[str, Any] = N
     return user_service.get_legal_agreements()
 
 
+async def auth_mail_providers_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Retrieve list of supported email providers and active routing configurations."""
+    from src.domains.user.service import user_service
+    target_email = p.get("email")
+    if target_email:
+        return user_service.resolve_mail_provider(target_email)
+    return user_service.get_supported_mail_providers()
+
+
 async def auth_login_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Authenticate maker via email and password."""
     from src.domains.user.models import UserLoginRequest
@@ -590,6 +606,7 @@ async def auth_session_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     profile = user_service.get_profile(uid=uid)
     return {
         "valid": True,
+        "authenticated": True,
         "token": token,
         "uid": uid,
         "email": email,
@@ -615,17 +632,31 @@ async def auth_change_password_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
 async def forum_upvote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Toggle an upvote on a forum thread or comment (authenticated maker)."""
     from src.domains.forum.service import forum_service
-    user_id = p.get("user_id") or (c or {}).get("user_id") or ""
-    res = forum_service.toggle_upvote(user_id, p.get("target_type", "THREAD"), p.get("target_id", ""))
+    user_id = p.get("user_id") or (c or {}).get("user_id") or "usr_guest"
+    target_id = str(p.get("target_id") or "")
+    res = forum_service.toggle_upvote(user_id, p.get("target_type", "THREAD"), target_id)
     return res.model_dump()
 
 
 async def forum_bookmark_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Toggle a bookmark on a forum thread (authenticated maker)."""
     from src.domains.forum.service import forum_service
-    user_id = p.get("user_id") or (c or {}).get("user_id") or ""
-    res = forum_service.toggle_bookmark(user_id, p.get("thread_id", ""), p.get("folder_name", "默认收藏夹"))
+    user_id = p.get("user_id") or (c or {}).get("user_id") or "usr_guest"
+    thread_id = str(p.get("thread_id") or "")
+    res = forum_service.toggle_bookmark(user_id, thread_id, p.get("folder_name", "默认收藏夹"))
     return res.model_dump()
+
+
+async def forum_thread_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Delete a forum thread and cascade delete its comments (ADMIN or author)."""
+    from src.domains.forum.service import forum_service
+    thread_id = str(p.get("thread_id") or (c or {}).get("thread_id") or "")
+    if not thread_id:
+        raise ValueError("thread_id is required")
+    deleted = forum_service.delete_thread(thread_id)
+    if not deleted:
+        raise KeyError(f"Forum thread with ID {thread_id} not found")
+    return {"thread_id": thread_id, "deleted": True}
 
 
 async def operator_mode_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -634,5 +665,60 @@ async def operator_mode_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> 
     req = OperatorModeUpdateRequest(**p)
     res = orchestration_service.update_operator_mode(req)
     return res.model_dump()
+
+
+async def framework_hot_reload_status_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """Introspection for file sensing watcher and staged/activated code versions."""
+    from src.core.microkernel.watcher import hot_reload_engine
+    return hot_reload_engine.get_status()
+
+
+async def framework_hot_reload_scan_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """Actively trigger a scan for file additions, modifications, and deletions."""
+    from src.core.microkernel.watcher import hot_reload_engine
+    changes = hot_reload_engine.scan_changes()
+    return {
+        "status": "ok",
+        "newly_detected_count": len(changes),
+        "staged_count": len(hot_reload_engine._staged_changes),
+        "detected_changes": [ch.model_dump() for ch in changes],
+    }
+
+
+async def framework_hot_reload_activate_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """Atomically load staged python changes into memory for the target version."""
+    from src.core.microkernel.watcher import hot_reload_engine
+    target_version = (p or {}).get("version", "v1.0.0")
+    file_paths = (p or {}).get("file_paths")
+    return hot_reload_engine.activate_version(
+        target_version=target_version,
+        file_paths=file_paths,
+        reload_gateway_routes=True,
+    )
+
+
+async def framework_gateway_reload_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """Reload routes, version policies, and activate pending modules."""
+    from src.core.microkernel.watcher import hot_reload_engine
+    from src.core.gateway import register_default_scenario_routes
+    from src.core.config import settings
+    target_ver = (p or {}).get("version") or getattr(settings, "app_version", "v1.0.0")
+    activation_res = hot_reload_engine.activate_version(
+        target_version=target_ver,
+        reload_gateway_routes=False,
+    )
+    count = register_default_scenario_routes()
+    return {
+        "status": "ok",
+        "reloaded_routes_count": count,
+        "hot_reload": activation_res,
+    }
+
+
+async def gateway_rules_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List all registered scenario routing rules across business domains."""
+    from src.core.gateway.router import scenario_router
+    return [r.model_dump() for r in scenario_router.list_rules()]
+
 
 

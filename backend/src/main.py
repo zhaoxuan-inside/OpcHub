@@ -2,7 +2,7 @@ import os
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional, List
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Response, Header, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,6 +19,7 @@ from src.core.microkernel.models import DAGConfig, ExecutionResult
 from src.core.microkernel.engine import microkernel_engine
 from src.core.microkernel.sandbox import validate_python_code
 from src.core.microkernel.script_ingestion import script_ingestion_service
+from src.core.microkernel.watcher import hot_reload_engine
 from src.core.audit import audit_service
 from src.core.security import verify_session_token
 from src.core.microkernel.registry import registry
@@ -62,12 +63,15 @@ async def lifespan(app: FastAPI):
         # Rebuild the in-memory domain indexes from persisted state (restart durability)
         await user_service.hydrate_from_db()
         await domain_persistence.initialize()
+        # Start file sensing watcher for versioned hot-reloading
+        hot_reload_engine.start_background_watcher()
     except Exception as e:
         import logging
         logging.getLogger("uvicorn").warning(f"Startup initialization note: {e}")
     yield
     # Flush any outstanding write-behind persistence tasks before shutdown
     try:
+        hot_reload_engine.stop_background_watcher()
         await domain_persistence.flush()
     except Exception:
         pass
@@ -214,10 +218,23 @@ async def list_scenario_rules():
     return scenario_router.list_rules()
 
 
+class HotReloadActivateRequest(BaseModel):
+    version: str = "v1.0.0"
+    file_paths: Optional[list[str]] = None
+
+
 async def reload_scenario_routes():
-    """Reload scenario routes and version policies directly from external YAML configuration."""
+    """Reload scenario routes, detect file changes, and activate versioned modules into memory."""
+    activation_res = hot_reload_engine.activate_version(
+        target_version=getattr(settings, "app_version", "v1.0.0"),
+        reload_gateway_routes=False,
+    )
     count = register_default_scenario_routes()
-    return {"status": "ok", "reloaded_routes_count": count}
+    return {
+        "status": "ok",
+        "reloaded_routes_count": count,
+        "hot_reload": activation_res,
+    }
 
 
 # Dynamically register gateway endpoints defined in configuration (zero hardcoding)
@@ -498,6 +515,15 @@ async def check_password_strength(req: PasswordStrengthRequest):
 async def get_agreements():
     """Retrieve statutory user terms of service and privacy policy."""
     return user_service.get_legal_agreements()
+
+
+@app.get("/api/auth/mail-providers", tags=["Authentication & Commercial Onboarding"])
+@app.get(f"{settings.api_prefix}/auth/mail-providers", tags=["Authentication & Commercial Onboarding"])
+async def get_mail_providers(email: Optional[str] = None):
+    """Retrieve supported email provider list and resolved SMTP configuration for target email."""
+    if email:
+        return user_service.resolve_mail_provider(email)
+    return user_service.get_supported_mail_providers()
 
 
 @app.post("/api/auth/register", tags=["Authentication & Commercial Onboarding"])

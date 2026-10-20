@@ -103,6 +103,7 @@ def resolve_resource_owner(resource_type: str, resource_id: str) -> Optional[str
             return obj.creator_id if obj else None
         if rt in ("thread", "threads", "forum_thread"):
             from src.domains.forum.service import forum_service
+            forum_service._ensure_seed_thread(resource_id)
             obj = forum_service._threads.get(resource_id)
             return obj.author_id if obj else None
         if rt in ("comment", "comments", "forum_comment"):

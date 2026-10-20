@@ -197,9 +197,9 @@ gateway:
     - scenario: "forum.threads.list"
       version: "v1.0.0"
       domain: "forum"
-      description: "检索头脑风暴社区讨论帖列表"
+      description: "检索头脑风暴社区讨论帖列表 (分页约束: id, page, page_size/page_length)"
       is_default: true
-      handler: "src.domains.forum.service.forum_service:list_threads"
+      handler: "src.domains.forum.service.forum_service:list_threads_paginated"
       args_type: "kwargs"
 
     - scenario: "forum.threads.publish"
@@ -243,16 +243,20 @@ gateway:
       handler: "src.core.gateway.adapters:forum_bookmark_adapter"
       required_permission: "forum:post_comment"
 
+    - scenario: "forum.threads.delete"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "删除头脑风暴社区讨论帖 (限超级管理员或帖子发帖人)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_thread_delete_adapter"
+      required_permission: "forum:post_comment"
+      owner_check:
+        resource_type: "thread"
+        id_field: "thread_id"
+
     # --------------------------------------------------------------------------
     # 7. Telemetry & Platform Overview (运营大盘与全景)
     # --------------------------------------------------------------------------
-    - scenario: "home.overview"
-      version: "v1.0.0"
-      domain: "telemetry"
-      description: "获取首页功能全景与平台宏观指标"
-      is_default: true
-      handler: "src.core.gateway.adapters:home_overview_adapter"
-
     - scenario: "telemetry.dashboard"
       version: "v1.0.0"
       domain: "telemetry"
@@ -337,6 +341,13 @@ gateway:
       description: "获取平台法定用户服务协议与隐私保护指引正文及版本"
       is_default: true
       handler: "src.core.gateway.adapters:auth_legal_agreements_adapter"
+
+    - scenario: "auth.mail-providers"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "获取系统已适配支持的主流邮箱服务商配置与路由元数据"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_mail_providers_adapter"
 
     - scenario: "auth.login"
       version: "v1.0.0"
@@ -531,4 +542,43 @@ gateway:
       description: "基于轻量向量引擎与大模型协同的一人公司互助社区经验 RAG 智能问答"
       is_default: true
       handler: "src.core.gateway.adapters:external_rag_forum_qa_adapter"
+
+    # --------------------------------------------------------------------------
+    # 22. Framework Governance & Hot-Reload (框架能力治理与热重载)
+    # --------------------------------------------------------------------------
+    - scenario: "framework.hot-reload.status"
+      version: "v1.0.0"
+      domain: "framework"
+      description: "自省文件感知监听器状态、监控文件数及 STAGED 待生效变更"
+      is_default: true
+      handler: "src.core.gateway.adapters:framework_hot_reload_status_adapter"
+
+    - scenario: "framework.hot-reload.scan"
+      version: "v1.0.0"
+      domain: "framework"
+      description: "主动触发一次文件系统 .py 变更感知与暂存"
+      is_default: true
+      handler: "src.core.gateway.adapters:framework_hot_reload_scan_adapter"
+
+    - scenario: "framework.hot-reload.activate"
+      version: "v1.0.0"
+      domain: "framework"
+      description: "跟随指定版本将处于 STAGED 状态的 Python 模块原子载入内存生效"
+      is_default: true
+      handler: "src.core.gateway.adapters:framework_hot_reload_activate_adapter"
+
+    - scenario: "framework.gateway.reload"
+      version: "v1.0.0"
+      domain: "framework"
+      description: "网关与框架统一重载：感知文件变动、随版本原子加载模块并重载场景路由"
+      is_default: true
+      handler: "src.core.gateway.adapters:framework_gateway_reload_adapter"
+
+    - scenario: "gateway.rules"
+      version: "v1.0.0"
+      domain: "framework"
+      description: "自省统一网关当前已挂载的所有场景路由与版本策略"
+      is_default: true
+      handler: "src.core.gateway.adapters:gateway_rules_adapter"
+
 

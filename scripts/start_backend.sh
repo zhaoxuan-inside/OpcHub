@@ -25,8 +25,13 @@ if [ -f "backend/.venv/bin/python3" ]; then
     PYTHON_CMD="backend/.venv/bin/python3"
 fi
 
-echo "[*] Starting OpcHub Backend Server in background..."
-PYTHONPATH="$PROJECT_ROOT/backend:$PROJECT_ROOT" setsid $PYTHON_CMD -m uvicorn src.main:app --host "$HOST" --port "$PORT" --app-dir "$PROJECT_ROOT/backend" > "$LOG_FILE" 2>&1 &
+RELOAD_ARG=""
+if [ "${BACKEND_RELOAD:-1}" = "1" ]; then
+    RELOAD_ARG="--reload --reload-dir $PROJECT_ROOT/backend/src"
+fi
+
+echo "[*] Starting OpcHub Backend Server in background (hot-reload: ${BACKEND_RELOAD:-1})..."
+PYTHONPATH="$PROJECT_ROOT/backend:$PROJECT_ROOT" setsid $PYTHON_CMD -m uvicorn src.main:app --host "$HOST" --port "$PORT" --app-dir "$PROJECT_ROOT/backend" $RELOAD_ARG > "$LOG_FILE" 2>&1 &
 NEW_PID=$!
 echo "$NEW_PID" > "$PID_FILE"
 

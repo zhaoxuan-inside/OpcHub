@@ -216,6 +216,8 @@ def test_gateway_auth_rest_equivalents():
     resp_sess = _post("auth.session", {"token": token})
     assert resp_sess.json()["code"] == 200
     assert resp_sess.json()["data"]["email"] == email
+    assert resp_sess.json()["data"]["valid"] is True
+    assert resp_sess.json()["data"]["authenticated"] is True
 
     # auth.session without token -> error (no valid session)
     client.headers.pop("Authorization", None)
@@ -225,3 +227,121 @@ def test_gateway_auth_rest_equivalents():
     # auth.session with invalid token -> error
     resp_sess_invalid = _post("auth.session", {"token": "invalid.token.signature"})
     assert resp_sess_invalid.json()["code"] != 200
+
+
+@pytest.mark.asyncio
+async def test_three_login_modes():
+    """Verify that user can log in via:
+    1. Account + Password (using username/nickname, uid, or email)
+    2. Email + Verification Code
+    3. Email + Password
+    """
+    ts = int(time.time() * 1000)
+    email = f"multi_mode_{ts}@opchub.cn"
+    nick = f"Nick_{ts}"
+    pwd = "ModePassword#2026"
+
+    # Register user
+    reg_req = UserRegisterRequest(
+        email=email,
+        password=pwd,
+        nickname=nick,
+        company_name="多模式登录创客工坊",
+    )
+    reg_res = await user_service.register_by_email(reg_req)
+    uid = reg_res.uid
+
+    # 1. Account + Password (using nickname)
+    login_acc_nick = await user_service.login_by_email(UserLoginRequest(
+        login_type="account_password",
+        account=nick,
+        password=pwd,
+    ))
+    assert login_acc_nick.uid == uid
+    assert login_acc_nick.email == email
+
+    # 1b. Account + Password (using uid)
+    login_acc_uid = await user_service.login_by_email(UserLoginRequest(
+        login_type="account_password",
+        account=uid,
+        password=pwd,
+    ))
+    assert login_acc_uid.uid == uid
+
+    # 1c. Account + Password with wrong password -> raises ValueError
+    with pytest.raises(ValueError, match="密码错误"):
+        await user_service.login_by_email(UserLoginRequest(
+            login_type="account_password",
+            account=nick,
+            password="WrongPassword!",
+        ))
+
+    # 2. Email + Verification Code
+    # Dispatch code
+    code_res = user_service.send_verification_code(email)
+    assert code_res["sent"] is True
+    # Retrieve code from store
+    from src.domains.user.verification import email_verification_service
+    code = email_verification_service.get_last_code(email)
+    assert code is not None
+
+    # Login with valid code
+    login_code_res = await user_service.login_by_email(UserLoginRequest(
+        login_type="email_code",
+        email=email,
+        code=code,
+    ))
+    assert login_code_res.uid == uid
+    assert login_code_res.email == email
+
+    # Login with invalid code -> raises ValueError
+    with pytest.raises(ValueError, match="验证码"):
+        await user_service.login_by_email(UserLoginRequest(
+            login_type="email_code",
+            email=email,
+            code="000000",
+        ))
+
+    # 3. Email + Password
+    login_email_pwd = await user_service.login_by_email(UserLoginRequest(
+        login_type="email_password",
+        email=email,
+        password=pwd,
+    ))
+    assert login_email_pwd.uid == uid
+    assert login_email_pwd.email == email
+
+    # 4. Gateway dispatching test for all three modes
+    # 4a. Gateway Account + Password
+    gw_acc_res = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.login",
+        "version": "v1.0.0",
+        "payload": {"login_type": "account_password", "account": nick, "password": pwd},
+    })
+    assert gw_acc_res.status_code == 200
+    assert gw_acc_res.json()["code"] == 200
+    assert gw_acc_res.json()["data"]["uid"] == uid
+
+    # 4b. Gateway Email + Code
+    user_service.send_verification_code(email)
+    code2 = email_verification_service.get_last_code(email)
+    gw_code_res = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.login",
+        "version": "v1.0.0",
+        "payload": {"login_type": "email_code", "email": email, "code": code2},
+    })
+    assert gw_code_res.status_code == 200
+    assert gw_code_res.json()["code"] == 200
+    assert gw_code_res.json()["data"]["uid"] == uid
+
+    # 4c. Gateway Email + Password
+    gw_email_pwd_res = client.post("/api/welcom/opc_world", json={
+        "scenario": "auth.login",
+        "version": "v1.0.0",
+        "payload": {"login_type": "email_password", "email": email, "password": pwd},
+    })
+    assert gw_email_pwd_res.status_code == 200
+    assert gw_email_pwd_res.json()["code"] == 200
+    assert gw_email_pwd_res.json()["data"]["uid"] == uid
+
+

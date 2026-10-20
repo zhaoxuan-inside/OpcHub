@@ -47,6 +47,7 @@ class OrchestrationService:
         topo_vat = {
             "topology": "DAG",
             "entry_node": "dnode-1",
+            "exit_node": "dnode-4",
             "nodes": [
                 {"id": "dnode-1", "action_handler": "gateway_ingress", "type": "GATEWAY"},
                 {"id": "dnode-2", "action_handler": "auth_guard", "type": "GUARD"},
@@ -72,6 +73,7 @@ class OrchestrationService:
         topo_startup = {
             "topology": "DAG",
             "entry_node": "step_auth",
+            "exit_node": "step_compliance",
             "nodes": [
                 {"id": "step_auth", "action_handler": "auth_guard", "type": "GUARD"},
                 {"id": "step_tax_calc", "action_handler": "policy.calculate_tax", "type": "BIZ"},
@@ -99,6 +101,7 @@ class OrchestrationService:
         topo_policy = {
             "topology": "DAG",
             "entry_node": "step_ingress",
+            "exit_node": "step_audit",
             "nodes": [
                 {"id": "step_ingress", "action_handler": "gateway_ingress", "type": "GATEWAY"},
                 {"id": "step_auth", "action_handler": "auth_guard", "type": "GUARD"},
@@ -126,6 +129,7 @@ class OrchestrationService:
         topo_home = {
             "topology": "DAG",
             "entry_node": "step_metrics",
+            "exit_node": "step_agg",
             "nodes": [
                 {"id": "step_metrics", "action_handler": "home.metrics.collector", "type": "BIZ"},
                 {"id": "step_sitemap", "action_handler": "home.sitemap.builder", "type": "BIZ"},
@@ -149,6 +153,7 @@ class OrchestrationService:
         topo_forum_thread = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "forum.thread.validate_guard", "type": "GUARD"},
@@ -173,6 +178,7 @@ class OrchestrationService:
         topo_forum_comment = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "forum.comment.validate_guard", "type": "GUARD"},
@@ -197,6 +203,7 @@ class OrchestrationService:
         topo_product_publish = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "product.validate_guard", "type": "GUARD"},
@@ -221,6 +228,7 @@ class OrchestrationService:
         topo_policy_match = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "policy.qualify_guard", "type": "GUARD"},
@@ -247,6 +255,7 @@ class OrchestrationService:
         topo_policy_publish = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "policy.publish.guard", "type": "GUARD"},
@@ -271,6 +280,7 @@ class OrchestrationService:
         topo_demand_publish = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "demand.publish.guard", "type": "GUARD"},
@@ -295,6 +305,7 @@ class OrchestrationService:
         topo_demand_bid = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "demand.bid.guard", "type": "GUARD"},
@@ -319,6 +330,7 @@ class OrchestrationService:
         topo_sop_render = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "sop.document.validate_guard", "type": "GUARD"},
@@ -343,6 +355,7 @@ class OrchestrationService:
         topo_perk_claim = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "perk.claim.guard", "type": "GUARD"},
@@ -367,6 +380,7 @@ class OrchestrationService:
         topo_perk_publish = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "perk.publish.guard", "type": "GUARD"},
@@ -391,6 +405,7 @@ class OrchestrationService:
         topo_compliance_audit = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "compliance.audit.guard", "type": "GUARD"},
@@ -415,6 +430,7 @@ class OrchestrationService:
         topo_moderation_takedown = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "moderation.takedown.guard", "type": "GUARD"},
@@ -439,6 +455,7 @@ class OrchestrationService:
         topo_moderation_restore = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "moderation.restore.guard", "type": "GUARD"},
@@ -463,6 +480,7 @@ class OrchestrationService:
         topo_ops_dashboard = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "telemetry.dashboard.guard", "type": "GUARD"},
@@ -489,6 +507,7 @@ class OrchestrationService:
         topo_user_profile = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "user.profile.guard", "type": "GUARD"},
@@ -513,6 +532,7 @@ class OrchestrationService:
         topo_user_activate = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "user.entitlement.activate.guard", "type": "GUARD"},
@@ -537,6 +557,7 @@ class OrchestrationService:
         topo_orch_control = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
                 {"id": "step_guard", "action_handler": "orchestration.control.guard", "type": "GUARD"},
@@ -561,6 +582,7 @@ class OrchestrationService:
         topo_orch_ops_list = {
             "topology": "DAG",
             "entry_node": "step_guard",
+            "exit_node": "step_collect",
             "enable_saga_compensation": False,
             "nodes": [
                 {"id": "step_guard", "action_handler": "orchestration.operators.guard", "type": "GUARD"},

@@ -85,7 +85,7 @@
             v-model="form.email"
             type="email"
             class="glass-input"
-            placeholder="例如: yourname@opchub.cn 或 常用邮箱"
+            placeholder="例如: yourname@gmail.com 或 qq.com / 163.com"
             style="width: 100%; box-sizing: border-box;"
           />
         </div>
@@ -245,19 +245,39 @@
         <!-- Industry Track Selection -->
         <div>
           <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">
-            意向业务赛道 (有助于定制工作台)
+            意向业务赛道
           </label>
           <div style="display: flex; flex-wrap: wrap; gap: 6px;">
             <span
               v-for="track in tracks"
               :key="track"
               class="track-pill"
-              :style="form.industry_track === track ? { background: 'var(--accent-glass)', border: '1px solid var(--accent)', color: 'var(--text-primary)' } : { background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border-subtle)', color: 'var(--text-secondary)' }"
-              style="font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer;"
-              @click="form.industry_track = track"
+              :style="form.industry_track === track && !isCustomTrack ? { background: 'var(--accent-glass)', border: '1px solid var(--accent)', color: 'var(--text-primary)' } : { background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border-subtle)', color: 'var(--text-secondary)' }"
+              style="font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer; transition: all 0.2s;"
+              @click="selectPresetTrack(track)"
             >
               {{ track }}
             </span>
+            <span
+              class="track-pill"
+              :style="isCustomTrack ? { background: 'var(--accent-glass)', border: '1px solid var(--accent)', color: 'var(--text-primary)' } : { background: 'var(--glass-surface-subtle)', border: '1px solid var(--glass-border-subtle)', color: 'var(--text-secondary)' }"
+              style="font-size: 11px; padding: 3px 9px; border-radius: 12px; cursor: pointer; transition: all 0.2s;"
+              @click="enableCustomTrack"
+            >
+              + 自定义
+            </span>
+          </div>
+          <div v-if="isCustomTrack" style="margin-top: 8px;">
+            <input
+              ref="customTrackInputRef"
+              v-model="customTrackInput"
+              type="text"
+              class="glass-input"
+              placeholder="请输入自定义业务赛道名称（如：数字游民、私域电商、独立游戏等）"
+              maxlength="40"
+              style="width: 100%; box-sizing: border-box; font-size: 12px;"
+              @input="onCustomTrackInput"
+            />
           </div>
         </div>
 
@@ -280,6 +300,14 @@
               ，承诺严格遵循国家法律法规及一人公司合规经营守则。
             </span>
           </label>
+        </div>
+
+        <!-- Success Alert -->
+        <div
+          v-if="codeSentSuccess"
+          style="color: #34c759; font-size: 12px; padding: 6px 10px; background: rgba(52, 199, 89, 0.1); border: 1px solid rgba(52, 199, 89, 0.2); border-radius: var(--radius-sm);"
+        >
+          ✓ {{ codeSentSuccess }}
         </div>
 
         <!-- Error Alert -->
@@ -356,7 +384,30 @@ const verifiedCaptchaId = ref('');
 const sendingCode = ref(false);
 const submitting = ref(false);
 const errorMessage = ref('');
+const codeSentSuccess = ref('');
 const agreeError = ref(false);
+
+const isCustomTrack = ref(false);
+const customTrackInput = ref('');
+const customTrackInputRef = ref(null);
+
+function selectPresetTrack(track) {
+  isCustomTrack.value = false;
+  form.industry_track = track;
+}
+
+function enableCustomTrack() {
+  isCustomTrack.value = true;
+  form.industry_track = customTrackInput.value.trim();
+  setTimeout(() => {
+    customTrackInputRef.value?.focus();
+  }, 50);
+}
+
+function onCustomTrackInput() {
+  form.industry_track = customTrackInput.value.trim();
+}
+
 
 const cooldownSeconds = ref(0);
 let cooldownTimer = null;
@@ -458,6 +509,7 @@ async function handleSendCode() {
     const res = await dispatchGateway('auth.send-code', payload);
     if (!res.ok) {
       errorMessage.value = res.error || '验证码发送失败';
+      codeSentSuccess.value = '';
       if (!captchaVerified.value) {
         refreshCaptcha();
       }
@@ -466,10 +518,16 @@ async function handleSendCode() {
 
     captchaVerified.value = true;
     verifiedCaptchaId.value = captchaId.value;
+    codeSentSuccess.value = res.data?.message || '验证码已发送至您的邮箱，5分钟内有效';
+    if (res.data?.mock_code) {
+      form.verification_code = res.data.mock_code;
+    }
+    errorMessage.value = '';
 
     startCooldown(60);
   } catch (e) {
     errorMessage.value = '网络异常，验证码发送失败';
+    codeSentSuccess.value = '';
   } finally {
     sendingCode.value = false;
   }
@@ -512,6 +570,10 @@ async function handleSubmit() {
   }
   if (form.account_type !== 'MAKER' && !form.company_name.trim()) {
     errorMessage.value = '一人公司或企业主体必须填写主体名称';
+    return;
+  }
+  if (isCustomTrack.value && !form.industry_track.trim()) {
+    errorMessage.value = '请输入自定义业务赛道名称';
     return;
   }
   if (!form.agreed_terms) {

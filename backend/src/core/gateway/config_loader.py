@@ -226,3 +226,17 @@ class GatewayConfigLoader:
 
         logger.info(f"Loaded {count} gateway routes from configuration into ScenarioRouter.")
         return count
+
+
+def load_scenario_routes_from_yaml(
+    router: ScenarioRouter = scenario_router,
+    config_path: Optional[str] = None,
+    clear_existing: bool = True,
+) -> int:
+    """Convenience alias to load and register routes into ScenarioRouter."""
+    return GatewayConfigLoader.apply_routes_to_router(
+        config_path=config_path,
+        router=router,
+        clear_existing=clear_existing,
+    )
+

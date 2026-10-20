@@ -1,7 +1,7 @@
 """User, authentication, and entitlement management service."""
 import re
 import uuid
-from typing import Dict, Set, Optional, Any
+from typing import Dict, Set, Optional, Any, List
 
 from src.core.config import settings
 from src.core.security import hash_password, verify_password, create_session_token, verify_session_token
@@ -20,6 +20,8 @@ from src.domains.user.models import (
 from src.domains.user.verification import (
     captcha_service,
     email_verification_service,
+    email_provider_registry,
+    email_dispatcher,
     PasswordPolicyService,
     LegalAgreementsRepository,
 )
@@ -92,50 +94,37 @@ class UserService:
         return len(rows)
 
     def _seed_default_entitlements(self):
-        items = [
-            (
-                "ent_microkernel_pipeline",
-                "超级个体全链路出海与合规通道",
-                "STANDARD",
-                0.0,
-                "一站式连通海外支付结算、企业合规自检与政务申报全套通道。",
-                "实时就绪",
-            ),
-            (
-                "ent_policy_radar_basic",
-                "全国与地方政策雷达白话提炼",
-                "STANDARD",
-                0.0,
-                "免费查阅与匹配国家级增值税与小微企业免税政策。",
-                "实时全量",
-            ),
-            (
-                "ent_ai_tax_assistant",
-                "AI 政策智能测算与申报材料极速出具",
-                "PRO",
-                199.0,
-                "解锁一键生成符合政务标准的设立登记、软著申报全套文书。",
-                "无限次导出",
-            ),
-            (
-                "ent_black_diamond_priority",
-                "黑钻合伙人 VIP 优先需求派单特权",
-                "BLACK_DIAMOND",
-                899.0,
-                "获得企业技术外包与出海委托优先推荐接单权限，技术担保履约背书。",
-                "顶格优先派单",
-            ),
+        """Load entitlements catalog from external seed data file (zero hardcoded catalog data in code)."""
+        import json
+        from pathlib import Path
+
+        search_paths = [
+            Path("backend/data/seeds/entitlements.json"),
+            Path("data/seeds/entitlements.json"),
+            Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "entitlements.json",
         ]
-        for eid, name, tier, price, desc, quota in items:
-            self._entitlements[eid] = EntitlementItem(
-                id=eid,
-                name=name,
-                tier=tier,
-                price_cny=price,
-                description=desc,
-                is_active=(eid in self._active_entitlements),
-                quota_desc=quota,
-            )
+        items_raw: List[Dict[str, Any]] = []
+        for p in search_paths:
+            if p.is_file():
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        items_raw = json.load(f)
+                    break
+                except Exception:
+                    pass
+
+        for raw in items_raw:
+            eid = raw.get("id")
+            if eid:
+                self._entitlements[eid] = EntitlementItem(
+                    id=eid,
+                    name=raw.get("name", ""),
+                    tier=raw.get("tier", "STANDARD"),
+                    price_cny=float(raw.get("price_cny", 0.0)),
+                    description=raw.get("description", ""),
+                    is_active=(eid in self._active_entitlements) or bool(raw.get("is_active", False)),
+                    quota_desc=raw.get("quota_desc", ""),
+                )
 
     def validate_email(self, email: str) -> bool:
         """Validate standard email format."""
@@ -176,6 +165,14 @@ class UserService:
     def get_legal_agreements(self) -> Dict[str, Any]:
         """Retrieve statutory platform user terms and privacy policy documents."""
         return LegalAgreementsRepository.get_agreements()
+
+    def get_supported_mail_providers(self) -> List[Dict[str, Any]]:
+        """List all supported commercial email providers and preset metadata."""
+        return email_provider_registry.list_supported_providers()
+
+    def resolve_mail_provider(self, email: str) -> Dict[str, Any]:
+        """Resolve email provider preset and active configuration state."""
+        return email_dispatcher.get_provider_config(email)
 
     async def register_by_email(self, req: UserRegisterRequest) -> AuthSessionResponse:
         """Register a new maker using email, password, and commercial validations."""
@@ -301,38 +298,33 @@ class UserService:
             message="商用创客账号注册成功，已初始化超级个体工作区！",
         )
 
-    async def login_by_email(self, req: UserLoginRequest) -> AuthSessionResponse:
-        """Authenticate user by email and password, issuing a signed session token."""
-        email = req.email.strip().lower()
-
-        # Try fetching from DB
-        db_user = await db_repository.get_user_by_email(email)
-        user_record = None
+    async def _fetch_user_record_by_email(self, email: str) -> Optional[Dict[str, Any]]:
+        clean_email = email.strip().lower()
+        db_user = await db_repository.get_user_by_email(clean_email)
         if db_user is not None:
-            meta = db_user.metadata_payload or {}
-            user_record = {
-                "uid": db_user.uid,
-                "email": db_user.email,
-                "nickname": db_user.nickname,
-                "role": db_user.role,
-                "company_name": db_user.company_name or "",
-                "tier_name": meta.get("tier_name", "标准创客"),
-                "account_type": meta.get("account_type", "MAKER"),
-                "industry_track": meta.get("industry_track", ""),
-                "password_hash": db_user.password_hash,
-                "must_change_password": bool(meta.get("must_change_password", False)),
-            }
-        elif email in self._users_by_email:
-            user_record = self._users_by_email[email]
+            return self._record_from_db_user(db_user)
+        if clean_email in self._users_by_email:
+            return self._users_by_email[clean_email]
+        return None
 
-        if not user_record:
-            raise ValueError("该邮箱未注册或密码不正确")
+    async def _fetch_user_record_by_account(self, account: str) -> Optional[Dict[str, Any]]:
+        clean = account.strip()
+        clean_lower = clean.lower()
+        db_user = await db_repository.get_user_by_account(clean)
+        if db_user is not None:
+            return self._record_from_db_user(db_user)
+        if clean_lower in self._users_by_email:
+            return self._users_by_email[clean_lower]
+        if clean in self._users_by_uid:
+            return self._users_by_uid[clean]
+        for u in self._users_by_uid.values():
+            if u.get("nickname") == clean or u.get("email") == clean_lower:
+                return u
+        return None
 
-        pwd_hash = user_record.get("password_hash")
-        if not pwd_hash or not verify_password(req.password, pwd_hash):
-            raise ValueError("邮箱或密码错误")
-
-        # Issue signed token (carries must_change_password for first-login enforcement)
+    def _build_auth_session_response(
+        self, user_record: Dict[str, Any], message: str = "登录成功，已恢复创客工作台会话"
+    ) -> AuthSessionResponse:
         must_chg = bool(user_record.get("must_change_password", False))
         token = create_session_token({
             "uid": user_record["uid"],
@@ -342,7 +334,6 @@ class UserService:
             "account_type": user_record.get("account_type", "MAKER"),
             "must_change_password": must_chg,
         })
-
         return AuthSessionResponse(
             token=token,
             uid=user_record["uid"],
@@ -353,9 +344,81 @@ class UserService:
             tier_name=user_record.get("tier_name", "标准创客"),
             account_type=user_record.get("account_type", "MAKER"),
             industry_track=user_record.get("industry_track", ""),
-            message="登录成功，已恢复创客工作台会话",
+            message=message,
             must_change_password=must_chg,
         )
+
+    async def login_by_email(self, req: UserLoginRequest) -> AuthSessionResponse:
+        """Authenticate user by account/password, email/code, or email/password."""
+        login_type = req.login_type or ""
+        code = req.code or req.verification_code
+        email = (req.email or "").strip().lower()
+        account = (req.account or "").strip()
+
+        # Deduce login_type if not explicitly set
+        if not login_type:
+            if code:
+                login_type = "email_code"
+            elif account and not email:
+                login_type = "account_password"
+            else:
+                login_type = "email_password"
+
+        if login_type == "email_code":
+            if not email:
+                raise ValueError("请输入登录邮箱")
+            if not self.validate_email(email):
+                raise ValueError(f"邮箱格式不正确: {email}")
+            if not code:
+                raise ValueError("请输入邮箱验证码")
+
+            if not email_verification_service.verify_code(email, code):
+                raise ValueError("邮箱验证码错误或已失效，请重新获取")
+
+            user_record = await self._fetch_user_record_by_email(email)
+            if not user_record:
+                raise ValueError("该邮箱尚未注册创客账号，请先完成注册")
+
+            return self._build_auth_session_response(user_record, message="验证码核验成功，已恢复创客工作台会话")
+
+        elif login_type == "account_password":
+            target_account = account or email
+            if not target_account:
+                raise ValueError("请输入创客账号、用户名或邮箱")
+            if not req.password:
+                raise ValueError("请输入登录密码")
+
+            user_record = await self._fetch_user_record_by_account(target_account)
+            if not user_record:
+                raise ValueError("该账号未注册或不存在")
+
+            pwd_hash = user_record.get("password_hash")
+            if not pwd_hash or not verify_password(req.password, pwd_hash):
+                raise ValueError("账号或密码错误")
+
+            return self._build_auth_session_response(user_record, message="登录成功，已恢复创客工作台会话")
+
+        else:  # email_password
+            target_email = email or account
+            if not target_email:
+                raise ValueError("请输入登录邮箱")
+            if not req.password:
+                raise ValueError("请输入登录密码")
+
+            user_record = await self._fetch_user_record_by_email(target_email)
+            if not user_record:
+                user_record = await self._fetch_user_record_by_account(target_email)
+
+            if not user_record:
+                raise ValueError("该邮箱未注册或密码不正确")
+
+            pwd_hash = user_record.get("password_hash")
+            if not pwd_hash or not verify_password(req.password, pwd_hash):
+                raise ValueError("邮箱或密码错误")
+
+            return self._build_auth_session_response(user_record, message="登录成功，已恢复创客工作台会话")
+
+    login_user = login_by_email
 
     async def get_session_by_token(self, token: str) -> AuthSessionResponse | None:
         """Decode and verify session token, returning session response or None."""
@@ -419,6 +482,8 @@ class UserService:
                 company_name="",
                 credit_code="",
                 tier_name="访客创客",
+                account_type="MAKER",
+                industry_track="",
                 phone="",
                 email="",
                 entitlements=ent_list,
@@ -431,6 +496,8 @@ class UserService:
             company = user_record.get("company_name", "")
             credit_code = user_record.get("credit_code", "")
             tier_name = user_record.get("tier_name", "标准创客")
+            account_type = user_record.get("account_type", "MAKER")
+            industry_track = user_record.get("industry_track", "")
             phone = user_record.get("phone", "")
             email = user_record.get("email", "")
         else:
@@ -439,6 +506,8 @@ class UserService:
             company = ""
             credit_code = ""
             tier_name = "标准创客"
+            account_type = "MAKER"
+            industry_track = ""
             phone = ""
             email = ""
 
@@ -456,6 +525,8 @@ class UserService:
             company_name=company,
             credit_code=credit_code,
             tier_name=tier_name,
+            account_type=account_type,
+            industry_track=industry_track,
             phone=phone,
             email=email,
             entitlements=ent_list,
@@ -496,6 +567,8 @@ class UserService:
             user_record["company_name"] = req.company_name.strip()
         if req.credit_code is not None:
             user_record["credit_code"] = req.credit_code.strip()
+        if req.industry_track is not None:
+            user_record["industry_track"] = req.industry_track.strip()
 
         # Update DB if available
         metadata_patch: Dict[str, Any] = {}
@@ -503,6 +576,8 @@ class UserService:
             metadata_patch["phone"] = req.phone.strip()
         if req.credit_code is not None:
             metadata_patch["credit_code"] = req.credit_code.strip()
+        if req.industry_track is not None:
+            metadata_patch["industry_track"] = req.industry_track.strip()
         await db_repository.update_user_fields(
             uid,
             nickname=req.nickname.strip() if req.nickname is not None else None,

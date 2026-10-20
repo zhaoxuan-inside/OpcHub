@@ -43,6 +43,30 @@ class PerkService:
         domain_persistence.write("perks.items", pid, perk)
         return perk
 
+    def validate_publish_payload(self, inputs: dict) -> dict:
+        name = inputs.get("name", "").strip()
+        provider = inputs.get("provider", "").strip()
+        val = float(inputs.get("value_cny", 0.0))
+        summary = inputs.get("summary", "").strip()
+
+        if len(name) < 2:
+            raise ValueError("Perk name must be at least 2 characters long")
+        if len(provider) < 2:
+            raise ValueError("Perk provider must be at least 2 characters long")
+        if val < 0:
+            raise ValueError("Perk value_cny cannot be negative")
+        if len(summary) < 5:
+            raise ValueError("Perk summary must be at least 5 characters long")
+        return {
+            "guard_passed": True,
+            "name": name,
+            "provider": provider,
+            "value_cny": val,
+            "category": inputs.get("category", "CLOUD"),
+            "summary": summary,
+            "quota_remaining": int(inputs.get("quota_remaining", 100)),
+        }
+
     def claim_perk(self, req: PerkClaimRequest) -> PerkClaimResponse:
         if req.perk_id not in self._perks:
             raise KeyError(f"Perk {req.perk_id} not found")

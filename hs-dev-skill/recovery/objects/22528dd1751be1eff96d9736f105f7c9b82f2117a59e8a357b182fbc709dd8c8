@@ -1,0 +1,31 @@
+# ==============================================================================
+# Mock Dataset: Content Moderation & Sensitive Keywords
+# Shared by both HTTP Mock Server and Automated Test Suites
+# ==============================================================================
+keywords:
+  - "代开假发票"
+  - "内嵌自设资金池"
+  - "洗钱"
+  - "非法集资"
+  - "地下钱庄"
+  - "高利贷"
+  - "虚开发票"
+
+test_cases:
+  safe_samples:
+    - "欢迎加入 OpcHub 独立开发者与一人公司赋能平台，共同探索商业化新思路！"
+    - "欢迎来到一人公司平台分享经验"
+    - "合法合规的开源商业项目"
+  prohibited_samples:
+    - text: "承接各类代开假发票业务，并协助内嵌自设资金池结算。"
+      expected_hits:
+        - "代开假发票"
+        - "内嵌自设资金池"
+    - text: "提供地下钱庄洗钱与非法集资通道"
+      expected_hits:
+        - "地下钱庄"
+        - "洗钱"
+        - "非法集资"
+  dynamic_lifecycle:
+    sample_dynamic_word: "零风险刷单赚佣金"
+    template_text: "推荐一个副业项目：{word}，日入过千。"
