@@ -1,0 +1,1318 @@
+{
+  "stages": [
+    {
+      "stage": 1,
+      "name": "阶段 01: 主体定名与税种选型",
+      "code": "STAGE_TAX_ENTITY",
+      "description": "从个体工商户到一人有限责任公司的低税率架构选型与核名申请"
+    },
+    {
+      "stage": 2,
+      "name": "阶段 02: 银行基本户与发票授信",
+      "code": "STAGE_BANK_INVOICE",
+      "description": "开立企业级银行结算账户与申请小规模纳税人电子数电发票授信"
+    },
+    {
+      "stage": 3,
+      "name": "阶段 03: 软著申报与技术入库",
+      "code": "STAGE_IP_COPYRIGHT",
+      "description": "核心软件知识产权代码封包、软著加急通道与科技型中小企业入库"
+    },
+    {
+      "stage": 4,
+      "name": "阶段 04: 跨境结汇通道配置",
+      "code": "STAGE_CROSS_BORDER",
+      "description": "Stripe、Mercury、PingPong 等出海跨境资金安全合规收结汇"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "tpl_individual_biz_reg",
+      "kind": "document",
+      "code": "INDIVIDUAL_BIZ_REGISTRATION",
+      "name": "个体工商户设立登记申请书",
+      "stage": 1,
+      "category": "ENTITY",
+      "description": "个人或家庭经营从事工业、商业、服务业等活动的登记申请书，是设立个体工商户的法定载体。",
+      "outcome": "拿到《个体工商户营业执照》，你就能以个体户身份对外签合同、开票收款。",
+      "next_hint": "拿到执照后 30 天内记得去税务局做税务登记，否则会被认定为非正常户。",
+      "unlocks": [
+        "对公签合同与开发票",
+        "申请个体户政策补贴",
+        "以个体户身份注册收款账户"
+      ],
+      "template_content": "个体工商户设立登记申请书\n\n申请人（经营者）姓名：{owner_name}\n身份证件号码：{id_number}\n经营场所（地址）：{address}\n经营范围：{biz_scope}\n\n经营者签字：{owner_name}\n申请日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "owner_name",
+          "label": "经营者姓名",
+          "type": "string",
+          "required": true,
+          "help": "这里填身份证上的姓名，必须和营业执照上的一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "不要填昵称或网名",
+            "姓名后不要加「先生/女士」",
+            "与身份证必须完全一致"
+          ],
+          "source": "本人身份证"
+        },
+        {
+          "key": "id_number",
+          "label": "身份证件号码",
+          "type": "string",
+          "required": true,
+          "help": "填 18 位身份证号码。系统会联网核验，不用你上传证件。",
+          "example": "330106199001011234",
+          "pitfalls": [
+            "末位校验位不要填错",
+            "填错会导致当场退件"
+          ],
+          "source": "本人身份证"
+        },
+        {
+          "key": "address",
+          "label": "经营场所（地址）",
+          "type": "string",
+          "required": true,
+          "help": "实际经营的地址。住宅也可以登记，但部分城市需要提交「住改商」材料。",
+          "example": "浙江省杭州市西湖区文三路 478 号华星时代广场 2 幢 1203 室",
+          "pitfalls": [
+            "住宅地址在部分城区需要经营场所使用证明",
+            "地址要精确到门牌号"
+          ],
+          "source": "房产证 / 租赁合同"
+        },
+        {
+          "key": "biz_scope",
+          "label": "经营范围",
+          "type": "text",
+          "required": true,
+          "help": "按市场监管总局的标准表述写，可以参考「全国标准规范化服务业经营范围目录」。",
+          "example": "软件开发；信息技术咨询服务；人工智能应用软件开发；互联网销售（除销售需要许可的商品）。",
+          "pitfalls": [
+            "不要写「等」字，审批时会被退回",
+            "涉及许可的表述（如「食品销售」）需要额外办许可证",
+            "把主营和兼营都列上，避免后续加项"
+          ],
+          "source": "国家市场监管总局经营范围规范表述目录"
+        },
+        {
+          "key": "apply_date",
+          "label": "申请日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交登记申请当天的日期。",
+          "example": "2026-11-05",
+          "pitfalls": [
+            "不要填未来的日期"
+          ],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "个体工商户设立登记的官方标准申请书，填完即可提交市场监管部门核发营业执照。",
+      "author_name": "张文远",
+      "author_title": "国家市场监管总局注册局高级审核员",
+      "publisher_org": "国家市场监督管理总局",
+      "is_official": true,
+      "published_at": "2026-03-12",
+      "like_count": 2841,
+      "favorite_count": 1263,
+      "usage_count": 18742
+    },
+    {
+      "id": "tpl_oneperson_company_reg",
+      "kind": "document",
+      "code": "ONE_PERSON_COMPANY_REGISTRATION",
+      "name": "一人有限责任公司设立登记申请书",
+      "stage": 1,
+      "category": "ENTITY",
+      "description": "以单个自然人股东出资设立有限责任公司的登记申请书，适用于需要承担有限责任的创客。",
+      "outcome": "拿到《一人有限责任公司营业执照》，股东责任以认缴出资额为限。",
+      "next_hint": "接着完成「一人有限责任公司章程」，没有章程银行和税务都不予受理。",
+      "unlocks": [
+        "有限责任保护",
+        "具备投标与资质申请主体资格",
+        "申请研发费用加计扣除"
+      ],
+      "template_content": "一人有限责任公司设立登记申请书\n\n公司名称：{company_name}\n注册资本：人民币 {capital} 万元\n住所：{address}\n经营范围：{biz_scope}\n股东（投资人）：{owner_name}\n\n申请人签字：{owner_name}\n申请日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "公司名称",
+          "type": "string",
+          "required": true,
+          "help": "「行政区划 + 字号 + 行业 + 组织形式」，一般写「XX 有限公司」。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "不得包含「中国」「中华」等禁限用词",
+            "字号至少 2 个汉字",
+            "同一区域内字号不得重复"
+          ],
+          "source": "自行拟定，需先通过名称自主申报"
+        },
+        {
+          "key": "capital",
+          "label": "注册资本（万元）",
+          "type": "number",
+          "required": true,
+          "help": "写你打算认缴的钱数。现在实行认缴制，不用当场实缴，但建议按实际能力填。",
+          "example": "10",
+          "pitfalls": [
+            "填太低影响后续投标与资质",
+            "填太高会带来实缴义务",
+            "一般是 10 万或 50 万"
+          ],
+          "source": "自行填写"
+        },
+        {
+          "key": "owner_name",
+          "label": "股东（投资人）姓名",
+          "type": "string",
+          "required": true,
+          "help": "填你本人姓名，和身份证一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "不要写公司名称",
+            "与身份证必须一致"
+          ],
+          "source": "本人身份证"
+        },
+        {
+          "key": "address",
+          "label": "公司住所",
+          "type": "string",
+          "required": true,
+          "help": "公司的注册地址，与经营地址可以不同。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [
+            "挂靠园区地址需要园区出具证明",
+            "住宅一般不能直接作为公司住所"
+          ],
+          "source": "房产证 / 租赁合同 / 园区入驻证明"
+        },
+        {
+          "key": "biz_scope",
+          "label": "经营范围",
+          "type": "text",
+          "required": true,
+          "help": "公司制主体建议把「技术开发、技术服务、进出口」都列进去，方便后续做加项。",
+          "example": "技术服务、技术开发、技术咨询；软件开发；人工智能应用软件开发；货物及技术进出口。",
+          "pitfalls": [
+            "不要写「等」",
+            "进出口相关表述需要同步办理海关报关单位备案"
+          ],
+          "source": "国家市场监管总局经营范围规范表述目录"
+        },
+        {
+          "key": "apply_date",
+          "label": "申请日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交登记申请当天日期。",
+          "example": "2026-11-05",
+          "pitfalls": [
+            "不要填未来日期"
+          ],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "一人有限责任公司设立登记申请书，明确股东认缴出资额与经营范围。",
+      "author_name": "李知微",
+      "author_title": "企业登记制度改革研究专家",
+      "publisher_org": "国家市场监督管理总局",
+      "is_official": true,
+      "published_at": "2026-04-08",
+      "like_count": 3172,
+      "favorite_count": 1508,
+      "usage_count": 24516
+    },
+    {
+      "id": "tpl_company_articles",
+      "kind": "document",
+      "code": "ONE_PERSON_COMPANY_ARTICLES",
+      "name": "一人有限责任公司章程",
+      "stage": 1,
+      "category": "LEGAL",
+      "description": "规定公司设立、股东权利义务、机构设置与利润分配的公司根本性法律文件，一人公司可由股东兼任执行董事。",
+      "outcome": "章程生效，公司治理结构落地，银行开户和税务登记都要求先有章程。",
+      "next_hint": "章程定稿后连同营业执照一起，去开立对公银行账户。",
+      "unlocks": [
+        "开立对公银行账户",
+        "股东会决议效力",
+        "利润分配与法定公积金提取"
+      ],
+      "template_content": "一人有限责任公司章程\n\n第一条 依据《中华人民共和国公司法》制定本章程。\n第二条 公司名称：{company_name}\n第三条 住所：{address}\n第四条 注册资本：人民币 {capital} 万元，由股东 {owner_name} 认缴。\n第五条 公司不设股东会，由执行董事全权行使经营管理职权。\n第六条 股东以其认缴的出资额为限对公司承担责任。\n第七条 公司依照本章程规定分配利润。\n\n股东签字：{owner_name}\n日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "公司名称",
+          "type": "string",
+          "required": true,
+          "help": "必须与营业执照上的名称完全一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "与营业执照名称不一致会被银行退件"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "capital",
+          "label": "注册资本（万元）",
+          "type": "number",
+          "required": true,
+          "help": "必须与设立登记申请书一致。",
+          "example": "10",
+          "pitfalls": [
+            "两处金额不一致会被认定材料矛盾"
+          ],
+          "source": "设立登记申请书"
+        },
+        {
+          "key": "owner_name",
+          "label": "股东（投资人）姓名",
+          "type": "string",
+          "required": true,
+          "help": "你的姓名，和身份证一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "与设立登记申请书不一致会被退件"
+          ],
+          "source": "本人身份证"
+        },
+        {
+          "key": "address",
+          "label": "公司住所",
+          "type": "string",
+          "required": true,
+          "help": "必须与营业执照登记的住所一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [
+            "不一致会被退件"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "apply_date",
+          "label": "签署日期",
+          "type": "date",
+          "required": true,
+          "help": "填你签署章程的日期。",
+          "example": "2026-11-08",
+          "pitfalls": [
+            "不要早于设立登记申请日"
+          ],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "一人有限责任公司章程标准文本，规定治理结构、股东权利义务与利润分配。",
+      "author_name": "李知微",
+      "author_title": "企业登记制度改革研究专家",
+      "publisher_org": "国家市场监督管理总局",
+      "is_official": true,
+      "published_at": "2026-04-08",
+      "like_count": 2455,
+      "favorite_count": 1187,
+      "usage_count": 21033
+    },
+    {
+      "id": "tpl_tax_registration",
+      "kind": "document",
+      "code": "NEW_TAXPAYER_PACKAGE",
+      "name": "新办纳税人套餐申报表",
+      "stage": 1,
+      "category": "TAX",
+      "description": "面向新设立主体的一次性税务信息确认与纳税人资格认定申报材料，决定你适用小规模还是一般纳税人身份。",
+      "outcome": "完成税务登记，拿到纳税人识别号，具备开票资格。",
+      "next_hint": "税务登记完成后就可以申请数电发票额度。",
+      "unlocks": [
+        "开具增值税发票",
+        "享受小规模纳税人减免政策",
+        "申报企业所得税与增值税"
+      ],
+      "template_content": "新办纳税人套餐申报表\n\n纳税人名称：{company_name}\n统一社会信用代码：{credit_code}\n法定代表人（负责人）：{owner_name}\n注册地址：{address}\n主管税务机关：{tax_office}\n\n纳税人声明：本单位如实填写上述资料，申请办理税务登记及纳税人资格认定。\n\n申请人签章：{owner_name}\n申请日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "纳税人名称",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "不要写简称"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "营业执照右上角的 18 位代码。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [
+            "不要漏掉最后一位",
+            "字母 O 与数字 0 容易看错"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "owner_name",
+          "label": "法定代表人（负责人）",
+          "type": "string",
+          "required": true,
+          "help": "和营业执照上的法定代表人一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "个体户填经营者姓名"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "address",
+          "label": "注册地址",
+          "type": "string",
+          "required": true,
+          "help": "和营业执照注册地址一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [
+            "不一致会被要求更正"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "tax_office",
+          "label": "主管税务机关",
+          "type": "string",
+          "required": true,
+          "help": "按注册地址所在地的税务局名称填写，平台会自动推荐。",
+          "example": "国家税务总局杭州市余杭区税务局",
+          "pitfalls": [
+            "跨区经营要注意实际经营地主管机关",
+            "选错会导致后续申报找不到主管机关"
+          ],
+          "source": "电子税务局地址推荐"
+        },
+        {
+          "key": "apply_date",
+          "label": "申请日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交日期。",
+          "example": "2026-11-12",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "新办纳税人套餐申报表，一次完成税务登记与纳税人资格认定。",
+      "author_name": "王思远",
+      "author_title": "注册税务师 / 财税合规顾问",
+      "publisher_org": "国家税务总局",
+      "is_official": true,
+      "published_at": "2026-05-20",
+      "like_count": 1986,
+      "favorite_count": 942,
+      "usage_count": 16890
+    },
+    {
+      "id": "tpl_bank_account_opening",
+      "kind": "document",
+      "code": "BANK_CROSS_BORDER_ACCOUNT",
+      "name": "小微企业简易开户备案表",
+      "stage": 2,
+      "category": "BANK",
+      "description": "小微企业通过简易程序开立基本存款账户的备案申请材料，用于银行账户备案与账户启用。",
+      "outcome": "拿到对公银行账户，公司资金可以合规收付。",
+      "next_hint": "开户完成后去申请数电发票额度，公司才能正常开票。",
+      "unlocks": [
+        "对公收付款",
+        "代发工资",
+        "申请银行授信与贷款",
+        "绑定 Stripe 等收款工具"
+      ],
+      "template_content": "小微企业简易开户备案表\n\n户名：{company_name}\n统一社会信用代码：{credit_code}\n法定代表人（负责人）：{owner_name}\n注册资本：{capital} 万元\n经营场所：{address}\n开户银行：{bank_name}\n\n备案人签章：{owner_name}\n备案日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "户名",
+          "type": "string",
+          "required": true,
+          "help": "和营业执照一致，账户名必须是全称。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "不能用简称开户",
+            "不能用产品名"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "18 位信用代码，和营业执照一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [
+            "末位字符不要填错"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "owner_name",
+          "label": "法定代表人（负责人）",
+          "type": "string",
+          "required": true,
+          "help": "和营业执照一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "不一致会被银行拒绝开户"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "capital",
+          "label": "注册资本（万元）",
+          "type": "number",
+          "required": true,
+          "help": "和营业执照一致。",
+          "example": "10",
+          "pitfalls": [
+            "与执照不一致会被退件"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "address",
+          "label": "经营场所",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照登记住所一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [
+            "地址不一致是开户被拒的最常见原因"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "bank_name",
+          "label": "开户银行",
+          "type": "string",
+          "required": true,
+          "help": "选一家你实际去办理的银行网点。",
+          "example": "中国工商银行杭州文三路支行",
+          "pitfalls": [
+            "选离你实际经营地远的网点，后续年检会很麻烦"
+          ],
+          "source": "自行选择"
+        },
+        {
+          "key": "apply_date",
+          "label": "备案日期",
+          "type": "date",
+          "required": true,
+          "help": "填到银行办理备案的日期。",
+          "example": "2026-11-20",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "小微企业简易开户备案表，用于开立企业级银行结算账户。",
+      "author_name": "陈慧敏",
+      "author_title": "银行对公业务高级客户经理",
+      "publisher_org": "中国工商银行 · 小微企业金融中心",
+      "is_official": true,
+      "published_at": "2026-06-02",
+      "like_count": 1533,
+      "favorite_count": 806,
+      "usage_count": 12477
+    },
+    {
+      "id": "tpl_invoice_quota",
+      "kind": "document",
+      "code": "DIGITAL_INVOICE_QUOTA",
+      "name": "数电发票授信额度核定申请表",
+      "stage": 2,
+      "category": "TAX",
+      "description": "申请核定增值税数电发票开具额度的申报材料，决定你能开多少金额的发票。",
+      "outcome": "获得数电发票额度，可以按额度随时开票。",
+      "next_hint": "拿到额度后，把开票信息同步给客户，收款流程才闭环。",
+      "unlocks": [
+        "按额度开具数电发票",
+        "申请小规模纳税人减免",
+        "年度汇算清缴时扣除进项"
+      ],
+      "template_content": "数电发票授信额度核定申请表\n\n纳税人名称：{company_name}\n统一社会信用代码：{credit_code}\n申请核定发票额度：{quota} 元\n申请额度依据：{quota_basis}\n\n申请人签章：{owner_name}\n申请日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "纳税人名称",
+          "type": "string",
+          "required": true,
+          "help": "与税务登记信息一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [],
+          "source": "税务登记信息"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "与税务登记一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [],
+          "source": "税务登记信息"
+        },
+        {
+          "key": "quota",
+          "label": "申请核定发票额度（元）",
+          "type": "currency",
+          "required": true,
+          "help": "按你预计的年开票额填写。首次核定通常从 10 万起，后续可调。",
+          "example": "100000",
+          "pitfalls": [
+            "虚高会被税务机关约谈",
+            "填太低会影响客户付款体验"
+          ],
+          "source": "自行测算"
+        },
+        {
+          "key": "quota_basis",
+          "label": "申请额度依据说明",
+          "type": "text",
+          "required": true,
+          "help": "简单说明你的业务模式和预计开票规模，税务机关会据此核定。",
+          "example": "公司为独立软件开发者，主要向企业客户提供 SaaS 订阅与定制开发服务，预计年开票额约 30 万元，客户集中于长三角制造业企业。",
+          "pitfalls": [
+            "不要只写「按需申请」",
+            "要体现业务真实性"
+          ],
+          "source": "自行填写"
+        },
+        {
+          "key": "apply_date",
+          "label": "申请日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交申请当天日期。",
+          "example": "2026-11-22",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "数电发票授信额度核定申请表，决定可开具的发票金额上限。",
+      "author_name": "王思远",
+      "author_title": "注册税务师 / 财税合规顾问",
+      "publisher_org": "国家税务总局",
+      "is_official": true,
+      "published_at": "2026-05-20",
+      "like_count": 1204,
+      "favorite_count": 635,
+      "usage_count": 10218
+    },
+    {
+      "id": "tpl_soft_copyright_application",
+      "kind": "document",
+      "code": "SOFTWARE_COPYRIGHT_APPLICATION",
+      "name": "计算机软件著作权登记申请表",
+      "stage": 3,
+      "category": "IP",
+      "description": "中国版权保护中心软件著作权登记的申请表，用于登记软件名称、版本号与著作权人。",
+      "outcome": "拿到《软件著作权登记证书》，这是申报高新技术企业和各类补贴的硬通货。",
+      "next_hint": "证书下来后，去科技型中小企业评价信息表把你的软著填进去。",
+      "unlocks": [
+        "申报高新技术企业",
+        "申报政府软件类补贴",
+        "证明软件自主研发",
+        "提升投标与采购加分"
+      ],
+      "template_content": "计算机软件著作权登记申请表\n\n软件全称：{software_name}\n简称：{software_short_name}\n版本号：{version}\n开发完成日期：{finish_date}\n首次发表日期：{publish_date}\n著作权人：{company_name}\n权利取得方式：原始取得\n开发方式：独立开发\n\n申请人签章：{owner_name}\n申请日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "software_name",
+          "label": "软件全称",
+          "type": "string",
+          "required": true,
+          "help": "写「XX 平台/系统/软件 V1.0」这种带版本后缀的规范名称。",
+          "example": "极客智造项目管理协同平台 V1.0",
+          "pitfalls": [
+            "必须带版本号",
+            "不能使用他人商标",
+            "名称要和源代码文档标题保持一致"
+          ],
+          "source": "自行拟定"
+        },
+        {
+          "key": "software_short_name",
+          "label": "软件简称",
+          "type": "string",
+          "required": true,
+          "help": "全称的简写，一般 2 到 10 个字。",
+          "example": "极客智造平台",
+          "pitfalls": [
+            "简称不能与全称无关"
+          ],
+          "source": "自行拟定"
+        },
+        {
+          "key": "version",
+          "label": "版本号",
+          "type": "string",
+          "required": true,
+          "help": "按 V1.0、V2.0 递增，注意大写 V。",
+          "example": "V1.0",
+          "pitfalls": [
+            "不要写 1.0",
+            "不要用 beta 之类字样"
+          ],
+          "source": "自行填写"
+        },
+        {
+          "key": "finish_date",
+          "label": "开发完成日期",
+          "type": "date",
+          "required": true,
+          "help": "填软件功能开发完成、可正常运行的日期。",
+          "example": "2026-09-30",
+          "pitfalls": [
+            "不能早于首次发表日期",
+            "填未来日期会被要求补正"
+          ],
+          "source": "自行填写"
+        },
+        {
+          "key": "publish_date",
+          "label": "首次发表日期",
+          "type": "date",
+          "required": true,
+          "help": "填软件第一次对外提供使用的日期；还没发布就填开发完成日期。",
+          "example": "2026-10-05",
+          "pitfalls": [
+            "未发表就填「未发表」而不是空着"
+          ],
+          "source": "自行填写"
+        },
+        {
+          "key": "company_name",
+          "label": "著作权人名称",
+          "type": "string",
+          "required": true,
+          "help": "以公司名义申请就填公司全称，和营业执照一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "个人申请和企业申请后续享受的补贴政策不同",
+            "要和营业执照完全一致"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "apply_date",
+          "label": "申请日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交当天日期。",
+          "example": "2026-10-10",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "计算机软件著作权登记申请表，用于取得软著证书支撑高企与补贴申报。",
+      "author_name": "赵一鸣",
+      "author_title": "知识产权代理机构合伙人",
+      "publisher_org": "中国版权保护中心",
+      "is_official": true,
+      "published_at": "2026-02-16",
+      "like_count": 4021,
+      "favorite_count": 2384,
+      "usage_count": 31205
+    },
+    {
+      "id": "tpl_tech_sme_evaluation",
+      "kind": "document",
+      "code": "TECH_SME_EVALUATION",
+      "name": "科技型中小企业评价信息表",
+      "stage": 3,
+      "category": "IP",
+      "description": "科技型中小企业评价的填报材料，登记企业科技人员、研发项目与知识产权情况。",
+      "outcome": "入库科技型中小企业，可直接享受研发费用加计扣除等税收优惠。",
+      "next_hint": "入库后每年需要重新评价，记得在年度到期前更新。",
+      "unlocks": [
+        "享受研发费用加计扣除",
+        "申报各类科技类补贴",
+        "参加科技型中小企业专项扶持"
+      ],
+      "template_content": "科技型中小企业评价信息表\n\n企业名称：{company_name}\n统一社会信用代码：{credit_code}\n注册地：{address}\n\n科技人员情况\n科技人员总数：{tech_staff_count} 人\n研发费用总额：{rd_expense} 元\n\n知识产权情况\n软件著作权：{copyright_count} 项\n\n企业自评结论：符合科技型中小企业条件。\n\n法定代表人签字：{owner_name}\n填报日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "企业名称",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "address",
+          "label": "注册地",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照注册地址一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "tech_staff_count",
+          "label": "科技人员总数（人）",
+          "type": "number",
+          "required": true,
+          "help": "含技术研发人员，按 180 天累计工作口径统计。",
+          "example": "3",
+          "pitfalls": [
+            "股东本人如参与研发可计入",
+            "纯销售岗不计入"
+          ],
+          "source": "自行统计"
+        },
+        {
+          "key": "rd_expense",
+          "label": "研发费用总额（元）",
+          "type": "currency",
+          "required": true,
+          "help": "上年度实际发生的研发投入，含人员人工与直接投入。",
+          "example": "180000",
+          "pitfalls": [
+            "没有真实研发投入的填 0 会被核查",
+            "需保留辅助账与凭证"
+          ],
+          "source": "财务账与研发辅助账"
+        },
+        {
+          "key": "copyright_count",
+          "label": "软件著作权（项）",
+          "type": "number",
+          "required": true,
+          "help": "填写已取得证书的软著数量。",
+          "example": "2",
+          "pitfalls": [
+            "申请中未下证的不能计入"
+          ],
+          "source": "软著登记证书"
+        },
+        {
+          "key": "apply_date",
+          "label": "填报日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交日期。",
+          "example": "2026-11-02",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "科技型中小企业评价信息表，登记科技人员、研发投入与知识产权情况。",
+      "author_name": "孙晓峰",
+      "author_title": "科技型中小企业评价辅导专家",
+      "publisher_org": "中国中小企业协会",
+      "is_official": true,
+      "published_at": "2026-07-11",
+      "like_count": 1372,
+      "favorite_count": 688,
+      "usage_count": 9315
+    },
+    {
+      "id": "tpl_cross_border_commitment",
+      "kind": "document",
+      "code": "CROSS_BORDER_SETTLEMENT_COMMITMENT",
+      "name": "跨境结汇真实性承诺书",
+      "stage": 4,
+      "category": "CROSS_BORDER",
+      "description": "向银行与外汇管理部门承诺跨境收付交易背景真实性的书面文件。",
+      "outcome": "完成真实性承诺，跨境收付通道正式打通。",
+      "next_hint": "接着完成外汇业务登记表，把你的跨境收支备案进系统。",
+      "unlocks": [
+        "合规收取海外货款",
+        "申请外汇额度与结汇",
+        "绑定 Stripe 等海外收款工具"
+      ],
+      "template_content": "跨境结汇真实性承诺书\n\n承诺人：{company_name}\n统一社会信用代码：{credit_code}\n\n本公司郑重承诺：本次申请办理的跨境收付业务及所提交的全部单证、\n资料真实、准确、完整，交易背景真实合法，不存在虚假交易、\n洗钱等违法违规情形。如有虚假，愿承担相应法律责任。\n\n承诺人（盖章）：{company_name}\n法定代表人：{owner_name}\n承诺日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "承诺人（公司全称）",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致，需盖章。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "必须与营业执照完全一致",
+            "承诺人需加盖公章"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "owner_name",
+          "label": "法定代表人",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "张创客",
+          "pitfalls": [
+            "不一致会被银行退件"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "apply_date",
+          "label": "承诺日期",
+          "type": "date",
+          "required": true,
+          "help": "填签署日期。",
+          "example": "2026-11-28",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "跨境结汇真实性承诺书，是打通海外收付通道的前置法律文件。",
+      "author_name": "周朗",
+      "author_title": "跨境支付合规顾问",
+      "publisher_org": "PingPong · 跨境支付合规中心",
+      "is_official": false,
+      "published_at": "2026-08-25",
+      "like_count": 968,
+      "favorite_count": 521,
+      "usage_count": 6842
+    },
+    {
+      "id": "tpl_fx_business_register",
+      "kind": "document",
+      "code": "FX_BUSINESS_REGISTRATION",
+      "name": "外汇业务登记表",
+      "stage": 4,
+      "category": "CROSS_BORDER",
+      "description": "登记企业经营范围中的进出口与外汇收支业务，供银行办理跨境资金结算。",
+      "outcome": "外汇业务完成登记，海外货款可以正常结汇入账。",
+      "next_hint": "登记完成后去申请跨境收款工具（如 Stripe / PingPong）并绑定对公账户。",
+      "unlocks": [
+        "海外客户付款入账",
+        "美元结汇成人民币",
+        "申请跨境收款工具"
+      ],
+      "template_content": "外汇业务登记表\n\n登记单位名称：{company_name}\n统一社会信用代码：{credit_code}\n法定代表人：{owner_name}\n注册资本：{capital} 万元\n\n外汇业务类型：货物贸易项下收汇、跨境服务贸易项下收汇\n经营地址：{address}\n\n登记单位签字（盖章）：{company_name}\n登记日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "登记单位名称",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [
+            "需与营业执照一致并盖章"
+          ],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "owner_name",
+          "label": "法定代表人",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "张创客",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "capital",
+          "label": "注册资本（万元）",
+          "type": "number",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "10",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "address",
+          "label": "经营地址",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "apply_date",
+          "label": "登记日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交登记当天日期。",
+          "example": "2026-12-02",
+          "pitfalls": [],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "外汇业务登记表，登记进出口与外汇收支业务以办理结汇手续。",
+      "author_name": "周朗",
+      "author_title": "跨境支付合规顾问",
+      "publisher_org": "国家外汇管理局",
+      "is_official": true,
+      "published_at": "2026-08-25",
+      "like_count": 846,
+      "favorite_count": 463,
+      "usage_count": 5903
+    },
+    {
+      "id": "sub_hnte_assessment",
+      "kind": "subgraph",
+      "code": "HNTE_ASSESSMENT",
+      "name": "高新技术企业资质评定",
+      "stage": 3,
+      "category": "IP",
+      "description": "由软著申请、科技型中小企业入库与高新认定申报三份文书构成的复合子图，用于完成高新技术企业资格评定。",
+      "outcome": "取得高新技术企业资格，享受 15% 企业所得税优惠税率与各类科技类补贴。",
+      "next_hint": "三个文书都提交后，等高企认定结果，通过即可享受优惠。",
+      "unlocks": [
+        "15% 企业所得税优惠税率",
+        "科技类政府补贴优先申报资格",
+        "高新投标加分与品牌背书"
+      ],
+      "children": [
+        "tpl_soft_copyright_application",
+        "tpl_tech_sme_evaluation",
+        "tpl_hnte_declaration"
+      ]
+    },
+    {
+      "id": "tpl_hnte_declaration",
+      "kind": "document",
+      "code": "HNTE_DECLARATION",
+      "name": "高新技术企业认定申报书",
+      "stage": 3,
+      "category": "IP",
+      "description": "向科技主管部门正式申报高新技术企业资格的核心申报材料，需与技术、研发、知识产权数据配套提交。",
+      "outcome": "申报材料受理，进入高企专家评审。",
+      "next_hint": "保持研发辅助账与财务账一致，等待现场核查与评审。",
+      "unlocks": [
+        "进入高企评审流程",
+        "获得 15% 所得税优惠资格"
+      ],
+      "template_content": "高新技术企业认定申报书\n\n企业名称：{company_name}\n统一社会信用代码：{credit_code}\n注册地址：{address}\n\n一、知识产权情况\n软件著作权：{copyright_count} 项\n二、科技人员情况\n科技人员总数：{tech_staff_count} 人\n三、研发项目情况\n主要研发项目：{rd_project}\n四、高新技术领域\n{high_tech_field}\n\n企业承诺所填报数据真实准确。\n\n法定代表人：{owner_name}\n申报日期：{apply_date}",
+      "required_fields": [
+        {
+          "key": "company_name",
+          "label": "企业名称",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "杭州极客智造一人有限责任公司",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "credit_code",
+          "label": "统一社会信用代码",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "91330110MA2AB1234X",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "address",
+          "label": "注册地址",
+          "type": "string",
+          "required": true,
+          "help": "与营业执照一致。",
+          "example": "浙江省杭州市余杭区文一西路 969 号 1 幢 3 单元 502 室",
+          "pitfalls": [],
+          "source": "营业执照"
+        },
+        {
+          "key": "copyright_count",
+          "label": "软件著作权（项）",
+          "type": "number",
+          "required": true,
+          "help": "填已下证的软著数量。",
+          "example": "2",
+          "pitfalls": [
+            "申请中的不能计入",
+            "需与软著证书一一对应"
+          ],
+          "source": "软著登记证书"
+        },
+        {
+          "key": "tech_staff_count",
+          "label": "科技人员总数（人）",
+          "type": "number",
+          "required": true,
+          "help": "与科技型中小企业评价信息表口径保持一致。",
+          "example": "3",
+          "pitfalls": [
+            "与评价信息表不一致会被要求更正",
+            "占比通常需达到 10% 以上"
+          ],
+          "source": "科技型中小企业评价信息表"
+        },
+        {
+          "key": "rd_project",
+          "label": "主要研发项目",
+          "type": "text",
+          "required": true,
+          "help": "描述你实际在做的研发项目，需要与研发费用辅助账对得上。",
+          "example": "多租户项目管理协同平台的研发：实现实时协作编辑内核、自动化任务编排引擎与基于向量检索的语义需求匹配模块。",
+          "pitfalls": [
+            "不要写与费用无关的项目",
+            "项目名称要能对应辅助账中的研发项目"
+          ],
+          "source": "研发辅助账"
+        },
+        {
+          "key": "high_tech_field",
+          "label": "高新技术领域",
+          "type": "select",
+          "required": true,
+          "options": [
+            "电子信息",
+            "软件与信息服务",
+            "增值电信业务",
+            "人工智能",
+            "新能源与节能"
+          ],
+          "help": "选择与你的主营业务最贴近的一项，只能选一个主领域。",
+          "example": "软件与信息服务",
+          "pitfalls": [
+            "必须与研发项目实际归属领域一致",
+            "跨领域会被要求补充材料"
+          ],
+          "source": "《国家重点支持的高新技术领域》"
+        },
+        {
+          "key": "apply_date",
+          "label": "申报日期",
+          "type": "date",
+          "required": true,
+          "help": "填提交申报日期。",
+          "example": "2026-12-10",
+          "pitfalls": [
+            "需在当年申报批次截止前提交"
+          ],
+          "source": "自行填写"
+        }
+      ],
+      "summary": "高新技术企业认定申报书，配套研发辅助账与技术、知识产权数据提交。",
+      "author_name": "孙晓峰",
+      "author_title": "科技型中小企业评价辅导专家",
+      "publisher_org": "中国中小企业协会",
+      "is_official": true,
+      "published_at": "2026-07-11",
+      "like_count": 2214,
+      "favorite_count": 1355,
+      "usage_count": 15342
+    },
+    {
+      "id": "sub_entity_setup",
+      "kind": "subgraph",
+      "code": "ENTITY_SETUP",
+      "name": "公司主体设立与税务落地",
+      "stage": 1,
+      "category": "ENTITY",
+      "description": "由设立登记申请书、公司章程与新办纳税人套餐申报三份文书构成的复合子图，用于完成公司主体从注册到税务登记的落地。",
+      "outcome": "公司主体合法存续并完成税务登记，具备开票与收款经营资质。",
+      "next_hint": "主体落地后即可开立对公账户，进入阶段 02。",
+      "unlocks": [
+        "合法经营主体",
+        "开票资格",
+        "申请各类主体类补贴"
+      ],
+      "children": [
+        "tpl_oneperson_company_reg",
+        "tpl_company_articles",
+        "tpl_tax_registration"
+      ]
+    },
+    {
+      "id": "sub_cross_border",
+      "kind": "subgraph",
+      "code": "CROSS_BORDER_SETUP",
+      "name": "出海跨境收付通道开通",
+      "stage": 4,
+      "category": "CROSS_BORDER",
+      "description": "由结汇真实性承诺与外汇业务登记两份文书构成的复合子图，用于打通合规的海外收款通道。",
+      "outcome": "跨境收付通道打通，海外客户款项可合规结汇入账。",
+      "next_hint": "通道打通后即可绑定 Stripe 等收款工具开始接单。",
+      "unlocks": [
+        "海外客户付款入账",
+        "美元结汇",
+        "出海 SaaS 商业闭环"
+      ],
+      "children": [
+        "tpl_cross_border_commitment",
+        "tpl_fx_business_register"
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from_node": "tpl_oneperson_company_reg",
+      "to_node": "tpl_company_articles",
+      "relation": "prerequisite",
+      "rationale": "章程里要写公司名称和注册资本，所以必须先拿到设立登记申请书的核准结果。"
+    },
+    {
+      "from_node": "tpl_company_articles",
+      "to_node": "tpl_tax_registration",
+      "relation": "prerequisite",
+      "rationale": "税务登记需要提供已生效的章程，银行和税务机关都会核验。"
+    },
+    {
+      "from_node": "tpl_tax_registration",
+      "to_node": "tpl_bank_account_opening",
+      "relation": "prerequisite",
+      "rationale": "银行开户要先完成税务登记，因为银行要联网核验你的纳税人资格。"
+    },
+    {
+      "from_node": "tpl_bank_account_opening",
+      "to_node": "tpl_invoice_quota",
+      "relation": "prerequisite",
+      "rationale": "申请数电发票额度需要已开立的对公账户作为收票主体账户。"
+    },
+    {
+      "from_node": "tpl_soft_copyright_application",
+      "to_node": "tpl_hnte_declaration",
+      "relation": "prerequisite",
+      "rationale": "高企申报必须提供已下证的软著作为知识产权证明，这是硬性门槛。"
+    },
+    {
+      "from_node": "tpl_tech_sme_evaluation",
+      "to_node": "tpl_hnte_declaration",
+      "relation": "prerequisite",
+      "rationale": "高企认定要求企业已通过科技型中小企业评价，申报时要附评价结论。"
+    },
+    {
+      "from_node": "tpl_cross_border_commitment",
+      "to_node": "tpl_fx_business_register",
+      "relation": "prerequisite",
+      "rationale": "外汇登记要求先出具真实性承诺，银行据此办理后续结汇手续。"
+    },
+    {
+      "from_node": "tpl_bank_account_opening",
+      "to_node": "tpl_cross_border_commitment",
+      "relation": "prerequisite",
+      "rationale": "跨境结汇承诺必须由已有对公账户的主体出具，没有账户无法做收付登记。"
+    },
+    {
+      "from_node": "tpl_oneperson_company_reg",
+      "to_node": "tpl_soft_copyright_application",
+      "relation": "recommended",
+      "rationale": "软著以企业名义申请效益最高，建议主体落地后再提交。"
+    },
+    {
+      "from_node": "tpl_tech_sme_evaluation",
+      "to_node": "tpl_hnte_declaration",
+      "relation": "optional",
+      "rationale": "若当年来不及入库，可次年再申报高企，不影响其他事项推进。"
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal_legal_entity",
+      "title": "我要合法开一家公司并能开票收款",
+      "description": "从零开始把主体立起来：拿到营业执照、公司章程、税务登记，具备开票与收款资格。",
+      "audience_hint": "刚开始创业、还没注册主体的个人开发者",
+      "outcome": "公司主体合法存续，可以对外签合同、开票、收款。",
+      "required_nodes": [
+        "sub_entity_setup"
+      ],
+      "recommended_nodes": [
+        "tpl_bank_account_opening"
+      ]
+    },
+    {
+      "id": "goal_hnte",
+      "title": "我要拿到高新技术企业资格，享受 15% 所得税",
+      "description": "通过软著、科技型中小企业入库与高企认定申报，拿到高新技术企业资格以享受税收优惠。",
+      "audience_hint": "有真实研发投入、营收规模较小的技术团队",
+      "outcome": "取得高新技术企业资格，企业所得税税率降至 15%，并获得科技类补贴申报资格。",
+      "required_nodes": [
+        "sub_hnte_assessment"
+      ],
+      "recommended_nodes": [
+        "sub_entity_setup"
+      ]
+    },
+    {
+      "id": "goal_cross_border",
+      "title": "我要开始接海外订单并收美元",
+      "description": "把跨境收付通道打通，让海外客户能付款、款项能合规结汇入账。",
+      "audience_hint": "已有国内主体、准备出海接单或卖 SaaS 的创客",
+      "outcome": "跨境收付通道合规打通，可以直接收取海外客户款项。",
+      "required_nodes": [
+        "sub_cross_border",
+        "sub_entity_setup"
+      ],
+      "recommended_nodes": [
+        "tpl_invoice_quota"
+      ]
+    },
+    {
+      "id": "goal_soft_copyright",
+      "title": "我要给自己的产品申请软件著作权",
+      "description": "独立完成软著登记申请，用于证明自主研发、投标加分和后续申报补贴。",
+      "audience_hint": "有可交付的软件产品、需要知识产权证明的开发者",
+      "outcome": "取得《计算机软件著作权登记证书》。",
+      "required_nodes": [
+        "tpl_soft_copyright_application"
+      ],
+      "recommended_nodes": []
+    },
+    {
+      "id": "goal_full_compliance",
+      "title": "我要把公司从设立到出海的合规材料一次性备齐",
+      "description": "覆盖主体设立、财税落地、知识产权与跨境收付的全套标准文书，适合要一次性打通的创客。",
+      "audience_hint": "追求完整合规闭环、不想遗漏环节的创客",
+      "outcome": "全套商事合规文书齐备，公司设立、开票、知识产权与跨境收付均无缺口。",
+      "required_nodes": [
+        "sub_entity_setup",
+        "sub_hnte_assessment",
+        "sub_cross_border"
+      ],
+      "recommended_nodes": []
+    }
+  ]
+}

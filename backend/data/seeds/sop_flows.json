@@ -1,0 +1,120 @@
+{
+  "flow_entity_establishment": {
+    "id": "flow_entity_establishment",
+    "code": "FLOW_ENTITY_ESTABLISHMENT",
+    "name": "公司主体设立全流程",
+    "summary": "从公司核名设立，到税务登记、对公开户与数电发票额度核定的完整主体落地流程。",
+    "description": "覆盖阶段 01 与阶段 02 的核心事项，是 OPC 从零开始合法经营必须走完的主体设立链路。依次完成设立登记与章程、税务报到、对公开户，最后核定数电发票授信额度，打通「能开票、能收款」的主体闭环。",
+    "category": "ENTITY",
+    "stages": [1, 2],
+    "node_refs": [
+      { "node_id": "sub_entity_setup", "required": true, "note": "主体落地：设立登记 + 章程 + 税务登记" },
+      { "node_id": "tpl_bank_account_opening", "required": true, "note": "开立对公结算账户" },
+      { "node_id": "tpl_invoice_quota", "required": true, "note": "核定数电发票授信额度" }
+    ],
+    "outcome": "取得营业执照与税务资格，拥有对公账户与开票能力，可正式对外签约收款。",
+    "unlocks": ["对公签合同与开发票", "申请主体类政府补贴", "进入研发费用加计扣除申报"],
+    "author_name": "李知微",
+    "author_title": "企业登记制度改革研究专家",
+    "publisher_org": "国家市场监督管理总局",
+    "is_official": true,
+    "published_at": "2026-04-12",
+    "like_count": 4218,
+    "favorite_count": 2096,
+    "usage_count": 18642
+  },
+  "flow_hnte_certification": {
+    "id": "flow_hnte_certification",
+    "code": "FLOW_HNTE_CERTIFICATION",
+    "name": "高新技术企业资质评定流程",
+    "summary": "从软著申请、科技型中小企业入库，到高新技术企业认定申报的三证联动评定流程。",
+    "description": "覆盖阶段 03 的核心事项。软著是知识产权门槛，科技型中小企业入库是前置条件，最终汇入高企认定申报书。三份材料互为因果，需按顺序推进，评审通过后即可享受 15% 企业所得税优惠。",
+    "category": "IP",
+    "stages": [3],
+    "node_refs": [
+      { "node_id": "tpl_soft_copyright_application", "required": true, "note": "取得软著证书，知识产权门槛" },
+      { "node_id": "tpl_tech_sme_evaluation", "required": true, "note": "通过科技型中小企业评价" },
+      { "node_id": "tpl_hnte_declaration", "required": true, "note": "提交高企认定申报书" }
+    ],
+    "outcome": "取得高新技术企业资格，享受 15% 企业所得税优惠税率与各类科技类补贴申报资格。",
+    "unlocks": ["15% 企业所得税优惠税率", "科技类政府补贴优先申报资格", "高新投标加分与品牌背书"],
+    "author_name": "孙晓峰",
+    "author_title": "科技型中小企业评价辅导专家",
+    "publisher_org": "中国中小企业协会",
+    "is_official": true,
+    "published_at": "2026-07-15",
+    "like_count": 3862,
+    "favorite_count": 1974,
+    "usage_count": 15208
+  },
+  "flow_cross_border_settlement": {
+    "id": "flow_cross_border_settlement",
+    "code": "FLOW_CROSS_BORDER_SETTLEMENT",
+    "name": "出海跨境收付通道开通流程",
+    "summary": "完成公司主体落地后，通过结汇承诺与外汇登记打通海外货款合规入境通道。",
+    "description": "覆盖阶段 01 与阶段 04。跨境结汇必须以已开立对公账户的主体身份进行，因此先完成主体设立与税务登记，再出具结汇真实性承诺并办理外汇业务登记，通道即可开通。",
+    "category": "CROSS_BORDER",
+    "stages": [1, 4],
+    "node_refs": [
+      { "node_id": "sub_entity_setup", "required": true, "note": "前置：主体与对公账户就位" },
+      { "node_id": "sub_cross_border", "required": true, "note": "结汇承诺 + 外汇业务登记" }
+    ],
+    "outcome": "跨境收付通道合规开通，可直接收取海外客户款项并结汇入账。",
+    "unlocks": ["海外客户付款入账", "美元结汇成人民币", "出海 SaaS 商业闭环"],
+    "author_name": "周朗",
+    "author_title": "跨境支付合规顾问",
+    "publisher_org": "PingPong · 跨境支付合规中心",
+    "is_official": false,
+    "published_at": "2026-08-28",
+    "like_count": 2547,
+    "favorite_count": 1388,
+    "usage_count": 9641
+  },
+  "flow_soft_copyright_only": {
+    "id": "flow_soft_copyright_only",
+    "code": "FLOW_SOFT_COPYRIGHT_ONLY",
+    "name": "软件著作权独立申报流程",
+    "summary": "单独申报软著，用于证明自主研发、投标加分与后续补贴申报。",
+    "description": "覆盖阶段 03 中可独立执行的一项。软著申请门槛低、周期短，可作为投标与补贴申报的辅助材料先行办理，之后再决定是否衔接高新技术企业认定流程。",
+    "category": "IP",
+    "stages": [3],
+    "node_refs": [
+      { "node_id": "tpl_soft_copyright_application", "required": true, "note": "提交软著登记申请" }
+    ],
+    "outcome": "取得《计算机软件著作权登记证书》，可用于证明自主研发、投标加分与补贴申报。",
+    "unlocks": ["证明软件自主研发", "投标与采购加分", "衔接高新技术企业认定"],
+    "author_name": "赵一鸣",
+    "author_title": "知识产权代理机构合伙人",
+    "publisher_org": "中国版权保护中心",
+    "is_official": true,
+    "published_at": "2026-02-20",
+    "like_count": 1976,
+    "favorite_count": 1024,
+    "usage_count": 12753
+  },
+  "flow_full_lifecycle_compliance": {
+    "id": "flow_full_lifecycle_compliance",
+    "code": "FLOW_FULL_LIFECYCLE_COMPLIANCE",
+    "name": "全生命周期合规办理流程",
+    "summary": "从主体设立、科技资质到跨境通道，一次性打通公司从成立到出海的完整合规链路。",
+    "description": "横跨全部四个阶段的完整链路。适合追求合规闭环、不想遗漏环节的创客：先落地主体与开票能力，再补齐高企资质，最后打通出海收付通道，一次性备齐全套合规材料。",
+    "category": "COMPLIANCE",
+    "stages": [1, 2, 3, 4],
+    "node_refs": [
+      { "node_id": "sub_entity_setup", "required": true, "note": "主体设立与税务落地" },
+      { "node_id": "tpl_bank_account_opening", "required": true, "note": "对公账户与开票能力" },
+      { "node_id": "sub_hnte_assessment", "required": true, "note": "科技资质评定" },
+      { "node_id": "sub_cross_border", "required": true, "note": "跨境收付通道" }
+    ],
+    "outcome": "全套商事合规文书齐备，公司设立、开票、知识产权与跨境收付均无缺口。",
+    "unlocks": ["完整合规闭环", "全类政府补贴申报资格", "出海商业化落地"],
+    "author_name": "张文远",
+    "author_title": "国家市场监管总局注册局高级审核员",
+    "publisher_org": "国家市场监督管理总局",
+    "is_official": true,
+    "published_at": "2026-09-05",
+    "like_count": 3184,
+    "favorite_count": 1642,
+    "usage_count": 7846
+  }
+}
