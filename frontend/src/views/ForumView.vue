@@ -28,16 +28,6 @@
       <div class="zhihu-feed-layout">
         <!-- Main Article Stream (左侧知乎文章流) -->
         <section class="zhihu-feed-stream">
-          <!-- Zhihu-style Top Creator Bar (知乎帖子顶部发帖栏) -->
-          <ForumTopCreatorBar
-            :user-session="currentUserSession"
-            :categories="categories"
-            @publish-success="handleTopBarPublishSuccess"
-            @open-full-editor="handleOpenCreatePage"
-            @open-register="$emit('open-register')"
-            @toast="$emit('toast', $event)"
-          />
-
           <!-- Category Filter Bar (风暴分区选项卡 + 排序选择) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -52,6 +42,32 @@
               </button>
             </div>
             <div class="feed-filter-right">
+              <!-- Search Box -->
+              <div class="semantic-search-box">
+                <div class="search-input-wrap">
+                  <input
+                    v-model="searchKeyword"
+                    type="text"
+                    class="semantic-search-input"
+                    placeholder="搜索..."
+                    @keydown.enter="handleSemanticSearch"
+                  />
+                  <button v-if="searchKeyword" type="button" class="clear-search-btn" @click="handleClearSearch" title="清空搜索">×</button>
+                </div>
+                <button
+                  type="button"
+                  class="btn-liquid semantic-search-btn"
+                  :disabled="isSearching"
+                  @click="handleSemanticSearch"
+                  title="搜索"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <span>{{ isSearching ? '搜索中...' : '搜索' }}</span>
+                </button>
+              </div>
+
               <div class="sort-segmented">
                 <button
                   v-for="opt in sortOptions"
@@ -60,64 +76,79 @@
                   :class="['sort-pill', { active: currentSort === opt.key }]"
                   @click="currentSort = opt.key"
                 >
-                  {{ opt.label }}
+                  <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
               </div>
             </div>
           </div>
 
-          <!-- Loading State Indicator (Initial or Category Reset) -->
-          <div v-if="isInitialLoading" class="posts-loading-banner glass-box">
-            <span class="loading-spinner"></span>
-            <span>正在检索「{{ currentCategoryName }}」实战风暴探讨...</span>
-          </div>
-
-          <div
-            v-if="filteredAndSortedPosts.length > 0"
-            class="zhihu-posts-list"
-            :class="{ 'density-compact': viewDensity === 'compact' }"
-          >
-            <ForumCard
-              v-for="post in filteredAndSortedPosts"
-              :key="post.id"
-              :post="post"
-              :density="viewDensity"
-              :user-session="currentUserSession"
-              @select="handleSelectPost"
-              @mouseenter="handlePostHover(post)"
-              @upvote="handleCardUpvote"
-              @bookmark="handleDetailBookmark"
-              @delete="handleDeletePost"
-              @toast="$emit('toast', $event)"
-            />
-          </div>
-
-          <!-- Infinite Scroll Sentinel Anchor (触发下一批流式拉取) -->
-          <div ref="infiniteScrollSentinel" class="feed-sentinel-anchor"></div>
-
-          <!-- Loading Next Batch Spinner -->
-          <div v-if="isLoadingMore" class="feed-stream-loading glass-box">
-            <span class="loading-spinner"></span>
-            <span>正在触底流式预加载后续风暴经验...</span>
-          </div>
-
-          <!-- Stream Completion Crystal Marker -->
-          <div v-else-if="!hasMore && filteredAndSortedPosts.length > 0" class="feed-stream-end glass-box">
-            <span class="crystal-dot"></span>
-            <span>已呈现当前分类下全部 {{ totalCount }} 篇探讨 · 保持专注与创客自驱</span>
-            <span class="crystal-dot"></span>
-          </div>
-
-          <!-- Empty State -->
-          <div v-else-if="!isInitialLoading && filteredAndSortedPosts.length === 0" class="glass-box empty-state-box">
-            <div class="empty-icon-wrap">
-              <ForumIcon name="empty-galaxy" size="38" />
+          <!-- Semantic Search Status Banner -->
+          <div v-if="isSemanticSearchActive" class="semantic-search-banner glass-box">
+            <div class="banner-left">
+              <span class="sparkle-badge"><OpcIcon name="search" :size="13" /> 搜索结果</span>
+              <span class="banner-text">
+                已为您找到与「<strong>{{ activeSearchQuery }}</strong>」相关的 <strong>{{ filteredAndSortedPosts.length }}</strong> 篇讨论
+              </span>
             </div>
-            <h3 class="empty-title">当前筛选下暂无风暴帖</h3>
-            <p class="empty-desc">换个关键词试试，或点击下方按钮发起该领域的第一个实战话题！</p>
-            <button class="btn-liquid" @click="handleOpenCreatePage">
-              <span>发起新风暴</span>
+            <button class="btn-liquid-outline btn-reset-search" @click="handleClearSearch">
+              <span>恢复全部讨论</span>
             </button>
+          </div>
+
+          <!-- Posts Scroll Container (ONLY this container scrolls with mouse wheel) -->
+          <div
+            class="zhihu-posts-scroll-container"
+            ref="postsScrollContainerRef"
+            @scroll.passive="handlePostsScroll"
+          >
+            <!-- Loading State Indicator (Initial or Category Reset) -->
+            <div v-if="isInitialLoading" class="posts-loading-banner glass-box">
+              <span class="loading-spinner"></span>
+              <span>正在检索「{{ currentCategoryName }}」实战风暴探讨...</span>
+            </div>
+
+            <div
+              v-if="filteredAndSortedPosts.length > 0"
+              class="zhihu-posts-list"
+              :class="{ 'density-compact': viewDensity === 'compact' }"
+            >
+              <ForumCard
+                v-for="post in filteredAndSortedPosts"
+                :key="post.id"
+                :post="post"
+                :density="viewDensity"
+                :user-session="currentUserSession"
+                @select="handleSelectPost"
+                @mouseenter="handlePostHover(post)"
+                @upvote="handleCardUpvote"
+                @bookmark="handleDetailBookmark"
+                @interaction="handleCardInteraction"
+                @delete="handleDeletePost"
+                @require-login="$emit('open-register')"
+                @toast="$emit('toast', $event)"
+              />
+            </div>
+
+            <!-- Infinite Scroll Sentinel Anchor (仅在有帖子且仍有更多时挂载监听) -->
+            <div v-if="filteredAndSortedPosts.length > 0 && hasMore" ref="infiniteScrollSentinel" class="feed-sentinel-anchor"></div>
+
+            <!-- Loading Next Batch Spinner -->
+            <div v-if="isLoadingMore" class="feed-stream-loading glass-box">
+              <span class="loading-spinner"></span>
+              <span>正在触底流式预加载后续风暴经验...</span>
+            </div>
+
+            <!-- Empty State -->
+            <div v-if="!isInitialLoading && filteredAndSortedPosts.length === 0" class="glass-box empty-state-box">
+              <div class="empty-icon-wrap">
+                <ForumIcon name="empty-galaxy" size="38" />
+              </div>
+              <h3 class="empty-title">当前筛选下暂无风暴帖</h3>
+              <p class="empty-desc">换个关键词试试，或点击下方按钮发起该领域的第一个实战话题！</p>
+              <button class="btn-liquid" @click="handleOpenCreatePage">
+                <span>发起新风暴</span>
+              </button>
+            </div>
           </div>
         </section>
 
@@ -153,7 +184,7 @@
           <div class="glass-box sidebar-card hot-ranking-card">
             <div class="sidebar-card-title-row">
               <div class="title-with-icon">
-                <span class="hot-badge-fire">🔥</span>
+                <span class="hot-badge-fire"><OpcIcon name="flame" :size="14" /></span>
                 <h4 class="sidebar-title">今日风暴热榜</h4>
               </div>
               <span class="hot-subtitle">实时更新</span>
@@ -170,9 +201,9 @@
                 <div class="hot-item-content">
                   <h5 class="hot-item-title">{{ item.title }}</h5>
                   <div class="hot-item-meta">
-                    <span>🔥 {{ (item.upvotes || 0) * 3 + (item.replies || 0) * 5 + 42 }} 热度</span>
+                    <span><OpcIcon name="flame" :size="12" /> {{ (item.upvotes || 0) * 3 + (item.replies || 0) * 5 + 42 }} 热度</span>
                     <span class="dot-sep">·</span>
-                    <span>{{ item.upvotes || 0 }} 赞同</span>
+                    <span>{{ item.upvotes || 0 }} 点赞</span>
                   </div>
                 </div>
               </div>
@@ -287,8 +318,8 @@ import ForumIcon from '@/components/ForumIcon.vue';
 import ForumCard from '@/components/ForumCard.vue';
 import ForumDetailView from '@/components/ForumDetailView.vue';
 import ForumCreateView from '@/components/ForumCreateView.vue';
-import ForumTopCreatorBar from '@/components/ForumTopCreatorBar.vue';
 import { dispatchGateway } from '@/api/gateway';
+import { enrichForumInteractions } from '@/utils/contentInteractions';
 
 const props = defineProps({
   userSession: {
@@ -325,14 +356,17 @@ const selectedCategoryCode = ref('ALL');
 
 // Sort Options
 const sortOptions = [
-  { key: 'hot', label: '🔥 最热讨论' },
-  { key: 'new', label: '⚡ 最新发表' },
-  { key: 'featured', label: '🏆 官方精选' },
+  { key: 'hot', label: '最热讨论', icon: 'flame' },
+  { key: 'new', label: '最新发表', icon: 'bolt' },
+  { key: 'featured', label: '官方精选', icon: 'trophy' },
 ];
 const currentSort = ref('hot');
 
 // Search
 const searchKeyword = ref('');
+const isSearching = ref(false);
+const isSemanticSearchActive = ref(false);
+const activeSearchQuery = ref('');
 
 // Drawer & Full-Page View States
 const isDrawerVisible = ref(false);
@@ -349,337 +383,29 @@ function setDensity(mode) {
   } catch (e) {}
 }
 
-// Default Seed Posts dataset with rich, high-density practical content and executive metrics
-const DEFAULT_SEEDS_DATA = [
-  {
-    id: 1,
-    pinned: '置顶',
-    category_code: 'TAX',
-    category: '工商财税',
-    title: '【必读】2026 一人公司工商年报与增值税免征额度最新操作细则',
-    snippet: '针对年应税销售额 500 万以下、季度销售额 30 万元以内的小规模纳税人免税实操。复盘新版电子税务局填报《增值税及附加税费申报表》时，免税收入切勿误填入“应税销售额”一栏，附零附加税与研发费用加计扣除全套申报步骤。',
-    content: `# 2026 小规模纳税人免税申报与财税合规避坑
-
-## 1. 适用群体与关键政策
-适用于年应税销售额在 500 万元以下、季度销售额在 30 万元以内的初创一人科技公司、工作室或独立咨询业务。
-
-## 2. 申报核心避坑点
-> [!IMPORTANT]
-> 电子税务局填报《增值税及附加税费申报表》时，免税收入切勿误填入“应税销售额”一栏，否则税务系统将直接生成缴税凭单！
-
-### 规范申报流程四步法：
-1. **登录新版电子税务局**：选择企业法定代表人或财务人员身份实名登录
-2. **核对发票汇总数据**：确认本季度开具普票总金额未超过 30 万元限额（专用发票不可享受该免税政策）
-3. **选择减免税政策代码**：勾选“小微企业免征增值税政策”，系统自动计算减免税额
-4. **零附加税确认**：增值税免征后，城建税、教育费附加与地方教育附加同步全额免征
-
-## 3. 真实核算对照表
-| 项目 | 季度销售额 28 万元 (免税线内) | 季度销售额 35 万元 (突破限额) |
-|---|---|---|
-| 增值税征收率 | 1% (免征额内) | 1% (按全部 35 万计税) |
-| 应纳增值税额 | ¥0.00 | ¥3,500.00 |
-| 附加税费 (城建/教育) | ¥0.00 | ¥420.00 |
-| 经营合规性 | 凭证齐全，零申报 | 需开票纳税，可抵扣进项 |
-
-> [!TIP]
-> 记得在每年 6 月 30 日前完成企业年报公示，逾期会被列入经营异常名录并影响银行对公账户使用！`,
-    author: '平台管家',
-    author_id: 'usr_platform_steward',
-    ip_location: '来自 杭州',
-    replies: 89,
-    comment_count: 89,
-    upvotes: 142,
-    upvote_count: 142,
-    is_upvoted: false,
-    created_at: '2026-01-01T00:00:00Z',
-    updated_at: '10 分钟前',
-    view_count: 1420,
-    tags: ['税务年报', '增值税免征', '电子税务局', '小规模合规'],
-    metrics: [
-      { label: '季度免征额', val: '¥300,000', icon: '💰', type: 'success' },
-      { label: '申报耗时', val: '15分钟', icon: '⏱️', type: 'info' },
-      { label: '综合税负', val: '0%', icon: '📊', type: 'accent' },
-    ],
-  },
-  {
-    id: 2,
-    pinned: '精选',
-    category_code: 'POLICY',
-    category: '政策申报',
-    title: '从 0 到 1 拿到长三角智能算力补贴 12 万元的全周期复盘 (附审批材料格式)',
-    snippet: '很多独立创客误以为个体户无法申报算力券。实测只要完成 1 项软件著作权登记 + 科技型中小企业入库登记即可破局。本文梳理从材料初审、机房用量凭证、算力服务商发票到财政直拨入账的 45 天全流程要点与避坑模版。',
-    content: `# 长三角智能算力补贴 12 万元全周期实操复盘
-
-## 1. 政策定位与申请门槛
-智能算力券是长三角区域针对科技型创客的一项实质性扶持政策。补贴额度通常为算力租赁费用的 30%~50%，年度最高可达 12~20 万元。
-
-## 2. 核心材料准备清单
-1. **企业资质**：软件著作权证书（1项以上） + 科技型中小企业入库登记编号
-2. **业务证明**：智能体或算法训练业务场景说明书、系统运行日志截图
-3. **财务凭证**：与指定算力中心签署的 GPU 算力租赁合同 + 银行付款对账单 + 增值税专用发票
-
-## 3. 审批与核销时间线
-| 节点阶段 | 耗时周期 | 交付物/审核重点 |
-|---|---|---|
-| 材料初审 | 7 个工作日 | 软著与入库资质真实性核查 |
-| 用量核验 | 15 个工作日 | GPU 运行时间与算力利用率抽样 |
-| 公示与发券 | 10 个工作日 | 财政厅官网公示期无异议 |
-| 资金直拨 | 13 个工作日 | 补贴款直接汇入企业对公账户 |
-
-> [!TIP]
-> 一定要选择列入当地“算力服务商白名单”的机房节点，第三方未备案转售发票无法通过财政穿透审核。`,
-    author: 'CodeNomad',
-    author_id: 'usr_codenomad',
-    ip_location: '来自 上海',
-    replies: 42,
-    comment_count: 42,
-    upvotes: 98,
-    upvote_count: 98,
-    is_upvoted: true,
-    created_at: '2026-01-02T00:00:00Z',
-    updated_at: '35 分钟前',
-    view_count: 890,
-    tags: ['算力补贴', '科技型中小企业', '软著申报', '政策扶持'],
-    metrics: [
-      { label: '财政直拨', val: '¥120,000', icon: '🎁', type: 'success' },
-      { label: '审批周期', val: '45天', icon: '📅', type: 'info' },
-      { label: '资质要件', val: '软著+科技型', icon: '📝', type: 'warning' },
-    ],
-  },
-  {
-    id: 3,
-    pinned: null,
-    category_code: 'BIZ',
-    category: '独立出海',
-    title: '独立开发者 Stripe 绑定万里汇香港对公户结汇流程避坑指南',
-    snippet: '出海一人微型 SaaS 在流水突破 $10,000 时常遭银行抽检风控。本文复盘合规“三流合一”凭证搭建（Stripe 订单流 + 在线服务协议履约流 + 银行对账流），彻底告别个人账户冻结风险，实现 T+1 自动结汇与 1.9% 综合费率通道。',
-    content: `# 独立开发者出海支付与合规结汇避坑复盘
-
-## 1. 背景与业务场景
-- **业务类型**：一人微型 SaaS / 工具出海
-- **目标市场**：北美与欧洲市场
-- **支付工具**：Stripe + 万里汇 (WorldFirst) 香港企业对公账户
-
-## 2. 踩坑与合规痛点
-> [!WARNING]
-> 跨境银行在流水达到 $10,000 以上时会触发随机合规审计，若无法在 7 天内提供符合要求的人工服务协议与对账单，结算账户将被临时冷冻！
-
-- **阻断问题 1**：个人账户直接挂载海外商业账户导致的税务稽查与风控抽检
-- **阻断问题 2**：汇率波动过大造成汇损与提现手续费吞噬微利
-- **阻断问题 3**：VAT 增值税代扣代缴与跨国数字税发票合规
-
-## 3. 破局实操与解决方案
-1. **公司实体搭建**：注册香港有限责任公司 + 香港本地对公商业账户
-2. **三流合一凭证建立**：
-   - 业务订单流（Stripe Dashboard 导出）
-   - 合同履约流（在线用户 Terms of Service 电子存证）
-   - 资金结算流（银行流水对账单明细）
-3. **资金安全结汇链路**：
-   \`\`\`
-   海外买家信用卡 -> Stripe 结算 -> 香港商业账户 -> 跨境结汇通 -> 境内合规完税入账
-   \`\`\`
-
-## 4. 核心数据与收益实测
-| 指标项 | 优化前 | 规范后 |
-|---|---|---|
-| 资金结算时效 | T+7 天（常被风控卡留） | T+1 日内自动结汇 |
-| 综合交易损耗 | 4.8% (中间行+汇损) | 1.9% (企业合规通道) |
-| 合规审查阻断率 | 35% 发生率 | 0% (已通过 2 次年检) |
-
-> [!TIP]
-> 建议每季度末及时导出 Stripe 报表与税务底稿备查，一人公司必须做好风险防线隔离！`,
-    author: 'SoloDev_Z',
-    author_id: 'usr_solodev_z',
-    ip_location: '来自 深圳',
-    replies: 19,
-    comment_count: 19,
-    upvotes: 64,
-    upvote_count: 64,
-    is_upvoted: false,
-    created_at: '2026-01-03T00:00:00Z',
-    updated_at: '2 小时前',
-    view_count: 670,
-    tags: ['Stripe跨境', '万里汇对公户', '合规风控', '三流合一'],
-    metrics: [
-      { label: '结汇时效', val: 'T+1 自动到账', icon: '⚡', type: 'success' },
-      { label: '综合费率', val: '4.8% → 1.9%', icon: '💵', type: 'accent' },
-      { label: '合规阻断', val: '0% 拦截', icon: '🛡️', type: 'info' },
-    ],
-  },
-  {
-    id: 4,
-    pinned: null,
-    category_code: 'AGENTS',
-    category: 'AI智能体',
-    title: '基于 PostgreSQL + pgvector 打造垂直知识库 Agent 的成本优化与延迟实测',
-    snippet: '生产环境下对比 pgvector、Pinecone 与 Milvus 后的落地实测：单台 4C8G 云服务器通过 HNSW 索引参数调优（m=16, ef_construction=64）与微内核流水线异步构建，将百万级向量余弦检索从 120ms 压至 18ms，单月基础设施成本仅需 $42。',
-    content: `# 基于 PostgreSQL + pgvector 打造垂直知识库 Agent 的成本优化与延迟实测
-
-## 1. 架构目标与选型对比
-在构建垂类企业知识库时，面对专有向量数据库（如 Pinecone、Milvus）的高昂固定租金与维护开销，我们探索将 PostgreSQL 结合 pgvector 插件作为全栈数据底座。
-
-## 2. 核心性能调优实践
-\`\`\`sql
--- 启用 pgvector 扩展并创建 HNSW 索引
-CREATE EXTENSION IF NOT EXISTS vector;
-
-CREATE INDEX ON document_embeddings 
-USING hnsw (embedding vector_cosine_ops)
-WITH (m = 16, ef_construction = 64);
-\`\`\`
-
-### 关键优化要点：
-1. **HNSW 索引替代 IVFFlat**：构建时间增加 20%，但高并发召回延迟降低 85%
-2. **异步流水线微内核**：文档拆分、Embedding 计算与向量入库异步化，解耦前台请求
-3. **多模态元数据过滤**：结合 JSONB 进行标签和权限前置过滤，避免全表扫描
-
-## 3. 生产压测基准数据
-| 维度指标 | 调优前 (IVFFlat) | 调优后 (HNSW+微内核) |
-|---|---|---|
-| 200万向量检索延迟 | 120ms (P99: 210ms) | 18ms (P99: 32ms) |
-| 内存占用 | 12GB | 4.2GB |
-| 月度基础设施成本 | $150/月 (托管集群) | $42/月 (单台高配云机) |`,
-    author: 'VectorPilot',
-    author_id: 'usr_vectorpilot',
-    ip_location: '来自 杭州',
-    replies: 31,
-    comment_count: 31,
-    upvotes: 85,
-    upvote_count: 85,
-    is_upvoted: false,
-    created_at: '2026-01-04T00:00:00Z',
-    updated_at: '3 小时前',
-    view_count: 540,
-    tags: ['PostgreSQL', 'pgvector', 'Agent架构', 'HNSW调优'],
-    metrics: [
-      { label: '检索延迟', val: '120ms → 18ms', icon: '⚡', type: 'success' },
-      { label: '节点容量', val: '200万向量', icon: '💾', type: 'info' },
-      { label: '基础设施', val: '$42/月', icon: '📉', type: 'accent' },
-    ],
-  },
-  {
-    id: 5,
-    pinned: null,
-    category_code: 'DEV',
-    category: '技术踩坑',
-    title: '一人公司全栈开发技术选型：FastAPI + Vue3 + SQLite 轻量化架构支撑 10 万 MAU 经验',
-    snippet: '拒绝过早分布式与 K8s 复杂化！深度复盘一人公司如何通过 FastAPI 异步协程 + Vue3 前端 + SQLite WAL 高并发读写模式抗住 10 万 MAU 突发流量。配合系统级自动热重载微内核，实现代码零停机平滑更新，运维投入低于 5%。',
-    content: `# 一人公司全栈技术选型与架构复盘
-
-## 1. 核心诉求与技术目标
-作为独立超级个体，运维时间必须压缩在 5% 以下，架构必须满足**极致轻量**、**高开发吞吐**与**零专职运维**。
-
-## 2. 技术栈清单
-- **后端**：FastAPI (Python 3.12 异步) + Uvicorn
-- **前端**：Vue 3 + Vite + VisionOS 液态毛玻璃设计系统
-- **数据库**：PostgreSQL 16 + pgvector (配合单机 SQLite 本地高速缓存)
-- **调度治理**：轻量级微内核插件流水线 + DAG 事件总线
-
-## 3. 架构设计与避坑
-\`\`\`python
-# 示例：微内核合规拦截算子
-async def compliance_guard_pipeline(context: dict) -> bool:
-    content = context.get("content", "")
-    if len(content) < 10:
-        raise ValueError("正文字数不足，无法形成有效技术风暴帖")
-    # 执行异步敏感词与防刷限流校验
-    return True
-\`\`\`
-
-> [!NOTE]
-> 永远不要在初创验证阶段引入复杂的 Kubernetes 分布式集群，单台高配云主机 + Docker Compose 足以支撑 10 万 MAU。
-
-## 4. 真实压测与资源开销
-| 场景 | 峰值并发 | CPU 占用 | 内存占用 |
-|---|---|---|---|
-| 日常平峰 | 200 QPS | 8% | 680MB |
-| 突发流量脉冲 | 2,400 QPS | 42% | 1.8GB |
-| 自动化流水线构建 | 16 并发 DAG | 65% | 2.2GB |`,
-    author: 'Solopreneur_99',
-    author_id: 'usr_solopreneur_99',
-    ip_location: '来自 北京',
-    replies: 56,
-    comment_count: 56,
-    upvotes: 112,
-    upvote_count: 112,
-    is_upvoted: false,
-    created_at: '2026-01-05T00:00:00Z',
-    updated_at: '5 小时前',
-    view_count: 1150,
-    tags: ['FastAPI', 'Vue3', 'SQLite-WAL', '微内核'],
-    metrics: [
-      { label: '承载峰值', val: '100,000 MAU', icon: '👥', type: 'success' },
-      { label: '硬件规格', val: '2核4G 单机', icon: '🖥️', type: 'info' },
-      { label: '运维精力', val: '< 5% 时长', icon: '🚀', type: 'accent' },
-    ],
-  },
-  {
-    id: 6,
-    pinned: null,
-    category_code: 'BIZ',
-    category: '独立出海',
-    title: '一人公司出海软件如何做定价策略？Freemium vs 买断制年度留存实录',
-    snippet: '追踪了 1,200 位海外付费用户 14 个月的生命周期价值（LTV）分析。实证买断制（Lifetime Deal）在初期虽有爆发性现金流但后期服务成本高企导致现金流断裂；转型为阶梯月付/年付订阅后，LTV 提升 3.2 倍且年度留存达 68.4%。',
-    content: `# 一人公司出海软件如何做定价策略？Freemium vs 买断制年度留存实录
-
-## 1. 业务背景与样本规模
-深度追踪了过去 14 个月中购买我们开发工具的 1,200 位海外付费创客（主要分布在美、德、日、英），对比了买断制（LTD）与订阅制（SaaS）的真实表现。
-
-## 2. 商业模式痛点复盘
-- **买断制陷阱**：早期涌入大量低客单价用户，首月冲上 $8,000；但在第 6 个月后，老用户的客服、API 算力与同步存储成本持续累积，现金流几乎断裂。
-- **阶梯订阅破局**：引入 $9.9/月 或 $89/年的分层订阅，并提供团队席位版。
-
-## 3. 14 个月关键指标对照
-| 核心指标 | 买断制 (LTD $49) | 阶梯订阅制 ($9.9/mo) | 差异幅度 |
-|---|---|---|---|
-| 用户生命周期价值 (LTV) | $49 (固定上限) | $158.4 (持续攀升) | +223% (3.2倍) |
-| 第 12 个月留存率 | 12.3% (日渐沉寂) | 68.4% (高粘性活跃) | +56.1% |
-| 净经常性收入 (MRR) | $0 (无持续流入) | $4,850/月 (稳健增长) | 现金流质变 |
-
-> [!TIP]
-> 订阅制初期一定要做好“取消挽留流程”（如赠送 1 个月试用或降级至微型版），仅此一项即可挽回 22% 的退订率！`,
-    author: 'GlobalNomad',
-    author_id: 'usr_globalnomad',
-    ip_location: '来自 新加坡',
-    replies: 27,
-    comment_count: 27,
-    upvotes: 73,
-    upvote_count: 73,
-    is_upvoted: false,
-    created_at: '2026-01-06T00:00:00Z',
-    updated_at: '6 小时前',
-    view_count: 780,
-    tags: ['出海定价', 'SaaS订阅', '单元经济学', '留存分析'],
-    metrics: [
-      { label: '跟踪样本', val: '1,200 付费创客', icon: '📊', type: 'info' },
-      { label: 'LTV提升', val: '3.2 倍', icon: '💰', type: 'success' },
-      { label: '年度留存', val: '68.4%', icon: '📈', type: 'accent' },
-    ],
-  },
-];
-
-// Deleted posts tracking across reloads
-function getDeletedThreadIds() {
+// Relative time formatting helper
+function formatTimeAgo(isoStr) {
+  if (!isoStr) return '刚刚';
   try {
-    const raw = localStorage.getItem('opchub_forum_deleted_threads');
-    return raw ? new Set(JSON.parse(raw).map(String)) : new Set();
+    const diff = Date.now() - new Date(isoStr).getTime();
+    if (isNaN(diff)) return '刚刚';
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins} 分钟前`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} 天前`;
+    return new Date(isoStr).toLocaleDateString('zh-CN');
   } catch (e) {
-    return new Set();
+    return '刚刚';
   }
-}
-
-function recordDeletedThreadId(id) {
-  try {
-    const set = getDeletedThreadIds();
-    set.add(String(id));
-    localStorage.setItem('opchub_forum_deleted_threads', JSON.stringify([...set]));
-  } catch (e) {}
 }
 
 // Active Posts dataset (infinite scroll stream)
 const postsList = ref([]);
 const currentCursor = ref(0);
-const feedLimit = ref(6);
+const feedLimit = ref(10);
 const totalCount = ref(0);
 const hasMore = ref(true);
 const isInitialLoading = ref(false);
@@ -702,28 +428,48 @@ const currentCategoryName = computed(() => {
 });
 
 function transformThread(t) {
-  const existing = DEFAULT_SEEDS_DATA.find((s) => String(s.id) === String(t.id));
+  let snippet = '';
+  if (t.content) {
+    snippet = t.content
+      .replace(/^#+\s+/gm, '')
+      .replace(/[*_`>]/g, '')
+      .replace(/\[!.*?\]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (snippet.length > 150) {
+      snippet = snippet.slice(0, 150) + '...';
+    }
+  }
+
+  const catObj = categories.find((c) => c.code === (t.category_code || '').toUpperCase());
+  const categoryName = catObj?.name || '实战探讨';
+
   return {
     id: t.id,
-    pinned: t.is_pinned ? '置顶' : (existing?.pinned || null),
-    category_code: t.category_code || existing?.category_code || 'DEV',
-    category: categories.find((c) => c.code === t.category_code)?.name || existing?.category || '技术踩坑',
-    title: t.title,
-    snippet: existing?.snippet || (t.content ? (t.content.slice(0, 160) + '...') : ''),
-    content: t.content || existing?.content || '',
-    metrics: existing?.metrics || [],
-    author: t.author_name || existing?.author || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
-    author_id: t.author_id || existing?.author_id || '',
-    ip_location: existing?.ip_location || '来自 浙江',
-    replies: t.comment_count ?? existing?.replies ?? 0,
-    comment_count: t.comment_count ?? existing?.comment_count ?? 0,
-    upvotes: t.upvote_count ?? existing?.upvotes ?? 0,
-    upvote_count: t.upvote_count ?? existing?.upvote_count ?? 0,
-    view_count: t.view_count ?? existing?.view_count ?? 500,
-    is_upvoted: existing?.is_upvoted || false,
-    created_at: t.created_at || existing?.created_at || new Date().toISOString(),
-    updated_at: existing?.updated_at || '刚刚',
-    tags: existing?.tags || [t.category_code || 'DEV'],
+    pinned: t.is_pinned ? '置顶' : null,
+    category_code: t.category_code || 'DEV',
+    category: categoryName,
+    title: t.title || '',
+    snippet: snippet,
+    content: t.content || '',
+    metrics: Array.isArray(t.metrics) ? t.metrics : [],
+    author: t.author_name || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
+    author_id: t.author_id || '',
+    ip_location: t.ip_location || '来自 浙江',
+    replies: t.comment_count ?? 0,
+    comment_count: t.comment_count ?? 0,
+    upvotes: t.upvote_count ?? 0,
+    upvote_count: t.upvote_count ?? 0,
+    like_count: t.upvote_count ?? 0,
+    bookmark_count: t.bookmark_count ?? 0,
+    favorite_count: t.bookmark_count ?? 0,
+    love_count: t.love_count ?? 0,
+    is_loved: Boolean(t.is_loved),
+    view_count: t.view_count ?? 0,
+    is_upvoted: Boolean(t.is_upvoted),
+    created_at: t.created_at || new Date().toISOString(),
+    updated_at: formatTimeAgo(t.updated_at || t.created_at),
+    tags: Array.isArray(t.tags) && t.tags.length ? t.tags : [categoryName],
   };
 }
 
@@ -736,20 +482,24 @@ async function fetchFeedStream(reset = false, silent = false) {
     currentCursor.value = 0;
     hasMore.value = true;
 
-    // Check if client memory cache exists and is fresh (< 60s)
+    // SWR Cache Check: if cached, render immediately without layout shift
     const cached = clientFeedCache.get(cacheKey);
-    if (cached && (Date.now() - cached.timestamp < 60000)) {
+    if (cached) {
       postsList.value = [...cached.items];
       currentCursor.value = cached.cursor;
       hasMore.value = cached.hasMore;
       totalCount.value = cached.total;
-      syncStoredInteractions(postsList.value);
-      speculativePrefetchNext();
-      return;
-    }
+      enrichForumInteractions(postsList.value);
 
-    if (!silent) isInitialLoading.value = true;
-    postsList.value = [];
+      // Fresh cache (< 15s): complete fast return
+      if (Date.now() - cached.timestamp < 15000) {
+        speculativePrefetchNext();
+        return;
+      }
+      silent = true; // Background revalidate
+    } else {
+      if (!silent) isInitialLoading.value = true;
+    }
   } else {
     if (isLoadingMore.value || !hasMore.value) return;
 
@@ -764,7 +514,7 @@ async function fetchFeedStream(reset = false, silent = false) {
         ? prefetched.next_cursor
         : (currentCursor.value + newItems.length);
       hasMore.value = prefetched.has_more;
-      syncStoredInteractions(postsList.value);
+      await enrichForumInteractions(newItems);
 
       clientFeedCache.set(cacheKey, {
         items: [...postsList.value],
@@ -798,10 +548,7 @@ async function fetchFeedStream(reset = false, silent = false) {
         ? data.next_cursor
         : (currentCursor.value + rawItems.length);
 
-      const deletedIds = getDeletedThreadIds();
-      const transformed = rawItems
-        .filter((t) => !deletedIds.has(String(t.id)))
-        .map(transformThread);
+      const transformed = rawItems.map(transformThread);
 
       if (reset) {
         postsList.value = transformed;
@@ -810,7 +557,7 @@ async function fetchFeedStream(reset = false, silent = false) {
         postsList.value.push(...newItems);
       }
 
-      syncStoredInteractions(postsList.value);
+      await enrichForumInteractions(postsList.value);
 
       clientFeedCache.set(cacheKey, {
         items: [...postsList.value],
@@ -821,24 +568,14 @@ async function fetchFeedStream(reset = false, silent = false) {
       });
 
       speculativePrefetchNext();
+    } else {
+      if (reset && !clientFeedCache.has(cacheKey)) {
+        postsList.value = [];
+      }
     }
   } catch (e) {
-    // Graceful fallback to initial seeds filtered by category and deleted
-    const deletedIds = getDeletedThreadIds();
-    let fallback = DEFAULT_SEEDS_DATA.filter((p) => !deletedIds.has(String(p.id)));
-    if (cat && cat !== 'ALL') {
-      fallback = fallback.filter((p) => p.category_code === cat);
-    }
-    totalCount.value = fallback.length;
-    const start = currentCursor.value;
-    const end = start + feedLimit.value;
-    const chunk = fallback.slice(start, end);
-    hasMore.value = end < fallback.length;
-    currentCursor.value = end;
-    if (reset) {
-      postsList.value = chunk;
-    } else {
-      postsList.value.push(...chunk);
+    if (reset && !clientFeedCache.has(cacheKey)) {
+      postsList.value = [];
     }
   } finally {
     isInitialLoading.value = false;
@@ -864,10 +601,7 @@ async function speculativePrefetchNext() {
     }, { silent: true });
     if (res.ok && res.data) {
       const rawItems = Array.isArray(res.data.items) ? res.data.items : [];
-      const deletedIds = getDeletedThreadIds();
-      const transformed = rawItems
-        .filter((t) => !deletedIds.has(String(t.id)))
-        .map(transformThread);
+      const transformed = rawItems.map(transformThread);
       prefetchBuffer.set(bufferKey, {
         items: transformed,
         next_cursor: res.data.next_cursor,
@@ -894,9 +628,136 @@ function handlePostHover(post) {
   }, 120);
 }
 
-function handleSelectCategory(catCode) {
-  selectedCategoryCode.value = catCode;
+function computeTextSemanticScore(query, text) {
+  if (!query || !text) return 0;
+  const q = query.toLowerCase().trim();
+  const t = text.toLowerCase().trim();
+  let score = 0;
+  if (t.includes(q)) score += 0.45;
+  const tokens = q.split(/[\s,，.。!！?？、/\\;；]+/).filter((w) => w.length >= 2);
+  let hits = 0;
+  tokens.forEach((tok) => {
+    if (t.includes(tok)) hits++;
+  });
+  if (tokens.length > 0) {
+    score += (hits / tokens.length) * 0.45;
+  }
+  const getBigrams = (str) => {
+    const s = new Set();
+    for (let i = 0; i < str.length - 1; i++) s.add(str.slice(i, i + 2));
+    return s;
+  };
+  const bq = getBigrams(q);
+  const bt = getBigrams(t);
+  let inter = 0;
+  bq.forEach((bg) => { if (bt.has(bg)) inter++; });
+  if (bq.size > 0) {
+    score += (inter / (bq.size + bt.size - inter || 1)) * 0.25;
+  }
+  return Math.min(0.999, Math.max(0.15, score));
+}
+
+async function handleSemanticSearch() {
+  const query = searchKeyword.value.trim();
+  if (!query) {
+    handleClearSearch();
+    return;
+  }
+
+  isSearching.value = true;
+  try {
+    const res = await dispatchGateway('forum.search.semantic', {
+      query: query,
+      category_code: selectedCategoryCode.value,
+      top_k: 25,
+    });
+
+    if (res.ok && res.data && Array.isArray(res.data.items) && res.data.items.length > 0) {
+      const transformed = res.data.items.map(transformThread);
+      await enrichForumInteractions(transformed);
+      postsList.value = transformed;
+      totalCount.value = transformed.length;
+      isSemanticSearchActive.value = true;
+      activeSearchQuery.value = query;
+      hasMore.value = false;
+      emit('toast', {
+        title: '搜索完成',
+        message: `已为您找到 ${transformed.length} 篇相关讨论。`,
+        type: 'SUCCESS',
+      });
+    } else {
+      // In-browser fallback scoring over current posts
+      const scored = postsList.value.map((p) => {
+        const fullText = `${p.title || ''} ${p.snippet || ''} ${p.content || ''} ${(p.tags || []).join(' ')}`;
+        const sim = computeTextSemanticScore(query, fullText);
+        return {
+          ...p,
+          similarity: Math.round(sim * 10000) / 10000,
+          similarity_score: Math.round(sim * 10000) / 10000,
+          semantic_score: Math.round(sim * 1000) / 10,
+        };
+      });
+      scored.sort((a, b) => (b.semantic_score || 0) - (a.semantic_score || 0));
+      postsList.value = scored;
+      isSemanticSearchActive.value = true;
+      activeSearchQuery.value = query;
+      hasMore.value = false;
+      emit('toast', {
+        title: '搜索完成',
+        message: `已为您匹配相关讨论内容。`,
+        type: 'SUCCESS',
+      });
+    }
+  } catch (e) {
+    const scored = postsList.value.map((p) => {
+      const fullText = `${p.title || ''} ${p.snippet || ''} ${p.content || ''}`;
+      const sim = computeTextSemanticScore(query, fullText);
+      return {
+        ...p,
+        similarity: Math.round(sim * 10000) / 10000,
+        similarity_score: Math.round(sim * 10000) / 10000,
+        semantic_score: Math.round(sim * 1000) / 10,
+      };
+    });
+    scored.sort((a, b) => (b.semantic_score || 0) - (a.semantic_score || 0));
+    postsList.value = scored;
+    isSemanticSearchActive.value = true;
+    activeSearchQuery.value = query;
+    hasMore.value = false;
+  } finally {
+    isSearching.value = false;
+  }
+}
+
+function handleClearSearch() {
+  searchKeyword.value = '';
+  activeSearchQuery.value = '';
+  isSemanticSearchActive.value = false;
+  clientFeedCache.clear();
   fetchFeedStream(true);
+}
+
+const postsScrollContainerRef = ref(null);
+
+function handlePostsScroll(e) {
+  const el = e.target;
+  if (!el || !hasMore.value || isLoadingMore.value || isInitialLoading.value) return;
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 250) {
+    fetchFeedStream(false);
+  }
+}
+
+function handleSelectCategory(catCode) {
+  if (selectedCategoryCode.value === catCode) return;
+  selectedCategoryCode.value = catCode;
+  if (postsScrollContainerRef.value) {
+    postsScrollContainerRef.value.scrollTop = 0;
+  }
+  if (isSemanticSearchActive.value && searchKeyword.value.trim()) {
+    handleSemanticSearch();
+  } else {
+    fetchFeedStream(true);
+  }
 }
 
 function initScrollObserver() {
@@ -908,11 +769,19 @@ function initScrollObserver() {
 
   scrollObserver = new IntersectionObserver((entries) => {
     const [entry] = entries;
-    if (entry && entry.isIntersecting && hasMore.value && !isLoadingMore.value && !isInitialLoading.value) {
+    if (
+      entry &&
+      entry.isIntersecting &&
+      hasMore.value &&
+      !isLoadingMore.value &&
+      !isInitialLoading.value &&
+      postsList.value.length > 0
+    ) {
       fetchFeedStream(false);
     }
   }, {
-    rootMargin: '250px',
+    root: postsScrollContainerRef.value || null,
+    rootMargin: '200px',
     threshold: 0.01,
   });
 
@@ -934,8 +803,8 @@ const filteredAndSortedPosts = computed(() => {
     list = list.filter((p) => (p.category_code || '').toUpperCase() === selectedCategoryCode.value);
   }
 
-  // 2. Keyword Filter
-  if (searchKeyword.value.trim()) {
+  // 2. Keyword Filter (only when not in semantic search mode)
+  if (!isSemanticSearchActive.value && searchKeyword.value.trim()) {
     const q = searchKeyword.value.trim().toLowerCase();
     list = list.filter((p) => {
       const matchTitle = (p.title || '').toLowerCase().includes(q);
@@ -947,7 +816,9 @@ const filteredAndSortedPosts = computed(() => {
   }
 
   // 3. Sorting
-  if (currentSort.value === 'hot') {
+  if (isSemanticSearchActive.value && currentSort.value !== 'new' && currentSort.value !== 'featured') {
+    list.sort((a, b) => (b.semantic_score || 0) - (a.semantic_score || 0));
+  } else if (currentSort.value === 'hot') {
     list.sort((a, b) => {
       // Newly created posts in current session stay at the very top
       if (a.is_new && !b.is_new) return -1;
@@ -1044,6 +915,35 @@ function handlePostUpdated(updatedPost) {
   }
 }
 
+function handleCardInteraction(payload) {
+  if (!payload?.post) return;
+  const post = payload.post;
+  const found = postsList.value.find((p) => String(p.id) === String(post.id));
+  if (found) {
+    Object.assign(found, {
+      like_count: post.like_count,
+      favorite_count: post.favorite_count,
+      love_count: post.love_count,
+      comment_count: post.comment_count,
+      viewer: post.viewer,
+      upvotes: post.upvotes,
+      upvote_count: post.upvote_count,
+      replies: post.replies,
+      bookmark_count: post.bookmark_count,
+      is_upvoted: post.is_upvoted,
+      is_bookmarked: post.is_bookmarked,
+      is_loved: post.is_loved,
+      is_commented: post.is_commented,
+    });
+  }
+  if (activePost.value && String(activePost.value.id) === String(post.id)) {
+    Object.assign(activePost.value, post);
+  }
+  try {
+    clientFeedCache.clear();
+  } catch (e) {}
+}
+
 // Post Deletion Modal & Execution (Super Admin or Author)
 const isDeleteModalVisible = ref(false);
 const postToDelete = ref(null);
@@ -1071,7 +971,6 @@ async function confirmExecuteDelete() {
       thread_id: String(post.id),
     });
     if (res.ok) {
-      recordDeletedThreadId(post.id);
       clientFeedCache.clear();
       prefetchBuffer.clear();
       detailCache.delete(String(post.id));
@@ -1123,7 +1022,7 @@ function handleCardUpvote({ post, isUpvoted, count }) {
   } catch (e) {}
 
   emit('toast', {
-    title: isUpvoted ? '已赞同灵感' : '已取消赞同',
+    title: isUpvoted ? '已点赞灵感' : '已取消点赞',
     message: isUpvoted ? `您为《${post.title}》投出了一票！` : '已更新您的投票状态',
     type: 'SUCCESS',
   });
@@ -1160,26 +1059,6 @@ function handleNewPostSuccess(newThread) {
   activePost.value = newThread;
   currentViewMode.value = 'detail';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-// Top Bar Post Created Callback (从信息流顶部快速发布后，直接插入流顶部并更新视图)
-function handleTopBarPublishSuccess(newThread) {
-  clientFeedCache.clear();
-  prefetchBuffer.clear();
-  // If user was filtering by a specific category that doesn't match, reset to ALL
-  if (selectedCategoryCode.value !== 'ALL' && selectedCategoryCode.value !== newThread.category_code) {
-    selectedCategoryCode.value = 'ALL';
-  }
-  // Automatically switch to 'new' sort so the newly created post is prominently at the very top
-  currentSort.value = 'new';
-
-  const existingIdx = postsList.value.findIndex((p) => String(p.id) === String(newThread.id));
-  if (existingIdx === -1) {
-    postsList.value.unshift(newThread);
-  } else {
-    postsList.value[existingIdx] = { ...postsList.value[existingIdx], ...newThread };
-  }
-  syncStoredInteractions(postsList.value);
 }
 
 function syncStoredInteractions(list) {
@@ -1223,8 +1102,22 @@ watch(currentSort, () => {
   fetchFeedStream(true);
 });
 
+watch(currentViewMode, (mode) => {
+  if (mode === 'list') {
+    document.body.classList.add('fixed-screen-feed');
+  } else {
+    document.body.classList.remove('fixed-screen-feed');
+  }
+}, { immediate: true });
+
 // Lifecycle: Infinite Scroll Feed stream initialization & intersection observer mounting
 onMounted(async () => {
+  if (currentViewMode.value === 'list') {
+    document.body.classList.add('fixed-screen-feed');
+  }
+  try {
+    localStorage.removeItem('opchub_forum_deleted_threads');
+  } catch (e) {}
   window.addEventListener('hashchange', onWindowHashChange);
   await fetchFeedStream(true);
   nextTick(() => {
@@ -1234,6 +1127,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  document.body.classList.remove('fixed-screen-feed');
   window.removeEventListener('hashchange', onWindowHashChange);
   if (scrollObserver) {
     scrollObserver.disconnect();
@@ -1249,39 +1143,79 @@ onUnmounted(() => {
 .forum-view-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 20px;
   width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
 .forum-main-content {
   display: flex;
   flex-direction: column;
-  gap: 20px;
   width: 100%;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
   box-sizing: border-box;
 }
-
-
-
-
 
 /* Zhihu-style Feed Two-Column Layout */
 .zhihu-feed-layout {
   display: flex;
   gap: 20px;
   width: 100%;
-  align-items: flex-start;
+  height: 100%;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
 .zhihu-feed-stream {
   flex: 1;
   min-width: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  overflow: hidden;
   box-sizing: border-box;
+}
+
+.feed-filter-bar {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.semantic-search-banner {
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+/* Scrollable Container: ONLY posts list scrolls with mouse wheel, NO scrollbar displayed */
+.zhihu-posts-scroll-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-right: 0;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.zhihu-posts-scroll-container::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 .zhihu-posts-list {
@@ -1300,13 +1234,10 @@ onUnmounted(() => {
 .zhihu-feed-sidebar {
   width: 320px;
   flex-shrink: 0;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  position: sticky;
-  top: 76px;
-  align-self: flex-start;
-  max-height: calc(100vh - 96px);
+  gap: 12px;
   overflow-y: auto;
   scrollbar-width: none;
   box-sizing: border-box;
@@ -1317,6 +1248,8 @@ onUnmounted(() => {
 }
 
 .sidebar-card {
+  flex-shrink: 0;
+  margin: 0;
   padding: 18px 20px;
   border-radius: var(--radius-md, 12px);
   background: var(--glass-surface, rgba(255, 255, 255, 0.7));
@@ -1457,19 +1390,20 @@ onUnmounted(() => {
   width: 18px;
   text-align: center;
   flex-shrink: 0;
-  color: var(--text-tertiary, #999);
+  color: var(--text-tertiary);
 }
 
 .rank-1 {
-  color: #ff3b30;
+  color: var(--text-primary);
+  font-weight: 700;
 }
 
 .rank-2 {
-  color: #ff9500;
+  color: var(--text-secondary);
 }
 
 .rank-3 {
-  color: #ffcc00;
+  color: var(--text-tertiary);
 }
 
 .hot-item-content {
@@ -1642,13 +1576,13 @@ onUnmounted(() => {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  background: rgba(239, 68, 68, 0.12);
-  color: #ef4444;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  border: 1px solid rgba(239, 68, 68, 0.25);
+  border: 1px solid var(--status-danger);
 }
 
 .delete-modal-title {
@@ -1731,19 +1665,19 @@ onUnmounted(() => {
   display: flex;
   gap: 10px;
   align-items: flex-start;
-  background: rgba(239, 68, 68, 0.08);
-  border: 1px solid rgba(239, 68, 68, 0.22);
+  background: var(--status-danger-soft);
+  border: 1px solid var(--status-danger);
   border-radius: var(--radius-sm, 10px);
   padding: 10px 14px;
   margin-bottom: 22px;
-  color: #ef4444;
+  color: var(--status-danger);
   font-size: 12.5px;
   line-height: 1.5;
 }
 
 .delete-warning-text strong {
   font-weight: 700;
-  color: #dc2626;
+  color: var(--status-danger);
 }
 
 .delete-modal-actions {
@@ -1754,7 +1688,7 @@ onUnmounted(() => {
 }
 
 .btn-confirm-delete {
-  background: #ef4444 !important;
+  background: var(--status-danger) !important;
   color: #ffffff !important;
   border: none !important;
   font-weight: 600;
@@ -1762,9 +1696,10 @@ onUnmounted(() => {
 }
 
 .btn-confirm-delete:hover:not(:disabled) {
-  background: #dc2626 !important;
+  background: var(--status-danger) !important;
+  filter: brightness(0.92);
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35);
+  box-shadow: 0 4px 14px var(--status-danger-soft);
 }
 
 .btn-confirm-delete:disabled {
@@ -1815,13 +1750,13 @@ onUnmounted(() => {
 }
 
 [data-theme="dark"] .delete-warning-banner {
-  background: rgba(239, 68, 68, 0.12);
-  border-color: rgba(239, 68, 68, 0.3);
-  color: #f87171;
+  background: var(--status-danger-soft);
+  border-color: var(--status-danger);
+  color: var(--status-danger);
 }
 
 [data-theme="dark"] .delete-warning-text strong {
-  color: #fca5a5;
+  color: var(--status-danger);
 }
 
 /* ---------------- Category Filter Bar ---------------- */
@@ -1876,7 +1811,131 @@ onUnmounted(() => {
 .feed-filter-right {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+}
+
+/* NLP Semantic Search in Feed Filter Bar */
+.semantic-search-box {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.semantic-search-input {
+  width: 200px;
+  padding: 6px 26px 6px 12px;
+  font-size: 12.5px;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--glass-surface-subtle, rgba(0, 0, 0, 0.04));
+  border: 1px solid var(--glass-border-subtle, rgba(0, 0, 0, 0.08));
+  color: var(--text-primary);
+  outline: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.semantic-search-input:focus {
+  width: 250px;
+  background: var(--glass-surface);
+  border-color: var(--accent, #0071E3);
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 50%;
+}
+
+.clear-search-btn:hover {
+  color: var(--text-primary);
+}
+
+.semantic-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: var(--radius-full, 9999px);
+  background: var(--accent, #0071E3);
+  color: #ffffff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.semantic-search-btn:hover:not(:disabled) {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+.semantic-search-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Semantic Search Status Banner */
+.semantic-search-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--accent-glass);
+  border: 1px solid rgba(0, 113, 227, 0.25);
+  font-size: 12.5px;
+  color: var(--text-primary);
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.semantic-search-banner .banner-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.sparkle-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--accent-glass);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.btn-reset-search {
+  padding: 4px 12px;
+  font-size: 11.5px;
+  flex-shrink: 0;
 }
 
 .sort-segmented {

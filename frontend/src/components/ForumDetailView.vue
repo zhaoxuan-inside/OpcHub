@@ -32,12 +32,12 @@
           class="btn-header-action"
           :class="{ active: threadUpvoted }"
           @click="toggleThreadUpvote"
-          title="赞同此实战经验"
+          title="点赞此实战经验"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
           </svg>
-          <span>{{ threadUpvoted ? '已赞同' : '赞同' }}</span>
+          <span>{{ threadUpvoted ? '已点赞' : '点赞' }}</span>
           <span class="count-tag">{{ threadUpvoteCount }}</span>
         </button>
 
@@ -52,6 +52,20 @@
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
           </svg>
           <span>{{ threadBookmarked ? '已收藏' : '收藏' }}</span>
+        </button>
+
+        <button
+          type="button"
+          class="btn-header-action"
+          :class="{ active: threadLoved }"
+          @click="toggleThreadLove"
+          :title="threadLoved ? '取消喜欢' : '喜欢这篇实战经验'"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" :fill="threadLoved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+            <path d="M20.8 5.6a5.2 5.2 0 0 0-7.4 0L12 7l-1.4-1.4a5.2 5.2 0 1 0-7.4 7.4L12 21l8.8-7.9a5.2 5.2 0 0 0 0-7.5Z"></path>
+          </svg>
+          <span>{{ threadLoved ? '已喜欢' : '喜欢' }}</span>
+          <span class="count-tag">{{ threadLoveCount }}</span>
         </button>
 
         <button
@@ -150,7 +164,7 @@
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
             </svg>
-            <span>{{ threadUpvoted ? '已赞同实战经验' : '赞同实战经验' }}</span>
+            <span>{{ threadUpvoted ? '已点赞实战经验' : '点赞实战经验' }}</span>
             <span class="badge-count">{{ threadUpvoteCount }}</span>
           </button>
 
@@ -164,6 +178,19 @@
               <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
             </svg>
             <span>{{ threadBookmarked ? '已收藏归档' : '收藏归档' }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="btn-outline-action"
+            :class="{ active: threadLoved }"
+            @click="toggleThreadLove"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" :fill="threadLoved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
+              <path d="M20.8 5.6a5.2 5.2 0 0 0-7.4 0L12 7l-1.4-1.4a5.2 5.2 0 1 0-7.4 7.4L12 21l8.8-7.9a5.2 5.2 0 0 0 0-7.5Z"></path>
+            </svg>
+            <span>{{ threadLoved ? '已喜欢' : '喜欢' }}</span>
+            <span class="badge-count">{{ threadLoveCount }}</span>
           </button>
 
           <button
@@ -279,7 +306,7 @@
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
                   </svg>
-                  <span>赞同 {{ item.upvote_count || 0 }}</span>
+                  <span>点赞 {{ item.upvote_count || 0 }}</span>
                 </button>
 
                 <button type="button" class="btn-c-action" @click="setReplyTarget(item)">
@@ -324,7 +351,7 @@
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
                     </svg>
-                    <span>赞同 {{ sub.upvote_count || 0 }}</span>
+                    <span>点赞 {{ sub.upvote_count || 0 }}</span>
                   </button>
 
                   <button type="button" class="btn-c-action" @click="setReplyTarget(item, sub.author_name)">
@@ -384,6 +411,8 @@ const canDelete = computed(() => {
 const threadUpvoted = ref(false);
 const threadUpvoteCount = ref(0);
 const threadBookmarked = ref(false);
+const threadLoved = ref(false);
+const threadLoveCount = ref(0);
 const isCopied = ref(false);
 let copyTimer = null;
 
@@ -418,9 +447,11 @@ watch(
   () => props.post,
   (newPost) => {
     if (newPost) {
-      threadUpvoted.value = Boolean(newPost.is_upvoted || isPostUpvotedInStorage(newPost.id));
-      threadUpvoteCount.value = newPost.upvotes ?? newPost.upvote_count ?? 0;
-      threadBookmarked.value = Boolean(newPost.is_bookmarked || isPostBookmarkedInStorage(newPost.id));
+      threadUpvoted.value = Boolean(newPost.viewer?.liked ?? newPost.is_upvoted);
+      threadUpvoteCount.value = newPost.like_count ?? newPost.upvotes ?? newPost.upvote_count ?? 0;
+      threadBookmarked.value = Boolean(newPost.viewer?.favorited ?? newPost.is_bookmarked);
+      threadLoved.value = Boolean(newPost.viewer?.loved ?? newPost.is_loved);
+      threadLoveCount.value = newPost.love_count ?? 0;
       replyTarget.value = null;
       replyText.value = '';
       loadThreadDetail(newPost);
@@ -542,8 +573,9 @@ const categoryLabel = computed(() => {
 
 const pillStyle = computed(() => {
   return {
-    color: '#0071E3',
-    background: 'rgba(0, 113, 227, 0.08)',
+    color: 'var(--text-secondary)',
+    background: 'var(--glass-surface-subtle)',
+    border: '1px solid var(--glass-border-subtle)',
   };
 });
 
@@ -554,99 +586,126 @@ const replyPlaceholder = computed(() => {
   return '分享您的实战经验、避坑细节或针对该方案提出见解...（支持富文本交流）';
 });
 
-function toggleThreadUpvote() {
-  threadUpvoted.value = !threadUpvoted.value;
-  threadUpvoteCount.value += threadUpvoted.value ? 1 : -1;
-  if (threadUpvoteCount.value < 0) threadUpvoteCount.value = 0;
-
-  if (props.post) {
-    props.post.is_upvoted = threadUpvoted.value;
-    props.post.upvotes = threadUpvoteCount.value;
-    props.post.upvote_count = threadUpvoteCount.value;
+async function toggleThreadUpvote() {
+  const wasUpvoted = threadUpvoted.value;
+  const previousCount = threadUpvoteCount.value;
+  threadUpvoted.value = !wasUpvoted;
+  threadUpvoteCount.value = Math.max(0, previousCount + (wasUpvoted ? -1 : 1));
+  try {
+    const res = await dispatchGateway('content.interaction.toggle', {
+      target_type: 'FORUM_THREAD',
+      target_id: String(props.post.id),
+      kind: 'LIKE',
+      target_title: props.post.title || '',
+    });
+    if (res.ok && res.data) {
+      threadUpvoted.value = Boolean(res.data.viewer?.liked);
+      threadUpvoteCount.value = Number(res.data.like_count || 0);
+      if (props.post) {
+        props.post.is_upvoted = threadUpvoted.value;
+        props.post.upvotes = threadUpvoteCount.value;
+        props.post.upvote_count = threadUpvoteCount.value;
+        props.post.like_count = threadUpvoteCount.value;
+        props.post.viewer = res.data.viewer;
+      }
+      emit('upvote', {
+        post: props.post,
+        isUpvoted: threadUpvoted.value,
+        count: threadUpvoteCount.value,
+      });
+      emit('update-post', props.post);
+    } else {
+      threadUpvoted.value = wasUpvoted;
+      threadUpvoteCount.value = previousCount;
+      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
+      return;
+    }
+  } catch (e) {
+    threadUpvoted.value = wasUpvoted;
+    threadUpvoteCount.value = previousCount;
+    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
+    return;
   }
 
-  try {
-    const raw = localStorage.getItem('opchub_forum_upvotes');
-    let upvotes = raw ? JSON.parse(raw) : [];
-    const sid = String(props.post.id);
-    if (threadUpvoted.value) {
-      if (!upvotes.includes(sid)) upvotes.push(sid);
-    } else {
-      upvotes = upvotes.filter((id) => id !== sid);
-    }
-    localStorage.setItem('opchub_forum_upvotes', JSON.stringify(upvotes));
-  } catch (e) {}
-
-  emit('upvote', {
-    post: props.post,
-    isUpvoted: threadUpvoted.value,
-    count: threadUpvoteCount.value,
-  });
-  emit('update-post', props.post);
-
   emit('toast', {
-    title: threadUpvoted.value ? '已赞同实战经验' : '已取消赞同',
-    message: threadUpvoted.value ? '感谢对创客实战经验的认可！' : '已更新您的赞同状态',
+    title: threadUpvoted.value ? '已点赞实战经验' : '已取消点赞',
+    message: threadUpvoted.value ? '感谢对创客实战经验的认可！' : '已更新您的点赞状态',
     type: 'SUCCESS',
   });
+}
 
-  if (props.post?.id) {
-    dispatchGateway(
-      'forum.upvote',
-      { target_type: 'THREAD', target_id: String(props.post.id) },
-      { silent: true }
-    );
+async function toggleThreadLove() {
+  const wasLoved = threadLoved.value;
+  const previousCount = threadLoveCount.value;
+  threadLoved.value = !wasLoved;
+  threadLoveCount.value = Math.max(0, previousCount + (wasLoved ? -1 : 1));
+  try {
+    const res = await dispatchGateway('content.interaction.toggle', {
+      target_type: 'FORUM_THREAD',
+      target_id: String(props.post.id),
+      kind: 'LOVE',
+      target_title: props.post.title || '',
+    });
+    if (res.ok && res.data) {
+      threadLoved.value = Boolean(res.data.viewer?.loved);
+      threadLoveCount.value = Number(res.data.love_count || 0);
+      if (props.post) {
+        props.post.is_loved = threadLoved.value;
+        props.post.love_count = threadLoveCount.value;
+        props.post.viewer = res.data.viewer;
+      }
+      emit('update-post', props.post);
+    } else {
+      threadLoved.value = wasLoved;
+      threadLoveCount.value = previousCount;
+      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
+    }
+  } catch (e) {
+    threadLoved.value = wasLoved;
+    threadLoveCount.value = previousCount;
+    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
   }
 }
 
-function toggleThreadBookmark() {
-  threadBookmarked.value = !threadBookmarked.value;
-
-  if (props.post) {
-    props.post.is_bookmarked = threadBookmarked.value;
-    props.post.bookmark_count = Math.max(0, (props.post.bookmark_count || 0) + (threadBookmarked.value ? 1 : -1));
-  }
-
+async function toggleThreadBookmark() {
+  const wasBookmarked = threadBookmarked.value;
+  threadBookmarked.value = !wasBookmarked;
   try {
-    const raw = localStorage.getItem('opchub_forum_bookmarks');
-    let bookmarks = raw ? JSON.parse(raw) : [];
-    const sid = String(props.post.id);
-    if (threadBookmarked.value) {
-      const exists = bookmarks.some((b) => (typeof b === 'object' ? String(b.id) === sid : String(b) === sid));
-      if (!exists) {
-        bookmarks.push({
-          id: props.post.id,
-          title: props.post.title,
-          category: categoryLabel.value,
-          author: props.post.author,
-          created_at: new Date().toISOString(),
-        });
+    const res = await dispatchGateway('content.interaction.toggle', {
+      target_type: 'FORUM_THREAD',
+      target_id: String(props.post.id),
+      kind: 'FAVORITE',
+      target_title: props.post.title || '',
+    });
+    if (res.ok && res.data) {
+      threadBookmarked.value = Boolean(res.data.viewer?.favorited);
+      if (props.post) {
+        props.post.is_bookmarked = threadBookmarked.value;
+        props.post.bookmark_count = Number(res.data.favorite_count || 0);
+        props.post.favorite_count = Number(res.data.favorite_count || 0);
+        props.post.viewer = res.data.viewer;
       }
+      emit('bookmark', {
+        post: props.post,
+        isBookmarked: threadBookmarked.value,
+      });
+      emit('update-post', props.post);
     } else {
-      bookmarks = bookmarks.filter((b) => (typeof b === 'object' ? String(b.id) !== sid : String(b) !== sid));
+      threadBookmarked.value = wasBookmarked;
+      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
+      return;
     }
-    localStorage.setItem('opchub_forum_bookmarks', JSON.stringify(bookmarks));
-  } catch (e) {}
-
-  emit('bookmark', {
-    post: props.post,
-    isBookmarked: threadBookmarked.value,
-  });
-  emit('update-post', props.post);
+  } catch (e) {
+    threadBookmarked.value = wasBookmarked;
+    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
+    return;
+  }
 
   emit('toast', {
     title: threadBookmarked.value ? '已收藏归档' : '已移出收藏夹',
     message: threadBookmarked.value ? '该实战帖已归档至您的个人知识库收藏目录！' : '已从知识库收藏目录移除',
     type: 'SUCCESS',
   });
-
-  if (props.post?.id) {
-    dispatchGateway(
-      'forum.bookmark',
-      { thread_id: String(props.post.id), folder_name: '默认收藏夹' },
-      { silent: true }
-    );
-  }
 }
 
 async function copyTextToClipboard(text) {
@@ -970,8 +1029,8 @@ async function submitReply() {
 }
 
 .btn-header-ghost-report:hover {
-  background: rgba(255, 59, 48, 0.08);
-  color: #ff3b30;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
 }
 
 .btn-header-ghost-delete {
@@ -981,22 +1040,22 @@ async function submitReply() {
   padding: 7px 10px;
   border-radius: var(--radius-md);
   background: transparent;
-  border: 1px solid rgba(255, 59, 48, 0.15);
-  color: #ff3b30;
+  border: 1px solid var(--status-danger-soft);
+  color: var(--status-danger);
   font-size: 11.5px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .btn-header-ghost-delete:hover {
-  background: rgba(255, 59, 48, 0.12);
-  border-color: rgba(255, 59, 48, 0.35);
+  background: var(--status-danger-soft);
+  border-color: var(--status-danger);
 }
 
 .btn-delete-action:hover {
-  border-color: #ff3b30 !important;
-  color: #ff3b30 !important;
-  background: rgba(255, 59, 48, 0.08) !important;
+  border-color: var(--status-danger) !important;
+  color: var(--status-danger) !important;
+  background: var(--status-danger-soft) !important;
 }
 
 /* Equal-Width Article Container (页面等宽统一体系) */
@@ -1042,14 +1101,14 @@ async function submitReply() {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #00c6ff);
-  color: #fff;
+  background: linear-gradient(135deg, var(--glass-surface-hover) 0%, var(--glass-surface-subtle) 100%);
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
   font-size: 17px;
-  box-shadow: 0 4px 12px var(--accent-glow);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .author-text-meta {
@@ -1074,9 +1133,9 @@ async function submitReply() {
   font-size: 11px;
   padding: 2px 7px;
   border-radius: var(--radius-full);
-  background: rgba(52, 199, 89, 0.12);
-  color: #34c759;
-  border: 1px solid rgba(52, 199, 89, 0.3);
+  background: var(--status-success-soft);
+  color: var(--status-success);
+  border: 1px solid var(--status-success);
 }
 
 .author-sub-line {
@@ -1235,7 +1294,7 @@ async function submitReply() {
 }
 
 .btn-cancel-reply-target:hover {
-  color: #ff3b30;
+  color: var(--status-danger);
 }
 
 .reply-textarea {
@@ -1296,8 +1355,8 @@ async function submitReply() {
 }
 
 .is-accepted-node .comment-bubble {
-  border-color: rgba(52, 199, 89, 0.4);
-  background: rgba(52, 199, 89, 0.04);
+  border-color: var(--status-success);
+  background: var(--status-success-soft);
 }
 
 .comment-head {
@@ -1350,8 +1409,8 @@ async function submitReply() {
   font-size: 10.5px;
   padding: 1px 6px;
   border-radius: var(--radius-full);
-  background: rgba(52, 199, 89, 0.15);
-  color: #34c759;
+  background: var(--status-success-soft);
+  color: var(--status-success);
   font-weight: 600;
 }
 

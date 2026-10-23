@@ -21,13 +21,13 @@
         <div style="font-size: 13px; color: var(--text-tertiary); margin-bottom: 12px;">
           {{ profile.email }}
         </div>
-        <div style="display: inline-block; padding: 4px 12px; border-radius: 12px; background: rgba(0, 113, 227, 0.15); color: #0071E3; font-size: 12px; font-weight: 600;">
+        <div style="display: inline-block; padding: 4px 12px; border-radius: 12px; background: var(--accent-glass); color: var(--accent); font-size: 12px; font-weight: 600;">
           {{ profile.tier_name || '标准创客' }} · {{ profile.account_type || 'MAKER' }}
         </div>
         <div style="margin-top: 18px;">
           <button
             class="btn-liquid-outline"
-            style="width: 100%; font-size: 12px; color: #ff453a; border-color: rgba(255, 69, 58, 0.3);"
+            style="width: 100%; font-size: 12px; color: var(--status-danger); border-color: var(--status-danger-soft);"
             @click="$emit('logout')"
           >
             退出创客登录
@@ -102,7 +102,7 @@
                   @input="editTrack = editCustomInput.trim()"
                 />
               </div>
-              <div v-if="trackSaveMsg" :style="{ color: trackSaveError ? '#ff453a' : '#30d158' }" style="font-size: 11px; margin-bottom: 6px;">
+              <div v-if="trackSaveMsg" :style="{ color: trackSaveError ? 'var(--status-danger)' : 'var(--status-success)' }" style="font-size: 11px; margin-bottom: 6px;">
                 {{ trackSaveMsg }}
               </div>
               <div style="display: flex; gap: 6px;">
@@ -119,8 +119,8 @@
           </div>
           <div>
             <span style="color: var(--text-tertiary);">法定义务协议存证:</span>
-            <div style="font-weight: 600; color: #30d158; margin-top: 2px;">
-              ✓ 已签署合规协议 (v1.2.0)
+            <div style="font-weight: 600; color: var(--status-success); margin-top: 2px;">
+              <OpcIcon name="check" :size="13" /> 已签署合规协议 (v1.2.0)
             </div>
           </div>
         </div>
@@ -129,6 +129,54 @@
     <div v-else style="text-align: center; padding: 60px 0; color: var(--text-tertiary);">
       加载创客档案中...
     </div>
+
+    <!-- My Interactions (我的互动) -->
+    <div v-if="profile" class="glass-panel" style="margin-top: 24px; padding: 24px;">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 16px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 10px;">
+        我的互动足迹
+      </h3>
+      <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px;">
+        <span class="track-pill" style="font-size: 11.5px; padding: 4px 12px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary);">
+          <OpcIcon name="like" :size="12" /> 点赞 {{ mineCounts.like || 0 }}
+        </span>
+        <span class="track-pill" style="font-size: 11.5px; padding: 4px 12px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary);">
+          <OpcIcon name="star-filled" :size="12" /> 收藏 {{ mineCounts.favorite || 0 }}
+        </span>
+        <span class="track-pill" style="font-size: 11.5px; padding: 4px 12px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary);">
+          <OpcIcon name="heart" :size="12" /> 喜欢 {{ mineCounts.love || 0 }}
+        </span>
+        <span class="track-pill" style="font-size: 11.5px; padding: 4px 12px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary);">
+          <OpcIcon name="comment" :size="12" /> 评论 {{ mineCounts.comment || 0 }}
+        </span>
+        <span class="track-pill" style="font-size: 11.5px; padding: 4px 12px; border-radius: 12px; background: var(--glass-surface-subtle); border: 1px solid var(--glass-border-subtle); color: var(--text-secondary);">
+          <OpcIcon name="dislike" :size="12" /> 踩 {{ mineCounts.dislike || 0 }}
+        </span>
+      </div>
+
+      <div v-if="mineItems.length === 0" style="color: var(--text-tertiary); font-size: 13px; padding: 20px 0; text-align: center;">
+        还没有互动足迹，去广场点赞、收藏、喜欢或在政策/需求/文书中发表评论吧。
+      </div>
+      <div v-else style="display: flex; flex-direction: column; gap: 8px; max-height: 320px; overflow-y: auto;">
+        <button
+          v-for="item in mineItems"
+          :key="`${item.kind}-${item.target_id}-${item.created_at}`"
+          type="button"
+          style="display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 14px; border-radius: 12px; border: 1px solid var(--glass-border-subtle); background: var(--glass-surface-subtle); cursor: pointer; transition: all 0.18s;"
+          @click="navigateToTab(item.tab)"
+        >
+          <span style="font-size: 15px;"><OpcIcon :name="kindIcon(item.kind)" :size="15" /></span>
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+              {{ item.title || '未命名内容' }}
+            </div>
+            <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+              {{ item.subtitle || '' }} · {{ formatMineTime(item.created_at) }}
+            </div>
+          </div>
+          <span style="font-size: 12px; color: var(--accent); flex-shrink: 0;">查看 →</span>
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -136,7 +184,7 @@
 import { ref, onMounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 
-const emit = defineEmits(['toast', 'logout']);
+const emit = defineEmits(['toast', 'logout', 'navigate']);
 
 const profile = ref(null);
 const isEditingTrack = ref(false);
@@ -146,6 +194,45 @@ const editCustomInput = ref('');
 const savingTrack = ref(false);
 const trackSaveMsg = ref('');
 const trackSaveError = ref(false);
+
+const mineItems = ref([]);
+const mineCounts = ref({ like: 0, favorite: 0, love: 0, comment: 0, dislike: 0 });
+
+async function loadMyInteractions() {
+  try {
+    const res = await dispatchGateway('content.interactions.mine', {}, { silent: true });
+    if (res.ok && res.data) {
+      mineItems.value = Array.isArray(res.data.items) ? res.data.items : [];
+      mineCounts.value = { ...(res.data.counts || {}) };
+    }
+  } catch (e) {
+    mineItems.value = [];
+  }
+}
+
+function kindIcon(kind) {
+  const map = { LIKE: 'like', FAVORITE: 'star-filled', LOVE: 'heart', COMMENT: 'comment', DISLIKE: 'dislike' };
+  return map[kind] || 'bookmark';
+}
+
+function formatMineTime(value) {
+  if (!value) return '';
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  } catch (e) {
+    return '';
+  }
+}
+
+function navigateToTab(tab) {
+  if (!tab) {
+    emit('toast', { title: '无法跳转', message: '该内容所在频道暂不可用。', type: 'INFO' });
+    return;
+  }
+  emit('navigate', tab);
+}
 
 const presetTracks = [
   'AI 原生应用与智能体',
@@ -205,7 +292,7 @@ async function saveProfileTrack() {
       if (profile.value) {
         profile.value.industry_track = res.data.industry_track || targetTrack;
       }
-      trackSaveMsg.value = '✓ 业务赛道已成功更新并持久化落盘！';
+      trackSaveMsg.value = '业务赛道已成功更新并持久化落盘！';
       setTimeout(() => {
         isEditingTrack.value = false;
         trackSaveMsg.value = '';
@@ -235,5 +322,6 @@ async function loadProfile() {
 
 onMounted(() => {
   loadProfile();
+  loadMyInteractions();
 });
 </script>

@@ -5,118 +5,116 @@
     class="compact-post-row glass-box"
     @click="$emit('select', post)"
   >
-    <div class="compact-main-col">
-      <div class="compact-title-row">
-        <span v-if="post.pinned" class="badge-pinned-sm">
-          <ForumIcon name="pinned" size="10" />
-          <span>{{ post.pinned }}</span>
-        </span>
-        <span class="badge-category-sm" :style="pillStyle">
-          {{ categoryLabel }}
-        </span>
-        <h4 class="compact-title" :title="post.title">
-          {{ post.title }}
-        </h4>
+    <div class="compact-body-row">
+      <div class="compact-main-col">
+        <div class="compact-title-row">
+          <span v-if="post.pinned" class="badge-pinned-sm">
+            <ForumIcon name="pinned" size="10" />
+            <span>{{ post.pinned }}</span>
+          </span>
+          <span class="badge-category-sm" :style="pillStyle">
+            {{ categoryLabel }}
+          </span>
+          <span v-if="post.semantic_score" class="badge-semantic-score-sm">
+            <OpcIcon name="spark" :size="11" /> {{ post.semantic_score }}%
+          </span>
+          <h4 class="compact-title" :title="post.title">
+            {{ post.title }}
+          </h4>
+        </div>
+
+        <div class="compact-meta-row">
+          <div class="author-micro">
+            <span class="author-micro-avatar" :style="{ background: avatarBg }">
+              {{ authorInitial }}
+            </span>
+            <span class="compact-author-name">{{ post.author || '平台创客' }}</span>
+          </div>
+          <span class="dot-sep">·</span>
+          <span class="compact-time">{{ post.updated_at || '刚刚' }}</span>
+          <span class="dot-sep">·</span>
+          <span class="compact-ip">{{ post.ip_location || '来自 浙江' }}</span>
+
+          <!-- Primary Highlight Metric in Compact View -->
+          <template v-if="computedMetrics.length > 0">
+            <span class="dot-sep">·</span>
+            <span class="compact-metric-pill" :class="`metric-${computedMetrics[0].type || 'info'}`">
+              <span class="metric-icon"><OpcIcon :name="computedMetrics[0].icon" :size="12" /></span>
+              <span class="metric-label">{{ computedMetrics[0].label }}:</span>
+              <strong class="metric-val">{{ computedMetrics[0].val }}</strong>
+            </span>
+          </template>
+        </div>
       </div>
 
-      <div class="compact-meta-row">
-        <div class="author-micro">
-          <span class="author-micro-avatar" :style="{ background: avatarBg }">
-            {{ authorInitial }}
-          </span>
-          <span class="compact-author-name">{{ post.author || '平台创客' }}</span>
-        </div>
-        <span class="dot-sep">·</span>
-        <span class="compact-time">{{ post.updated_at || '刚刚' }}</span>
-        <span class="dot-sep">·</span>
-        <span class="compact-ip">{{ post.ip_location || '来自 浙江' }}</span>
+      <!-- Compact functional actions (share / delete) -->
+      <div class="compact-actions-col" @click.stop>
+        <button
+          type="button"
+          class="compact-btn-icon"
+          :class="{ active: isCopied }"
+          @click="handleShare"
+          :title="isCopied ? '已复制链接' : '分享经验帖'"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"></circle>
+            <circle cx="6" cy="12" r="3"></circle>
+            <circle cx="18" cy="19" r="3"></circle>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+          </svg>
+        </button>
 
-        <!-- Primary Highlight Metric in Compact View -->
-        <template v-if="computedMetrics.length > 0">
-          <span class="dot-sep">·</span>
-          <span class="compact-metric-pill" :class="`metric-${computedMetrics[0].type || 'info'}`">
-            <span class="metric-icon">{{ computedMetrics[0].icon }}</span>
-            <span class="metric-label">{{ computedMetrics[0].label }}:</span>
-            <strong class="metric-val">{{ computedMetrics[0].val }}</strong>
-          </span>
-        </template>
+        <button
+          v-if="canDelete"
+          type="button"
+          class="compact-btn-icon compact-btn-delete"
+          @click="$emit('delete', post)"
+          title="删除此实战帖"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+        </button>
       </div>
     </div>
 
-    <!-- Compact Actions Group -->
-    <div class="compact-actions-col" @click.stop>
-      <button
-        type="button"
-        class="compact-btn-upvote"
-        :class="{ active: isUpvoted }"
-        @click="handleToggleUpvote"
-        :title="isUpvoted ? '已赞同 (点击取消)' : '赞同实战经验'"
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <path d="M12 4.5L19 14H5L12 4.5Z" :fill="isUpvoted ? 'currentColor' : 'none'"></path>
-        </svg>
-        <span>{{ currentUpvotes }}</span>
-      </button>
-
-      <button
-        type="button"
-        class="compact-btn-action"
-        @click="$emit('select', post)"
-        title="查看探讨见解"
-      >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-        </svg>
-        <span>{{ post.replies || post.comment_count || 0 }}</span>
-      </button>
-
-      <button
-        type="button"
-        class="compact-btn-icon"
-        :class="{ active: isBookmarked }"
-        @click="handleToggleBookmark"
-        :title="isBookmarked ? '已收藏' : '收藏归档'"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" :fill="isBookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-        </svg>
-      </button>
-
-      <button
-        type="button"
-        class="compact-btn-icon"
-        :class="{ active: isCopied }"
-        @click="handleShare"
-        :title="isCopied ? '已复制链接' : '分享经验帖'"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="18" cy="5" r="3"></circle>
-          <circle cx="6" cy="12" r="3"></circle>
-          <circle cx="18" cy="19" r="3"></circle>
-          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-        </svg>
-      </button>
-
-      <button
-        v-if="canDelete"
-        type="button"
-        class="compact-btn-icon compact-btn-delete"
-        @click="$emit('delete', post)"
-        title="删除此实战帖"
-      >
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polyline points="3 6 5 6 21 6"></polyline>
-          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-        </svg>
-      </button>
+    <!-- Compact unified interaction bar (bottom, separated by a divider) -->
+    <div class="compact-interaction-row" @click.stop>
+      <div class="compact-interaction-divider"></div>
+      <ContentInteractionBar
+        :target-type="'FORUM_THREAD'"
+        :target-id="post.id"
+        :target-title="post.title"
+        :like-count="post.like_count ?? post.upvote_count ?? post.upvotes ?? 0"
+        :favorite-count="post.favorite_count ?? post.bookmark_count ?? 0"
+        :love-count="post.love_count ?? 0"
+        :comment-count="post.comment_count ?? post.replies ?? 0"
+        :dislike-count="post.dislike_count ?? 0"
+        :rating-avg="post.rating_avg ?? 0"
+        :rating-count="post.rating_count ?? 0"
+        :my-rating="post.viewer?.rating ?? 0"
+        :liked="post.viewer ? post.viewer.liked : Boolean(post.is_upvoted)"
+        :favorited="post.viewer ? post.viewer.favorited : Boolean(post.is_bookmarked)"
+        :loved="post.viewer ? post.viewer.loved : Boolean(post.is_loved)"
+        :commented="post.viewer ? post.viewer.commented : Boolean(post.is_commented)"
+        :disliked="post.viewer?.disliked ?? false"
+        :authenticated="Boolean(currentUserId)"
+        compact
+        comment-mode="emit"
+        @open-comments="$emit('select', post)"
+        @changed="onInteractionChanged"
+        @require-login="$emit('require-login')"
+        @toast="$emit('toast', $event)"
+      />
     </div>
   </article>
 
   <!-- 2. Standard Zhihu Feed Stream Mode (知乎文章流深度模式) -->
   <article
     v-else
-    class="zhihu-post-card glass-box"
+    class="zhihu-post-card glass-box opc-reveal-host"
     :class="{ 'card-expanded': isExpanded }"
     @click="$emit('select', post)"
   >
@@ -128,13 +126,8 @@
         </div>
         <div class="author-inline-info">
           <span class="author-name">{{ post.author || '平台创客' }}</span>
-          <span class="author-badge">认证个体</span>
           <span class="dot-sep">·</span>
           <span class="post-time">{{ post.updated_at || '刚刚' }}</span>
-          <span class="dot-sep">·</span>
-          <span class="post-ip">{{ post.ip_location || '来自 浙江' }}</span>
-          <span v-if="post.view_count" class="dot-sep">·</span>
-          <span v-if="post.view_count" class="post-views">浏览 {{ post.view_count }}</span>
         </div>
       </div>
 
@@ -147,35 +140,22 @@
         <span class="badge-category" :style="pillStyle">
           {{ categoryLabel }}
         </span>
+        <span v-if="post.semantic_score" class="badge-semantic-score">
+          <OpcIcon name="spark" :size="12" /> {{ post.semantic_score }}% 匹配
+        </span>
       </div>
     </div>
 
     <!-- 2.2 Zhihu Headline Title -->
-    <h3 class="zhihu-card-title">
+    <h3 class="zhihu-card-title opc-clamp opc-clamp-2">
       {{ post.title }}
     </h3>
-
-    <!-- 2.3 Executive Practical Metric Chips (实战量化核心指标) -->
-    <div v-if="computedMetrics.length > 0" class="zhihu-metrics-row">
-      <div
-        v-for="(m, idx) in computedMetrics"
-        :key="idx"
-        class="metric-chip"
-        :class="`chip-${m.type || 'info'}`"
-      >
-        <span class="chip-icon">{{ m.icon }}</span>
-        <span class="chip-label">{{ m.label }}</span>
-        <strong class="chip-val">{{ m.val }}</strong>
-      </div>
-    </div>
 
     <!-- 2.4 Excerpt with Inline Markdown Expand/Collapse (知乎核心体验：卡片内原地阅读全文) -->
     <div class="zhihu-card-content" @click.stop>
       <!-- Collapsed: 3-line rich excerpt -->
       <div v-if="!isExpanded" class="snippet-wrapper">
-        <p class="snippet-text">
-          {{ post.snippet || post.content }}
-        </p>
+        <HoverRevealText :text="post.snippet || post.content" :lines="3" />
         <button type="button" class="btn-read-full" @click="toggleExpand">
           <span>阅读全文</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
@@ -201,63 +181,9 @@
       </div>
     </div>
 
-    <!-- 2.5 Keyword Tags -->
-    <div v-if="computedTags.length > 0 && !isExpanded" class="zhihu-keywords-row">
-      <span
-        v-for="tag in computedTags"
-        :key="tag"
-        class="keyword-tag"
-        @click.stop
-      >
-        #{{ tag }}
-      </span>
-    </div>
-
     <!-- 2.6 Zhihu Signature Action Toolbar -->
     <div class="zhihu-action-bar">
       <div class="action-buttons-group">
-        <!-- Upvote (知乎经典赞同块) -->
-        <button
-          type="button"
-          class="btn-zhihu-upvote"
-          :class="{ active: isUpvoted }"
-          @click.stop="handleToggleUpvote"
-          :title="isUpvoted ? '取消赞同' : '赞同此实战经验'"
-        >
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M12 4.5L19 14H5L12 4.5Z" :fill="isUpvoted ? 'currentColor' : 'none'"></path>
-          </svg>
-          <span class="upvote-label">{{ isUpvoted ? '已赞同' : '赞同' }}</span>
-          <span class="upvote-count">{{ currentUpvotes }}</span>
-        </button>
-
-        <!-- Comments -->
-        <button
-          type="button"
-          class="btn-zhihu-action"
-          @click.stop="$emit('select', post)"
-          title="进入深度交流与评论树"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span>{{ post.replies || post.comment_count || 0 }} 条探讨</span>
-        </button>
-
-        <!-- Bookmark -->
-        <button
-          type="button"
-          class="btn-zhihu-action"
-          :class="{ active: isBookmarked }"
-          @click.stop="handleToggleBookmark"
-          title="收藏归档至知识库"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" :fill="isBookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span>{{ isBookmarked ? '已收藏' : '收藏' }}</span>
-        </button>
-
         <!-- Share -->
         <button
           type="button"
@@ -315,11 +241,36 @@
           </svg>
           <span>收起全文</span>
         </button>
-        <div v-else class="discuss-heat-tag">
-          <span class="heat-flame">🔥</span>
-          <span>{{ Math.max(3, Math.floor((post.replies || post.comment_count || 8) * 1.5)) }} 人热议中</span>
-        </div>
       </div>
+    </div>
+
+    <!-- 2.7 Unified Interaction Band (bottom) -->
+    <div class="zhihu-interaction-row" @click.stop>
+      <ContentInteractionBar
+        :target-type="'FORUM_THREAD'"
+        :target-id="post.id"
+        :target-title="post.title"
+        :like-count="post.like_count ?? post.upvote_count ?? post.upvotes ?? 0"
+        :favorite-count="post.favorite_count ?? post.bookmark_count ?? 0"
+        :love-count="post.love_count ?? 0"
+        :comment-count="post.comment_count ?? post.replies ?? 0"
+        :dislike-count="post.dislike_count ?? 0"
+        :rating-avg="post.rating_avg ?? 0"
+        :rating-count="post.rating_count ?? 0"
+        :my-rating="post.viewer?.rating ?? 0"
+        :liked="post.viewer ? post.viewer.liked : Boolean(post.is_upvoted)"
+        :favorited="post.viewer ? post.viewer.favorited : Boolean(post.is_bookmarked)"
+        :loved="post.viewer ? post.viewer.loved : Boolean(post.is_loved)"
+        :commented="post.viewer ? post.viewer.commented : Boolean(post.is_commented)"
+        :disliked="post.viewer?.disliked ?? false"
+        :authenticated="Boolean(currentUserId)"
+        variant="band"
+        comment-mode="emit"
+        @open-comments="$emit('select', post)"
+        @changed="onInteractionChanged"
+        @require-login="$emit('require-login')"
+        @toast="$emit('toast', $event)"
+      />
     </div>
   </article>
 </template>
@@ -327,6 +278,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import ForumIcon from '@/components/ForumIcon.vue';
+import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import HoverRevealText from '@/components/HoverRevealText.vue';
+import { applyBarChange, applyForumInteractionAliases } from '@/utils/contentInteractions';
 import { renderMarkdown } from '@/utils/markdown';
 
 const props = defineProps({
@@ -344,7 +298,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'upvote', 'bookmark', 'delete', 'toast']);
+const emit = defineEmits(['select', 'upvote', 'bookmark', 'delete', 'toast', 'interaction', 'require-login']);
 
 const currentUserId = computed(() => {
   return props.userSession?.uid || props.userSession?.id || props.userSession?.user?.id || props.userSession?.user?.uid || '';
@@ -386,6 +340,15 @@ function toggleExpand(e) {
   isExpanded.value = !isExpanded.value;
 }
 
+function onInteractionChanged(payload) {
+  applyBarChange(props.post, payload);
+  applyForumInteractionAliases(props.post);
+  isUpvoted.value = Boolean(props.post.viewer?.liked);
+  currentUpvotes.value = Number(props.post.like_count || 0);
+  isBookmarked.value = Boolean(props.post.viewer?.favorited);
+  emit('interaction', { post: props.post, ...payload });
+}
+
 const renderedFullContent = computed(() => {
   const text = props.post.content || props.post.snippet || '';
   return renderMarkdown(text);
@@ -397,24 +360,16 @@ const authorInitial = computed(() => {
 });
 
 const avatarBg = computed(() => {
-  const code = (props.post.author || 'M').charCodeAt(0);
-  const gradients = [
-    'linear-gradient(135deg, #0071E3, #42B883)',
-    'linear-gradient(135deg, #FF6B6B, #FFE66D)',
-    'linear-gradient(135deg, #4E65FF, #92EFFD)',
-    'linear-gradient(135deg, #7F00FF, #E100FF)',
-    'linear-gradient(135deg, #F97316, #FB7185)',
-  ];
-  return gradients[code % gradients.length];
+  return 'linear-gradient(135deg, var(--glass-surface-hover) 0%, var(--glass-surface-subtle) 100%)';
 });
 
 // Category metadata
 const categoryMeta = {
-  DEV: { label: '技术踩坑', color: '#0071e3', bg: 'rgba(0, 113, 227, 0.1)' },
-  BIZ: { label: '独立出海', color: '#00a3ff', bg: 'rgba(0, 163, 255, 0.1)' },
-  TAX: { label: '工商财税', color: '#e67e22', bg: 'rgba(230, 126, 34, 0.12)' },
-  AGENTS: { label: 'AI智能体', color: '#a855f7', bg: 'rgba(168, 85, 247, 0.12)' },
-  POLICY: { label: '政策申报', color: '#10b981', bg: 'rgba(16, 185, 129, 0.12)' },
+  DEV: { label: '技术踩坑' },
+  BIZ: { label: '独立出海' },
+  TAX: { label: '工商财税' },
+  AGENTS: { label: 'AI智能体' },
+  POLICY: { label: '政策申报' },
 };
 
 const normalizedCategory = computed(() => {
@@ -432,10 +387,10 @@ const categoryLabel = computed(() => {
 });
 
 const pillStyle = computed(() => {
-  const meta = categoryMeta[normalizedCategory.value] || categoryMeta.DEV;
   return {
-    color: meta.color,
-    background: meta.bg,
+    color: 'var(--text-secondary)',
+    background: 'var(--glass-surface-subtle)',
+    border: '1px solid var(--glass-border-subtle)',
   };
 });
 
@@ -449,29 +404,29 @@ const computedMetrics = computed(() => {
   const c = props.post.snippet || props.post.content || '';
 
   if (t.includes('免征') || t.includes('年报') || c.includes('30 万')) {
-    list.push({ label: '季度免征额', val: '¥300,000', icon: '💰', type: 'success' });
-    list.push({ label: '申报耗时', val: '15分钟', icon: '⏱️', type: 'info' });
-    list.push({ label: '综合税负', val: '0%', icon: '📊', type: 'accent' });
+    list.push({ label: '季度免征额', val: '¥300,000', icon: 'coin', type: 'success' });
+    list.push({ label: '申报耗时', val: '15分钟', icon: 'timer', type: 'info' });
+    list.push({ label: '综合税负', val: '0%', icon: 'chart-bar', type: 'accent' });
   } else if (t.includes('算力') || c.includes('算力券')) {
-    list.push({ label: '财政直拨', val: '¥120,000', icon: '🎁', type: 'success' });
-    list.push({ label: '审批周期', val: '45天', icon: '📅', type: 'info' });
-    list.push({ label: '资质要件', val: '软著+科技型', icon: '📝', type: 'warning' });
+    list.push({ label: '财政直拨', val: '¥120,000', icon: 'gift', type: 'success' });
+    list.push({ label: '审批周期', val: '45天', icon: 'calendar', type: 'info' });
+    list.push({ label: '资质要件', val: '软著+科技型', icon: 'pen', type: 'warning' });
   } else if (t.includes('Stripe') || t.includes('对公户') || c.includes('结汇')) {
-    list.push({ label: '结汇时效', val: 'T+1 自动到账', icon: '⚡', type: 'success' });
-    list.push({ label: '综合费率', val: '4.8% → 1.9%', icon: '💵', type: 'accent' });
-    list.push({ label: '合规阻断', val: '0% 拦截', icon: '🛡️', type: 'info' });
+    list.push({ label: '结汇时效', val: 'T+1 自动到账', icon: 'bolt', type: 'success' });
+    list.push({ label: '综合费率', val: '4.8% → 1.9%', icon: 'cash', type: 'accent' });
+    list.push({ label: '合规阻断', val: '0% 拦截', icon: 'shield', type: 'info' });
   } else if (t.includes('pgvector') || t.includes('PostgreSQL')) {
-    list.push({ label: '检索延迟', val: '120ms → 18ms', icon: '⚡', type: 'success' });
-    list.push({ label: '节点容量', val: '200万向量', icon: '💾', type: 'info' });
-    list.push({ label: '基础设施', val: '$42/月', icon: '📉', type: 'accent' });
+    list.push({ label: '检索延迟', val: '120ms → 18ms', icon: 'bolt', type: 'success' });
+    list.push({ label: '节点容量', val: '200万向量', icon: 'database', type: 'info' });
+    list.push({ label: '基础设施', val: '$42/月', icon: 'chart-down', type: 'accent' });
   } else if (t.includes('FastAPI') || t.includes('SQLite') || t.includes('全栈')) {
-    list.push({ label: '承载峰值', val: '100,000 MAU', icon: '👥', type: 'success' });
-    list.push({ label: '硬件规格', val: '2核4G 单机', icon: '🖥️', type: 'info' });
-    list.push({ label: '运维精力', val: '< 5% 时长', icon: '🚀', type: 'accent' });
+    list.push({ label: '承载峰值', val: '100,000 MAU', icon: 'users', type: 'success' });
+    list.push({ label: '硬件规格', val: '2核4G 单机', icon: 'monitor', type: 'info' });
+    list.push({ label: '运维精力', val: '< 5% 时长', icon: 'rocket', type: 'accent' });
   } else if (t.includes('定价') || t.includes('Freemium') || c.includes('留存')) {
-    list.push({ label: '跟踪样本', val: '1,200 付费创客', icon: '📊', type: 'info' });
-    list.push({ label: 'LTV提升', val: '3.2 倍', icon: '💰', type: 'success' });
-    list.push({ label: '年度留存', val: '68.4%', icon: '📈', type: 'accent' });
+    list.push({ label: '跟踪样本', val: '1,200 付费创客', icon: 'chart-bar', type: 'info' });
+    list.push({ label: 'LTV提升', val: '3.2 倍', icon: 'coin', type: 'success' });
+    list.push({ label: '年度留存', val: '68.4%', icon: 'chart-up', type: 'accent' });
   }
   return list;
 });
@@ -580,21 +535,43 @@ async function handleShare() {
    ======================================================== */
 .compact-post-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 8px;
   padding: 10px 16px;
   border-radius: var(--radius-sm, 8px);
   background: var(--glass-surface, rgba(255, 255, 255, 0.7));
   border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.85));
   cursor: pointer;
   transition: all 0.16s ease;
-  gap: 16px;
 }
 
 .compact-post-row:hover {
   transform: translateY(-1px);
-  border-color: rgba(0, 113, 227, 0.3);
-  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.08);
+  border-color: var(--glass-border-hover, rgba(120, 130, 150, 0.25));
+  box-shadow: 0 4px 12px rgba(120, 130, 150, 0.12);
+}
+
+.compact-body-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+}
+
+/* Compact unified interaction bar (bottom, separated by a divider) */
+.compact-interaction-row {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  margin-top: 2px;
+}
+
+.compact-interaction-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--glass-border-subtle, rgba(120, 130, 150, 0.16));
 }
 
 .compact-main-col {
@@ -618,8 +595,8 @@ async function handleShare() {
   gap: 3px;
   font-size: 10px;
   font-weight: 700;
-  color: #ff3b30;
-  background: rgba(255, 59, 48, 0.1);
+  color: var(--accent);
+  background: var(--accent-glass);
   padding: 1px 5px;
   border-radius: 3px;
   flex-shrink: 0;
@@ -630,6 +607,17 @@ async function handleShare() {
   font-weight: 600;
   padding: 1px 6px;
   border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.badge-semantic-score-sm {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent-glass);
+  color: var(--accent);
+  border: 1px solid rgba(0, 113, 227, 0.25);
   flex-shrink: 0;
 }
 
@@ -668,7 +656,7 @@ async function handleShare() {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  color: #fff;
+  color: var(--text-secondary);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -693,13 +681,13 @@ async function handleShare() {
 }
 
 .compact-metric-pill.metric-success {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
+  background: var(--status-success-soft);
+  color: var(--status-success);
 }
 
 .compact-metric-pill.metric-warning {
-  background: rgba(245, 158, 11, 0.1);
-  color: #d97706;
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
 }
 
 .compact-actions-col {
@@ -775,8 +763,8 @@ async function handleShare() {
 
 .zhihu-post-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 113, 227, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 113, 227, 0.25);
+  box-shadow: 0 8px 24px rgba(120, 130, 150, 0.12), 0 2px 8px rgba(0, 0, 0, 0.04);
+  border-color: var(--glass-border-hover, rgba(120, 130, 150, 0.25));
 }
 
 /* 2.1 Ultra-Compact Single-Row Author Meta */
@@ -797,7 +785,7 @@ async function handleShare() {
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  color: #ffffff;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -848,8 +836,8 @@ async function handleShare() {
   gap: 3px;
   font-size: 10.5px;
   font-weight: 600;
-  color: #ff3b30;
-  background: rgba(255, 59, 48, 0.08);
+  color: var(--accent);
+  background: var(--accent-glass);
   padding: 2px 6px;
   border-radius: 4px;
 }
@@ -859,6 +847,19 @@ async function handleShare() {
   font-weight: 600;
   padding: 2px 7px;
   border-radius: 5px;
+}
+
+.badge-semantic-score {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  background: var(--accent-glass);
+  color: var(--accent);
+  border: 1px solid rgba(0, 113, 227, 0.25);
 }
 
 /* 2.2 Headline Title */
@@ -902,27 +903,27 @@ async function handleShare() {
 }
 
 .metric-chip.chip-success {
-  background: rgba(16, 185, 129, 0.08);
-  border-color: rgba(16, 185, 129, 0.18);
+  background: var(--status-success-soft);
+  border-color: var(--status-success);
 }
 .metric-chip.chip-success strong {
-  color: #059669;
+  color: var(--status-success);
 }
 
 .metric-chip.chip-warning {
-  background: rgba(245, 158, 11, 0.08);
-  border-color: rgba(245, 158, 11, 0.18);
+  background: var(--status-warning-soft);
+  border-color: var(--status-warning);
 }
 .metric-chip.chip-warning strong {
-  color: #d97706;
+  color: var(--status-warning);
 }
 
 .metric-chip.chip-accent {
-  background: rgba(127, 0, 255, 0.06);
-  border-color: rgba(127, 0, 255, 0.14);
+  background: var(--accent-glass);
+  border-color: rgba(0, 113, 227, 0.16);
 }
 .metric-chip.chip-accent strong {
-  color: #7c3aed;
+  color: var(--accent);
 }
 
 /* 2.4 Excerpt & In-Place Expand */
@@ -1057,6 +1058,12 @@ async function handleShare() {
   flex-wrap: wrap;
 }
 
+/* 2.7 Unified Interaction Band (bottom) */
+.zhihu-interaction-row {
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
 .btn-zhihu-upvote {
   display: inline-flex;
   align-items: center;
@@ -1183,13 +1190,13 @@ async function handleShare() {
 
 .btn-zhihu-delete:hover,
 .compact-btn-delete:hover {
-  color: #ff3b30 !important;
-  background: rgba(255, 59, 48, 0.1) !important;
+  color: var(--status-danger) !important;
+  background: var(--status-danger-soft) !important;
 }
 
 [data-theme="dark"] .btn-zhihu-delete:hover,
 [data-theme="dark"] .compact-btn-delete:hover {
-  color: #ff453a !important;
-  background: rgba(255, 69, 58, 0.18) !important;
+  color: var(--status-danger) !important;
+  background: var(--status-danger-soft) !important;
 }
 </style>
