@@ -65,8 +65,15 @@ gateway:
       args_type: "key"
       key_name: "product_id"
 
+    - scenario: "products.search.semantic"
+      version: "v1.0.0"
+      domain: "products"
+      description: "基于轻量向量引擎与余弦相似度检索独立商业作品库 (NLP 语义搜索)"
+      is_default: true
+      handler: "src.core.gateway.adapters:product_semantic_search_adapter"
+
     # --------------------------------------------------------------------------
-    # 2. Policy Radar (政策雷达)
+    # 2. Policy Center (政策中心)
     # --------------------------------------------------------------------------
     - scenario: "policies.list"
       version: "v1.0.0"
@@ -129,6 +136,128 @@ gateway:
       is_default: true
       handler: "src.domains.sop.service.sop_service:get_stages_and_templates"
 
+    - scenario: "sop.documents"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取标准文书库列表（含作者、来源机构、喜欢/收藏/真实使用数）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_document_catalog_adapter"
+
+    - scenario: "sop.flow.templates"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取平台流程模板库列表（含作者、来源机构、喜欢/收藏/使用数）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_template_catalog_adapter"
+
+    - scenario: "sop.flow.template.detail"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取单个平台流程模板及其展开后的文书步骤"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_template_detail_adapter"
+      args_type: "key"
+      key_name: "flow_id"
+
+    - scenario: "sop.flow.like"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "喜欢/取消喜欢一个平台流程模板"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_like_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.flow.favorite"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "收藏/取消收藏一个平台流程模板"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_favorite_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.document.like"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "喜欢/取消喜欢一份标准文书"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_document_like_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.document.favorite"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "收藏/取消收藏一份标准文书"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_document_favorite_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.graph"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取完整合规流程图谱：阶段、节点(文书/子图)、依赖边与目标反查索引"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:get_graph"
+
+    - scenario: "sop.node"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取单个流程节点上下文：子文档、前置依赖与本步产出说明"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_node_context_adapter"
+      args_type: "key"
+      key_name: "node_id"
+
+    - scenario: "sop.flow.list"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取创客自建的流程清单"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:list_flows"
+      args_type: "kwargs"
+
+    - scenario: "sop.myflow.cards"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取创客私有流程卡片列表（与平台流程卡片同构）"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:list_my_flow_cards"
+      args_type: "kwargs"
+
+    - scenario: "sop.flow.get"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取单个自建流程及其展开后的文书清单"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:resolve_flow"
+      args_type: "key"
+      key_name: "flow_id"
+
+    - scenario: "sop.flow.create"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "创建并持久化一条创客自建流程"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_create_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.flow.update"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "更新一条创客自建流程"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_update_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.flow.delete"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "删除一条创客自建流程"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_delete_adapter"
+      required_permission: "sop:save_progress"
+      args_type: "key"
+      key_name: "flow_id"
+
     - scenario: "sop.template.publish"
       version: "v1.0.0"
       domain: "sop"
@@ -164,20 +293,62 @@ gateway:
       handler: "src.domains.sop.service.sop_service:list_documents"
       args_type: "kwargs"
 
+    - scenario: "sop.document.delete"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "删除一条创客已保存的文书实例"
+      is_default: true
+      handler: "src.domains.sop.service.sop_service:delete_document"
+      args_type: "key"
+      key_name: "doc_id"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.document.publish"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "发布「我的文书」至审核队列（提交后进入待审核状态）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_document_publish_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.flow.publish"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "发布「我的流程」至审核队列（提交后进入待审核状态）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_flow_publish_adapter"
+      required_permission: "sop:save_progress"
+
+    - scenario: "sop.review.queue"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "获取文书与流程发布审核队列（含合法性/合规性/敏感词审核状态）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_review_queue_adapter"
+      required_permission: "review:audit_all"
+
+    - scenario: "sop.review.process"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "消费审核队列：逐项检查合法性/合规性/敏感词，通过后发布至标准文书与流程向导"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_review_process_adapter"
+      required_permission: "review:audit_all"
+
     # --------------------------------------------------------------------------
     # 5. Perks & Infrastructure (基础设施与福利)
     # --------------------------------------------------------------------------
     - scenario: "perks.list"
       version: "v1.0.0"
       domain: "perks"
-      description: "获取开发者基础设施折扣与算力福利列表"
+      description: "获取生态优惠公告列表（Token 优惠 / 服务器优惠 / SaaS 服务优惠等，支持按分类过滤）"
       is_default: true
       handler: "src.domains.perks.service.perk_service:list_perks"
 
     - scenario: "perks.publish"
       version: "v1.0.0"
       domain: "perks"
-      description: "微内核DAG编排：提报并上线生态特权福利"
+      description: "微内核DAG编排：提报并上线生态优惠公告"
       is_default: true
       handler: "src.core.gateway.adapters:perk_publish_adapter"
       required_permission: "data:schema_manage"
@@ -260,6 +431,69 @@ gateway:
       owner_check:
         resource_type: "thread"
         id_field: "thread_id"
+
+    - scenario: "forum.search.semantic"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "基于轻量向量引擎与余弦相似度检索头脑风暴社区讨论帖 (NLP 语义搜索)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_semantic_search_adapter"
+
+    # --------------------------------------------------------------------------
+    # 6.5 Unified Content Interactions (统一公开内容互动)
+    # --------------------------------------------------------------------------
+    - scenario: "content.interaction.toggle"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "统一切换公开内容互动：点赞 LIKE / 收藏 FAVORITE / 喜欢 LOVE / 踩 DISLIKE"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_interaction_toggle_adapter"
+      required_permission: "content:interact"
+
+    - scenario: "content.interaction.rate"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "对公开内容进行 1-5 星打分（可重复打分覆盖）"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_interaction_rate_adapter"
+      required_permission: "content:interact"
+
+    - scenario: "content.interactions.state"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "批量读取公开内容的互动计数与当前登录用户的互动状态"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_interactions_state_adapter"
+
+    - scenario: "content.interactions.mine"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "读取当前创客的点赞、收藏、喜欢与评论记录"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_interactions_mine_adapter"
+
+    - scenario: "content.comments.list"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "读取公开内容的评论列表"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_comments_list_adapter"
+
+    - scenario: "content.comments.create"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "对公开内容发表评论"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_comments_create_adapter"
+      required_permission: "content:comment"
+
+    - scenario: "content.comments.delete"
+      version: "v1.0.0"
+      domain: "interactions"
+      description: "删除自己发表的公开内容评论"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_comments_delete_adapter"
+      required_permission: "content:comment"
 
     # --------------------------------------------------------------------------
     # 7. Telemetry & Platform Overview (运营大盘与全景)
@@ -408,14 +642,14 @@ gateway:
       required_permission: "review:audit_all"
 
     # --------------------------------------------------------------------------
-    # 10. Compliance (合规避坑与自检)
+    # 10. Compliance (合规法条 / 避坑案例 / 自检)
     # --------------------------------------------------------------------------
-    - scenario: "compliance.dimensions"
+    - scenario: "compliance.laws"
       version: "v1.0.0"
       domain: "compliance"
-      description: "获取六维合规防线核心法则与处罚依据"
+      description: "获取合规法条知识库（法律、行政法规、部门规章白话提炼）"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.get_dimensions"
+      handler: "src.domains.compliance.service:compliance_service.get_laws"
 
     - scenario: "compliance.cases"
       version: "v1.0.0"
@@ -423,6 +657,21 @@ gateway:
       description: "获取典型踩坑与行政处罚案例库"
       is_default: true
       handler: "src.domains.compliance.service:compliance_service.get_cases"
+
+    - scenario: "compliance.publish"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "登录创客发布法条或避坑案例（kind: law | case）"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.publish_entry"
+
+    # 向后兼容别名：旧调用方仍可用 compliance.dimensions 读取法条库
+    - scenario: "compliance.dimensions"
+      version: "v1.0.0"
+      domain: "compliance"
+      description: "获取合规法条知识库（兼容旧场景名）"
+      is_default: true
+      handler: "src.domains.compliance.service:compliance_service.get_laws"
 
     - scenario: "compliance.checkpoints"
       version: "v1.0.0"
@@ -539,7 +788,7 @@ gateway:
     - scenario: "external.rag.policy_search"
       version: "v1.0.0"
       domain: "external"
-      description: "基于轻量向量引擎与余弦相似度检索政策雷达公文库 (RAG 混合召回)"
+      description: "基于轻量向量引擎与余弦相似度检索政策中心公文库 (RAG 混合召回)"
       is_default: true
       handler: "src.core.gateway.adapters:external_rag_policy_search_adapter"
 

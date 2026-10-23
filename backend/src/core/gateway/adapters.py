@@ -14,6 +14,10 @@ from src.infrastructure.external_gateway import (
 )
 from src.core.rag import policy_rag_service, forum_rag_service
 
+# Imported eagerly so its domain-persistence hydrators are registered before
+# startup hydration (restart durability for interactions / comments).
+from src.domains.interactions.service import content_interaction_service  # noqa: E402,F401
+
 
 async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for enterprise outsourcing demand publishing."""
@@ -53,6 +57,153 @@ async def demand_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any
     return res.final_output.get("created_bid") or res.final_output
 
 
+async def sop_flow_create_adapter(p: Any, c: Dict[str, Any] = None) -> Any:
+    """Create a maker-owned flow.
+
+    The route uses the default payload+context contract, so ``p`` is the raw payload
+    mapping and ``c`` carries the identity injected by the router.
+    """
+    from src.domains.sop.service import sop_service
+    req = p if hasattr(p, "node_refs") else _build_flow_create(p)
+    # The router injects the verified identity into the context; use it as the owner
+    # so a flow always belongs to the maker who created it.
+    if not getattr(req, "owner_id", ""):
+        req.owner_id = (c or {}).get("user_id", "")
+    flow = sop_service.create_flow(req)
+    return flow.model_dump()
+
+
+async def sop_flow_update_adapter(p: Any, c: Dict[str, Any] = None) -> Any:
+    """Update an existing maker-owned flow."""
+    from src.domains.sop.service import sop_service
+    req = p if hasattr(p, "node_refs") else _build_flow_create(p)
+    flow_id = getattr(req, "flow_id", None) or (c or {}).get("flow_id")
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow update")
+    flow = sop_service.update_flow(flow_id, req)
+    return flow.model_dump()
+
+
+async def sop_flow_delete_adapter(p: Any, c: Dict[str, Any] = None) -> Any:
+    """Delete a maker-owned flow. The route is key-typed, so ``p`` is the flow id."""
+    from src.domains.sop.service import sop_service
+    flow_id = p if isinstance(p, str) else (c or {}).get("flow_id")
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow deletion")
+    return {"deleted": sop_service.delete_flow(flow_id)}
+
+
+def _build_flow_create(data: Dict[str, Any]):
+    """Build an SOPFlowCreate from a raw payload mapping."""
+    from src.domains.sop.models import SOPFlowCreate
+    return SOPFlowCreate(**(data or {}))
+
+
+async def sop_document_catalog_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """List the standard document catalog for the workbench.
+
+    The route uses the default payload+context contract, so ``c`` carries the
+    identity injected by the router.
+    """
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    catalog = sop_service.list_document_cards(
+        user_id=user_id,
+        category=payload.get("category"),
+    )
+    return catalog.model_dump()
+
+
+async def sop_flow_template_catalog_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """List the platform flow catalog for the flow-guide workspace."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    catalog = sop_service.list_flow_template_cards(
+        user_id=user_id,
+        category=payload.get("category"),
+    )
+    return catalog.model_dump()
+
+
+async def sop_flow_template_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Resolve one platform flow template into its ordered document steps.
+
+    The route is key-typed, so the handler receives the bare ``flow_id`` string.
+    """
+    from src.domains.sop.service import sop_service
+    flow_id = p if isinstance(p, str) else ((p or {}).get("flow_id") or (c or {}).get("flow_id"))
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow template detail")
+    detail = sop_service.get_flow_template_detail(flow_id)
+    return detail.model_dump()
+
+
+async def sop_flow_like_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle the caller's like on a platform flow template."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    flow_id = payload.get("flow_id") or payload.get("node_id") or ""
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow like")
+    return sop_service.toggle_flow_like(user_id, flow_id).model_dump()
+
+
+async def sop_flow_favorite_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle the caller's favourite on a platform flow template."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    flow_id = payload.get("flow_id") or payload.get("node_id") or ""
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow favorite")
+    return sop_service.toggle_flow_favorite(user_id, flow_id).model_dump()
+
+
+async def sop_document_like_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle the caller's like on a standard document."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    node_id = payload.get("node_id") or payload.get("template_id") or ""
+    if not node_id:
+        raise ValueError("node_id is required for SOP document like")
+    return sop_service.toggle_like(user_id, node_id).model_dump()
+
+
+async def sop_document_favorite_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle the caller's favourite on a standard document."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    node_id = payload.get("node_id") or payload.get("template_id") or ""
+    if not node_id:
+        raise ValueError("node_id is required for SOP document favorite")
+    return sop_service.toggle_favorite(user_id, node_id).model_dump()
+
+
+async def sop_node_context_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Resolve one workflow node (document or subgraph) into its full maker-facing context.
+
+    The route is declared with ``args_type: "key"``, so the handler receives the bare
+    ``node_id`` string rather than the full payload mapping.
+    """
+    from src.domains.sop.service import sop_service
+    node_id = p if isinstance(p, str) else ((p or {}).get("node_id") or (p or {}).get("id") or "")
+    if not node_id:
+        raise ValueError("node_id is required for SOP node context")
+    ctx = sop_service.get_node_context(node_id)
+    node = ctx["node"]
+    children = ctx["children"]
+    return {
+        "node": node.model_dump(),
+        "children": [ch.model_dump() for ch in children],
+        "prerequisites": ctx["prerequisites"],
+    }
+
+
 async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for SOP document generation and persistence."""
     inputs = dict(p)
@@ -70,6 +221,48 @@ async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
         error_msg = res.error_message or "SOP document render pipeline failed"
         raise ValueError(error_msg)
     return res.final_output.get("created_doc") or res.final_output
+
+
+async def sop_document_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Submit one of the maker's own documents for publish review (发布 → 待审核)."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    doc_id = payload.get("doc_id") or ""
+    if not doc_id:
+        raise ValueError("doc_id is required for SOP document publish review")
+    res = sop_service.submit_document_for_review(doc_id, user_id)
+    return res.model_dump()
+
+
+async def sop_flow_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Submit one of the maker's own flows for publish review (发布 → 待审核)."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
+    flow_id = payload.get("flow_id") or ""
+    if not flow_id:
+        raise ValueError("flow_id is required for SOP flow publish review")
+    res = sop_service.submit_flow_for_review(flow_id, user_id)
+    return res.model_dump()
+
+
+async def sop_review_queue_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """List the publish review queue (documents & flows awaiting audit)."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    res = sop_service.list_review_queue(status=payload.get("status"))
+    return res.model_dump()
+
+
+async def sop_review_process_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Consume the review queue: audit legality/compliance/sensitive words, then
+    promote approved submissions into the standard catalogs."""
+    from src.domains.sop.service import sop_service
+    payload = p or {}
+    limit = payload.get("limit")
+    res = await sop_service.process_review_queue(limit=limit)
+    return res.model_dump()
 
 
 async def perk_claim_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -737,6 +930,152 @@ async def gateway_rules_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = No
     """List all registered scenario routing rules across business domains."""
     from src.core.gateway.router import scenario_router
     return [r.model_dump() for r in scenario_router.list_rules()]
+
+
+async def forum_semantic_search_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes NLP and vector semantic similarity search for forum threads."""
+    from src.core.rag.service import forum_rag_service
+    query = (p or {}).get("query") or (p or {}).get("search") or ""
+    category_code = (p or {}).get("category_code") or (p or {}).get("category")
+    top_k = int((p or {}).get("top_k", 20))
+    if not query.strip():
+        return {"status": "SUCCESS", "query": "", "total": 0, "items": []}
+    items = await forum_rag_service.search_threads(query=query, top_k=top_k, category_code=category_code)
+    return {
+        "status": "SUCCESS",
+        "query": query,
+        "category_code": category_code or "ALL",
+        "total": len(items),
+        "items": items,
+    }
+
+
+async def content_interaction_toggle_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle one unified interaction (LIKE / FAVORITE / LOVE / DISLIKE) for the caller."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    user_id = ctx.get("user_id", "")
+    if not user_id:
+        raise PermissionError("请先登录创客账号后再进行互动")
+    payload = p or {}
+    result = content_interaction_service.toggle(
+        user_id=str(user_id),
+        target_type=payload.get("target_type", ""),
+        target_id=str(payload.get("target_id", "")),
+        kind=payload.get("kind", ""),
+        target_title=payload.get("target_title"),
+    )
+    return result.model_dump()
+
+
+async def content_interaction_rate_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Submit / update the caller's 1-5 star rating for a public content target."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    user_id = ctx.get("user_id", "")
+    if not user_id:
+        raise PermissionError("请先登录创客账号后再进行打分")
+    payload = p or {}
+    result = content_interaction_service.rate(
+        user_id=str(user_id),
+        target_type=payload.get("target_type", ""),
+        target_id=str(payload.get("target_id", "")),
+        score=int(payload.get("score", 0) or 0),
+    )
+    return result.model_dump()
+
+
+async def content_interactions_state_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Batch-read interaction counters and the caller's own toggle state."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    payload = p or {}
+    targets = payload.get("targets") or []
+    if not isinstance(targets, list):
+        raise ValueError("targets must be a list")
+    return content_interaction_service.batch_state(ctx.get("user_id", ""), targets[:200])
+
+
+async def content_interactions_mine_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Return the caller's own likes, favorites, loves and comments."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    return content_interaction_service.mine(str(ctx.get("user_id", "") or "")).model_dump()
+
+
+async def content_comments_list_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """List comments for one public content target (public read)."""
+    from src.domains.interactions.service import content_interaction_service
+
+    payload = p or {}
+    result = content_interaction_service.list_comments(
+        payload.get("target_type", ""),
+        str(payload.get("target_id", "")),
+    )
+    return result.model_dump()
+
+
+async def content_comments_create_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Create a comment on a public content target for the caller."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    user_id = ctx.get("user_id", "")
+    if not user_id:
+        raise PermissionError("请先登录创客账号后再发表评论")
+    payload = p or {}
+    comment = content_interaction_service.create_comment(
+        user_id=str(user_id),
+        target_type=payload.get("target_type", ""),
+        target_id=str(payload.get("target_id", "")),
+        content=payload.get("content", ""),
+        author_name=payload.get("author_name"),
+        parent_id=payload.get("parent_id"),
+    )
+    return comment.model_dump()
+
+
+async def content_comments_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Delete a comment (author only; admins bypass ownership)."""
+    from src.domains.interactions.service import content_interaction_service
+
+    ctx = c or {}
+    user_id = ctx.get("user_id", "")
+    if not user_id:
+        raise PermissionError("请先登录创客账号后再操作")
+    payload = p or {}
+    comment_id = payload.get("comment_id") or payload.get("id")
+    if not comment_id:
+        raise ValueError("comment_id is required")
+    ok = content_interaction_service.delete_comment(
+        user_id=str(user_id),
+        comment_id=str(comment_id),
+        is_admin=str(ctx.get("user_role", "")).upper() == "ADMIN",
+    )
+    return {"deleted": bool(ok), "comment_id": str(comment_id)}
+
+
+async def product_semantic_search_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes NLP and vector semantic similarity search for showcase products."""
+    from src.core.rag.service import product_rag_service
+    query = (p or {}).get("query") or (p or {}).get("search") or ""
+    category = (p or {}).get("category")
+    top_k = int((p or {}).get("top_k", 20))
+    if not query.strip():
+        return {"status": "SUCCESS", "query": "", "total": 0, "items": []}
+    items = await product_rag_service.search_products(query=query, top_k=top_k, category=category)
+    return {
+        "status": "SUCCESS",
+        "query": query,
+        "category": category or "ALL",
+        "total": len(items),
+        "items": items,
+    }
+
 
 
 
