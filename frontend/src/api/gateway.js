@@ -64,6 +64,11 @@ export function humanizeError(rawError, statusCode = 0) {
     if (lower.includes('bad gateway') || lower.includes('gateway timeout')) {
       return '网关节点正在热重载或服务连接中断，请稍后刷新重试';
     }
+    if (lower.includes('unknown scenario') || lower.includes('no matching route')) {
+      const matched = trimmed.match(/Unknown scenario '([^']+)'/i);
+      const scenario = matched ? matched[1] : '当前请求';
+      return `服务场景「${scenario}」未在网关注册，请检查场景命名是否与网关路由一致`;
+    }
 
     // If it contains Chinese characters and is reasonable length, keep it
     if (/[\u4e00-\u9fa5]/.test(trimmed)) {
@@ -172,14 +177,19 @@ export async function dispatchGateway(scenario, payload = {}, context = {}) {
       return { ok: true, data: data.data, raw: data };
     }
 
-    // Intercept error and humanize into user-friendly message
+    // Intercept error and humanize into user-friendly message.
+    // The unified gateway always answers with HTTP 200 and carries the real
+    // semantic status inside the envelope `code` field, so the envelope code
+    // takes precedence over the transport status for error classification.
     const rawError = data?.message || data?.detail || data?.error || (res.statusText !== 'OK' ? res.statusText : null);
-    const friendlyError = humanizeError(rawError, res.status);
+    const envelopeCode = Number(data?.code);
+    const effectiveStatus = Number.isFinite(envelopeCode) && envelopeCode >= 400 ? envelopeCode : res.status;
+    const friendlyError = humanizeError(rawError, effectiveStatus);
 
     // Pop user-friendly toast unless explicitly silenced
     if (!silent) {
       notify({
-        title: errorTitle || (res.status >= 500 ? '服务处理受阻' : '操作未完成'),
+        title: errorTitle || (effectiveStatus >= 500 ? '服务处理受阻' : '操作未完成'),
         message: friendlyError,
         type: 'ERROR',
       });
@@ -188,7 +198,7 @@ export async function dispatchGateway(scenario, payload = {}, context = {}) {
     return {
       ok: false,
       error: friendlyError,
-      statusCode: res.status,
+      statusCode: effectiveStatus,
       raw: data,
     };
   } catch (err) {

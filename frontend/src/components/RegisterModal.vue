@@ -42,7 +42,7 @@
       <!-- Commercial Account Identity Selector -->
       <div style="margin-bottom: 14px;">
         <label style="display: block; font-size: 11.5px; font-weight: 500; margin-bottom: 6px; color: var(--text-secondary);">
-          入驻身份类型 <span style="color: #ff453a;">*</span>
+          入驻身份类型 <span style="color: var(--status-danger);">*</span>
         </label>
         <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
           <div
@@ -79,7 +79,7 @@
         <!-- Email Row -->
         <div>
           <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-            创客商用邮箱 <span style="color: #ff453a;">*</span>
+            创客商用邮箱 <span style="color: var(--status-danger);">*</span>
           </label>
           <input
             v-model="form.email"
@@ -94,13 +94,13 @@
         <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-              人机防刷安全验证 <span style="color: #ff453a;">*</span>
+              人机防刷安全验证 <span style="color: var(--status-danger);">*</span>
             </label>
             <input
               v-model="form.captcha_code"
               :disabled="captchaVerified"
               class="glass-input"
-              :placeholder="captchaVerified ? '✓ 人机验证已通过' : '输入计算结果或字符'"
+              :placeholder="captchaVerified ? '人机验证已通过' : '输入计算结果或字符'"
               style="width: 100%; box-sizing: border-box;"
             />
           </div>
@@ -120,7 +120,7 @@
         <div style="display: grid; grid-template-columns: 1fr 140px; gap: 10px; align-items: end;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-              邮箱验证码 <span style="color: #ff453a;">*</span>
+              邮箱验证码 <span style="color: var(--status-danger);">*</span>
             </label>
             <input
               v-model="form.verification_code"
@@ -147,7 +147,7 @@
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-              登录密码 <span style="color: #ff453a;">*</span>
+              登录密码 <span style="color: var(--status-danger);">*</span>
             </label>
             <input
               v-model="form.password"
@@ -159,7 +159,7 @@
           </div>
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-              确认密码 <span style="color: #ff453a;">*</span>
+              确认密码 <span style="color: var(--status-danger);">*</span>
             </label>
             <input
               v-model="form.confirm_password"
@@ -217,7 +217,7 @@
         <div v-if="form.account_type !== 'MAKER'" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label style="display: block; font-size: 12px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary);">
-              企业/工作室全称 <span style="color: #ff453a;">*</span>
+              企业/工作室全称 <span style="color: var(--status-danger);">*</span>
             </label>
             <input
               v-model="form.company_name"
@@ -283,7 +283,7 @@
 
         <!-- Statutory Compliance Checkbox (Default Unchecked) -->
         <div
-          :style="{ border: agreeError ? '1px solid #ff453a' : '1px solid var(--glass-border-subtle)' }"
+          :style="{ border: agreeError ? '1px solid var(--status-danger)' : '1px solid var(--glass-border-subtle)' }"
           style="margin-top: 2px; padding: 8px 10px; border-radius: var(--radius-sm); background: var(--glass-surface-subtle); transition: border 0.3s;"
         >
           <label style="display: flex; align-items: flex-start; gap: 8px; cursor: pointer; user-select: none;">
@@ -305,15 +305,15 @@
         <!-- Success Alert -->
         <div
           v-if="codeSentSuccess"
-          style="color: #34c759; font-size: 12px; padding: 6px 10px; background: rgba(52, 199, 89, 0.1); border: 1px solid rgba(52, 199, 89, 0.2); border-radius: var(--radius-sm);"
+          style="color: var(--status-success); font-size: 12px; padding: 6px 10px; background: var(--status-success-soft); border: 1px solid var(--status-success-soft); border-radius: var(--radius-sm);"
         >
-          ✓ {{ codeSentSuccess }}
+          <OpcIcon name="check" :size="13" /> {{ codeSentSuccess }}
         </div>
 
         <!-- Error Alert -->
         <div
           v-if="errorMessage"
-          style="color: #ff453a; font-size: 12px; padding: 6px 10px; background: rgba(255, 69, 58, 0.1); border-radius: var(--radius-sm);"
+          style="color: var(--status-danger); font-size: 12px; padding: 6px 10px; background: var(--status-danger-soft); border-radius: var(--radius-sm);"
         >
           {{ errorMessage }}
         </div>
@@ -444,15 +444,15 @@ const pwdStrengthLabel = computed(() => {
 const pwdStrengthColor = computed(() => {
   switch (pwdScore.value) {
     case 1:
-      return '#ff453a';
+      return 'var(--status-danger)';
     case 2:
-      return '#ff9f0a';
+      return 'var(--status-warning)';
     case 3:
-      return '#30d158';
+      return 'var(--status-success)';
     case 4:
-      return '#0071E3';
+      return 'var(--accent)';
     default:
-      return '#8e8e93';
+      return 'var(--text-tertiary)';
   }
 });
 

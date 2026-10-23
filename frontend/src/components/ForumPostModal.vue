@@ -36,7 +36,7 @@
                   :class="{ active: selectedCategory === cat.code }"
                   @click="selectedCategory = cat.code"
                 >
-                  <span class="chip-dot" :style="{ background: cat.color }"></span>
+                  <span class="chip-dot"></span>
                   <span>{{ cat.label }}</span>
                 </button>
               </div>
@@ -133,11 +133,11 @@ const props = defineProps({
 const emit = defineEmits(['close', 'toast', 'success']);
 
 const categoryOptions = [
-  { code: 'DEV', label: '技术踩坑', color: '#0071E3' },
-  { code: 'BIZ', label: '独立出海', color: '#00c6ff' },
-  { code: 'TAX', label: '工商财税', color: '#e67e22' },
-  { code: 'AGENTS', label: 'AI智能体', color: '#a855f7' },
-  { code: 'POLICY', label: '政策申报', color: '#10b981' },
+  { code: 'DEV', label: '技术踩坑' },
+  { code: 'BIZ', label: '独立出海' },
+  { code: 'TAX', label: '工商财税' },
+  { code: 'AGENTS', label: 'AI智能体' },
+  { code: 'POLICY', label: '政策申报' },
 ];
 
 const selectedCategory = ref('DEV');
@@ -344,7 +344,7 @@ async function handleSubmit() {
 }
 
 .required-star {
-  color: #ff3b30;
+  color: var(--status-danger);
 }
 
 .mono-counter {
@@ -391,6 +391,7 @@ async function handleSubmit() {
   width: 7px;
   height: 7px;
   border-radius: 50%;
+  background: var(--text-tertiary);
 }
 
 .content-textarea {

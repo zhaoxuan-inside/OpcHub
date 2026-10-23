@@ -7,7 +7,7 @@
       <div class="ambient-orb orb-3"></div>
     </div>
 
-    <!-- Sticky Liquid Navigation -->
+    <!-- Fixed Liquid Navigation -->
     <Navbar
       :active-tab="activeTab"
       :user-session="userSession"
@@ -42,20 +42,27 @@
         />
         <ShowcaseView
           v-else-if="activeTab === 'product'"
+          :user-session="userSession"
           @open-register="showRegisterModal = true"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <PolicyView
           v-else-if="activeTab === 'policy'"
+          :user-session="userSession"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <DemandsView
           v-else-if="activeTab === 'demand'"
+          :user-session="userSession"
           @open-register="showRegisterModal = true"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <SopView
           v-else-if="activeTab === 'sop'"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <PerksView
@@ -66,10 +73,12 @@
         <ComplianceView
           v-else-if="activeTab === 'compliance'"
           @switch-tab="handleSwitchTab"
+          @toast="showToast"
         />
         <ProfileView
           v-else-if="activeTab === 'profile'"
           @logout="handleLogout"
+          @navigate="handleSwitchTab"
           @toast="showToast"
         />
       </template>
@@ -86,6 +95,7 @@
         <ProfileView
           v-else-if="activeTab === 'profile'"
           @logout="handleLogout"
+          @navigate="handleSwitchTab"
           @toast="showToast"
         />
       </template>
@@ -131,16 +141,16 @@
             alignItems: 'center',
             justifyContent: 'center',
             flexShrink: 0,
-            background: notice.type === 'SUCCESS' ? 'rgba(52, 199, 89, 0.14)' : (notice.type === 'DANGER' || notice.type === 'ERROR' ? 'rgba(255, 59, 48, 0.14)' : (notice.type === 'WARN' ? 'rgba(255, 149, 0, 0.14)' : 'rgba(0, 113, 227, 0.14)')),
-            color: notice.type === 'SUCCESS' ? '#34C759' : (notice.type === 'DANGER' || notice.type === 'ERROR' ? '#FF3B30' : (notice.type === 'WARN' ? '#FF9500' : 'var(--accent)')),
+            background: notice.type === 'SUCCESS' ? 'var(--status-success-soft)' : (notice.type === 'DANGER' || notice.type === 'ERROR' ? 'var(--status-danger-soft)' : (notice.type === 'WARN' ? 'var(--status-warning-soft)' : 'var(--accent-glass)')),
+            color: notice.type === 'SUCCESS' ? 'var(--status-success)' : (notice.type === 'DANGER' || notice.type === 'ERROR' ? 'var(--status-danger)' : (notice.type === 'WARN' ? 'var(--status-warning)' : 'var(--accent)')),
             fontWeight: '700',
             fontSize: '14px',
           }"
         >
-          <span v-if="notice.type === 'SUCCESS'">✓</span>
-          <span v-else-if="notice.type === 'DANGER' || notice.type === 'ERROR'">✕</span>
-          <span v-else-if="notice.type === 'WARN'">⚠</span>
-          <span v-else>ℹ</span>
+          <OpcIcon v-if="notice.type === 'SUCCESS'" name="check" :size="15" />
+          <OpcIcon v-else-if="notice.type === 'DANGER' || notice.type === 'ERROR'" name="close" :size="15" />
+          <OpcIcon v-else-if="notice.type === 'WARN'" name="alert" :size="15" />
+          <OpcIcon v-else name="info" :size="15" />
         </div>
 
         <div style="flex: 1; min-width: 0;">
@@ -151,7 +161,7 @@
               style="border: none; background: transparent; cursor: pointer; color: var(--text-tertiary); font-size: 14px; line-height: 1; padding: 2px 4px; border-radius: 4px; transition: color 0.15s ease;"
               title="关闭通知"
             >
-              ✕
+              <OpcIcon name="close" :size="14" />
             </button>
           </div>
           <div style="font-size: 12.5px; color: var(--text-secondary); line-height: 1.5; word-break: break-word;">
@@ -513,19 +523,9 @@ onUnmounted(() => {
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
 
-.notice-error {
-  border-left: 4px solid #FF3B30 !important;
-}
-
-.notice-success {
-  border-left: 4px solid #34C759 !important;
-}
-
-.notice-warn {
-  border-left: 4px solid #FF9500 !important;
-}
-
-.notice-info {
-  border-left: 4px solid var(--accent) !important;
-}
+/*
+ * Message blocks carry no left accent bar. The circular icon badge already
+ * conveys the severity (success / error / warn / info) through its own colour,
+ * so a second coloured stripe on the edge is redundant.
+ */
 </style>

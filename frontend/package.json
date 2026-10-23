@@ -9,6 +9,8 @@
     "preview": "node node_modules/vite/bin/vite.js preview"
   },
   "dependencies": {
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "marked": "^18.1.1",
     "pinia": "^2.1.7",
     "vue": "^3.4.21",

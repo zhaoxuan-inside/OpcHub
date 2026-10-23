@@ -25,7 +25,7 @@
         </h1>
 
         <p class="hero-subtitle">
-          深度集成政策雷达、智能申报文书、独立作品高光橱窗与超级个体需求集市。<br class="desktop-break" />
+          深度集成政策中心、智能申报文书、独立作品高光橱窗与超级个体需求集市。<br class="desktop-break" />
           告别繁杂孤立的工商、报税与流量焦虑，让单兵作战拥有集团级的商业势能与合规保障。
         </p>
 
@@ -101,14 +101,14 @@
       </div>
 
       <div class="bento-grid">
-        <!-- Bento 1: 政策雷达 (Large) -->
+        <!-- Bento 1: 政策中心 (Large) -->
         <div class="bento-card bento-span-2" @mousemove="handleMouseMove" @click="handleCardClick('policy')">
           <div class="bento-content">
             <div class="card-top-meta">
               <span class="mono-tag accent-tag">POL-RADAR // 实时聚合</span>
               <span class="card-status-badge">全域覆盖</span>
             </div>
-            <h3 class="bento-title">政策雷达 · 精准洞悉各省市一人公司专项扶持</h3>
+            <h3 class="bento-title">政策中心 · 精准洞悉各省市一人公司专项扶持</h3>
             <p class="bento-text">
               打破信息不对称与晦涩公文壁垒。独家收录深圳、上海、杭州、成都等城市针对 OPC、独立开发者的无偿资助、税收减免与算力免租政策，AI 智能评估匹配度。
             </p>
@@ -135,7 +135,7 @@
             </div>
           </div>
           <div class="bento-action-row">
-            <span class="action-text">查看全部政策雷达数据库</span>
+            <span class="action-text">查看全部政策中心数据库</span>
             <span class="action-arrow">→</span>
           </div>
         </div>
@@ -152,21 +152,25 @@
               打造超级个体的 Product Hunt。优秀商业产品打榜 Upvote，全站置顶曝光与公测获客直达。
             </p>
             <div class="mini-showcase-box">
-              <div class="mini-product-item">
-                <div class="mini-prod-avatar">IF</div>
-                <div class="mini-prod-info">
-                  <div class="mini-prod-title">InkFlow AI 写作器</div>
-                  <div class="mini-prod-sub">专注长文研究员与小说家</div>
+              <template v-if="hotProducts.length > 0">
+                <div
+                  v-for="(p, pIdx) in hotProducts.slice(0, 2)"
+                  :key="p.id"
+                  class="mini-product-item"
+                >
+                  <div class="mini-prod-avatar" :class="{ alt: pIdx > 0 }">
+                    <img v-if="p.icon_url" :src="p.icon_url" :alt="p.title" style="width: 100%; height: 100%; object-fit: contain; padding: 2px;" />
+                    <span v-else>{{ getInitials(p.title) }}</span>
+                  </div>
+                  <div class="mini-prod-info">
+                    <div class="mini-prod-title">{{ p.title }}</div>
+                    <div class="mini-prod-sub">{{ p.tagline || p.description }}</div>
+                  </div>
+                  <div class="mini-upvote"><OpcIcon name="like" :size="11" /> {{ p.upvote_count ?? p.upvotes ?? 0 }}</div>
                 </div>
-                <div class="mini-upvote">▲ 342</div>
-              </div>
-              <div class="mini-product-item">
-                <div class="mini-prod-avatar alt">CP</div>
-                <div class="mini-prod-info">
-                  <div class="mini-prod-title">CloudPulse 成本卫士</div>
-                  <div class="mini-prod-sub">一人公司多云支出实时裁剪</div>
-                </div>
-                <div class="mini-upvote">▲ 289</div>
+              </template>
+              <div v-else class="mini-product-item" style="justify-content: center; color: var(--text-tertiary); font-size: 12px; padding: 12px 0;">
+                <span>暂无上架作品 · 点击探索首发</span>
               </div>
             </div>
           </div>
@@ -265,28 +269,28 @@
             :class="{ active: currentContentFilter === 'product' }"
             @click="currentContentFilter = 'product'"
           >
-            🔥 卓越商业作品
+            <OpcIcon name="flame" :size="13" /> 卓越商业作品
           </button>
           <button
             class="filter-tab-pill"
             :class="{ active: currentContentFilter === 'policy' }"
             @click="currentContentFilter = 'policy'"
           >
-            🏛️ 重点扶持政策
+            <OpcIcon name="landmark" :size="13" /> 重点扶持政策
           </button>
           <button
             class="filter-tab-pill"
             :class="{ active: currentContentFilter === 'forum' }"
             @click="currentContentFilter = 'forum'"
           >
-            💡 创客思想手记
+            <OpcIcon name="bulb" :size="13" /> 创客思想手记
           </button>
           <button
             class="filter-tab-pill"
             :class="{ active: currentContentFilter === 'perk' }"
             @click="currentContentFilter = 'perk'"
           >
-            🎁 独家生态特权
+            <OpcIcon name="gift" :size="13" /> 独家生态特权
           </button>
         </div>
       </div>
@@ -341,9 +345,9 @@
           <div class="journey-step-num">PHASE 01</div>
           <h4 class="journey-card-title">立项与政策锁定</h4>
           <p class="journey-card-desc">
-            借助政策雷达测算全国优惠税率与落地园区，筛选最契合主营赛道的落地城市与初创免租扶持。
+            借助政策中心测算全国优惠税率与落地园区，筛选最契合主营赛道的落地城市与初创免租扶持。
           </p>
-          <div class="journey-feature-tag">政策雷达 · 城市匹配</div>
+          <div class="journey-feature-tag">政策中心 · 城市匹配</div>
         </div>
 
         <div class="journey-card glass-card" @mousemove="handleMouseMove">
@@ -388,7 +392,7 @@
       <div class="grid-3">
         <div class="glass-card testimonial-card" @mousemove="handleMouseMove">
           <p class="testimonial-quote">
-            “以前最恐惧的就是工商注册与繁复的税务报表，找中介每次都要好几千。在「晨昏线外」跟着 SOP 走，配合政策雷达，顺利拿到了首批创业孵化直补，省下大笔开销。”
+            “以前最恐惧的就是工商注册与繁复的税务报表，找中介每次都要好几千。在「晨昏线外」跟着 SOP 走，配合政策中心，顺利拿到了首批创业孵化直补，省下大笔开销。”
           </p>
           <div class="testimonial-author-row">
             <div class="testimonial-avatar">LT</div>
@@ -414,7 +418,7 @@
 
         <div class="glass-card testimonial-card" @mousemove="handleMouseMove">
           <p class="testimonial-quote">
-            “政策雷达的白话解读是真神。传统政府公文几十页又长又晦涩，这里的关键资格和材料清单一目了然，一人创业的时间终于能 100% 聚焦在核心产品打磨上。”
+            “政策中心的白话解读是真神。传统政府公文几十页又长又晦涩，这里的关键资格和材料清单一目了然，一人创业的时间终于能 100% 聚焦在核心产品打磨上。”
           </p>
           <div class="testimonial-author-row">
             <div class="testimonial-avatar mono">DC</div>
@@ -491,7 +495,7 @@
         <div class="footer-links-col">
           <div class="footer-col-heading">平台四大支柱</div>
           <ul class="footer-links-list">
-            <li><a @click.prevent="handleFooterNav('policy')">政策雷达与城市招商</a></li>
+            <li><a @click.prevent="handleFooterNav('policy')">政策中心与城市招商</a></li>
             <li><a @click.prevent="handleFooterNav('sop')">合规文书与流程 SOP</a></li>
             <li><a @click.prevent="handleFooterNav('product')">超级个体产品橱窗</a></li>
             <li><a @click.prevent="handleFooterNav('demand')">创客需求集市撮合</a></li>
@@ -502,7 +506,7 @@
           <div class="footer-col-heading">创客成长生态</div>
           <ul class="footer-links-list">
             <li><a @click.prevent="handleFooterNav('forum')">头脑风暴社区</a></li>
-            <li><a @click.prevent="handleFooterNav('perks')">独家生态云算力特权</a></li>
+            <li><a @click.prevent="handleFooterNav('perks')">生态伙伴优惠公告</a></li>
             <li><a @click.prevent="handleFooterNav('compliance')">合规法务指南</a></li>
           </ul>
         </div>
@@ -531,7 +535,8 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
+import { dispatchGateway } from '@/api/gateway';
 import BrandLogo from '../components/BrandLogo.vue';
 
 const props = defineProps({
@@ -549,50 +554,56 @@ const emit = defineEmits([
 ]);
 
 const currentContentFilter = ref('all');
+const hotProducts = ref([]);
+const hotPolicies = ref([]);
 
-// Curated exhibition showcase data
-const exhibitionData = [
-  {
-    id: 'ex-prod-1',
-    type: 'product',
-    categoryTag: 'AI 原生写作 · 橱窗收录',
-    badgeColor: '#0071E3',
-    title: 'InkFlow AI 专注编辑器',
-    summary: '结合本地知识库与大语言模型的沉浸式写作工作台，专为长文研究员与独立小说创作者打造。已实现海外月经常性收入 \$4,200。',
-    authorOrSource: '@Alex_Writer · 创客出品',
-    metricLabel: '▲ 342 赞',
-    actionLabel: '查看产品详情',
-    targetTab: 'product',
-  },
+async function loadHomeProducts() {
+  try {
+    const res = await dispatchGateway('products.list', {});
+    if (res.ok && res.data) {
+      hotProducts.value = Array.isArray(res.data) ? res.data : (res.data.items || []);
+    }
+  } catch (e) {
+    console.error('Failed to load home products:', e);
+  }
+}
+
+async function loadHomePolicies() {
+  try {
+    const res = await dispatchGateway('policies.list', {});
+    if (res.ok && res.data) {
+      hotPolicies.value = Array.isArray(res.data) ? res.data : (res.data.items || []);
+    }
+  } catch (e) {
+    console.error('Failed to load home policies:', e);
+  }
+}
+
+function getInitials(name) {
+  if (!name) return 'OP';
+  const clean = name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
+  return clean.slice(0, 2).toUpperCase() || 'OP';
+}
+
+// Static baseline resources for other tabs (policy / forum / perk)
+const staticBaselineExhibits = [
   {
     id: 'ex-pol-1',
     type: 'policy',
-    categoryTag: '重点扶持 · 政策雷达',
-    badgeColor: '#34C759',
+    categoryTag: '重点扶持 · 政策中心',
+    badgeColor: 'var(--status-success)',
     title: '深圳市南山区一人公司算力与租金直达资助',
     summary: '面向人工智能、独立软件开发领域的 OPC 实体，提供首年办公空间免租及最高 50 万元的公有云与智算算力补贴。',
-    authorOrSource: '深圳市科技创新局 · POL-2026-081',
+    authorOrSource: '深圳市科技创新局 · POL-2026-088',
     metricLabel: '最高 ¥500,000',
     actionLabel: '研判申报资格',
     targetTab: 'policy',
   },
   {
-    id: 'ex-prod-2',
-    type: 'product',
-    categoryTag: '微SaaS工具 · 橱窗收录',
-    badgeColor: '#0071E3',
-    title: 'CloudPulse 个人云成本治理平台',
-    summary: '一键扫描 AWS/阿里云/腾讯云未释放资源与空闲计算实例，平均为每位独立开发者削减 42% 云账单。',
-    authorOrSource: '@DevOps_Solo · 创客出品',
-    metricLabel: '▲ 289 赞',
-    actionLabel: '查看产品详情',
-    targetTab: 'product',
-  },
-  {
     id: 'ex-forum-1',
     type: 'forum',
     categoryTag: '实战复盘 · 头脑风暴',
-    badgeColor: '#FF9500',
+    badgeColor: 'var(--status-warning)',
     title: '一人公司如何实现首年收支平衡？3000 字全链路拆解',
     summary: '涵盖公司设立、零申报财务避坑、海外 Stripe 注册以及首批 100 个种子客户获客的真实实战心得。',
     authorOrSource: '@Master_Maker · 深度长文',
@@ -603,8 +614,8 @@ const exhibitionData = [
   {
     id: 'ex-pol-2',
     type: 'policy',
-    categoryTag: '税收减免 · 政策雷达',
-    badgeColor: '#34C759',
+    categoryTag: '税收减免 · 政策中心',
+    badgeColor: 'var(--status-success)',
     title: '上海张江创客工作室小微所得税减免细则',
     summary: '针对独立设计师与个人咨询工作室，享受应纳税所得额 100 万元以内减免 20% 专项税优政策，全流程在线填报。',
     authorOrSource: '张江综合保税区管理局 · POL-2026-042',
@@ -615,22 +626,57 @@ const exhibitionData = [
   {
     id: 'ex-perk-1',
     type: 'perk',
-    categoryTag: '独家特权 · 生态资源',
-    badgeColor: '#AF52DE',
-    title: '阿里云与腾讯云创客专属 ¥5,000 算力扶持券',
-    summary: '认证一人公司会员可无门槛领取专属云服务器、对象存储与 LLM 接口代金券，直达技术架构落地。',
+    categoryTag: '生态优惠 · 公告速递',
+    badgeColor: 'var(--text-secondary)',
+    title: '生态伙伴云服务器与 Token 优惠上新',
+    summary: '汇集云厂商 Token 抵扣券、服务器折扣与 SaaS 服务特惠的一站式优惠公告板，直达领取权益落地技术架构。',
     authorOrSource: '晨昏线外 生态联盟伙伴',
-    metricLabel: '立省 ¥5,000',
-    actionLabel: '领取生态特权',
+    metricLabel: '多类优惠持续上新',
+    actionLabel: '查看生态优惠',
     targetTab: 'perks',
   },
 ];
 
+// Computed dynamic exhibition showcase data: dynamically derives products & policies from backend
+const exhibitionData = computed(() => {
+  const dynamicProdList = hotProducts.value.map((p) => ({
+    id: `ex-${p.id}`,
+    type: 'product',
+    categoryTag: `${p.category || '独立作品'} · 橱窗收录`,
+    badgeColor: 'var(--accent)',
+    title: p.title,
+    summary: p.tagline || p.description,
+    authorOrSource: `${p.author_name || '@创客'} · 创客出品`,
+    metricLabel: `${p.upvote_count ?? p.upvotes ?? 0} 赞`,
+    actionLabel: '查看产品详情',
+    targetTab: 'product',
+  }));
+
+  const dynamicPolicyList = hotPolicies.value.length > 0
+    ? hotPolicies.value.slice(0, 2).map((p) => ({
+        id: `ex-pol-${p.id || p.code}`,
+        type: 'policy',
+        categoryTag: `${p.category === 'TAX' ? '税收减免' : '重点扶持'} · 政策中心`,
+        badgeColor: 'var(--status-success)',
+        title: p.title,
+        summary: p.summary,
+        authorOrSource: `${p.region || '全国'} · ${p.code || 'POL-2026'}`,
+        metricLabel: p.subsidy_amount_max > 0 ? `最高 ¥${Number(p.subsidy_amount_max).toLocaleString()}` : (p.category === 'TAX' ? '税优减免' : '专项扶持'),
+        actionLabel: p.action_text || '研判申报资格',
+        targetTab: 'policy',
+      }))
+    : staticBaselineExhibits.filter((e) => e.type === 'policy');
+
+  const otherExhibits = staticBaselineExhibits.filter((e) => e.type !== 'policy');
+
+  return [...dynamicProdList, ...dynamicPolicyList, ...otherExhibits];
+});
+
 const filteredContentList = computed(() => {
   if (currentContentFilter.value === 'all') {
-    return exhibitionData;
+    return exhibitionData.value;
   }
-  return exhibitionData.filter((item) => item.type === currentContentFilter.value);
+  return exhibitionData.value.filter((item) => item.type === currentContentFilter.value);
 });
 
 function handleExploreAction(tab) {
@@ -679,6 +725,11 @@ function handleMouseMove(e) {
   e.currentTarget.style.setProperty('--mouse-x', `${x}px`);
   e.currentTarget.style.setProperty('--mouse-y', `${y}px`);
 }
+
+onMounted(() => {
+  loadHomeProducts();
+  loadHomePolicies();
+});
 </script>
 
 <style scoped>
@@ -723,8 +774,8 @@ function handleMouseMove(e) {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #34C759;
-  box-shadow: 0 0 8px rgba(52, 199, 89, 0.8);
+  background: var(--status-success);
+  box-shadow: 0 0 8px var(--status-success-soft);
   flex-shrink: 0;
   animation: pulse 2s infinite ease-in-out;
 }
@@ -807,9 +858,7 @@ function handleMouseMove(e) {
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+  color: var(--accent);
 }
 
 .hero-subtitle {
@@ -983,18 +1032,18 @@ function handleMouseMove(e) {
   font-family: var(--font-mono);
   padding: 2px 7px;
   border-radius: var(--radius-xs);
-  background: rgba(52, 199, 89, 0.12);
-  color: #34C759;
+  background: var(--status-success-soft);
+  color: var(--status-success);
 }
 
 .card-status-badge.hot {
-  background: rgba(255, 149, 0, 0.12);
-  color: #FF9500;
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
 }
 
 .card-status-badge.ai {
-  background: rgba(175, 82, 222, 0.12);
-  color: #AF52DE;
+  background: var(--glass-surface-subtle);
+  color: var(--text-secondary);
 }
 
 .bento-title {
@@ -1045,7 +1094,7 @@ function handleMouseMove(e) {
 
 .policy-amount {
   font-family: var(--font-mono);
-  color: #34C759;
+  color: var(--text-secondary);
   font-weight: 600;
 }
 
@@ -1074,7 +1123,7 @@ function handleMouseMove(e) {
   width: 28px;
   height: 28px;
   border-radius: 6px;
-  background: linear-gradient(135deg, var(--accent), #5856D6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -1085,7 +1134,7 @@ function handleMouseMove(e) {
 }
 
 .mini-prod-avatar.alt {
-  background: linear-gradient(135deg, #FF9500, #FF2D55);
+  background: var(--accent);
 }
 
 .mini-prod-info {
@@ -1408,7 +1457,7 @@ function handleMouseMove(e) {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--accent), #5856D6);
+  background: var(--accent);
   color: #fff;
   display: flex;
   align-items: center;
@@ -1419,11 +1468,11 @@ function handleMouseMove(e) {
 }
 
 .testimonial-avatar.alt {
-  background: linear-gradient(135deg, #FF9500, #FF2D55);
+  background: var(--accent);
 }
 
 .testimonial-avatar.mono {
-  background: linear-gradient(135deg, #34C759, #0071E3);
+  background: var(--accent);
 }
 
 .author-name {
@@ -1530,7 +1579,7 @@ function handleMouseMove(e) {
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
+  background: var(--accent);
 }
 
 .footer-brand-ver {

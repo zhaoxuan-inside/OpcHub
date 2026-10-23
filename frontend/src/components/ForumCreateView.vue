@@ -125,7 +125,7 @@
             :class="{ active: selectedCategory === cat.code }"
             @click="selectedCategory = cat.code"
           >
-            <span class="cat-dot" :style="{ background: cat.color }"></span>
+            <span class="cat-dot"></span>
             <span class="cat-name">{{ cat.label }}</span>
             <span class="cat-desc">{{ cat.desc }}</span>
           </button>
@@ -459,7 +459,7 @@
               title="插入避坑预警 / 关键提示框 (> [!WARNING] 或 > [!TIP])"
               @click="insertCalloutPrompt"
             >
-              <span class="callout-icon-mini">💡</span>
+              <span class="callout-icon-mini"><OpcIcon name="bulb" :size="14" /></span>
               <span class="btn-txt-mini">提示框</span>
             </button>
           </div>
@@ -563,7 +563,7 @@
         <div v-show="editorMode === 'preview'" class="pane-full-preview">
           <div class="preview-card-wrap">
             <div class="preview-header-meta">
-              <span class="category-pill-preview" :style="{ background: currentCategoryColor }">
+              <span class="category-pill-preview">
                 {{ currentCategoryName }}
               </span>
               <span class="preview-ip">来自 浙江</span>
@@ -650,11 +650,11 @@ const emit = defineEmits(['back', 'success', 'toast']);
 
 // Categories Configuration
 const categoryOptions = [
-  { code: 'DEV', label: '技术踩坑', color: '#0071E3', desc: '全栈架构 · 数据库选型 · 异步流水线' },
-  { code: 'BIZ', label: '独立出海', color: '#00c6ff', desc: 'Stripe结汇 · 境外企业 · 单元经济' },
-  { code: 'TAX', label: '工商财税', color: '#e67e22', desc: '小规模免税 · 电子税务局 · 年报合规' },
-  { code: 'AGENTS', label: 'AI智能体', color: '#a855f7', desc: 'RAG知识库 · 提示词流水线 · 算力优化' },
-  { code: 'POLICY', label: '政策申报', color: '#10b981', desc: '算力补贴 · 科技型中小企业 · 软著申请' },
+  { code: 'DEV', label: '技术踩坑', desc: '全栈架构 · 数据库选型 · 异步流水线' },
+  { code: 'BIZ', label: '独立出海', desc: 'Stripe结汇 · 境外企业 · 单元经济' },
+  { code: 'TAX', label: '工商财税', desc: '小规模免税 · 电子税务局 · 年报合规' },
+  { code: 'AGENTS', label: 'AI智能体', desc: 'RAG知识库 · 提示词流水线 · 算力优化' },
+  { code: 'POLICY', label: '政策申报', desc: '算力补贴 · 科技型中小企业 · 软著申请' },
 ];
 
 // Suggested Tags
@@ -723,10 +723,6 @@ const renderedHtml = computed(() => {
 
 const currentCategoryName = computed(() => {
   return categoryOptions.find(c => c.code === selectedCategory.value)?.label || '实战风暴';
-});
-
-const currentCategoryColor = computed(() => {
-  return categoryOptions.find(c => c.code === selectedCategory.value)?.color || '#0071E3';
 });
 
 const saveStatusText = computed(() => {
@@ -1469,10 +1465,10 @@ onBeforeUnmount(() => {
   gap: 6px;
   padding: 4px 10px;
   border-radius: var(--radius-full);
-  background: rgba(52, 199, 89, 0.08);
-  border: 1px solid rgba(52, 199, 89, 0.25);
+  background: var(--status-success-soft);
+  border: 1px solid var(--status-success);
   font-size: 11.5px;
-  color: #34c759;
+  color: var(--status-success);
   transition: all 0.25s ease;
 }
 
@@ -1544,8 +1540,8 @@ onBeforeUnmount(() => {
 }
 
 .btn-header-ghost:hover {
-  background: rgba(255, 59, 48, 0.08);
-  color: #ff3b30;
+  background: var(--status-danger-soft);
+  color: var(--status-danger);
 }
 
 .btn-primary-publish {
@@ -1647,7 +1643,7 @@ onBeforeUnmount(() => {
 }
 
 .required-star {
-  color: #ff3b30;
+  color: var(--status-danger);
 }
 
 /* Category Pills Row */
@@ -1686,6 +1682,7 @@ onBeforeUnmount(() => {
   height: 8px;
   border-radius: 50%;
   margin-bottom: 6px;
+  background: var(--text-tertiary);
 }
 
 .cat-name {
@@ -1715,7 +1712,7 @@ onBeforeUnmount(() => {
 }
 
 .char-counter.is-limit {
-  color: #ff9500;
+  color: var(--status-warning);
 }
 
 .title-input-wrapper {
@@ -1892,17 +1889,17 @@ onBeforeUnmount(() => {
 }
 
 .tool-btn-highlight {
-  background: rgba(255, 149, 0, 0.1);
-  color: #ff9500;
-  border-color: rgba(255, 149, 0, 0.25);
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  border-color: var(--status-warning);
   gap: 4px;
   padding: 0 8px;
 }
 
 .tool-btn-highlight:hover {
-  background: rgba(255, 149, 0, 0.18);
-  color: #ff9500;
-  border-color: #ff9500;
+  background: var(--status-warning-soft);
+  color: var(--status-warning);
+  border-color: var(--status-warning);
 }
 
 .callout-icon-mini {
@@ -2100,7 +2097,9 @@ onBeforeUnmount(() => {
 .category-pill-preview {
   font-size: 11.5px;
   font-weight: 600;
-  color: #fff;
+  color: var(--text-secondary);
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
   padding: 3px 9px;
   border-radius: var(--radius-full);
 }
@@ -2152,9 +2151,9 @@ onBeforeUnmount(() => {
   font-size: 10.5px;
   padding: 1px 6px;
   border-radius: var(--radius-full);
-  background: rgba(52, 199, 89, 0.12);
-  color: #34c759;
-  border: 1px solid rgba(52, 199, 89, 0.3);
+  background: var(--status-success-soft);
+  color: var(--status-success);
+  border: 1px solid var(--status-success);
 }
 
 .author-sub-desc {

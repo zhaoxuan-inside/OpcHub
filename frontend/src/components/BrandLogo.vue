@@ -9,35 +9,35 @@
   >
     <defs>
       <linearGradient id="sky-grad" x1="0%" y1="85%" x2="100%" y2="10%">
-        <stop offset="0%" stop-color="#FFD99C" />
-        <stop offset="30%" stop-color="#F8C6C4" />
-        <stop offset="65%" stop-color="#A5C8F5" />
+        <stop offset="0%" stop-color="#BFE3FF" />
+        <stop offset="30%" stop-color="#8CCBFF" />
+        <stop offset="65%" stop-color="#4A90D9" />
         <stop offset="100%" stop-color="#2689EC" />
       </linearGradient>
 
       <radialGradient id="glow-rad" cx="23%" cy="70%" r="70%">
-        <stop offset="0%" stop-color="#FFE79B" stop-opacity=".95" />
-        <stop offset="48%" stop-color="#FFC2A7" stop-opacity=".45" />
-        <stop offset="100%" stop-color="#FFC2A7" stop-opacity="0" />
+        <stop offset="0%" stop-color="#BFE3FF" stop-opacity=".95" />
+        <stop offset="48%" stop-color="#A5C8F5" stop-opacity=".45" />
+        <stop offset="100%" stop-color="#A5C8F5" stop-opacity="0" />
       </radialGradient>
 
       <linearGradient id="sea-grad" x1="12%" y1="0%" x2="85%" y2="100%">
-        <stop offset="0%" stop-color="#AAB9E8" />
-        <stop offset="32%" stop-color="#4E8AE1" />
-        <stop offset="72%" stop-color="#174990" />
+        <stop offset="0%" stop-color="#4A90D9" />
+        <stop offset="32%" stop-color="#0071E3" />
+        <stop offset="72%" stop-color="#0A4B9C" />
         <stop offset="100%" stop-color="#8CCBFF" />
       </linearGradient>
 
       <radialGradient id="sun-rad" cx="30%" cy="22%" r="85%">
-        <stop offset="0%" stop-color="#FFFFF8" />
-        <stop offset="55%" stop-color="#F7F0F8" />
-        <stop offset="100%" stop-color="#AFCFF7" />
+        <stop offset="0%" stop-color="#FFFFFF" />
+        <stop offset="55%" stop-color="#EAF4FF" />
+        <stop offset="100%" stop-color="#A5C8F5" />
       </radialGradient>
 
       <linearGradient id="rim-grad" x1="0%" y1="100%" x2="100%" y2="0%">
-        <stop offset="0%" stop-color="#D8C8F3" />
-        <stop offset="52%" stop-color="#E4F4FF" />
-        <stop offset="100%" stop-color="#2B8DF1" />
+        <stop offset="0%" stop-color="#8CCBFF" />
+        <stop offset="52%" stop-color="#EAF4FF" />
+        <stop offset="100%" stop-color="#2689EC" />
       </linearGradient>
 
       <filter id="blur-filter">
@@ -55,7 +55,7 @@
 
       <path
         d="M100 795 C190 355 570 130 964 70 L964 964 L60 964Z"
-        fill="#579DE8"
+        fill="#2689EC"
         opacity=".17"
       />
 
@@ -94,7 +94,7 @@
 
       <path
         d="M530 600 C700 655 855 750 965 915 L965 965 L530 965Z"
-        fill="#2A64C5"
+        fill="#174990"
         opacity=".13"
       />
 

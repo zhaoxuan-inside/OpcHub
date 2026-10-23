@@ -6,7 +6,7 @@
         <div>
           <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
             <h1 class="page-title" style="font-size: 26px; margin: 0;">后端微内核流程图可视化编排 · DAG Orchestrator</h1>
-            <span class="mono-tag" style="background: rgba(52, 199, 89, 0.12); color: #34C759; border-color: rgba(52, 199, 89, 0.3);">
+            <span class="mono-tag" style="background: var(--status-success-soft); color: var(--status-success); border-color: var(--status-success-soft);">
               微内核编排引擎
             </span>
           </div>
@@ -24,13 +24,15 @@
               <option value="OPC_POLICY_TAX_AI_MATCH">政策算力匹配流水线 (OPC_POLICY_TAX_AI_MATCH)</option>
               <option value="tax.calculate_vat_exemption">增值税免征流水线 (tax.calculate_vat_exemption)</option>
             </select>
+            <!-- Note: these values are DAG scenario codes, not gateway scenarios. They are
+                 dispatched through the `orchestration.scenarios.execute` gateway scenario. -->
           </div>
 
           <!-- Dual-mode Dispatcher Indicator -->
           <div style="background: var(--glass-surface-subtle); border: 1px solid var(--glass-border); border-radius: var(--radius-full); padding: 4px 10px; font-size: 12px; font-family: var(--font-mono); display: flex; align-items: center; gap: 6px;">
             <span style="color: var(--text-tertiary);">双模调度:</span>
             <button class="btn-liquid-outline" style="padding: 2px 8px; font-size: 11px; margin: 0;" @click="toggleDispatcherMode">
-              <span style="color: #34C759;">●</span>
+              <span style="color: var(--status-success);">●</span>
               <span>{{ isDistributed ? '微服务HTTP' : '单体直接' }}</span>
             </button>
           </div>
@@ -97,18 +99,18 @@
           </div>
 
           <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">3. 流程文书组装</div>
-          <div class="sitemap-card" style="padding: 8px 10px;" @click="selectNode('sop.render_document')">
+          <div class="sitemap-card" style="padding: 8px 10px;" @click="selectNode('sop.document.render_persist')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-weight: 600; font-size: 12px;">sop.render_document</span>
+              <span style="font-weight: 600; font-size: 12px;">sop.document.render_persist</span>
               <span class="mono-tag" style="font-size: 9.5px; padding: 1px 4px;">sop</span>
             </div>
             <div style="font-size: 10px; color: var(--text-tertiary);">设立登记文书渲染与防伪核验</div>
           </div>
 
           <div style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">4. 合规与内容治理</div>
-          <div class="sitemap-card" style="padding: 8px 10px;" @click="selectNode('compliance.evaluate_audit')">
+          <div class="sitemap-card" style="padding: 8px 10px;" @click="selectNode('compliance.audit.guard')">
             <div style="display: flex; justify-content: space-between; align-items: center;">
-              <span style="font-weight: 600; font-size: 12px;">compliance.evaluate_audit</span>
+              <span style="font-weight: 600; font-size: 12px;">compliance.audit.guard</span>
               <span class="mono-tag" style="font-size: 9.5px; padding: 1px 4px;">compliance</span>
             </div>
             <div style="font-size: 10px; color: var(--text-tertiary);">六维合规防线自检安全评分</div>
@@ -203,7 +205,7 @@
           <!-- Controls Bar -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; padding: 10px 16px; background: var(--glass-surface-subtle); border-radius: var(--radius-sm); border: 1px solid var(--glass-border-subtle);">
             <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
-              <span style="width: 7px; height: 7px; border-radius: 50%; background: #34C759; box-shadow: 0 0 8px #34C759;"></span>
+              <span style="width: 7px; height: 7px; border-radius: 50%; background: var(--status-success); box-shadow: 0 0 8px var(--status-success);"></span>
               <span>微内核已加载 4 节点 · 3 边 | 支持全链路拓扑追踪留痕</span>
             </div>
             <button class="btn-liquid" style="font-size: 12.5px; padding: 6px 14px;" @click="runSimulation">
@@ -284,8 +286,8 @@
               </svg>
               <span>安全编译</span>
             </button>
-            <span v-if="astSuccess" style="font-family: var(--font-mono); font-size: 12px; color: #34C759;">
-              ✔ AST 检查通过: 无危险系统模块，已注册进微内核字典。
+            <span v-if="astSuccess" style="font-family: var(--font-mono); font-size: 12px; color: var(--status-success);">
+              <OpcIcon name="check" :size="13" /> AST 检查通过: 无危险系统模块，已注册进微内核字典。
             </span>
           </div>
         </div>
@@ -335,19 +337,35 @@ function toggleDispatcherMode() {
 async function runSimulation() {
   isExecuting.value = true;
   try {
-    const res = await dispatchGateway(selectedScenario.value, {
-      quarterly_income: 260000,
-    });
-    emit('toast', {
-      title: 'DAG 场景仿真执行成功',
-      message: `场景 ${selectedScenario.value} 经过 4 节点流水线顺利履约！`,
-      type: 'SUCCESS',
-    });
+    // `selectedScenario` holds a DAG scenario code, which is executed through the
+    // registered `orchestration.scenarios.execute` gateway scenario.
+    const res = await dispatchGateway(
+      'orchestration.scenarios.execute',
+      {
+        scenario_code: selectedScenario.value,
+        inputs: { quarterly_income: 260000 },
+      },
+      { silent: true },
+    );
+    if (res.ok) {
+      const data = res.data || {};
+      emit('toast', {
+        title: 'DAG 场景仿真执行成功',
+        message: `场景 ${selectedScenario.value} 执行完成 (耗时 ${data.execution_time_ms ?? '-'}ms，共 ${data.node_traces?.length ?? 0} 个节点)。`,
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', {
+        title: 'DAG 场景仿真执行失败',
+        message: res.error || `场景 ${selectedScenario.value} 执行未成功，请检查节点编排配置。`,
+        type: 'ERROR',
+      });
+    }
   } catch (e) {
     emit('toast', {
-      title: '仿真运行记录',
-      message: `场景拓扑执行完成 (耗时 16ms)，全部断言通过！`,
-      type: 'SUCCESS',
+      title: 'DAG 场景仿真执行失败',
+      message: e?.message || '场景拓扑执行异常，请稍后重试。',
+      type: 'ERROR',
     });
   } finally {
     setTimeout(() => {
@@ -375,7 +393,7 @@ async function triggerHotReload() {
       const data = res.data || {};
       const routesCount = data.reloaded_routes_count || 64;
       emit('toast', {
-        title: '🔥 热重载完成',
+        title: '热重载完成',
         message: `微内核与网关热载完毕：已重新感知并激活 ${routesCount} 条场景路由与微内核版本！`,
         type: 'SUCCESS',
       });

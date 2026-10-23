@@ -7,6 +7,32 @@ marked.setOptions({
 });
 
 /**
+ * Callout icons are injected as HTML strings, so they use the same redrawn
+ * line-icon geometry as OpcIcon.vue but as inline SVG (no Emoji).
+ */
+const calloutIcon = (paths) =>
+  `<svg class="opc-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
+
+const CALLOUT_ICONS = {
+  NOTE: calloutIcon(
+    '<path d="M9 18h6M10 21h4"/><path d="M12 2.5A6.5 6.5 0 0 0 8.1 14.2c.6.5 1 1.2 1.1 2.1h5.6c.1-.9.5-1.6 1.1-2.1A6.5 6.5 0 0 0 12 2.5Z"/><path d="M9.6 12.4c.5-1 1.3-1.5 2.4-1.5s1.9.5 2.4 1.5"/>'
+  ),
+  TIP: calloutIcon(
+    '<path d="M12 2.5C12 7.1 7.1 12 2.5 12 7.1 12 12 16.9 12 21.5 12 16.9 16.9 12 21.5 12 16.9 12 12 7.1 12 2.5Z"/>'
+  ),
+  IMPORTANT: calloutIcon(
+    '<path d="M13 2.5 4.5 13.5h6L10.5 21.5 20 10.5h-6.5L13 2.5Z"/>'
+  ),
+  WARNING: calloutIcon(
+    '<path d="M12 3.2 21.5 20H2.5L12 3.2Z"/><path d="M12 9v4.6"/><circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none"/>'
+  ),
+  CAUTION: calloutIcon(
+    '<path d="M8 3h8l5 5v8l-5 5H8l-5-5V8l5-5Z"/><path d="M9 12h6" stroke-width="2"/>'
+  ),
+};
+
+
+/**
  * Enhanced Markdown parser that outputs sanitized, styled HTML
  * Supports GitHub Flavored Markdown, callouts/alerts, code blocks, and tables.
  */
@@ -21,13 +47,7 @@ export function renderMarkdown(content) {
       /<blockquote>\s*<p>\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\]\s*([\s\S]*?)<\/p>\s*<\/blockquote>/gi,
       (match, type, innerContent) => {
         const t = type.toUpperCase();
-        const iconMap = {
-          NOTE: '💡',
-          TIP: '✨',
-          IMPORTANT: '⚡',
-          WARNING: '⚠️',
-          CAUTION: '🛑',
-        };
+        const iconMap = CALLOUT_ICONS;
         const titleMap = {
           NOTE: '提示说明',
           TIP: '经验诀窍',
@@ -39,7 +59,7 @@ export function renderMarkdown(content) {
         return `
           <div class="md-callout md-callout-${t.toLowerCase()}">
             <div class="md-callout-header">
-              <span class="md-callout-icon">${iconMap[t] || '💡'}</span>
+              <span class="md-callout-icon">${iconMap[t] || CALLOUT_ICONS.NOTE}</span>
               <span class="md-callout-title">${titleMap[t] || t}</span>
             </div>
             <div class="md-callout-body">

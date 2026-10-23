@@ -194,7 +194,7 @@
         <!-- Error Feedback -->
         <div
           v-if="errorMessage"
-          style="color: #ff453a; font-size: 12px; padding: 6px 10px; background: rgba(255, 69, 58, 0.1); border-radius: var(--radius-sm);"
+          style="color: var(--status-danger); font-size: 12px; padding: 6px 10px; background: var(--status-danger-soft); border-radius: var(--radius-sm);"
         >
           {{ errorMessage }}
         </div>

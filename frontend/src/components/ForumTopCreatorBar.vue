@@ -162,7 +162,7 @@
               class="btn-fmt-tpl"
               @click.stop="isTemplatesOpen = !isTemplatesOpen"
             >
-              <span>📋 套用模板</span>
+              <span><OpcIcon name="clipboard" :size="13" /> 套用模板</span>
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                 <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
@@ -326,15 +326,7 @@ const userInitial = computed(() => {
 });
 
 const userAvatarBg = computed(() => {
-  const name = props.userSession?.nickname || 'M';
-  const code = name.charCodeAt(0);
-  const gradients = [
-    'linear-gradient(135deg, #0071E3, #42B883)',
-    'linear-gradient(135deg, #FF6B6B, #FFE66D)',
-    'linear-gradient(135deg, #4E65FF, #92EFFD)',
-    'linear-gradient(135deg, #7F00FF, #E100FF)',
-  ];
-  return gradients[code % gradients.length];
+  return 'linear-gradient(135deg, var(--glass-surface-hover) 0%, var(--glass-surface-subtle) 100%)';
 });
 
 // Placeholders based on mode
@@ -692,7 +684,7 @@ async function handlePublish() {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  color: #fff;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -714,7 +706,7 @@ async function handlePublish() {
 }
 
 .creator-input-row:hover .creator-mock-input {
-  background: #ffffff;
+  background: var(--glass-surface-hover);
   border-color: var(--accent, #0071E3);
   box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.08);
 }
@@ -769,7 +761,7 @@ async function handlePublish() {
 }
 
 .btn-quick-publish:hover {
-  background: #0077ED;
+  background: var(--accent, #0071E3);
   box-shadow: 0 4px 12px rgba(0, 113, 227, 0.35);
   transform: translateY(-1px);
 }
@@ -1146,11 +1138,11 @@ async function handlePublish() {
 [data-theme="dark"] .inline-content-textarea {
   background: rgba(18, 20, 26, 0.8);
   border-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
+  color: var(--text-primary);
 }
 
 [data-theme="dark"] .inline-tpl-dropdown {
-  background: #1e222b;
+  background: var(--glass-surface-solid);
   border-color: rgba(255, 255, 255, 0.12);
 }
 </style>

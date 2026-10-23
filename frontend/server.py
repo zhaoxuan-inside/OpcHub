@@ -97,9 +97,20 @@ async def serve_brand_icon():
     return Response(status_code=404)
 
 
+_http_client: httpx.AsyncClient | None = None
+
+
+def get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None or _http_client.is_closed:
+        limits = httpx.Limits(max_keepalive_connections=50, max_connections=200, keepalive_expiry=30.0)
+        _http_client = httpx.AsyncClient(timeout=30.0, trust_env=False, limits=limits)
+    return _http_client
+
+
 @app.api_route("/api/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def proxy_api_to_backend(path: str, request: Request):
-    """Transparently proxy /api requests to backend gateway."""
+    """Transparently proxy /api requests to backend gateway with persistent connection pool."""
     target_url = f"{BACKEND_BASE_URL}/api/{path}"
     headers = dict(request.headers)
     headers.pop("host", None)
@@ -108,31 +119,31 @@ async def proxy_api_to_backend(path: str, request: Request):
     body = await request.body()
     params = request.query_params
 
-    async with httpx.AsyncClient(timeout=30.0, trust_env=False) as client:
-        try:
-            resp = await client.request(
-                method=request.method,
-                url=target_url,
-                headers=headers,
-                params=params,
-                content=body,
-            )
-            excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
-            forward_headers = {
-                k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers
-            }
-            return Response(
-                content=resp.content,
-                status_code=resp.status_code,
-                headers=forward_headers,
-                media_type=resp.headers.get("content-type"),
-            )
-        except Exception as e:
-            return Response(
-                content=f'{{"code": 502, "message": "Failed to connect to backend: {str(e)}"}}',
-                status_code=502,
-                media_type="application/json",
-            )
+    client = get_http_client()
+    try:
+        resp = await client.request(
+            method=request.method,
+            url=target_url,
+            headers=headers,
+            params=params,
+            content=body,
+        )
+        excluded_headers = {"content-encoding", "content-length", "transfer-encoding", "connection"}
+        forward_headers = {
+            k: v for k, v in resp.headers.items() if k.lower() not in excluded_headers
+        }
+        return Response(
+            content=resp.content,
+            status_code=resp.status_code,
+            headers=forward_headers,
+            media_type=resp.headers.get("content-type"),
+        )
+    except Exception as e:
+        return Response(
+            content=f'{{"code": 502, "message": "Failed to connect to backend: {str(e)}"}}',
+            status_code=502,
+            media_type="application/json",
+        )
 
 
 if __name__ == "__main__":

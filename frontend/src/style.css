@@ -31,6 +31,14 @@
   --accent-glow: rgba(0, 113, 227, 0.25);
   --accent-glass: rgba(0, 113, 227, 0.08);
 
+  /* 语义状态色（全站仅此 3 种彩色，其余一律灰阶 + accent） */
+  --status-success: #34C759;
+  --status-warning: #FF9500;
+  --status-danger: #FF3B30;
+  --status-success-soft: rgba(52, 199, 89, 0.14);
+  --status-warning-soft: rgba(255, 149, 0, 0.14);
+  --status-danger-soft: rgba(255, 59, 48, 0.14);
+
   --orb-1: rgba(142, 197, 252, 0.45);
   --orb-2: rgba(224, 195, 252, 0.4);
   --orb-3: rgba(186, 230, 253, 0.35);
@@ -74,6 +82,14 @@
   --accent-glow: rgba(41, 151, 255, 0.35);
   --accent-glass: rgba(41, 151, 255, 0.14);
 
+  /* 语义状态色（深色模式使用 iOS 深色系变体） */
+  --status-success: #30D158;
+  --status-warning: #FF9F0A;
+  --status-danger: #FF453A;
+  --status-success-soft: rgba(48, 209, 88, 0.16);
+  --status-warning-soft: rgba(255, 159, 10, 0.16);
+  --status-danger-soft: rgba(255, 69, 58, 0.16);
+
   --orb-1: rgba(56, 75, 140, 0.4);
   --orb-2: rgba(99, 44, 133, 0.3);
   --orb-3: rgba(28, 100, 148, 0.35);
@@ -91,6 +107,7 @@
 html {
   scrollbar-gutter: stable;
   overflow-y: scroll;
+  scroll-padding-top: 80px;
 }
 
 body {
@@ -126,9 +143,11 @@ body {
 
 /* ---------------- Navigation Bar & Sub-Bar ---------------- */
 header {
-  position: sticky;
+  position: fixed;
   top: 12px;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 500;
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
@@ -209,7 +228,7 @@ header {
   width: 10px;
   height: 10px;
   border-radius: 3px;
-  background: linear-gradient(135deg, var(--accent) 0%, #B85DFF 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #4A90D9 100%);
   box-shadow: 0 0 12px var(--accent-glow);
   flex-shrink: 0;
 }
@@ -349,12 +368,12 @@ header {
 }
 
 .nav-icon-btn.admin-active {
-  color: #FF9500;
+  color: var(--accent);
 }
 
 .nav-icon-btn.admin-active:hover {
-  color: #FF9500;
-  box-shadow: 0 0 12px rgba(255, 149, 0, 0.35);
+  color: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .nav-icon-btn svg {
@@ -379,19 +398,19 @@ header {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #8E8E93;
+  background: var(--text-quaternary);
   border: 1.5px solid var(--bg-canvas);
   box-shadow: none;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .nav-user-badge.online {
-  background: #34C759;
-  box-shadow: 0 0 6px rgba(52, 199, 89, 0.75);
+  background: var(--status-success);
+  box-shadow: 0 0 6px var(--status-success-soft);
 }
 
 .nav-user-badge.offline {
-  background: #8E8E93;
+  background: var(--text-quaternary);
   box-shadow: none;
 }
 
@@ -440,15 +459,15 @@ header {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #34C759;
+  background: var(--status-success);
   border: 1.5px solid var(--bg-canvas);
-  box-shadow: 0 0 5px rgba(52, 199, 89, 0.6);
+  box-shadow: 0 0 5px var(--status-success-soft);
   transition: background 0.25s ease, box-shadow 0.25s ease;
 }
 
 .nav-icon-btn.admin-active .nav-role-dot {
-  background: #FF9500;
-  box-shadow: 0 0 6px rgba(255, 149, 0, 0.8);
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent-glow);
 }
 
 /* ---------------- Main View Container ---------------- */
@@ -458,9 +477,43 @@ main {
   width: 100%;
   max-width: 1240px;
   margin: 0 auto;
-  padding: 32px 16px 100px;
+  padding: 84px 16px 100px;
   box-sizing: border-box;
   flex: 1 0 auto;
+}
+
+/* Fixed Screen Feed Mode (Forum / Showcase Viewport Locked Layout) */
+html.fixed-screen-feed,
+body.fixed-screen-feed {
+  overflow: hidden !important;
+  height: 100vh !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+html.fixed-screen-feed::-webkit-scrollbar,
+body.fixed-screen-feed::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+body.fixed-screen-feed main {
+  height: 100vh !important;
+  max-height: 100vh !important;
+  padding: 72px 16px 12px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+body.fixed-screen-feed main::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .view-panel {
@@ -904,7 +957,7 @@ main {
 }
 @keyframes nodePulse {
   0% { border-color: var(--accent); box-shadow: 0 0 15px var(--accent-glow); }
-  100% { border-color: #34C759; box-shadow: 0 0 26px rgba(52, 199, 89, 0.6); }
+  100% { border-color: var(--status-success); box-shadow: 0 0 26px var(--status-success-soft); }
 }
 .node-port {
   position: absolute;
@@ -1004,8 +1057,8 @@ main {
   gap: 3px;
   font-weight: 500;
 }
-.kpi-delta.up { color: #34C759; }
-.kpi-delta.down { color: #FF3B30; }
+.kpi-delta.up { color: var(--status-success); }
+.kpi-delta.down { color: var(--status-danger); }
 
 .device-showcase-container {
   display: flex;
@@ -1197,10 +1250,12 @@ main {
 }
 
 .markdown-rendered-content blockquote {
-  border-left: 3.5px solid var(--accent);
-  padding: 10px 18px;
+  /* Quoted content uses the same glass panel idiom as every other surface —
+     no coloured edge stripe. */
+  border: 1px solid var(--glass-border-subtle, rgba(0, 0, 0, 0.05));
+  padding: 12px 18px;
   background: var(--glass-surface-subtle);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  border-radius: var(--radius-sm);
   margin: 16px 0;
   color: var(--text-secondary);
 }
@@ -1317,8 +1372,8 @@ main {
 }
 
 .md-callout-note {
-  border-color: rgba(0, 113, 227, 0.35);
-  background: rgba(0, 113, 227, 0.06);
+  border-color: var(--accent-glass);
+  background: var(--accent-glass);
   color: var(--text-primary);
 }
 .md-callout-note .md-callout-header {
@@ -1326,37 +1381,394 @@ main {
 }
 
 .md-callout-tip {
-  border-color: rgba(52, 199, 89, 0.35);
-  background: rgba(52, 199, 89, 0.06);
+  border-color: var(--status-success-soft);
+  background: var(--status-success-soft);
   color: var(--text-primary);
 }
 .md-callout-tip .md-callout-header {
-  color: #34c759;
+  color: var(--status-success);
 }
 
 .md-callout-warning {
-  border-color: rgba(255, 149, 0, 0.35);
-  background: rgba(255, 149, 0, 0.07);
+  border-color: var(--status-warning-soft);
+  background: var(--status-warning-soft);
   color: var(--text-primary);
 }
 .md-callout-warning .md-callout-header {
-  color: #ff9500;
+  color: var(--status-warning);
 }
 
 .md-callout-important {
-  border-color: rgba(168, 85, 247, 0.35);
-  background: rgba(168, 85, 247, 0.06);
+  border-color: var(--accent-glass);
+  background: var(--accent-glass);
+  border-width: 1.5px;
   color: var(--text-primary);
 }
 .md-callout-important .md-callout-header {
-  color: #a855f7;
+  color: var(--accent);
 }
 
 .md-callout-caution {
-  border-color: rgba(255, 59, 48, 0.35);
-  background: rgba(255, 59, 48, 0.07);
+  border-color: var(--status-danger-soft);
+  background: var(--status-danger-soft);
   color: var(--text-primary);
 }
 .md-callout-caution .md-callout-header {
-  color: #ff3b30;
+  color: var(--status-danger);
+}
+
+/* =====================================================================
+ * Uniform card layout & fixed-range summary helpers
+ * ---------------------------------------------------------------------
+ * .opc-card            -> consistent flex-column card shell (footers align)
+ * .opc-clamp-{1,2,3}   -> summary/title clamped to a FIXED line range so
+ *                         every card keeps the same footprint regardless
+ *                         of content length (overlong text is hidden).
+ * .opc-hover-expand    -> on hover, the clamped text expands to reveal the
+ *                         full content (still bounded to a sane max height).
+ * ===================================================================== */
+.opc-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.opc-clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  word-break: break-word;
+}
+
+.opc-clamp-1 {
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  min-height: 1.5em;
+  max-height: 1.5em;
+  line-height: 1.5;
+}
+
+.opc-clamp-2 {
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  min-height: 2.9em;
+  max-height: 2.9em;
+  line-height: 1.45;
+}
+
+.opc-clamp-3 {
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  min-height: 4.35em;
+  max-height: 4.35em;
+  line-height: 1.45;
+}
+
+.opc-hover-expand:hover .opc-clamp-1,
+.opc-hover-expand:hover .opc-clamp-2,
+.opc-hover-expand:hover .opc-clamp-3 {
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  max-height: 380px;
+}
+
+/* =====================================================================
+ * Button / pill / tag labels must NEVER wrap because of long content.
+ * Overflowing text is clipped with ellipsis where truncation is safe.
+ * ===================================================================== */
+button,
+.btn-liquid,
+.btn-liquid-outline,
+.action-btn,
+.btn-zhihu-action,
+.btn-zhihu-upvote,
+.btn-outline-action,
+.btn-header-action,
+.btn-action-big,
+.btn-back-square,
+.btn-back-inline,
+.btn-detail-sm,
+.btn-bid-sm,
+.btn-ai-summary,
+.btn-match-eval,
+.track-pill,
+.condition-pill,
+.highlight-chip,
+.sop-doc-action,
+.sop-flow-action,
+.compact-btn-icon,
+.compact-btn-action,
+.compact-btn-upvote,
+.ci-btn,
+.keyword-tag,
+.mono-tag,
+.version-pill,
+.badge-cat,
+.badge-level,
+.badge-region,
+.badge-pricing,
+.demand-status-badge,
+.quick-pill,
+.link-span {
+  white-space: nowrap;
+}
+
+/* =====================================================================
+ * Hover reveal host: lifts the whole card above neighbours so its
+ * absolute hover-reveal overlay never gets covered by the next row.
+ * The card size is untouched on hover (no layout jitter).
+ * ===================================================================== */
+.opc-reveal-host {
+  position: relative;
+  z-index: 1;
+}
+
+.opc-reveal-host:hover {
+  z-index: 40;
+}
+
+/* =====================================================================
+ * Unified card system (统一卡片体系)
+ * ---------------------------------------------------------------------
+ * 产品橱窗 / 政策中心 / 需求集市 / 流程文书 / 生态特权 / 合规指南
+ * 六类业务卡片共用同一套外壳、子结构与网格，保证视觉一致。
+ * 各页面仅通过主题 class（emblem-* / cat-* / badge-*）保留分类配色差异。
+ * 页面级 scoped 样式只需补充本体系未覆盖的页面专属细节。
+ * ===================================================================== */
+
+/* ---- 统一网格容器 ---- */
+.opc-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* ---- 统一卡片外壳（覆盖 .glass-card 默认 padding，形成 feed 卡片） ---- */
+.opc-card-shell {
+  padding: 18px 20px;
+  border-radius: var(--radius-lg, 16px);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.22s ease;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+}
+
+.opc-card-shell:hover {
+  transform: translateY(-3px);
+  border-color: var(--glass-border-hover, rgba(120, 130, 150, 0.3));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 0 0 1px rgba(120, 130, 150, 0.1);
+}
+
+/* ---- 统一图标 tile（48×48，主题色由 iconClass 提供） ---- */
+.opc-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.opc-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---- 统一卡片子结构 ---- */
+.card-header-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.card-title-group {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.card-badges-line {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.card-highlights-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.card-footer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border-subtle);
+  gap: 10px;
+}
+
+.card-actions-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.card-interaction-row {
+  padding-top: 10px;
+  margin-top: 2px;
+}
+
+/* ---- 统一 highlight chip ---- */
+.highlight-chip {
+  font-size: 10.5px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+/* OpcIcon + 文案：inline-flex 胶囊会折叠空白文本节点，需显式给节奏 */
+.sparkle-badge {
+  gap: 5px;
+}
+
+/* ---- 统一页脚单元（作者 / 发布方） ---- */
+.author-cell,
+.issuer-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.author-avatar,
+.issuer-avatar {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.author-text,
+.issuer-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.author-name,
+.issuer-name {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.author-title,
+.publish-time,
+.issuer-level-tag {
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+/* ---- 统一徽章（分类 / 级别 / 区域） ---- */
+/* 收敛原则：分类与级别徽章一律使用灰阶玻璃质感，仅保留 accent 与三个语义状态色 */
+.badge-cat {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--glass-surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.badge-level {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.badge-region {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.level-national {
+  background: var(--glass-surface-subtle);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border-subtle);
+  font-weight: 600;
+}
+
+.level-provincial {
+  background: var(--glass-surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.level-park {
+  background: var(--glass-surface-subtle);
+  color: var(--text-secondary);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+/* ---- 统一卡片滚动容器 ---- */
+.opc-cards-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 24px;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.opc-cards-scroll::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
