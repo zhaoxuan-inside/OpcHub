@@ -1,4 +1,5 @@
 """Data models for Corporate Demands and Maker Bids."""
+from typing import Optional
 from pydantic import BaseModel, Field
 
 
@@ -9,16 +10,22 @@ class DemandCreate(BaseModel):
     category: str = Field(default="DEV", description="DEV, BIZ, TAX, AI, LEGAL")
     deadline_days: int = Field(default=14, ge=1)
     creator_id: str
+    creator_name: Optional[str] = None
 
 
 class DemandResponse(BaseModel):
     id: str
     creator_id: str
+    creator_name: Optional[str] = None
     title: str
     description: str
     budget_cny: float
     category: str
     bidders_count: int = 0
+    like_count: int = 0
+    favorite_count: int = 0
+    love_count: int = 0
+    comment_count: int = 0
     status: str = "OPEN"  # "OPEN", "BIDDING", "CLOSED"
     deadline_at: str
     created_at: str

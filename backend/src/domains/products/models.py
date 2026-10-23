@@ -1,5 +1,5 @@
 """Data models for Product Showcases."""
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -11,7 +11,13 @@ class ProductCreate(BaseModel):
     pricing_model: str = Field(default="SUBSCRIPTION", description="FREE, ONE_TIME, SUBSCRIPTION")
     price_cny: float = Field(default=0.0, ge=0.0)
     demo_url: Optional[str] = None
-    author_id: str
+    icon_url: Optional[str] = None
+    version: Optional[str] = "1.0.0"
+    official_url: Optional[str] = None
+    download_url: Optional[str] = None
+    author_name: Optional[str] = None
+    author_id: str = ""
+    screenshots: Optional[List[str]] = None
 
 
 class ProductResponse(BaseModel):
@@ -24,7 +30,17 @@ class ProductResponse(BaseModel):
     pricing_model: str
     price_cny: float
     demo_url: Optional[str] = None
+    icon_url: Optional[str] = None
+    version: Optional[str] = "1.0.0"
+    official_url: Optional[str] = None
+    download_url: Optional[str] = None
+    author_name: Optional[str] = None
+    screenshots: Optional[List[str]] = None
     upvote_count: int = 0
+    favorite_count: int = 0
+    love_count: int = 0
+    comment_count: int = 0
     status: str = "PUBLISHED"
     created_at: str
     updated_at: str
+

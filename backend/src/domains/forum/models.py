@@ -22,6 +22,7 @@ class ForumThreadResponse(BaseModel):
     upvote_count: int = 0
     comment_count: int = 0
     bookmark_count: int = 0
+    love_count: int = 0
     is_pinned: bool = False
     status: str = "PUBLISHED"
     created_at: str

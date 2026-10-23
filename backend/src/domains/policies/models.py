@@ -1,4 +1,4 @@
-"""Data models for Policy Radar and Qualification Matching."""
+"""Data models for Policy Center and Qualification Matching."""
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
@@ -11,6 +11,10 @@ class PolicyCreate(BaseModel):
     summary: str = Field(..., min_length=5)
     eligible_conditions: List[str] = Field(default_factory=list)
     legal_basis: str = Field(..., min_length=2)
+    code: Optional[str] = Field(default=None, description="政策编号 (如 POL-2026-081)")
+    region: Optional[str] = Field(default="全国统一", description="适用地域")
+    deadline: Optional[str] = Field(default="常年有效", description="申报截止日期")
+    action_text: Optional[str] = Field(default="匹配资格", description="卡片操作文案")
 
 
 class PolicyResponse(BaseModel):
@@ -22,6 +26,14 @@ class PolicyResponse(BaseModel):
     summary: str
     eligible_conditions: List[str]
     legal_basis: str
+    code: Optional[str] = "POL-2026-001"
+    region: Optional[str] = "全国统一"
+    deadline: Optional[str] = "常年有效"
+    action_text: Optional[str] = "匹配资格"
+    like_count: int = 0
+    favorite_count: int = 0
+    love_count: int = 0
+    comment_count: int = 0
 
 
 class PolicyMatchRequest(BaseModel):
