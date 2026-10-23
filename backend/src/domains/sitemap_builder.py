@@ -24,7 +24,7 @@ def build_sitemap_quick_links(
             "description": "独立创客产品画廊，支持点赞打榜、产品收录与出海获客。",
         },
         {
-            "name": "政策雷达",
+            "name": "政策中心",
             "route": "policy",
             "count_desc": f"{policies_count} 条扶持减免红利",
             "tag": "政策",
@@ -47,16 +47,16 @@ def build_sitemap_quick_links(
         {
             "name": "生态特权",
             "route": "perks",
-            "count_desc": "最高 $5,000 算力补贴券",
+            "count_desc": "Token 优惠 · 服务器 · SaaS 优惠公告",
             "tag": "福利",
-            "description": "云厂商激活特权、Token 优惠券、Stripe 结汇通道及工具折扣。",
+            "description": "生态伙伴优惠公告板：Token 优惠券、云服务器折扣、SaaS 服务特惠与结汇通道。",
         },
         {
             "name": "合规指南",
             "route": "compliance",
-            "count_desc": "6 大防线自检避坑雷达",
-            "tag": "防线",
-            "description": "六维合规防线、典型避坑案例库与上线前自检雷达。",
+            "count_desc": "法条库与避坑案例集",
+            "tag": "法条",
+            "description": "合规法条白话提炼、典型避坑案例库与免责声明。",
         },
         {
             "name": "创客档案",

@@ -155,3 +155,61 @@ def test_product_upvote_and_listing(client):
     # Check descending sort by upvote count
     counts = [p["upvote_count"] for p in list_data]
     assert counts == sorted(counts, reverse=True)
+
+
+def test_product_pagination_and_caching(client):
+    """Verify infinite scroll pagination and multi-tier server-side caching."""
+    # 1. First paged fetch (cache miss)
+    resp1 = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "products.list",
+            "version": "v1.0.0",
+            "payload": {"page": 1, "page_size": 2},
+        },
+    )
+    assert resp1.status_code == 200
+    d1 = resp1.json()["data"]
+    assert "items" in d1
+    assert d1["page"] == 1
+    assert d1["page_size"] == 2
+    assert d1["from_cache"] is False
+
+    # 2. Second identical paged fetch (cache hit)
+    resp2 = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "products.list",
+            "version": "v1.0.0",
+            "payload": {"page": 1, "page_size": 2},
+        },
+    )
+    assert resp2.status_code == 200
+    d2 = resp2.json()["data"]
+    assert d2["from_cache"] is True
+    assert len(d2["items"]) == len(d1["items"])
+
+    # 3. Upvote to trigger cache invalidation
+    prod_id = d1["items"][0]["id"]
+    client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "products.upvote",
+            "version": "v1.0.0",
+            "payload": {"product_id": prod_id},
+        },
+    )
+
+    # 4. Fetch again (cache invalidated and re-cached)
+    resp3 = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "products.list",
+            "version": "v1.0.0",
+            "payload": {"page": 1, "page_size": 2},
+        },
+    )
+    assert resp3.status_code == 200
+    d3 = resp3.json()["data"]
+    assert d3["from_cache"] is False
+

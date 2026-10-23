@@ -12,6 +12,7 @@ from .content_moderation_gateway import (
     ContentModerationGateway,
     content_moderation_gateway,
     check_content_safety,
+    prescreen_and_scan,
 )
 from .oss_storage_gateway import OSSStorageGateway, oss_storage_gateway
 
@@ -33,6 +34,7 @@ __all__ = [
     "ContentModerationGateway",
     "content_moderation_gateway",
     "check_content_safety",
+    "prescreen_and_scan",
     "OSSStorageGateway",
     "oss_storage_gateway",
 ]

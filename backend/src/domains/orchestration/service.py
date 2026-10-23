@@ -226,7 +226,7 @@ class OrchestrationService:
             )
         )
 
-        # 8. Policy Radar Match DAG Pipeline: OPC_POLICY_MATCH_PIPELINE
+        # 8. Policy Center Match DAG Pipeline: OPC_POLICY_MATCH_PIPELINE
         topo_policy_match = {
             "topology": "DAG",
             "entry_node": "step_guard",
@@ -253,7 +253,7 @@ class OrchestrationService:
             )
         )
 
-        # 9. Policy Radar Publish DAG Pipeline: OPC_POLICY_PUBLISH_PIPELINE
+        # 9. Policy Center Publish DAG Pipeline: OPC_POLICY_PUBLISH_PIPELINE
         topo_policy_publish = {
             "topology": "DAG",
             "entry_node": "step_guard",

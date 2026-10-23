@@ -1,0 +1,94 @@
+{
+  "prod-inkflow-001": {
+    "id": "prod-inkflow-001",
+    "author_id": "usr_maker_alex",
+    "author_name": "@Alex_Writer",
+    "title": "InkFlow AI 专注编辑器",
+    "tagline": "专为长文研究员与小说创作者打造的本地增强写作工作台",
+    "description": "结合本地私有知识库（RAG）与大语言模型的无干扰长文写作工作台。具备智能大纲实时推演、人物关系网图谱化管理、上下文感知自动补全与双语润色能力。所有创作底稿均支持本地离线加密存储，无缝导出为 Markdown、PDF 与标准出版格式。",
+    "icon_url": null,
+    "category": "AI 原生写作",
+    "version": "v2.3.0",
+    "pricing_model": "FREEMIUM",
+    "price_cny": 0.0,
+    "official_url": "https://inkflow.opchub.cn",
+    "download_url": "https://download.inkflow.opchub.cn/releases/InkFlow-Desktop-latest.dmg",
+    "demo_url": "https://inkflow.opchub.cn/demo",
+    "upvote_count": 342,
+    "status": "PUBLISHED",
+    "screenshots": [
+      "https://images.unsplash.com/photo-1517842645767-c639042777db?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "created_at": "2026-01-10T08:00:00Z",
+    "updated_at": "2026-01-10T08:00:00Z"
+  },
+  "prod-shipglobal-002": {
+    "id": "prod-shipglobal-002",
+    "author_id": "usr_global_master",
+    "author_name": "@GlobalPayMaster",
+    "title": "ShipGlobal 独立站支付聚合网关",
+    "tagline": "为一人出海创客打造的合规无损全球多渠道收单路由",
+    "description": "面向国内独立开发者与微型 SaaS 团队的全球收款聚合中间件。单 SDK 直连 Stripe、PayPal、Apple Pay、Google Pay 以及东南亚本地电子钱包。内置自动化 VAT/消费税智能计算、多币种动态对冲避险与反欺诈雷达风控引擎。",
+    "icon_url": null,
+    "category": "跨境出海",
+    "version": "v1.8.5",
+    "pricing_model": "SUBSCRIPTION",
+    "price_cny": 199.0,
+    "official_url": "https://shipglobal.opchub.cn",
+    "download_url": "https://download.shipglobal.opchub.cn/sdk/shipglobal-gateway-v1.8.5.zip",
+    "demo_url": "https://shipglobal.opchub.cn/sandbox",
+    "upvote_count": 195,
+    "status": "PUBLISHED",
+    "screenshots": [
+      "https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "created_at": "2026-01-15T09:30:00Z",
+    "updated_at": "2026-01-15T09:30:00Z"
+  },
+  "prod-tailwindflex-003": {
+    "id": "prod-tailwindflex-003",
+    "author_id": "usr_front_genius",
+    "author_name": "@FrontGenius",
+    "title": "TailwindFlex 响应式设计系统",
+    "tagline": "一键生成 Apple 液态毛玻璃美学的高性能组件库",
+    "description": "专为追求极致视觉品质的个人产品打造的前端设计系统。开箱支持 Vue 3、React 19 与 Tailwind CSS v4。包含 60+ 液态磨砂拟物组件、视差滚动驱动引擎、微交互动效与无障碍键盘导航规范，极大压缩独立创客的产品 UI 开发周期。",
+    "icon_url": null,
+    "category": "开发工具",
+    "version": "v3.1.2",
+    "pricing_model": "ONE_TIME",
+    "price_cny": 89.0,
+    "official_url": "https://tailwindflex.opchub.cn",
+    "download_url": "https://download.tailwindflex.opchub.cn/packages/tailwindflex-pro-v3.1.2.tar.gz",
+    "demo_url": "https://tailwindflex.opchub.cn/preview",
+    "upvote_count": 148,
+    "status": "PUBLISHED",
+    "screenshots": [
+      "https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "created_at": "2026-01-20T14:20:00Z",
+    "updated_at": "2026-01-20T14:20:00Z"
+  },
+  "prod-cloudpulse-004": {
+    "id": "prod-cloudpulse-004",
+    "author_id": "usr_devops_solo",
+    "author_name": "@DevOps_Solo",
+    "title": "CloudPulse 个人云成本治理平台",
+    "tagline": "一人公司多云基础设施闲置资源实时裁剪卫士",
+    "description": "跨 AWS、阿里云、腾讯云等公有云的自动化成本优化与监控探针。通过只读权限秒级识别未绑定的弹性公网 IP、孤儿块存储卷与低负载计算实例，智能推荐突发型实例置换与预留资源配置，平均为独立开发者削减 40% 的基础设施固定开销。",
+    "icon_url": null,
+    "category": "微SaaS工具",
+    "version": "v1.2.0",
+    "pricing_model": "FREEMIUM",
+    "price_cny": 0.0,
+    "official_url": "https://cloudpulse.opchub.cn",
+    "download_url": "https://download.cloudpulse.opchub.cn/cli/cloudpulse-cli-amd64.tar.gz",
+    "demo_url": "https://cloudpulse.opchub.cn/dashboard",
+    "upvote_count": 289,
+    "status": "PUBLISHED",
+    "screenshots": [
+      "https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=1200&q=80"
+    ],
+    "created_at": "2026-01-25T11:00:00Z",
+    "updated_at": "2026-01-25T11:00:00Z"
+  }
+}

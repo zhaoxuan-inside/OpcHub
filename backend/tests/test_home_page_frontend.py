@@ -4,7 +4,7 @@ Verifies:
 1. Frontend dist bundle exists and contains the HomeView promotional showcase content.
 2. Unauthenticated user restriction: HomeView is the default and only visible page for unlogged users.
 3. Content showcase style elements: Bento grid, metric pillars, journey roadmap, testimonials, and content exhibition tabs.
-4. Promotional message accurately describes OpcHub's capabilities (Policy Radar, SOP documents, Product Showcase, Demands Marketplace, Perks).
+4. Promotional message accurately describes OpcHub's capabilities (Policy Center, SOP documents, Product Showcase, Demands Marketplace, Perks).
 """
 import os
 from pathlib import Path
@@ -42,7 +42,7 @@ def test_frontend_dist_contains_home_promotional_content():
       "一人公司",
       "超级个体",
       "商业操作系统",
-      "政策雷达",
+      "政策中心",
       "流程文书",
       "产品橱窗",
       "需求集市",

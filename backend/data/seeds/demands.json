@@ -1,0 +1,80 @@
+{
+  "dmd-agentic-workflow-001": {
+    "id": "dmd-agentic-workflow-001",
+    "creator_id": "usr_ent_hr_alpha",
+    "creator_name": "杭州云图科技 · 企业服务部",
+    "title": "外贸 CRM 系统的垂直行业 Agent 工作流搭建",
+    "description": "需要基于 FastAPI + PostgreSQL + pgvector 打造私有知识库问答与自动邮件生成插件，周期 3 周。要求交付可运行的私有化部署包、向量检索基准测试报告与运维手册。",
+    "budget_cny": 35000.0,
+    "category": "AI",
+    "bidders_count": 3,
+    "status": "OPEN",
+    "deadline_at": "2026-11-28T10:00:00Z",
+    "created_at": "2026-10-18T09:30:00Z"
+  },
+  "dmd-crossend-refactor-002": {
+    "id": "dmd-crossend-refactor-002",
+    "creator_id": "usr_ent_ops_delta",
+    "creator_name": "深圳极序软件 · 研发效能组",
+    "title": "跨端桌面工具 (Electron / Tauri) 界面重构与性能调优",
+    "description": "将老旧代码升级为 Vue3 组合式 API 并适配深色/浅色液态毛玻璃界面，具备良好现代美感。需保证首屏加载低于 1.5 秒，并交付完整的组件文档站与回归测试用例。",
+    "budget_cny": 18000.0,
+    "category": "DEV",
+    "bidders_count": 1,
+    "status": "OPEN",
+    "deadline_at": "2026-11-20T10:00:00Z",
+    "created_at": "2026-10-17T06:15:00Z"
+  },
+  "dmd-devops-advisor-003": {
+    "id": "dmd-devops-advisor-003",
+    "creator_id": "usr_ent_cto_epsilon",
+    "creator_name": "上海远帆出海 · 技术合伙人办公室",
+    "title": "出海 SaaS 平台长期兼职 DevOps 与合规架构顾问",
+    "description": "负责 AWS Terraform 编排、Stripe Webhook 支付链路稳定性监控与自动化数据库备份保障。期望按月长期合作，每周提供一次架构复盘与技术决策纪要。",
+    "budget_cny": 60000.0,
+    "category": "BIZ",
+    "bidders_count": 5,
+    "status": "OPEN",
+    "deadline_at": "2026-12-15T10:00:00Z",
+    "created_at": "2026-10-16T11:40:00Z"
+  },
+  "dmd-gdpr-review-004": {
+    "id": "dmd-gdpr-review-004",
+    "creator_id": "usr_ent_legal_zeta",
+    "creator_name": "北京合众律所 · 企业法律顾问部",
+    "title": "出海独立 SaaS 平台隐私协议与 GDPR 合规审查求助",
+    "description": "寻求资深涉外法务或合规律师，起草符合欧盟 GDPR 与美区 CCPA 标准的隐私政策与用户数据出境评估报告。需要出具可直接签署的标准合同条款（SCC）与整改清单。",
+    "budget_cny": 12000.0,
+    "category": "LEGAL",
+    "bidders_count": 2,
+    "status": "OPEN",
+    "deadline_at": "2026-11-14T10:00:00Z",
+    "created_at": "2026-10-19T03:20:00Z"
+  },
+  "dmd-tax-filing-005": {
+    "id": "dmd-tax-filing-005",
+    "creator_id": "usr_ent_finance_eta",
+    "creator_name": "成都微光创投 · 财税合规中心",
+    "title": "独立开发者季度纳税申报与离岸公司简易做账辅导",
+    "description": "辅导香港公司与内地个体户合规纳税申报，并指导电子税务局增值税零税率备案流程。需覆盖季度申报表填写、税收优惠留存备查与年度汇算清缴三个环节。",
+    "budget_cny": 8000.0,
+    "category": "TAX",
+    "bidders_count": 4,
+    "status": "OPEN",
+    "deadline_at": "2026-11-30T10:00:00Z",
+    "created_at": "2026-10-20T02:10:00Z"
+  },
+  "dmd-ai-knowledgebase-006": {
+    "id": "dmd-ai-knowledgebase-006",
+    "creator_id": "usr_ent_rd_theta",
+    "creator_name": "苏州澜图智能 · 知识工程实验室",
+    "title": "企业内训知识库 RAG 检索质量评测与提示词工程优化",
+    "description": "针对 1200 篇内部制度与 SOP 文档搭建检索评测集，定位召回偏差并优化切分策略与提示词模板。交付需包含评测脚本、基线对比报告与可复现的回归流水线。",
+    "budget_cny": 26000.0,
+    "category": "AI",
+    "bidders_count": 0,
+    "status": "OPEN",
+    "deadline_at": "2026-12-05T10:00:00Z",
+    "created_at": "2026-10-20T07:55:00Z"
+  }
+}

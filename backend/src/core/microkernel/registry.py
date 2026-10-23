@@ -203,12 +203,12 @@ class AtomicRegistry:
                 "matched_count": inputs.get("matched_count", 0),
                 "increment": 1,
             }
-        self.register("policy.telemetry.incr", policy_telemetry_incr, domain="policy", description="政策雷达智能测算与撮合检索度量打点算子")
+        self.register("policy.telemetry.incr", policy_telemetry_incr, domain="policy", description="政策中心智能测算与撮合检索度量打点算子")
 
         # Policy Publishing Operators
         async def validate_publish_policy(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发布政策合法性并做公文文本合规审查"""
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             t, s, l = inputs.get("title", "").strip(), inputs.get("summary", "").strip(), inputs.get("legal_basis", "").strip()
             if len(t) < 2:
                 raise ValueError("Policy title must be at least 2 characters long")
@@ -216,15 +216,15 @@ class AtomicRegistry:
                 raise ValueError("Policy summary must be at least 5 characters long")
             if not l:
                 raise ValueError("legal_basis is required for government policy")
-            await check_content_safety(f"{t} {s} {l}", field_name="policy publish")
+            await prescreen_and_scan(f"{t} {s} {l}", field_name="policy publish")
             return {
                 "guard_passed": True, "title": t, "summary": s, "legal_basis": l,
                 "policy_level": inputs.get("policy_level", "国家级"), "category": inputs.get("category", "TAX"),
                 "subsidy_amount_max": float(inputs.get("subsidy_amount_max", 0.0)),
                 "eligible_conditions": inputs.get("eligible_conditions", []),
             }
-        self.register("policy.publish.guard", validate_publish_policy, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
-        self.register("validate_publish_policy", validate_publish_policy, domain="policy", description="政策雷达政府红利发布准入与法律依据校验门禁")
+        self.register("policy.publish.guard", validate_publish_policy, domain="policy", description="政策中心政府红利发布准入与法律依据校验门禁")
+        self.register("validate_publish_policy", validate_publish_policy, domain="policy", description="政策中心政府红利发布准入与法律依据校验门禁")
 
         async def policy_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.policies.service import policy_service
@@ -257,19 +257,28 @@ class AtomicRegistry:
             "policy.publish.persist",
             policy_publish_persist,
             domain="policy",
-            description="政策雷达政府扶持红利持久化存储算子",
+            description="政策中心政府扶持红利持久化存储算子",
             compensator=policy_publish_persist_compensate,
         )
 
 
         # Domain 2: SOP Document Domain (商事登记与合规文书生成微内核算子与 Saga 补偿)
         async def validate_sop_document_params(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            """原子算子：校验生成文书所需的模版有效性及表单数据敏感词合规"""
+            """原子算子：校验生成文书所需的模版有效性及表单数据敏感词合规。
+
+            两级审核：本地 NLP 前置算子先给出「肯定没问题/肯定有问题」的高置信短接结论，
+            仅对「不确定」的内容再外呼内容审核服务兜底裁决。
+            """
             from src.domains.sop.service import sop_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = sop_service.validate_render_payload(inputs)
             full_text = " ".join(str(v) for v in res["form_data"].values())
-            await check_content_safety(full_text, field_name="SOP document form data")
+            audit = await prescreen_and_scan(full_text, field_name="SOP document form data")
+            res["moderation"] = {
+                "verdict": audit["verdict"],
+                "external_scan_used": audit["external_scan_used"],
+                "external_unavailable": audit["external_unavailable"],
+            }
             return res
         self.register("sop.document.validate_guard", validate_sop_document_params, domain="sop", description="合规文书模版准入与表单合规风控门禁")
         self.register("validate_sop_document_params", validate_sop_document_params, domain="sop", description="合规文书模版准入与表单合规风控门禁")
@@ -411,6 +420,28 @@ class AtomicRegistry:
                 "filtered_content": scan_res.get("filtered_content", content),
             }
         self.register("moderation.inspect_content", moderation_inspect_content, domain="moderation", description="UGC文本敏感词审查与违规处置算子")
+
+        async def nlp_prescreen_content(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：本地 NLP 前置审核，给出「肯定没问题 / 肯定有问题 / 不确定」三态结论。
+
+            只消费文本，零网络、零第三方依赖。只有当 NLP 有高置信把握时短接裁决；
+            不确定的文本由调用方交给外部审核服务兜底。
+            """
+            from src.domains.moderation.nlp_prescreen import prescreen_text
+            content = inputs.get("content", "")
+            res = prescreen_text(content)
+            return {
+                "verdict": res["verdict"],
+                "confirmed_issue": res["confirmed_issue"],
+                "confirmed_clean": res["confirmed_clean"],
+                "should_defer_to_external": res["should_defer_to_external"],
+                "violation_score": res["violation_score"],
+                "safe_score": res["safe_score"],
+                "hit_sensitive": res["hit_sensitive"],
+                "matched_patterns": res["matched_patterns"],
+                "content": content,
+            }
+        self.register("moderation.nlp.prescreen", nlp_prescreen_content, domain="moderation", description="本地NLP前置审核算子：三态结论，高置信短接，不确定交外部服务")
 
         async def validate_takedown_request(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验下架操作的 item_id 与 reason 有效性"""
@@ -604,8 +635,8 @@ class AtomicRegistry:
                 raise ValueError("Forum thread content must be at least 10 characters long")
             
             # Content moderation check via external HTTP moderation gateway
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
-            await check_content_safety(f"{title} {content}", field_name="forum thread")
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            await prescreen_and_scan(f"{title} {content}", field_name="forum thread")
             
             return {
                 "guard_passed": True,
@@ -654,9 +685,9 @@ class AtomicRegistry:
         async def validate_create_comment(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发评论参数合法性并进行文本合规审查"""
             from src.domains.forum.service import forum_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = forum_service.validate_create_comment_payload(inputs)
-            await check_content_safety(res["content"], field_name="forum comment")
+            await prescreen_and_scan(res["content"], field_name="forum comment")
             return res
         self.register("forum.comment.validate_guard", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
         self.register("validate_create_comment", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
@@ -844,9 +875,9 @@ class AtomicRegistry:
         async def validate_publish_product(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验独立商用作品发布入参合法性并做文本合规审查"""
             from src.domains.products.service import product_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = product_service.validate_publish_payload(inputs)
-            await check_content_safety(f"{res['title']} {res['tagline']} {res['description']}", field_name="product showcase")
+            await prescreen_and_scan(f"{res['title']} {res['tagline']} {res['description']}", field_name="product showcase")
             return res
         self.register("product.validate_guard", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
         self.register("validate_publish_product", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
@@ -856,13 +887,19 @@ class AtomicRegistry:
             from src.domains.products.models import ProductCreate
             payload = ProductCreate(
                 author_id=inputs.get("author_id", ""),
+                author_name=inputs.get("author_name"),
                 title=inputs.get("title", ""),
                 tagline=inputs.get("tagline", ""),
                 description=inputs.get("description", "") or inputs.get("tagline", ""),
+                icon_url=inputs.get("icon_url"),
                 category=inputs.get("category", "DEV"),
+                version=inputs.get("version", "1.0.0"),
                 pricing_model=inputs.get("pricing_model", "FREE"),
                 price_cny=float(inputs.get("price_cny", 0.0)),
+                official_url=inputs.get("official_url"),
+                download_url=inputs.get("download_url"),
                 demo_url=inputs.get("demo_url", ""),
+                screenshots=inputs.get("screenshots", []),
             )
             created = product_service.create_product(payload)
             return {
@@ -904,9 +941,9 @@ class AtomicRegistry:
         async def validate_publish_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发布需求入参合法性并进行敏感词风控审查"""
             from src.domains.demands.service import demand_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = demand_service.validate_publish_payload(inputs)
-            await check_content_safety(f"{res['title']} {res['description']}", field_name="demand publish")
+            await prescreen_and_scan(f"{res['title']} {res['description']}", field_name="demand publish")
             return res
         self.register("demand.publish.guard", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
         self.register("validate_publish_demand", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
@@ -921,6 +958,7 @@ class AtomicRegistry:
                 category=inputs.get("category", "DEV"),
                 deadline_days=int(inputs.get("deadline_days", 14)),
                 creator_id=inputs.get("creator_id", ""),
+                creator_name=inputs.get("creator_name", ""),
             )
             created = demand_service.create_demand(payload)
             return {
@@ -948,9 +986,9 @@ class AtomicRegistry:
         async def validate_bid_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验创客竞标方案合法性并审查提案内容安全"""
             from src.domains.demands.service import demand_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = demand_service.validate_bid_payload(inputs)
-            await check_content_safety(res["proposal_text"], field_name="demand bid proposal")
+            await prescreen_and_scan(res["proposal_text"], field_name="demand bid proposal")
             return res
         self.register("demand.bid.guard", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
         self.register("validate_bid_demand", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
@@ -1059,9 +1097,9 @@ class AtomicRegistry:
         async def validate_publish_perk(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验生态特权福利上线合法性并进行文本合规审查"""
             from src.domains.perks.service import perk_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             res = perk_service.validate_publish_payload(inputs)
-            await check_content_safety(f"{res['name']} {res['provider']} {res['summary']}", field_name="perk publish")
+            await prescreen_and_scan(f"{res['name']} {res['provider']} {res['summary']}", field_name="perk publish")
             return res
         self.register("perk.publish.guard", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
         self.register("validate_publish_perk", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
@@ -1069,13 +1107,20 @@ class AtomicRegistry:
         async def perk_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.perks.service import perk_service
             from src.domains.perks.models import PerkCreate
+            from src.core.config import settings
             payload = PerkCreate(
                 name=inputs.get("name", ""),
                 provider=inputs.get("provider", ""),
                 value_cny=float(inputs.get("value_cny", 0.0)),
-                category=inputs.get("category", "CLOUD"),
+                category=inputs.get("category", settings.perk_default_category),
                 summary=inputs.get("summary", ""),
-                quota_remaining=int(inputs.get("quota_remaining", 100)),
+                quota_remaining=int(inputs.get("quota_remaining", settings.perk_default_quota)),
+                effective_start=inputs.get("effective_start"),
+                effective_end=inputs.get("effective_end"),
+                redeem_url=inputs.get("redeem_url"),
+                priority=int(inputs.get("priority", settings.perk_default_priority)),
+                status=inputs.get("status", settings.perk_default_status),
+                highlights=inputs.get("highlights", []) or [],
             )
             created = perk_service.create_perk(payload)
             return {

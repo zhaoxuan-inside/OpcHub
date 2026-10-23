@@ -45,6 +45,8 @@ _SMS_SECTION = _EXT_SECTION.get("sms_auth", {})
 _RAG_SECTION = _EXT_SECTION.get("rag", {})
 _FISCAL_SECTION = _YAML_DATA.get("fiscal_policy", {})
 _DB_SECTION = _YAML_DATA.get("database", {})
+_PERKS_SECTION = _YAML_DATA.get("perks", {})
+_COMPLIANCE_SECTION = _YAML_DATA.get("compliance", {})
 
 
 class Settings(BaseSettings):
@@ -125,6 +127,30 @@ class Settings(BaseSettings):
     audit_retention_days: int = int(os.getenv("OPCHUB_AUDIT_RETENTION_DAYS", "180"))
     audit_secret: str = os.getenv("OPCHUB_AUDIT_SECRET", "")
     audit_archive_batch_size: int = int(os.getenv("OPCHUB_AUDIT_ARCHIVE_BATCH_SIZE", "500"))
+
+    # Ecosystem Perks Announcement Board domain config (生态特权 优惠公告板)
+    perk_categories: List[str] = [
+        c.get("key") for c in _PERKS_SECTION.get("categories", [])
+        if c.get("key")
+    ] or ["TOKEN", "SERVER", "SAAS", "AI", "FINANCE", "INFRA", "OTHER"]
+    perk_category_labels: dict = {
+        c.get("key"): c.get("label", "") for c in _PERKS_SECTION.get("categories", []) if c.get("key")
+    }
+    perk_default_category: str = _PERKS_SECTION.get("default_category", "TOKEN")
+    perk_default_status: str = _PERKS_SECTION.get("default_status", "PUBLISHED")
+    perk_default_priority: int = int(_PERKS_SECTION.get("default_priority", 60))
+    perk_default_quota: int = int(_PERKS_SECTION.get("default_quota", 100))
+    perk_statuses: List[str] = _PERKS_SECTION.get("statuses", ["PUBLISHED", "OFFLINE"])
+
+    # Compliance Guide domain config (合规指南 法条/案例知识库)
+    compliance_grade_excellent: int = int(_COMPLIANCE_SECTION.get("grade_excellent", 90))
+    compliance_grade_good: int = int(_COMPLIANCE_SECTION.get("grade_good", 75))
+    compliance_grade_warning: int = int(_COMPLIANCE_SECTION.get("grade_warning", 60))
+    compliance_default_strict_mode: bool = bool(_COMPLIANCE_SECTION.get("default_strict_mode", False))
+    compliance_legal_help_recommendation_template: str = _COMPLIANCE_SECTION.get(
+        "legal_help_recommendation_template",
+        "检测到 {count} 个合规风险点（特别是 {first}），建议前往需求集市发布专项法律求助或咨询法务服务商。",
+    )
 
     model_config = SettingsConfigDict(env_prefix="OPCHUB_", env_file=".env", extra="ignore")
 

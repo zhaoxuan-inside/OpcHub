@@ -1,4 +1,4 @@
-"""Test suite for P04 Policy Radar driven by Microkernel DAG Orchestration & Saga Compensation."""
+"""Test suite for P04 Policy Center driven by Microkernel DAG Orchestration & Saga Compensation."""
 import pytest
 from fastapi.testclient import TestClient
 

@@ -1,0 +1,38 @@
+[
+  {
+    "id": "ent_microkernel_pipeline",
+    "name": "超级个体全链路出海与合规通道",
+    "tier": "STANDARD",
+    "price_cny": 0.0,
+    "description": "一站式连通海外支付结算、企业合规自检与政务申报全套通道。",
+    "is_active": false,
+    "quota_desc": "实时就绪"
+  },
+  {
+    "id": "ent_policy_radar_basic",
+    "name": "全国与地方政策中心白话提炼",
+    "tier": "STANDARD",
+    "price_cny": 0.0,
+    "description": "免费查阅与匹配国家级增值税与小微企业免税政策。",
+    "is_active": false,
+    "quota_desc": "实时全量"
+  },
+  {
+    "id": "ent_ai_tax_assistant",
+    "name": "AI 政策智能测算与申报材料极速出具",
+    "tier": "PRO",
+    "price_cny": 199.0,
+    "description": "解锁一键生成符合政务标准的设立登记、软著申报全套文书。",
+    "is_active": false,
+    "quota_desc": "无限次导出"
+  },
+  {
+    "id": "ent_black_diamond_priority",
+    "name": "黑钻合伙人 VIP 优先需求派单特权",
+    "tier": "BLACK_DIAMOND",
+    "price_cny": 899.0,
+    "description": "获得企业技术外包与出海委托优先推荐接单权限，技术担保履约背书。",
+    "is_active": false,
+    "quota_desc": "顶格优先派单"
+  }
+]

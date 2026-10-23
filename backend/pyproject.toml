@@ -36,4 +36,7 @@ packages = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-pythonpath = ["."]
+# "." resolves to backend/; ".." is the repo root where the decoupled
+# mock_data/ external-service dataset package lives (shared by the mock server
+# and the test suites that exercise it).
+pythonpath = ["..", "."]

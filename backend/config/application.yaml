@@ -28,6 +28,32 @@ fiscal_policy:
   vat_standard_rate: 0.03
   legal_basis: "财政部 税务总局公告 2023年第12号 (小规模纳税人季度销售额30万元以下免征增值税)"
 
+# Ecosystem Perks Announcement Board (生态特权 优惠公告板) — domain config, zero hardcoding
+perks:
+  categories:
+    - { key: "TOKEN", label: "Token 优惠" }
+    - { key: "SERVER", label: "服务器优惠" }
+    - { key: "SAAS", label: "SaaS 服务" }
+    - { key: "AI", label: "AI 与算力" }
+    - { key: "FINANCE", label: "结算与支付" }
+    - { key: "INFRA", label: "基础设施" }
+    - { key: "OTHER", label: "其他优惠" }
+  default_category: "TOKEN"
+  default_status: "PUBLISHED"
+  default_priority: 60
+  default_quota: 100
+  statuses:
+    - "PUBLISHED"
+    - "OFFLINE"
+
+# Compliance Guide domain config (合规指南 法条/案例知识库) — domain config, zero hardcoding
+compliance:
+  grade_excellent: 90
+  grade_good: 75
+  grade_warning: 60
+  default_strict_mode: false
+  legal_help_recommendation_template: "检测到 {count} 个合规风险点（特别是 {first}），建议前往需求集市发布专项法律求助或咨询法务服务商。"
+
 gateway:
   # Inbound Unified Gateway Endpoints
   endpoints:

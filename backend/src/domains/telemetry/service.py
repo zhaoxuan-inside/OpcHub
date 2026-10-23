@@ -38,13 +38,13 @@ class TelemetryService:
         demand_count = len(demand_service.list_demands())
         perk_count = len(perk_service.list_perks())
         sop_template_count = len(sop_service.get_stages_and_templates().templates)
-        compliance_count = len(compliance_service.get_dimensions())
+        compliance_count = len(compliance_service.get_laws())
         maker_count = len([
             u for u in user_service._users_by_uid.values() if u.get("role") != "GUEST"
         ])
 
         module_counts = [
-            ("政策雷达", "POLICY", policy_count),
+            ("政策中心", "POLICY", policy_count),
             ("流程文书SOP", "SOP", sop_template_count),
             ("头脑风暴", "FORUM", forum_count),
             ("需求外包集市", "MARKET", demand_count),

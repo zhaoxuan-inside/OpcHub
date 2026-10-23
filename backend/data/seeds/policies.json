@@ -1,0 +1,105 @@
+{
+  "pol_vat_exemption_2026": {
+    "id": "pol_vat_exemption_2026",
+    "code": "POL-2026-081",
+    "region": "全国统一",
+    "title": "小微企业月销售额 10 万以下免征增值税",
+    "policy_level": "国家级",
+    "category": "TAX",
+    "subsidy_amount_max": 9000.0,
+    "summary": "【白话要点】按季申报纳税人，季度开票未超 30 万元免交增值税；若开具专票需按 1% 征收率纳税。",
+    "eligible_conditions": [
+      "小规模纳税人",
+      "季度开票销售额未超 30 万元"
+    ],
+    "legal_basis": "财政部 税务总局公告 2023年第12号",
+    "deadline": "截止 2027-12-31",
+    "action_text": "匹配资格"
+  },
+  "pol_ai_compute_voucher_hz": {
+    "id": "pol_ai_compute_voucher_hz",
+    "code": "POL-2026-094",
+    "region": "大湾区",
+    "title": "智能算力券补贴申领 (第 3 批)",
+    "policy_level": "省市级",
+    "category": "SUBSIDY",
+    "subsidy_amount_max": 200000.0,
+    "summary": "【白话要点】租赁云厂商 GPU 算力卡训练微调大模型，由财政直补 30% 租赁费用，每家主体上限 20 万元。",
+    "eligible_conditions": [
+      "AI微调及大模型开发",
+      "租赁指定合规公有云算力",
+      "独立团队及一人公司"
+    ],
+    "legal_basis": "杭政办发〔2024〕18号 与 大湾区科技创新智算专项扶持指引",
+    "deadline": "剩余 12 天",
+    "action_text": "申报材料"
+  },
+  "pol_rnd_deduction_100": {
+    "id": "pol_rnd_deduction_100",
+    "code": "POL-2026-105",
+    "region": "长三角",
+    "title": "科技型中小企业研发费用加计扣除",
+    "policy_level": "国家级",
+    "category": "TAX",
+    "subsidy_amount_max": 0.0,
+    "summary": "【白话要点】研发活动发生的人工与设备折旧费用，在税前按 100% 比例加计扣除，有效抵冲经营利润税负。",
+    "eligible_conditions": [
+      "科技型中小企业评价入库",
+      "发生真实研发活动与独立研发核算账套"
+    ],
+    "legal_basis": "财政部 税务总局 科技部公告 2023年第11号",
+    "deadline": "常年开放申报",
+    "action_text": "入库测评"
+  },
+  "pol_offshore_trade_2026": {
+    "id": "pol_offshore_trade_2026",
+    "code": "POL-2026-118",
+    "region": "出海特区",
+    "title": "离岸数字贸易与技术出口增值税零税率",
+    "policy_level": "园区级",
+    "category": "TAX",
+    "subsidy_amount_max": 50000.0,
+    "summary": "【白话要点】为海外机构提供软件研发、远程设计及技术咨询服务，经商务局认定后免征增值税且免除附加税。",
+    "eligible_conditions": [
+      "跨境离岸软件与技术出口合同",
+      "经所在地商务主管机关涉外贸易备案"
+    ],
+    "legal_basis": "国家税务总局令第33号 适用增值税零税率应税服务退（免）税管理办法",
+    "deadline": "2026-11-30",
+    "action_text": "资格预审"
+  },
+  "pol_sz_nanshan_compute_2026": {
+    "id": "pol_sz_nanshan_compute_2026",
+    "code": "POL-2026-088",
+    "region": "深圳南山",
+    "title": "深圳市南山区一人公司算力与租金直达资助",
+    "policy_level": "园区级",
+    "category": "SUBSIDY",
+    "subsidy_amount_max": 500000.0,
+    "summary": "【白话要点】面向人工智能、独立软件开发领域的 OPC 实体，提供首年办公空间免租及最高 50 万元的公有云与智算算力补贴。",
+    "eligible_conditions": [
+      "南山区注册独立法人或一人公司",
+      "主营人工智能算法或独立软件"
+    ],
+    "legal_basis": "深圳市南山区促进科技创新高质量发展专项资金管理办法",
+    "deadline": "截止 2026-12-31",
+    "action_text": "研判申报"
+  },
+  "pol_sh_zhangjiang_tax_2026": {
+    "id": "pol_sh_zhangjiang_tax_2026",
+    "code": "POL-2026-042",
+    "region": "上海张江",
+    "title": "上海张江创客工作室小微所得税减免细则",
+    "policy_level": "省市级",
+    "category": "TAX",
+    "subsidy_amount_max": 20000.0,
+    "summary": "【白话要点】针对独立设计师与个人咨询工作室，享受应纳税所得额 100 万元以内减免 20% 专项税优政策，全流程在线填报。",
+    "eligible_conditions": [
+      "张江自主创新示范区注册创客",
+      "年应纳税所得额 100 万元以内"
+    ],
+    "legal_basis": "上海市浦东新区张江科学城专项发展资金实施细则",
+    "deadline": "常年有效",
+    "action_text": "在线填报"
+  }
+}
