@@ -21,7 +21,7 @@ architecture_contract:
       core_engine: "backend/src/core"             # 配置、安全、异常、底座
       metadata_engine: "backend/src/metadata"     # 低代码元数据与动态 Schema 引擎
       domains:
-        policy: "backend/src/domains/policy"       # 政策雷达与补贴计算
+        policy: "backend/src/domains/policy"       # 政策中心与补贴计算
         perk: "backend/src/domains/perk"           # 算力与基础设施装备包
         gallery: "backend/src/domains/gallery"     # 产品展示橱窗与打榜
         marketplace: "backend/src/domains/market"  # 需求集市与服务撮合
@@ -92,7 +92,7 @@ graph TD
 
 | 领域上下文 | 英文标识 | 核心聚合根 (Aggregate Root) | 负责职责与数据所有权 |
 | :--- | :--- | :--- | :--- |
-| **政策雷达域** | `PolicyContext` | `PolicyItem` (政策条目) | 负责政策全文解析、多维度标签、白话提炼、补贴测算算法。拥有政策主表与向量表写入权。 |
+| **政策中心域** | `PolicyContext` | `PolicyItem` (政策条目) | 负责政策全文解析、多维度标签、白话提炼、补贴测算算法。拥有政策主表与向量表写入权。 |
 | **算力装备域** | `PerkContext` | `PerkItem` (装备包权益) | 负责厂商折扣、专属优惠码、返佣外链转化埋点跟踪 (`PerkClickLog`)。 |
 | **产品橱窗域** | `GalleryContext` | `GalleryProduct` (橱窗产品) | 负责创客独立产品提交、付费审核状态机、Upvote 点赞计数、打榜排序。 |
 | **需求集市域** | `MarketContext` | `ServiceDemand` / `Vendor` | 负责外包需求发布、服务商资质认证、线索安全交换与撮合记录。 |

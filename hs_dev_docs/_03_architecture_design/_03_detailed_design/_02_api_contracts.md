@@ -62,7 +62,7 @@ api_contract:
       auth: "ADMIN"
       summary: "AST 静态安全检测与函数签名签发"
 
-    # 3. 政策雷达与测算 (Policy Radar)
+    # 3. 政策中心与测算 (Policy Center)
     - path: "/policies/match"
       method: "POST"
       auth: "OPTIONAL"
@@ -361,7 +361,7 @@ api_contract:
 - `GET /api/v1/products?category=AI`: 获取创客独立产品列表。
 - `POST /api/v1/products`: 提交产品橱窗展示。
 
-### 1.7 政策雷达与智能测算接口 (`GET/POST /api/v1/policies/...`)
+### 1.7 政策中心与智能测算接口 (`GET/POST /api/v1/policies/...`)
 - `GET /api/v1/policies`: 获取全国及地方扶持补贴政策列表。
 - `POST /api/v1/policies/match`:
   - **请求载荷**：`{ "quarterly_income": 280000, "maker_type": "INDIVIDUAL", "region": "杭州" }`

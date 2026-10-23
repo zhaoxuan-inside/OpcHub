@@ -113,7 +113,7 @@ async def abac_owner_guard(ctx: PipelineContext) -> PipelineContext:
 
 ### 3.1 前端低代码页面编排流 (Low-Code Orchestration)
 管理员在专属控制台中操作：
-1. **组件槽位配置**：自由选择页面的 Block 布局（如将政策雷达调整到首页顶部，更换侧边栏 Perks Banner）；
+1. **组件槽位配置**：自由选择页面的 Block 布局（如将政策中心调整到首页顶部，更换侧边栏 Perks Banner）；
 2. **Schema 属性发布**：无需后端工程师改表，通过界面在线填入新政策数据并绑定动态 Schema（如添加“免税专属测算公式”）；
 3. **数据生效广播**：提交后系统更新 `SchemaRegistry` 缓存，所有前端用户刷新或下一次请求即时生效。
 

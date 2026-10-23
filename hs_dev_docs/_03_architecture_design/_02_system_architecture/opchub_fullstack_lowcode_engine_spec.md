@@ -182,7 +182,7 @@ classDiagram
   "bundle_id": "bundle_20261016_v1_4",
   "page_id": "policy_radar_home",
   "route_path": "/policy-radar",
-  "title": "政策雷达 · 一人公司专属红利",
+  "title": "政策中心 · 一人公司专属红利",
   "required_role": "GUEST",
   "grid_layout": {
     "columns": 24,

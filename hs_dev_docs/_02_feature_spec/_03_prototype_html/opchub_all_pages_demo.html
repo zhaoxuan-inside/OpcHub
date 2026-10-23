@@ -1196,7 +1196,7 @@
           <button class="nav-tab-btn tab-user-only active" onclick="switchView('home', this)">首页地图</button>
           <button class="nav-tab-btn tab-user-only" onclick="switchView('forum', this)">头脑风暴</button>
           <button class="nav-tab-btn tab-user-only" onclick="switchView('product', this)">产品橱窗</button>
-          <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)">政策雷达</button>
+          <button class="nav-tab-btn tab-user-only" onclick="switchView('policy', this)">政策中心</button>
           <button class="nav-tab-btn tab-user-only" onclick="switchView('demand', this)">需求集市</button>
           <button class="nav-tab-btn tab-user-only" onclick="switchView('sop', this)">流程文书</button>
           <button class="nav-tab-btn tab-user-only" onclick="switchView('perks', this)">生态特权</button>
@@ -1265,7 +1265,7 @@
           </button>
           <button class="btn-liquid-outline" onclick="switchView('policy')" data-tooltip="浏览长三角与全国扶持政策白话库">
             <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a10 10 0 0 1 10 10"></path><line x1="12" y1="12" x2="19" y2="5"></line></svg>
-            <span>政策雷达</span>
+            <span>政策中心</span>
           </button>
         </div>
 
@@ -1287,7 +1287,7 @@
             </div>
             <div class="sitemap-card" onclick="switchView('policy')">
               <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">03 · INTELLIGENCE</div>
-              <h3 style="font-size: 16px; margin: 8px 0 6px;">政策雷达内参</h3>
+              <h3 style="font-size: 16px; margin: 8px 0 6px;">政策中心内参</h3>
               <p style="font-size: 13px; color: var(--text-secondary);">全网政策白话提炼，税收减免、算力返还与地方补贴精准匹配。</p>
             </div>
             <div class="sitemap-card" onclick="switchView('demand')">
@@ -1502,13 +1502,13 @@
     </div>
 
     <!-- ==========================================
-         VIEW 4: 政策 Gallery (Policy Radar)
+         VIEW 4: 政策 Gallery (Policy Center)
          ========================================== -->
     <div id="view-policy" class="view-panel">
       <div class="glass-box" style="padding: 24px 32px 16px;">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
           <div>
-            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">政策雷达与白话提炼库</h1>
+            <h1 class="page-title" style="font-size: 26px; margin-bottom: 4px;">政策中心与白话提炼库</h1>
             <p style="font-size: 13px; color: var(--text-secondary);">汇集长三角、大湾区及全国针对超级个体与初创团队的扶持红利，拒绝官话套话，直达关键要求。</p>
           </div>
           <div style="display: flex; align-items: center; gap: 12px;">
@@ -1984,7 +1984,7 @@
 
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--glass-border-subtle);">
                   <div>
-                    <div style="font-weight: 600; font-size: 13.5px;">全国与地方政策雷达白话提炼</div>
+                    <div style="font-weight: 600; font-size: 13.5px;">全国与地方政策中心白话提炼</div>
                     <div style="font-size: 12px; color: var(--text-secondary); margin-top: 2px;">免费查阅与匹配国家级增值税与小微企业免税政策 · 配额: 实时全量</div>
                   </div>
                   <span class="mono-tag" style="background: rgba(52, 199, 89, 0.15); color: #34C759; border-color: rgba(52, 199, 89, 0.3); font-weight: 600;">已生效</span>
@@ -2593,7 +2593,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
             <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 18px;">
               <div>
                 <div style="display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 3px;">
-                  <span>政策雷达 (白话速查)</span>
+                  <span>政策中心 (白话速查)</span>
                   <span style="font-family: var(--font-mono); color: var(--accent);">32.0% (20.1万)</span>
                 </div>
                 <div style="height: 6px; background: var(--glass-surface-subtle); border-radius: 3px; overflow: hidden;">
@@ -3909,7 +3909,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
       </div>
       <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px;">
         <button class="btn-liquid-outline" onclick="closePublishPolicyModal()" data-tooltip="取消发布"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>取消</button>
-        <button class="btn-liquid" onclick="submitPublishPolicy()" data-tooltip="发布至政策雷达库"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
+        <button class="btn-liquid" onclick="submitPublishPolicy()" data-tooltip="发布至政策中心库"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>确认发布</button>
       </div>
     </div>
   </div>
@@ -5359,7 +5359,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
           status: 'TAKEN_DOWN',
           title: '保证月入十万！加 V 信 138XXXX 一对一包过工商免征偷逃税，买发票冲抵进项全套服务...',
           violation_type: '涉税违法欺诈',
-          source: '政策雷达 · 评论',
+          source: '政策中心 · 评论',
           author: '财税黑中介 (usr_tax_fake_33)',
           reason: '虚假违规宣传与涉税违法黑产引流',
           reporter: '创客自律委员会',
@@ -5763,7 +5763,7 @@ async def execute(ctx: PipelineContext) -> PipelineContext:
         version: "v1.0.4",
         widgets: [
           { widget_type: "stat", title: "小微季度免征预估", grid_column: "span 6" },
-          { widget_type: "table", title: "最新政策雷达", grid_column: "span 6" }
+          { widget_type: "table", title: "最新政策中心", grid_column: "span 6" }
         ]
       };
 

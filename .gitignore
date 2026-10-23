@@ -35,6 +35,7 @@ dist/
 *.pid
 
 # Runtime Data Cache
-data/
-backend/data/
+/data/
+/backend/data/*
+!/backend/data/seeds/
 mock_server/storage/

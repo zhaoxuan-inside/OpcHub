@@ -50,6 +50,6 @@ OpcHub 的核心定位是“重后端、薄前端、API-First 多端适配”的
 
 ### 3. 决策结果与详细理由 (Decision & Rationale)
 经综合权衡，采纳 **方案 A (Python + FastAPI + Vue 3)**：
-1. **Python 生态对 AI 原生支持**：OpcHub 政策雷达严重依赖 AI 抓取、大白话提炼与清洗，FastAPI 异步架构能够与 Python 强大的数据/AI 库原生结合；
+1. **Python 生态对 AI 原生支持**：OpcHub 政策中心严重依赖 AI 抓取、大白话提炼与清洗，FastAPI 异步架构能够与 Python 强大的数据/AI 库原生结合；
 2. **极速 OpenAPI 契约**：FastAPI 原生生成 OpenAPI (Swagger) 文档，为薄前端（Vue 3）和未来全端（小程序/CLI/插件）提供精确的机器交互契约；
 3. **符合一人公司开发心智**：Vue 3 Composition API + Vite 启动与构建秒级完成，大幅降低前端维护开销。

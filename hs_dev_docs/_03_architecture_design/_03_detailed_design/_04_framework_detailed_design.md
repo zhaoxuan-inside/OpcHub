@@ -48,7 +48,7 @@ flowchart TD
     end
 
     subgraph L4["第四层：自治业务领域层 (Autonomous Domain Modules)"]
-        D1["policies: 政策雷达与小微免税测算"]
+        D1["policies: 政策中心与小微免税测算"]
         D2["sop: 合规流程与公文模板渲染存证"]
         D3["forum: 头脑风暴与物化路径嵌套问答"]
         D4["demands: 需求外包集市与法律求助竞标"]
