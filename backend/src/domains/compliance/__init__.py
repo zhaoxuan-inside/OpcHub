@@ -1,7 +1,8 @@
 """Compliance domain exports."""
 from src.domains.compliance.models import (
-    ComplianceDimension,
+    ComplianceLaw,
     ComplianceCase,
+    CompliancePublishRequest,
     AuditCheckItem,
     AuditEvaluateRequest,
     AuditReportResponse,
@@ -9,8 +10,9 @@ from src.domains.compliance.models import (
 from src.domains.compliance.service import compliance_service, ComplianceService
 
 __all__ = [
-    "ComplianceDimension",
+    "ComplianceLaw",
     "ComplianceCase",
+    "CompliancePublishRequest",
     "AuditCheckItem",
     "AuditEvaluateRequest",
     "AuditReportResponse",

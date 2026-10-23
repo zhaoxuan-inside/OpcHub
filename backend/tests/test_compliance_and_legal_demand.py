@@ -47,27 +47,29 @@ async def test_get_compliance_checkpoints():
 
 @pytest.mark.asyncio
 async def test_evaluate_compliance_audit_all_pass():
-    """Verify audit over empty checklist stays safe (no crash, score 0)."""
+    """Verify audit over the full seeded checklist yields a perfect score."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         chks_res = await _gw(client, "compliance.checkpoints", {})
         all_ids = [chk["id"] for chk in chks_res.json()["data"]]
+        assert all_ids, "Seeded compliance checkpoints must exist"
 
         audit_res = await _gw(client, "compliance.audit", {"passed_item_ids": all_ids, "strict_mode": False})
         assert audit_res.json()["code"] == 200
         report = audit_res.json()["data"]
-        assert report["score"] == 0
+        assert report["score"] == 100
         assert report["failed_items_count"] == 0
 
 
 @pytest.mark.asyncio
 async def test_evaluate_compliance_audit_critical_risks():
-    """Verify audit over empty checklist remains safe with no risk items."""
+    """Verify audit over an empty pass list flags every seeded checkpoint as a risk."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         audit_res = await _gw(client, "compliance.audit", {"passed_item_ids": [], "strict_mode": False})
         assert audit_res.json()["code"] == 200
         report = audit_res.json()["data"]
         assert report["score"] == 0
-        assert report["failed_items_count"] == 0
+        assert report["failed_items_count"] > 0
+        assert len(report["risk_items"]) == report["failed_items_count"]
 
 
 @pytest.mark.asyncio
