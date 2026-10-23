@@ -39,3 +39,6 @@ dist/
 /backend/data/*
 !/backend/data/seeds/
 mock_server/storage/
+
+# Local agent skill state
+hs-dev-skill/state/
