@@ -22,6 +22,10 @@ class ComplianceLaw(BaseModel):
     law_ref: str = ""  # 法条依据引用
     icon_name: str = ""
     hot_score: int = 0  # 热度分 (打榜/热门排序)
+    # Unified publish provenance (统一发布契约：作者由网关身份绑定，官方标签由角色决定)
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
 
 
 class ComplianceCase(BaseModel):
@@ -35,6 +39,9 @@ class ComplianceCase(BaseModel):
     lesson: str
     badge_color: str = "#5B6472"
     hot_score: int = 0  # 热度分 (打榜/热门排序)
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
 
 
 class CompliancePublishRequest(BaseModel):
@@ -58,6 +65,10 @@ class CompliancePublishRequest(BaseModel):
     lesson: str = ""
     badge: str = ""
     badge_color: str = "#5B6472"
+    # Unified publish provenance (由网关适配器按登录身份与角色绑定)
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
 
 
 class AuditCheckItem(BaseModel):

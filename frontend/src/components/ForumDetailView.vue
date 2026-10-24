@@ -113,6 +113,7 @@
       <article class="glass-box article-main-card">
         <!-- Post Title -->
         <h1 class="article-title">{{ post?.title }}</h1>
+        <OfficialBadge v-if="post?.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
 
         <!-- Author Information Bar -->
         <div class="article-author-bar">
@@ -150,6 +151,9 @@
           class="article-body-content markdown-rendered-content"
           v-html="renderedPostContent"
         ></div>
+
+        <!-- 展示页面免责声明 -->
+        <ContentDisclaimer type="forum" />
 
         <div class="article-divider"></div>
 
@@ -377,6 +381,8 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import { renderMarkdown } from '@/utils/markdown';
 
 const props = defineProps({
@@ -771,12 +777,40 @@ async function handleCopyLink() {
   }
 }
 
-function handleReport() {
-  emit('toast', {
-    title: '已提交合规复审',
-    message: '言论举报线索已同步推送至平台法务合规审计中心。',
-    type: 'INFO',
-  });
+// 举报进入平台审核队列（moderation.report），由运营复核后下架/恢复，
+// 与全站统一的 ContentInteractionBar 举报走同一条链路。
+async function handleReport() {
+  const post = props.post || {};
+  try {
+    const res = await dispatchGateway('moderation.report', {
+      target_type: 'FORUM_THREAD',
+      target_id: String(post.id || ''),
+      target_title: post.title || '',
+      snippet_content: post.title || '',
+      author_id: post.author_id || '',
+      author_name: post.author_name || '',
+      reason: '头脑风暴帖子被举报：疑似违规或内容失实',
+    });
+    if (res.ok && res.data) {
+      emit('toast', {
+        title: '已提交合规复审',
+        message: '举报已进入平台审核队列，运营复核后将作下架或恢复处理。',
+        type: 'INFO',
+      });
+    } else {
+      emit('toast', {
+        title: '举报未提交',
+        message: res.error || '请稍后重试。',
+        type: 'ERROR',
+      });
+    }
+  } catch (e) {
+    emit('toast', {
+      title: '举报异常',
+      message: '举报服务暂时不可用，请稍后重试。',
+      type: 'ERROR',
+    });
+  }
 }
 
 function toggleCommentUpvote(item) {

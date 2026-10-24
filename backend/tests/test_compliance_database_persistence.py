@@ -7,6 +7,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 
 from src.main import app
+from src.core.security import create_session_token
 from src.domains.compliance.service import (
     compliance_service,
     _load_compliance_seeds,
@@ -93,12 +94,24 @@ async def test_compliance_gateway_list_and_audit():
 
 @pytest.mark.asyncio
 async def test_compliance_publish_law_and_case_via_gateway():
-    """Verify logged-in maker can publish a law or case via compliance.publish."""
+    """Verify logged-in maker can publish a law or case via compliance.publish.
+
+    统一发布契约生效后 compliance.publish 要求登录（content:publish），
+    请求需携带创客会话 token。
+    """
+    maker_token = create_session_token({
+        "uid": "usr_compliance_writer",
+        "email": "compliance_writer@opchub.cn",
+        "nickname": "合规创客",
+        "role": "MAKER",
+        "must_change_password": False,
+    })
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         # 1. Publish a law
         law_resp = await ac.post("/api/welcom/opc_world", json={
             "scenario": "compliance.publish",
+            "token": maker_token,
             "payload": {
                 "kind": "law",
                 "title": "数据安全法 · 数据分类分级保护",
@@ -120,6 +133,7 @@ async def test_compliance_publish_law_and_case_via_gateway():
         # 2. Publish a case
         case_resp = await ac.post("/api/welcom/opc_world", json={
             "scenario": "compliance.publish",
+            "token": maker_token,
             "payload": {
                 "kind": "case",
                 "title": "某隐私采集违规 App 被责令下架整改",
@@ -139,6 +153,7 @@ async def test_compliance_publish_law_and_case_via_gateway():
         # 3. Invalid kind is rejected
         bad_resp = await ac.post("/api/welcom/opc_world", json={
             "scenario": "compliance.publish",
+            "token": maker_token,
             "payload": {"kind": "unknown", "title": "x"},
         })
         assert bad_resp.json()["code"] != 200

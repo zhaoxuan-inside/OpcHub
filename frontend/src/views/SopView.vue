@@ -31,33 +31,22 @@
     />
 
     <!-- Full-page flow builder (replaces the workspace, not a modal) -->
-    <div v-else-if="currentViewMode === 'flowbuilder'" class="sop-flow-builder-page">
-      <div class="glass-box sop-flow-builder-head">
-        <div class="sop-flow-builder-title-wrap">
-          <button class="btn-liquid-outline sop-flow-builder-back" @click="closeFlowBuilder" title="返回">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-            <span>返回</span>
-          </button>
-          <div>
-            <h2 class="sop-flow-builder-title">{{ editingFlowId ? '编辑流程' : '创建流程' }}</h2>
-            <p class="sop-flow-builder-sub">挑选文书节点组成你的专属办理流程，可随时回来继续</p>
-          </div>
-        </div>
-      </div>
-      <div class="glass-box sop-flow-builder-body">
-        <SopFlowBuilder
-          :goals="goals"
-          :nodes="nodes"
-          :initial="flowBuilderInitial"
-          :submitting="flowSubmitting"
-          @submit="submitFlow"
-          @cancel="closeFlowBuilder"
-        />
-      </div>
-    </div>
+    <CreatePageLayout
+      v-else-if="currentViewMode === 'flowbuilder'"
+      :title="editingFlowId ? '编辑流程' : '创建流程'"
+      back-label="流程文书"
+      @back="closeFlowBuilder"
+    >
+      <PublishNotice />
+      <SopFlowBuilder
+        :goals="goals"
+        :nodes="nodes"
+        :initial="flowBuilderInitial"
+        :submitting="flowSubmitting"
+        @submit="submitFlow"
+        @cancel="closeFlowBuilder"
+      />
+    </CreatePageLayout>
 
     <!-- Full-page private-document reader (replaces the workspace, not a modal) -->
     <SopMyDocPage
@@ -361,7 +350,7 @@
                 </div>
                 <h3 class="empty-title">没有匹配的文书</h3>
                 <p class="empty-desc">
-                  {{ myDocSearchQuery ? `没有找到与 “${myDocSearchQuery}” 匹配的文书。` : '你还没有生成过文书。点右侧「创建文书」，从标准文书中挑选模板并填写要素，保存后就会出现在这里。' }}
+                  {{ myDocSearchQuery ? `没有找到与 “${myDocSearchQuery}” 匹配的文书。` : '你还没有起草过文书。点右侧「起草新文书」，直接在编辑器里撰写，或选择模板后修改保存，就会出现在这里。' }}
                 </p>
                 <div class="empty-actions">
                   <button v-if="myDocSearchQuery" class="btn-liquid-outline" @click="handleMyDocClearSearch">清除搜索条件</button>
@@ -473,7 +462,7 @@
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                <span>发布新文档</span>
+                <span>起草新文书</span>
               </button>
               <div class="creator-quick-links">
                 <span class="quick-pill" @click="openDocByCategory('ENTITY')">主体登记</span>
@@ -627,7 +616,7 @@
                   <line x1="12" y1="5" x2="12" y2="19"></line>
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
-                <span>创建文书</span>
+                <span>起草新文书</span>
               </button>
               <div class="creator-quick-links">
                 <span class="quick-pill">{{ myDocuments.length }} 份私有文书</span>
@@ -770,6 +759,8 @@ import SopFlowBuilder from '@/components/sop/SopFlowBuilder.vue';
 import SopFlowCard from '@/components/sop/SopFlowCard.vue';
 import SopDocPage from '@/components/sop/SopDocPage.vue';
 import SopFlowPage from '@/components/sop/SopFlowPage.vue';
+import PublishNotice from '@/components/PublishNotice.vue';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import SopMyDocPage from '@/components/sop/SopMyDocPage.vue';
 import SopMyDocCard from '@/components/sop/SopMyDocCard.vue';
 import SopMyFlowCard from '@/components/sop/SopMyFlowCard.vue';

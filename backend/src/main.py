@@ -24,6 +24,7 @@ from src.core.audit import audit_service
 from src.core.security import verify_session_token
 from src.core.microkernel.registry import registry
 from src.domains.user.service import user_service
+from src.domains.notifications.service import notification_service  # noqa: F401  (register persistence hydrator)
 from src.domains.user.models import (
     UserRegisterRequest,
     UserLoginRequest,

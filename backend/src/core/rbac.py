@@ -1,6 +1,6 @@
 """RBAC + ABAC authorization model (opchub_rbac_auth_architecture.md §1.1 / §2).
 
-- RBAC: three-tier roles (ADMIN / USER / GUEST) mapped to the 14-permission matrix.
+- RBAC: three-tier roles (ADMIN / USER / GUEST) mapped to the unified permission matrix.
 - ABAC: resource-ownership (Owner Check) resolution for modify/delete scenarios.
 """
 from typing import Any, Dict, Optional
@@ -24,18 +24,27 @@ P_SCRIPT_UPLOAD = "script:upload_python"
 P_REVIEW_AUDIT = "review:audit_all"
 P_CONTENT_INTERACT = "content:interact"
 P_CONTENT_COMMENT = "content:comment"
+# Unified publish permission: every registered maker may publish content on all
+# UGC boards (policies / perks / compliance / products / demands / forum / SOP).
+# The platform only runs the sensitive-word gate; authenticity is governed by
+# community interaction (likes / dislikes / reports), and ADMIN-authored entries
+# are stamped is_official server-side.
+P_CONTENT_PUBLISH = "content:publish"
+# Message box: every registered user can read and manage their own receipts.
+P_NOTIFICATION_READ = "notification:read"
 
 ALL_PERMISSIONS = {
     P_READ_PUBLIC, P_CALC_EPHEMERAL, P_READ_DETAIL, P_SOP_SAVE, P_PERK_CLAIM,
     P_GALLERY_SUBMIT, P_GALLERY_UPVOTE, P_MARKET_DEMAND, P_MARKET_VENDOR,
     P_FORUM_POST, P_PAGE_ORCHESTRATE, P_SCHEMA_MANAGE, P_SCRIPT_UPLOAD, P_REVIEW_AUDIT,
-    P_CONTENT_INTERACT, P_CONTENT_COMMENT,
+    P_CONTENT_INTERACT, P_CONTENT_COMMENT, P_CONTENT_PUBLISH, P_NOTIFICATION_READ,
 }
 
 GUEST_PERMISSIONS = {P_READ_PUBLIC, P_CALC_EPHEMERAL}
 USER_PERMISSIONS = GUEST_PERMISSIONS | {
     P_READ_DETAIL, P_SOP_SAVE, P_PERK_CLAIM, P_GALLERY_SUBMIT, P_GALLERY_UPVOTE,
     P_MARKET_DEMAND, P_MARKET_VENDOR, P_FORUM_POST, P_CONTENT_INTERACT, P_CONTENT_COMMENT,
+    P_CONTENT_PUBLISH, P_NOTIFICATION_READ,
 }
 
 # Permissions blocked while a credential rotation is pending (first-login enforcement).

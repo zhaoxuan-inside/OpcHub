@@ -22,6 +22,10 @@ class PerkCreate(BaseModel):
     priority: int = Field(default=50, ge=0, le=100, description="置顶优先级，越大越靠前")
     status: str = Field(default="PUBLISHED", description="PUBLISHED / OFFLINE")
     highlights: List[str] = Field(default_factory=list, description="核心卖点短句列表")
+    # Unified publish provenance (统一发布契约：作者由网关身份绑定，官方标签由角色决定)
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
 
 
 class PerkResponse(BaseModel):
@@ -39,6 +43,9 @@ class PerkResponse(BaseModel):
     priority: int = 50
     status: str = "PUBLISHED"
     highlights: List[str] = []
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
     created_at: Optional[str] = None
     claim_count: int = 0
     like_count: int = 0

@@ -13,11 +13,13 @@
       :user-session="userSession"
       :current-role="currentRole"
       :is-dark="isDark"
+      :unread-count="unreadCount"
       @switch-tab="handleSwitchTab"
       @toggle-role="handleToggleRole"
       @toggle-theme="handleToggleTheme"
       @open-login="showLoginModal = true"
       @open-profile="handleSwitchTab('profile')"
+      @open-inbox="openInbox"
     />
 
     <!-- Main View Container -->
@@ -67,12 +69,15 @@
         />
         <PerksView
           v-else-if="activeTab === 'perks'"
+          :user-session="userSession"
           @open-register="showRegisterModal = true"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <ComplianceView
           v-else-if="activeTab === 'compliance'"
           @switch-tab="handleSwitchTab"
+          @open-login="showLoginModal = true"
           @toast="showToast"
         />
         <ProfileView
@@ -122,6 +127,15 @@
       :initial-tab="legalTab"
       @close="showLegalModal = false"
       @agree="onLegalAgreed"
+    />
+
+    <!-- 消息箱：发布敏感词校验结果通知 -->
+    <NotificationInbox
+      :visible="showInbox"
+      :user-session="userSession"
+      @close="showInbox = false"
+      @unread-change="unreadCount = $event"
+      @toast="showToast"
     />
 
     <!-- Liquid Specular Notice Capsule -->
@@ -174,11 +188,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import Navbar from '@/components/Navbar.vue';
 import RegisterModal from '@/components/RegisterModal.vue';
 import LoginModal from '@/components/LoginModal.vue';
 import LegalModal from '@/components/LegalModal.vue';
+import NotificationInbox from '@/components/NotificationInbox.vue';
 import HomeView from '@/views/HomeView.vue';
 import ForumView from '@/views/ForumView.vue';
 import ShowcaseView from '@/views/ShowcaseView.vue';
@@ -240,7 +255,48 @@ const showLoginModal = ref(false);
 const showLegalModal = ref(false);
 const legalTab = ref('terms');
 
+// 消息箱：发布敏感词校验结果的持久通知
+const showInbox = ref(false);
+const unreadCount = ref(0);
+let unreadTimer = null;
+
 const notice = activeNotice;
+
+async function refreshUnread(announceNew = false) {
+  if (!userSession.value) {
+    unreadCount.value = 0;
+    return;
+  }
+  const res = await dispatchGateway('notifications.unread_count', {}, { silent: true });
+  if (!res.ok) return;
+  const next = Number(res.data?.unread || 0);
+  if (announceNew && next > unreadCount.value) {
+    showToast({
+      title: '消息箱',
+      message: `收到 ${next - unreadCount.value} 条新的敏感词校验结果`,
+      type: 'INFO',
+    });
+  }
+  unreadCount.value = next;
+}
+
+function openInbox() {
+  showInbox.value = true;
+  refreshUnread(false);
+}
+
+watch(userSession, (session) => {
+  if (session) {
+    refreshUnread(false);
+  } else {
+    unreadCount.value = 0;
+    showInbox.value = false;
+  }
+});
+
+watch(activeTab, () => {
+  if (userSession.value) refreshUnread(true);
+});
 
 function handleSwitchTab(tab) {
   if (!userSession.value && tab !== 'home') {
@@ -496,10 +552,18 @@ onMounted(() => {
     window.location.hash = activeTab.value;
   }
   checkSession();
+  refreshUnread(false);
+  unreadTimer = setInterval(() => {
+    if (userSession.value) refreshUnread(true);
+  }, 60000);
 });
 
 onUnmounted(() => {
   window.removeEventListener('hashchange', onHashChange);
+  if (unreadTimer) {
+    clearInterval(unreadTimer);
+    unreadTimer = null;
+  }
 });
 </script>
 

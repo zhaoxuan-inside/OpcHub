@@ -103,6 +103,9 @@
             <span class="sop-doc-child-go">去填写 ›</span>
           </button>
         </div>
+
+        <!-- 展示页面免责声明 -->
+        <ContentDisclaimer type="sop" />
       </section>
     </div>
   </div>
@@ -111,6 +114,7 @@
 <script setup>
 import { computed } from 'vue';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 
 const props = defineProps({
   detail: { type: Object, default: null },

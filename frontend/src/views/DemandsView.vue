@@ -1,6 +1,28 @@
 <template>
   <div class="view-panel active demands-view-wrapper">
-    <div class="demands-main-content">
+    <!-- Full-page publishing surface -->
+    <CreatePageLayout
+      v-if="showPublishPage"
+      title="发布企业外包委托"
+      back-label="需求集市"
+      @back="closePublishPage"
+    >
+      <template #actions>
+        <button type="submit" form="demand-publish-form" class="btn-liquid" :disabled="submitting">
+          <span v-if="submitting">发布中…</span>
+          <span v-else>发布</span>
+        </button>
+      </template>
+
+      <PublishForm
+        id="demand-publish-form"
+        :model="publishForm"
+        :fields="DEMAND_FIELDS"
+        @submit="submitPublishDemand"
+      />
+    </CreatePageLayout>
+
+    <div v-else class="demands-main-content">
       <!-- Dual-column Layout identical to Product Showcase (产品橱窗) -->
       <div class="demands-feed-layout">
         <!-- Main Demand Stream (左侧商机流) -->
@@ -129,13 +151,14 @@
                       <span v-if="item.bidders_count" class="badge-semantic-score">
                         <OpcIcon name="users" :size="12" /> {{ item.bidders_count }} 人已竞标
                       </span>
+                      <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
                   </div>
                 </div>
 
                 <!-- Card Body: Description (hover reveals full) -->
                 <div class="card-body">
-                  <HoverRevealText :text="item.description" :lines="2" />
+                  <HoverRevealText :text="descriptionExcerpt(item)" :lines="2" />
                 </div>
 
                 <!-- Card Highlights / Quick Spec Chips -->
@@ -230,6 +253,7 @@
                     <span class="mono-tag version-pill" :class="getStatusClass(selectedDemand.status)">
                       {{ getStatusLabel(selectedDemand.status) }}
                     </span>
+                    <OfficialBadge :visible="selectedDemand.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                   </div>
                   <p class="detail-tagline">
                     {{ getCategoryLabel(selectedDemand.category) }} · 预算 ¥{{ formatBudget(selectedDemand.budget_cny) }} · {{ selectedDemand.bidders_count || 0 }} 人已竞标
@@ -279,7 +303,8 @@
               <div class="detail-body-scroll">
                 <div class="detail-section">
                   <h4 class="section-title">委托详情</h4>
-                  <p class="detail-full-description">{{ selectedDemand.description }}</p>
+                  <!-- 发布侧为富文本（Markdown），详情统一渲染后展示 -->
+                  <div class="detail-full-description markdown-rendered-content" v-html="renderedDemandDescription"></div>
                 </div>
 
                 <div class="detail-section">
@@ -311,6 +336,9 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- 展示页面免责声明 -->
+                <ContentDisclaimer type="demand" />
               </div>
             </div>
 
@@ -419,95 +447,14 @@
               <span class="link-span" @click="handleOpenPublish">发布委托</span>
             </div>
           </div>
+
+          <!-- 4. Disclaimer Card (免责声明) -->
+          <ContentDisclaimer type="demand" mode="card" />
         </aside>
       </div>
     </div>
 
 
-    <!-- Demand Publish Modal -->
-    <Teleport to="body">
-      <transition name="modal-fade">
-        <div v-if="showPublishModal" class="modal-backdrop" @click="closePublishModal">
-          <div class="modal-window glass-box publish-modal" @click.stop>
-            <div class="modal-header">
-              <div>
-                <h2 class="modal-title">发布企业外包委托</h2>
-                <p class="modal-subtitle">发布真实寻源需求至超级个体需求集市，资金由平台托管保障</p>
-              </div>
-              <button class="modal-close-btn" @click="closePublishModal"><OpcIcon name="close" :size="16" /></button>
-            </div>
-
-            <form class="publish-form" @submit.prevent="submitPublishDemand">
-              <div class="form-group">
-                <label class="form-label">委托标题 <span class="req">*</span></label>
-                <input
-                  v-model="publishForm.title"
-                  type="text"
-                  required
-                  class="glass-input"
-                  placeholder="如：外贸 CRM 系统的垂直行业 Agent 工作流搭建"
-                />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">详细需求说明 <span class="req">*</span></label>
-                <textarea
-                  v-model="publishForm.description"
-                  required
-                  rows="4"
-                  class="glass-input"
-                  placeholder="详细描述技术栈、交付物、验收标准与期望周期..."
-                ></textarea>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">商机类别</label>
-                  <select v-model="publishForm.category" class="glass-input glass-select">
-                    <option value="DEV">技术开发</option>
-                    <option value="AI">AI 智能体</option>
-                    <option value="TAX">财税合规</option>
-                    <option value="LEGAL">法律求助</option>
-                    <option value="BIZ">商业运营</option>
-                  </select>
-                </div>
-
-                <div class="form-group flex-1">
-                  <label class="form-label">托管预算 (¥)</label>
-                  <input
-                    v-model.number="publishForm.budget_cny"
-                    type="number"
-                    min="0"
-                    step="100"
-                    class="glass-input"
-                    placeholder="35000"
-                  />
-                </div>
-
-                <div class="form-group flex-1">
-                  <label class="form-label">交付周期 (天)</label>
-                  <input
-                    v-model.number="publishForm.deadline_days"
-                    type="number"
-                    min="1"
-                    max="365"
-                    class="glass-input"
-                    placeholder="14"
-                  />
-                </div>
-              </div>
-
-              <div class="modal-footer-actions">
-                <button type="button" class="btn-liquid-outline submit-btn" @click="closePublishModal">取消</button>
-                <button type="submit" class="btn-liquid submit-btn" :disabled="submitting">
-                  {{ submitting ? '发布中...' : '确认发布委托' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
 
     <!-- Bid Submission Modal -->
     <Teleport to="body">
@@ -581,8 +528,14 @@
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import PublishForm from '@/components/PublishForm.vue';
+import { DEMAND_FIELDS } from '@/config/publishForms';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
 const emit = defineEmits(['open-register', 'open-login', 'toast']);
 
@@ -616,7 +569,16 @@ const isSearchActive = ref(false);
 const activeSearchQuery = ref('');
 const currentCategory = ref('ALL');
 const selectedDemand = ref(null);
-const showPublishModal = ref(false);
+
+// 详情正文渲染：发布侧为富文本（Markdown）；卡片预览退回纯文本
+const renderedDemandDescription = computed(() =>
+  selectedDemand.value ? renderMarkdown(selectedDemand.value.description || '') : ''
+);
+
+function descriptionExcerpt(item) {
+  return stripMarkdown(item?.description || '');
+}
+const showPublishPage = ref(false);
 const bidTarget = ref(null);
 const sentinelRef = ref(null);
 const demandsScrollContainerRef = ref(null);
@@ -1041,11 +1003,12 @@ function handleOpenPublish() {
     emit('open-login');
     return;
   }
-  showPublishModal.value = true;
+  showPublishPage.value = true;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function closePublishModal() {
-  showPublishModal.value = false;
+function closePublishPage() {
+  showPublishPage.value = false;
 }
 
 async function submitPublishDemand() {
@@ -1073,7 +1036,7 @@ async function submitPublishDemand() {
         message: `企业委托《${payload.title}》已成功收录入库并向超级个体公开！`,
         type: 'SUCCESS',
       });
-      closePublishModal();
+      closePublishPage();
       publishForm.title = '';
       publishForm.description = '';
       publishForm.budget_cny = 0;
@@ -2214,11 +2177,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.publish-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 
 .form-row {
   display: flex;

@@ -208,7 +208,7 @@ class AtomicRegistry:
         # Policy Publishing Operators
         async def validate_publish_policy(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发布政策合法性并做公文文本合规审查"""
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             t, s, l = inputs.get("title", "").strip(), inputs.get("summary", "").strip(), inputs.get("legal_basis", "").strip()
             if len(t) < 2:
                 raise ValueError("Policy title must be at least 2 characters long")
@@ -216,7 +216,17 @@ class AtomicRegistry:
                 raise ValueError("Policy summary must be at least 5 characters long")
             if not l:
                 raise ValueError("legal_basis is required for government policy")
-            await prescreen_and_scan(f"{t} {s} {l}", field_name="policy publish")
+            conditions = inputs.get("eligible_conditions", []) or []
+            if isinstance(conditions, list):
+                conditions = " ".join(str(c) for c in conditions)
+            await prescreen_and_record(
+                f"{t} {s} {l} {conditions}",
+                field_name="policy publish",
+                user_id=(context or {}).get("user_id", ""),
+                scene="政策中心",
+                title=t,
+                target_type="POLICY",
+            )
             return {
                 "guard_passed": True, "title": t, "summary": s, "legal_basis": l,
                 "policy_level": inputs.get("policy_level", "国家级"), "category": inputs.get("category", "TAX"),
@@ -237,6 +247,9 @@ class AtomicRegistry:
                 summary=inputs.get("summary", ""),
                 eligible_conditions=inputs.get("eligible_conditions", []),
                 legal_basis=inputs.get("legal_basis", ""),
+                author_id=inputs.get("author_id", ""),
+                author_name=inputs.get("author_name"),
+                is_official=bool(inputs.get("is_official", False)),
             )
             created = policy_service.create_policy(payload)
             return {
@@ -270,10 +283,17 @@ class AtomicRegistry:
             仅对「不确定」的内容再外呼内容审核服务兜底裁决。
             """
             from src.domains.sop.service import sop_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = sop_service.validate_render_payload(inputs)
             full_text = " ".join(str(v) for v in res["form_data"].values())
-            audit = await prescreen_and_scan(full_text, field_name="SOP document form data")
+            audit = await prescreen_and_record(
+                full_text,
+                field_name="SOP document form data",
+                user_id=(context or {}).get("user_id") or res.get("user_id", ""),
+                scene="流程文书",
+                title=res.get("template_name") or "标准文书",
+                target_type="SOP_DOCUMENT",
+            )
             res["moderation"] = {
                 "verdict": audit["verdict"],
                 "external_scan_used": audit["external_scan_used"],
@@ -407,17 +427,14 @@ class AtomicRegistry:
 
         # Domain 4: Moderation Domain (内容安全审查、全网下架与误判恢复微内核算子与 Saga 补偿)
         async def moderation_inspect_content(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-            from src.infrastructure.external_gateway.content_moderation_gateway import content_moderation_gateway
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
             content = inputs.get("content", "")
-            scan_res = await content_moderation_gateway.scan_text(content)
-            if not scan_res["passed"]:
-                hit_words = scan_res["hit_words"]
-                raise ValueError(f"Content moderation violation: found prohibited keywords {hit_words}")
+            await prescreen_and_scan(content, field_name="moderation inspect")
             return {
                 "moderation_inspected": True,
                 "passed": True,
                 "flagged_keywords": [],
-                "filtered_content": scan_res.get("filtered_content", content),
+                "filtered_content": content,
             }
         self.register("moderation.inspect_content", moderation_inspect_content, domain="moderation", description="UGC文本敏感词审查与违规处置算子")
 
@@ -635,8 +652,15 @@ class AtomicRegistry:
                 raise ValueError("Forum thread content must be at least 10 characters long")
             
             # Content moderation check via external HTTP moderation gateway
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
-            await prescreen_and_scan(f"{title} {content}", field_name="forum thread")
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+            await prescreen_and_record(
+                f"{title} {content}",
+                field_name="forum thread",
+                user_id=(context or {}).get("user_id", ""),
+                scene="头脑风暴",
+                title=title,
+                target_type="FORUM_THREAD",
+            )
             
             return {
                 "guard_passed": True,
@@ -656,6 +680,7 @@ class AtomicRegistry:
                 category_code=inputs.get("category_code", "GENERAL"),
                 author_id=author_id,
                 author_name=author_name,
+                is_official=bool(inputs.get("is_official", False)),
                 title=inputs.get("title", ""),
                 content=inputs.get("content", ""),
             )
@@ -685,9 +710,17 @@ class AtomicRegistry:
         async def validate_create_comment(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发评论参数合法性并进行文本合规审查"""
             from src.domains.forum.service import forum_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = forum_service.validate_create_comment_payload(inputs)
-            await prescreen_and_scan(res["content"], field_name="forum comment")
+            await prescreen_and_record(
+                res["content"],
+                field_name="forum comment",
+                user_id=(context or {}).get("user_id", ""),
+                scene="头脑风暴评论",
+                title="评论",
+                target_type="FORUM_COMMENT",
+                target_id=str(inputs.get("thread_id") or ""),
+            )
             return res
         self.register("forum.comment.validate_guard", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
         self.register("validate_create_comment", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
@@ -875,9 +908,16 @@ class AtomicRegistry:
         async def validate_publish_product(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验独立商用作品发布入参合法性并做文本合规审查"""
             from src.domains.products.service import product_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = product_service.validate_publish_payload(inputs)
-            await prescreen_and_scan(f"{res['title']} {res['tagline']} {res['description']}", field_name="product showcase")
+            await prescreen_and_record(
+                f"{res['title']} {res['tagline']} {res['description']}",
+                field_name="product showcase",
+                user_id=(context or {}).get("user_id", ""),
+                scene="产品橱窗",
+                title=res["title"],
+                target_type="PRODUCT",
+            )
             return res
         self.register("product.validate_guard", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
         self.register("validate_publish_product", validate_publish_product, domain="product", description="产品橱窗作品发布准入校验与合规审查门禁")
@@ -900,6 +940,7 @@ class AtomicRegistry:
                 download_url=inputs.get("download_url"),
                 demo_url=inputs.get("demo_url", ""),
                 screenshots=inputs.get("screenshots", []),
+                is_official=bool(inputs.get("is_official", False)),
             )
             created = product_service.create_product(payload)
             return {
@@ -941,9 +982,16 @@ class AtomicRegistry:
         async def validate_publish_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发布需求入参合法性并进行敏感词风控审查"""
             from src.domains.demands.service import demand_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = demand_service.validate_publish_payload(inputs)
-            await prescreen_and_scan(f"{res['title']} {res['description']}", field_name="demand publish")
+            await prescreen_and_record(
+                f"{res['title']} {res['description']}",
+                field_name="demand publish",
+                user_id=(context or {}).get("user_id", ""),
+                scene="需求集市",
+                title=res["title"],
+                target_type="DEMAND",
+            )
             return res
         self.register("demand.publish.guard", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
         self.register("validate_publish_demand", validate_publish_demand, domain="demands", description="需求集市外包寻源委托发布准入校验与合规审查门禁")
@@ -959,6 +1007,7 @@ class AtomicRegistry:
                 deadline_days=int(inputs.get("deadline_days", 14)),
                 creator_id=inputs.get("creator_id", ""),
                 creator_name=inputs.get("creator_name", ""),
+                is_official=bool(inputs.get("is_official", False)),
             )
             created = demand_service.create_demand(payload)
             return {
@@ -986,9 +1035,17 @@ class AtomicRegistry:
         async def validate_bid_demand(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验创客竞标方案合法性并审查提案内容安全"""
             from src.domains.demands.service import demand_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = demand_service.validate_bid_payload(inputs)
-            await prescreen_and_scan(res["proposal_text"], field_name="demand bid proposal")
+            await prescreen_and_record(
+                res["proposal_text"],
+                field_name="demand bid proposal",
+                user_id=(context or {}).get("user_id", ""),
+                scene="需求集市竞标",
+                title="竞标方案",
+                target_type="DEMAND",
+                target_id=str(inputs.get("demand_id") or ""),
+            )
             return res
         self.register("demand.bid.guard", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
         self.register("validate_bid_demand", validate_bid_demand, domain="demands", description="需求集市创客竞标方案准入审查门禁")
@@ -1097,9 +1154,17 @@ class AtomicRegistry:
         async def validate_publish_perk(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验生态特权福利上线合法性并进行文本合规审查"""
             from src.domains.perks.service import perk_service
-            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_scan
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
             res = perk_service.validate_publish_payload(inputs)
-            await prescreen_and_scan(f"{res['name']} {res['provider']} {res['summary']}", field_name="perk publish")
+            highlights = " ".join(str(h) for h in (res.get("highlights") or []))
+            await prescreen_and_record(
+                f"{res['name']} {res['provider']} {res['summary']} {highlights}",
+                field_name="perk publish",
+                user_id=(context or {}).get("user_id", ""),
+                scene="生态特权",
+                title=res["name"],
+                target_type="PERK",
+            )
             return res
         self.register("perk.publish.guard", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
         self.register("validate_publish_perk", validate_publish_perk, domain="perks", description="生态特权提报上线准入与风控审查门禁")
@@ -1121,6 +1186,9 @@ class AtomicRegistry:
                 priority=int(inputs.get("priority", settings.perk_default_priority)),
                 status=inputs.get("status", settings.perk_default_status),
                 highlights=inputs.get("highlights", []) or [],
+                author_id=inputs.get("author_id", ""),
+                author_name=inputs.get("author_name"),
+                is_official=bool(inputs.get("is_official", False)),
             )
             created = perk_service.create_perk(payload)
             return {
@@ -1501,6 +1569,484 @@ class AtomicRegistry:
                 "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
             }
         self.register("orchestration.operators.collect", orchestration_operators_collect, domain="orchestration", description="全域微内核原子算子清单聚合算子")
+
+        # ==================================================================
+        # Domain 13: Unified Content Publication (统一创建发布算子)
+        #
+        # All UGC publish pipelines share one entry guard (`identity_guard`)
+        # that binds the authenticated caller and decides the official tag
+        # server-side, followed by a domain guard (validation + two-tier
+        # sensitive-word gate), a persist operator with Saga compensation, and
+        # a telemetry operator. No adapter binds identity or calls a domain
+        # service directly anymore.
+        # ==================================================================
+
+        async def content_publish_identity_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：绑定登录身份并判定官方标签（统一发布契约）。
+
+            * 普通创客永远只能以本人身份发布，payload 中的 author 字段被忽略；
+            * ADMIN 可代发并归属原作者，官方标签仍由 ADMIN 角色决定；
+            * 直接调用 DAG（无网关注入 context）时保留既有 payload 身份，
+              以兼容编排层内部调用与测试。
+            """
+            from src.core.security import verify_session_token
+            from src.domains.user.service import user_service
+
+            ctx = context or {}
+            role = str(ctx.get("user_role") or "").upper()
+            caller_id = str(ctx.get("user_id") or "")
+            author_key = str(inputs.get("_author_key") or "author_id")
+            name_key = str(inputs.get("_author_name_key") or "author_name")
+            payload_author = str(inputs.get(author_key) or "")
+
+            attributed_to_other = bool(role == "ADMIN" and payload_author)
+            author_id = payload_author if attributed_to_other else (caller_id or payload_author)
+
+            display = ctx.get("nickname") or ctx.get("username")
+            if not display:
+                token_payload = verify_session_token(ctx.get("token") or "") or {}
+                display = token_payload.get("nickname") or token_payload.get("email")
+
+            if attributed_to_other:
+                display_name = inputs.get(name_key)
+                if not display_name and author_id:
+                    try:
+                        profile = user_service.get_profile(uid=author_id)
+                        display_name = getattr(profile, "nickname", None)
+                    except Exception:
+                        display_name = None
+                display_name = display_name or display or "创客"
+            else:
+                display_name = display or inputs.get(name_key) or "创客"
+
+            if ctx.get("user_id"):
+                is_official = role == "ADMIN"
+            else:
+                # Internal DAG invocation: keep the caller-provided provenance.
+                is_official = bool(inputs.get("is_official", False))
+
+            return {
+                "identity_bound": True,
+                author_key: author_id,
+                name_key: display_name,
+                "is_official": is_official,
+            }
+
+        self.register(
+            "content.publish.identity_guard",
+            content_publish_identity_guard,
+            domain="content",
+            description="统一发布身份绑定与官方标签判定算子（服务端角色裁决，客户端字段不可伪造）",
+        )
+
+        async def content_publish_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            if inputs.get("simulate_downstream_failure", False):
+                raise RuntimeError("Simulated downstream telemetry failure in content publish pipeline")
+            return {
+                "telemetry_recorded": True,
+                "metric": inputs.get("_publish_metric") or "content.published",
+                "target_id": inputs.get("compliance_id") or inputs.get("report_id")
+                or inputs.get("doc_id") or inputs.get("comment_id") or "unknown",
+                "increment": 1,
+            }
+
+        self.register(
+            "content.publish.telemetry.incr",
+            content_publish_telemetry_incr,
+            domain="content",
+            description="统一发布度量打点算子",
+        )
+
+        # ---- Compliance publish (法条 / 避坑案例) ----
+        async def compliance_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """原子算子：校验法条/案例发布参数并执行两级敏感词门禁。"""
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+
+            kind = str(inputs.get("kind") or "").strip().lower()
+            if kind not in ("law", "case"):
+                raise ValueError(f"Unsupported compliance publish kind: {inputs.get('kind')}")
+            title = str(inputs.get("title") or "").strip()
+            if len(title) < 2:
+                raise ValueError("Compliance entry title must be at least 2 characters long")
+
+            texts = [
+                str(inputs.get(k, "") or "")
+                for k in ("title", "summary", "content", "violation", "consequence", "lesson", "penalties")
+            ]
+            penalties = inputs.get("penalties")
+            if isinstance(penalties, (list, tuple)):
+                texts.append(" ".join(str(p) for p in penalties))
+            await prescreen_and_record(
+                " ".join(t for t in texts if t.strip()),
+                field_name="compliance publish",
+                user_id=(context or {}).get("user_id", ""),
+                scene="合规指南",
+                title=title,
+                target_type="COMPLIANCE",
+            )
+            return {"guard_passed": True, "kind": kind, "title": title, "_compliance_kind": kind}
+
+        self.register(
+            "compliance.publish.guard",
+            compliance_publish_guard,
+            domain="compliance",
+            description="合规法条/避坑案例发布校验与两级敏感词门禁算子",
+        )
+
+        async def compliance_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.compliance.service import compliance_service
+
+            payload = {k: v for k, v in inputs.items() if not k.startswith("_") and k != "guard_passed"}
+            created = compliance_service.publish_entry(payload)
+            kind = str(inputs.get("_compliance_kind") or inputs.get("kind") or "")
+            return {
+                "created_entry": created,
+                "compliance_id": created.get("id"),
+                "compliance_kind": kind,
+                "orchestrated_by": "OPC_COMPLIANCE_PUBLISH_PIPELINE",
+            }
+
+        async def compliance_publish_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.compliance.service import compliance_service
+
+            kind = inputs.get("compliance_kind") or inputs.get("_compliance_kind") or inputs.get("kind")
+            entity_id = inputs.get("compliance_id") or (inputs.get("created_entry") or {}).get("id")
+            deleted = compliance_service.delete_entry(str(kind or ""), str(entity_id or ""))
+            return {"compensated": deleted, "action": "ROLLED_BACK", "entity_id": entity_id}
+
+        self.register(
+            "compliance.publish.persist",
+            compliance_publish_persist,
+            domain="compliance",
+            description="合规法条/避坑案例持久化存储算子",
+            compensator=compliance_publish_compensate,
+        )
+
+        # ---- User report (用户举报) ----
+        async def moderation_report_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.models import REPORTABLE_TARGET_TYPES
+
+            target_type = str(inputs.get("target_type") or "").strip().upper()
+            target_id = str(inputs.get("target_id") or "").strip()
+            if target_type not in REPORTABLE_TARGET_TYPES:
+                raise ValueError(f"Unsupported report target_type: {inputs.get('target_type')}")
+            if not target_id:
+                raise ValueError("target_id is required for a report")
+            reporter_id = str((context or {}).get("user_id") or inputs.get("reporter_id") or "")
+            return {
+                "guard_passed": True,
+                "target_type": target_type,
+                "target_id": target_id,
+                "reporter_id": reporter_id,
+            }
+
+        self.register(
+            "moderation.report.guard",
+            moderation_report_guard,
+            domain="moderation",
+            description="用户举报目标校验与举报人身份绑定算子",
+        )
+
+        async def moderation_report_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.models import ContentReportRequest
+            from src.domains.moderation.service import moderation_service
+
+            previous_count = next(
+                (it.report_count for it in moderation_service._items.values()
+                 if it.target_type == inputs.get("target_type")
+                 and it.target_id == inputs.get("target_id")
+                 and it.status == "FLAGGED"),
+                0,
+            )
+            payload = {k: v for k, v in inputs.items() if not k.startswith("_") and k != "guard_passed"}
+            item = moderation_service.report(ContentReportRequest(**payload))
+            return {
+                "created_report": item.model_dump(),
+                "report_id": item.id,
+                "report_previous_count": previous_count,
+                "status": item.status,
+                "orchestrated_by": "OPC_MODERATION_REPORT_PIPELINE",
+            }
+
+        async def moderation_report_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.moderation.service import moderation_service
+
+            report_id = inputs.get("report_id") or (inputs.get("created_report") or {}).get("id")
+            reverted = moderation_service.revert_report(
+                str(report_id or ""), int(inputs.get("report_previous_count") or 0)
+            )
+            return {"compensated": reverted, "action": "ROLLED_BACK", "report_id": report_id}
+
+        self.register(
+            "moderation.report.persist",
+            moderation_report_persist,
+            domain="moderation",
+            description="用户举报去重合并与审核队列持久化算子",
+            compensator=moderation_report_compensate,
+        )
+
+        # ---- SOP free-form document draft (起草新文书) ----
+        async def sop_document_draft_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            content = str(inputs.get("content") or "").strip()
+            if not content:
+                raise ValueError("文书正文不能为空，请先撰写内容")
+            doc_id = str(inputs.get("doc_id") or "").strip()
+            snapshot = None
+            if doc_id:
+                try:
+                    snapshot = sop_service.snapshot_draft(doc_id)
+                except KeyError:
+                    raise ValueError(f"SOP document {doc_id} not found")
+            return {
+                "guard_passed": True,
+                "doc_id": doc_id or None,
+                "_draft_existing": bool(doc_id),
+                "_draft_snapshot": snapshot,
+            }
+
+        self.register(
+            "sop.document.draft.guard",
+            sop_document_draft_guard,
+            domain="sop",
+            description="文书草稿正文校验与修改前快照算子",
+        )
+
+        async def sop_document_draft_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.models import SOPDocumentDraftCreate
+            from src.domains.sop.service import sop_service
+
+            payload = {k: v for k, v in inputs.items() if not k.startswith("_") and k != "guard_passed"}
+            doc = sop_service.save_draft_document(SOPDocumentDraftCreate(**payload))
+            return {
+                "created_doc": doc.model_dump(),
+                "doc_id": doc.id,
+                "sop_document_id": doc.id,
+                "orchestrated_by": "OPC_SOP_DOCUMENT_DRAFT_PIPELINE",
+            }
+
+        async def sop_document_draft_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            doc_id = inputs.get("doc_id") or (inputs.get("created_doc") or {}).get("id")
+            if inputs.get("_draft_existing"):
+                restored = sop_service.restore_draft_snapshot(str(doc_id or ""), inputs.get("_draft_snapshot") or {})
+                return {"compensated": restored, "action": "ROLLED_BACK", "mode": "RESTORED"}
+            deleted = sop_service.delete_document(str(doc_id or ""))
+            return {"compensated": deleted, "action": "ROLLED_BACK", "mode": "DELETED"}
+
+        self.register(
+            "sop.document.draft.persist",
+            sop_document_draft_persist,
+            domain="sop",
+            description="自由编辑文书草稿持久化算子",
+            compensator=sop_document_draft_compensate,
+        )
+
+        # ---- SOP document / flow publish review submission ----
+        async def sop_document_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            doc_id = str(inputs.get("doc_id") or "").strip()
+            if not doc_id:
+                raise ValueError("doc_id is required for SOP document publish review")
+            try:
+                sop_service.get_document(doc_id)
+            except KeyError:
+                raise ValueError(f"SOP document {doc_id} not found")
+            user_id = str(inputs.get("user_id") or (context or {}).get("user_id") or "")
+            return {
+                "guard_passed": True,
+                "doc_id": doc_id,
+                "user_id": user_id,
+                "is_official": bool(inputs.get("is_official", False)),
+                "_review_target_type": "SOP_DOCUMENT",
+            }
+
+        self.register(
+            "sop.document.publish.guard",
+            sop_document_publish_guard,
+            domain="sop",
+            description="文书发布审核提交校验算子",
+        )
+
+        async def sop_document_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            res = sop_service.submit_document_for_review(
+                str(inputs.get("doc_id")),
+                str(inputs.get("user_id") or ""),
+                is_official=bool(inputs.get("is_official", False)),
+            )
+            data = res.model_dump()
+            return {
+                "review_submission": data,
+                "review_item_id": data["item_id"],
+                "target_type": data["target_type"],
+                "target_id": data["target_id"],
+                "status": data["status"],
+            }
+
+        async def sop_document_publish_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            item_id = inputs.get("review_item_id") or (inputs.get("review_submission") or {}).get("item_id")
+            withdrawn = sop_service.withdraw_review_submission(str(item_id or ""))
+            return {"compensated": withdrawn, "action": "ROLLED_BACK", "review_item_id": item_id}
+
+        self.register(
+            "sop.document.publish.persist",
+            sop_document_publish_persist,
+            domain="sop",
+            description="文书发布审核入队持久化算子",
+            compensator=sop_document_publish_compensate,
+        )
+
+        async def sop_flow_publish_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            flow_id = str(inputs.get("flow_id") or "").strip()
+            if not flow_id:
+                raise ValueError("flow_id is required for SOP flow publish review")
+            try:
+                sop_service.get_flow(flow_id)
+            except KeyError:
+                raise ValueError(f"SOP flow {flow_id} not found")
+            user_id = str(inputs.get("user_id") or (context or {}).get("user_id") or "")
+            return {
+                "guard_passed": True,
+                "flow_id": flow_id,
+                "user_id": user_id,
+                "is_official": bool(inputs.get("is_official", False)),
+                "_review_target_type": "SOP_FLOW",
+            }
+
+        self.register(
+            "sop.flow.publish.guard",
+            sop_flow_publish_guard,
+            domain="sop",
+            description="流程发布审核提交校验算子",
+        )
+
+        async def sop_flow_publish_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            res = sop_service.submit_flow_for_review(
+                str(inputs.get("flow_id")),
+                str(inputs.get("user_id") or ""),
+                is_official=bool(inputs.get("is_official", False)),
+            )
+            data = res.model_dump()
+            return {
+                "review_submission": data,
+                "review_item_id": data["item_id"],
+                "target_type": data["target_type"],
+                "target_id": data["target_id"],
+                "status": data["status"],
+            }
+
+        async def sop_flow_publish_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.sop.service import sop_service
+
+            item_id = inputs.get("review_item_id") or (inputs.get("review_submission") or {}).get("item_id")
+            withdrawn = sop_service.withdraw_review_submission(str(item_id or ""))
+            return {"compensated": withdrawn, "action": "ROLLED_BACK", "review_item_id": item_id}
+
+        self.register(
+            "sop.flow.publish.persist",
+            sop_flow_publish_persist,
+            domain="sop",
+            description="流程发布审核入队持久化算子",
+            compensator=sop_flow_publish_compensate,
+        )
+
+        # ---- Unified content comment (统一评论) ----
+        async def content_comment_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.core.security import verify_session_token
+            from src.domains.interactions.models import TARGET_TYPES
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+
+            ctx = context or {}
+            user_id = str(ctx.get("user_id") or inputs.get("user_id") or "")
+            if not user_id:
+                raise PermissionError("请先登录创客账号后再发表评论")
+            target_type = str(inputs.get("target_type") or "").strip().upper()
+            target_id = str(inputs.get("target_id") or "").strip()
+            if target_type not in TARGET_TYPES:
+                raise ValueError(f"Unsupported comment target_type: {inputs.get('target_type')}")
+            if not target_id:
+                raise ValueError("target_id is required for a comment")
+            content = str(inputs.get("content") or "").strip()
+            if not content:
+                raise ValueError("评论内容不能为空")
+
+            await prescreen_and_record(
+                content,
+                field_name="content comment",
+                user_id=user_id,
+                scene="内容评论",
+                title="评论",
+                target_type=target_type,
+                target_id=target_id,
+            )
+
+            author_name = inputs.get("author_name")
+            if not author_name:
+                token_payload = verify_session_token(ctx.get("token") or "") or {}
+                author_name = token_payload.get("nickname") or token_payload.get("email")
+            return {
+                "guard_passed": True,
+                "user_id": user_id,
+                "target_type": target_type,
+                "target_id": target_id,
+                "content": content,
+                "author_name": author_name or "创客",
+            }
+
+        self.register(
+            "content.comment.guard",
+            content_comment_guard,
+            domain="content",
+            description="统一评论登录校验、目标校验与两级敏感词门禁算子",
+        )
+
+        async def content_comment_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.interactions.service import content_interaction_service
+
+            comment = content_interaction_service.create_comment(
+                user_id=str(inputs.get("user_id") or ""),
+                target_type=str(inputs.get("target_type") or ""),
+                target_id=str(inputs.get("target_id") or ""),
+                content=str(inputs.get("content") or ""),
+                author_name=inputs.get("author_name"),
+                parent_id=inputs.get("parent_id"),
+            )
+            return {
+                "created_comment": comment.model_dump(),
+                "comment_id": comment.id,
+                "orchestrated_by": "OPC_CONTENT_COMMENT_PUBLISH_PIPELINE",
+            }
+
+        async def content_comment_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.interactions.service import content_interaction_service
+
+            comment_id = inputs.get("comment_id") or (inputs.get("created_comment") or {}).get("id")
+            try:
+                deleted = content_interaction_service.delete_comment(
+                    str(inputs.get("user_id") or ""), str(comment_id or ""), is_admin=True
+                )
+            except Exception:
+                deleted = False
+            return {"compensated": deleted, "action": "ROLLED_BACK", "comment_id": comment_id}
+
+        self.register(
+            "content.comment.persist",
+            content_comment_persist,
+            domain="content",
+            description="统一评论持久化算子",
+            compensator=content_comment_compensate,
+        )
 
 
 registry = AtomicRegistry()

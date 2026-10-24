@@ -86,6 +86,7 @@ class ProductService:
             id=pid,
             author_id=payload.author_id or "usr_maker_anonymous",
             author_name=payload.author_name or "@创客",
+            is_official=payload.is_official,
             title=payload.title,
             tagline=payload.tagline,
             description=payload.description,

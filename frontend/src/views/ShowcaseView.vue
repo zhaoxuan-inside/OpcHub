@@ -1,12 +1,34 @@
 <template>
   <div class="view-panel active showcase-view-wrapper">
-    <div class="showcase-main-content">
+    <!-- Full-page publishing surface -->
+    <CreatePageLayout
+      v-if="showPublishPage"
+      title="发布创客独立作品"
+      back-label="产品橱窗"
+      @back="closePublishPage"
+    >
+      <template #actions>
+        <button type="submit" form="product-publish-form" class="btn-liquid" :disabled="submitting">
+          <span v-if="submitting">发布中…</span>
+          <span v-else>发布</span>
+        </button>
+      </template>
+
+      <PublishForm
+        id="product-publish-form"
+        :model="publishForm"
+        :fields="PRODUCT_FIELDS"
+        @submit="submitPublishProduct"
+      />
+    </CreatePageLayout>
+
+    <div v-else class="showcase-main-content">
       <!-- Dual-column Layout identical to Brainstorm (头脑风暴) -->
       <div class="showcase-feed-layout">
         <!-- Main Product Stream (左侧产品流) -->
         <section class="showcase-feed-stream">
           <!-- Category Filter Bar (产品分区选项卡 + 搜索 + 排序选择) -->
-          <div class="glass-box feed-filter-bar">
+          <div class="glass-box feed-filter-bar showcase-top-bar">
             <div class="category-tabs-scroll">
               <button
                 v-for="cat in categoryList"
@@ -109,8 +131,11 @@
                 <!-- Card Top: Icon & Basic Info -->
                 <div class="card-header-row">
                   <div class="app-icon-wrapper opc-card-icon">
+                    <span v-if="builtinIconOf(item)" class="app-icon-fallback app-icon-builtin" :style="getIconFallbackStyle(item)">
+                      <OpcIcon :name="builtinIconOf(item)" :size="26" />
+                    </span>
                     <img
-                      v-if="item.icon_url"
+                      v-else-if="item.icon_url"
                       :src="item.icon_url"
                       :alt="item.title"
                       class="app-icon-img"
@@ -130,13 +155,14 @@
                       <span class="badge-pricing" :class="getPricingClass(item.pricing_model)">
                         {{ formatPricing(item.pricing_model, item.price_cny) }}
                       </span>
+                      <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
                   </div>
                 </div>
 
                 <!-- Card Body: Tagline (concise core summary, hover reveals full) -->
                 <div class="card-body">
-                  <HoverRevealText :text="item.tagline || item.description" :lines="2" />
+                  <HoverRevealText :text="item.tagline || descriptionExcerpt(item)" :lines="2" />
                 </div>
 
                 <!-- Card Footer: Author -->
@@ -196,8 +222,11 @@
 
               <div class="detail-header">
                 <div class="detail-icon-wrap">
+                  <span v-if="builtinIconOf(selectedProduct)" class="app-icon-fallback app-icon-builtin detail-icon-builtin" :style="getIconFallbackStyle(selectedProduct)">
+                    <OpcIcon :name="builtinIconOf(selectedProduct)" :size="40" />
+                  </span>
                   <img
-                    v-if="selectedProduct.icon_url"
+                    v-else-if="selectedProduct.icon_url"
                     :src="selectedProduct.icon_url"
                     :alt="selectedProduct.title"
                     class="detail-icon-img"
@@ -214,8 +243,9 @@
                     <span v-if="selectedProduct.version" class="mono-tag version-pill">
                       {{ selectedProduct.version }}
                     </span>
+                    <OfficialBadge :visible="selectedProduct.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                   </div>
-                  <p class="detail-tagline">{{ selectedProduct.tagline || selectedProduct.description }}</p>
+                  <p class="detail-tagline">{{ selectedProduct.tagline || descriptionExcerpt(selectedProduct) }}</p>
                   <div class="detail-meta-pills">
                     <span class="detail-cat-pill">{{ selectedProduct.category }}</span>
                     <span class="detail-author-pill">作者: {{ selectedProduct.author_name || '@创客' }}</span>
@@ -308,7 +338,8 @@
 
                 <div class="detail-section">
                   <h4 class="section-title">应用介绍</h4>
-                  <p class="detail-full-description">{{ selectedProduct.description }}</p>
+                  <!-- 正文为统一富文本编辑器产出的 Markdown，渲染后展示 -->
+                  <div class="detail-full-description markdown-rendered-content" v-html="renderedProductDescription"></div>
                 </div>
 
                 <div class="detail-section">
@@ -334,12 +365,15 @@
                       <span class="spec-label">上架时间</span>
                       <span class="spec-value mono-val">{{ formatDate(selectedProduct.created_at) }}</span>
                     </div>
-                    <div class="spec-item">
+                    <div class="spec-item" style="grid-column: span 2;">
                       <span class="spec-label">数据与持久化</span>
                       <span class="spec-value spec-success">PostgreSQL 库表持久存储</span>
                     </div>
                   </div>
                 </div>
+
+                <!-- 展示页面免责声明 -->
+                <ContentDisclaimer type="showcase" />
               </div>
             </div>
 
@@ -449,163 +483,14 @@
               <span class="link-span" @click="handleOpenPublish">申请上架</span>
             </div>
           </div>
+
+          <!-- 4. Disclaimer Card (免责声明) -->
+          <ContentDisclaimer type="showcase" mode="card" />
         </aside>
       </div>
     </div>
 
 
-    <!-- Product Publish Modal -->
-    <Teleport to="body">
-      <transition name="modal-fade">
-        <div v-if="showPublishModal" class="modal-backdrop" @click="closePublishModal">
-          <div class="modal-window glass-box publish-modal" @click.stop>
-            <div class="modal-header">
-              <div>
-                <h2 class="modal-title">发布创客独立作品</h2>
-                <p class="modal-subtitle">上架商用作品至超级个体橱窗与首页打榜，支持官网与下载直达</p>
-              </div>
-              <button class="modal-close-btn" @click="closePublishModal"><OpcIcon name="close" :size="16" /></button>
-            </div>
-
-            <form class="publish-form" @submit.prevent="submitPublishProduct">
-              <div class="form-row">
-                <div class="form-group flex-2">
-                  <label class="form-label">产品名称 <span class="req">*</span></label>
-                  <input
-                    v-model="publishForm.title"
-                    type="text"
-                    required
-                    class="glass-input"
-                    placeholder="如：InkFlow AI 专注编辑器"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">软件版本</label>
-                  <input
-                    v-model="publishForm.version"
-                    type="text"
-                    class="glass-input"
-                    placeholder="如：v1.0.0"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">一句话卖点简介 (Tagline) <span class="req">*</span></label>
-                <input
-                  v-model="publishForm.tagline"
-                  type="text"
-                  required
-                  class="glass-input"
-                  placeholder="如：专为长文研究员与独立小说家打造的本地离线增强写作工作台"
-                />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">详细应用介绍 <span class="req">*</span></label>
-                <textarea
-                  v-model="publishForm.description"
-                  required
-                  rows="4"
-                  class="glass-input"
-                  placeholder="详细介绍产品核心功能、应用场景、技术亮点与解决的用户痛点..."
-                ></textarea>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">应用分类</label>
-                  <select v-model="publishForm.category" class="glass-input glass-select">
-                    <option value="AI 原生写作">AI 原生写作</option>
-                    <option value="跨境出海">跨境出海</option>
-                    <option value="开发工具">开发工具</option>
-                    <option value="微SaaS工具">微SaaS工具</option>
-                    <option value="自动化工作流">自动化工作流</option>
-                    <option value="设计系统">设计系统</option>
-                  </select>
-                </div>
-
-                <div class="form-group flex-1">
-                  <label class="form-label">商业计费模式</label>
-                  <select v-model="publishForm.pricing_model" class="glass-input glass-select">
-                    <option value="FREE">免费体验</option>
-                    <option value="FREEMIUM">免费增值 (Freemium)</option>
-                    <option value="ONE_TIME">买断制 (One-Time)</option>
-                    <option value="SUBSCRIPTION">周期订阅 (Subscription)</option>
-                  </select>
-                </div>
-
-                <div class="form-group flex-1" v-if="publishForm.pricing_model !== 'FREE'">
-                  <label class="form-label">参考定价 (¥)</label>
-                  <input
-                    v-model.number="publishForm.price_cny"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    class="glass-input"
-                    placeholder="0.00"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">应用图标 Icon (图片或 SVG 地址)</label>
-                <div class="icon-input-row">
-                  <input
-                    v-model="publishForm.icon_url"
-                    type="url"
-                    class="glass-input"
-                    placeholder="https://... (支持 PNG、JPG、SVG 或留空使用生成渐变)"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">官方网站地址 (Official URL)</label>
-                  <input
-                    v-model="publishForm.official_url"
-                    type="url"
-                    class="glass-input"
-                    placeholder="https://yourproduct.com"
-                  />
-                </div>
-
-                <div class="form-group flex-1">
-                  <label class="form-label">安装包下载地址 (Download URL)</label>
-                  <input
-                    v-model="publishForm.download_url"
-                    type="url"
-                    class="glass-input"
-                    placeholder="https://download.yourproduct.com/setup.dmg"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">在线体验或演示链接 (Demo URL)</label>
-                <input
-                  v-model="publishForm.demo_url"
-                  type="url"
-                  class="glass-input"
-                  placeholder="https://yourproduct.com/demo"
-                />
-              </div>
-
-              <div class="modal-footer-actions">
-                <button type="button" class="btn-liquid-outline" @click="closePublishModal">
-                  取消
-                </button>
-                <button type="submit" class="btn-liquid submit-btn" :disabled="submitting">
-                  <span v-if="submitting">正在发布入库...</span>
-                  <span v-else>立即发布入库</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
   </div>
 </template>
 
@@ -613,8 +498,15 @@
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import PublishForm from '@/components/PublishForm.vue';
+import { PRODUCT_FIELDS } from '@/config/publishForms';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
+import { resolveProductIcon } from '@/utils/builtinIcons';
 
 const props = defineProps({
   userSession: {
@@ -652,7 +544,12 @@ const isSemanticSearchActive = ref(false);
 const activeSearchQuery = ref('');
 const currentCategory = ref('ALL');
 const selectedProduct = ref(null);
-const showPublishModal = ref(false);
+
+// 详情页应用介绍：富文本正文渲染为 Markdown HTML
+const renderedProductDescription = computed(() =>
+  selectedProduct.value ? renderMarkdown(selectedProduct.value.description || '') : ''
+);
+const showPublishPage = ref(false);
 const upvotedIds = ref(new Set());
 const sentinelRef = ref(null);
 let observer = null;
@@ -1090,11 +987,12 @@ function handleOpenPublish() {
     emit('open-login');
     return;
   }
-  showPublishModal.value = true;
+  showPublishPage.value = true;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function closePublishModal() {
-  showPublishModal.value = false;
+function closePublishPage() {
+  showPublishPage.value = false;
 }
 
 // Submit publish form to backend microkernel DAG
@@ -1129,7 +1027,7 @@ async function submitPublishProduct() {
         message: `商业作品《${payload.title}》已成功收录入库并发布！`,
         type: 'SUCCESS',
       });
-      closePublishModal();
+      closePublishPage();
       // Reset form
       publishForm.title = '';
       publishForm.tagline = '';
@@ -1172,6 +1070,16 @@ function getInitials(name) {
   if (!name) return 'OPC';
   const clean = name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '');
   return clean.slice(0, 2).toUpperCase() || 'OP';
+}
+
+// 内置图标选择（icon:<name>）优先于外链图片展示；外链为历史数据兼容保留
+function builtinIconOf(item) {
+  return item ? resolveProductIcon(item.icon_url) : null;
+}
+
+// 卡片/标签预览退回纯文本（正文为 Markdown）
+function descriptionExcerpt(item) {
+  return stripMarkdown(item?.description || '');
 }
 
 function getIconFallbackStyle(item) {
@@ -1618,6 +1526,13 @@ onUnmounted(() => {
   font-weight: 700;
   font-size: 15px;
   letter-spacing: -0.02em;
+}
+
+/* 内置图标展示：平台线性图标 + 渐变底座（无外链图片时的统一素材方案） */
+.app-icon-builtin {
+  color: var(--accent);
+  background: linear-gradient(135deg, var(--accent-glass, rgba(0, 113, 227, 0.14)) 0%, var(--glass-surface-hover) 100%);
+  border: 1px solid rgba(0, 113, 227, 0.2);
 }
 
 .product-title {
@@ -2399,11 +2314,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.publish-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
 
 .form-row {
   display: flex;

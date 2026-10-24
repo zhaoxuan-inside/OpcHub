@@ -48,13 +48,17 @@
         <div class="sop-doc-pane-label">文书正文</div>
 
         <div class="sop-doc-paper">
-          <pre class="sop-doc-paper-content">{{ doc.rendered_content || '该文书暂无正文内容。' }}</pre>
+          <!-- 正文为统一富文本编辑器产出的 Markdown，渲染为排版 HTML -->
+          <div class="sop-doc-paper-content markdown-rendered-content" v-html="renderedBody"></div>
         </div>
 
         <div class="sop-doc-outcome">
           <span class="sop-doc-outcome-label">合规状态</span>
           <span>{{ doc.compliance_passed ? '要素齐备，已通过合规校验。' : '存在缺失要素，建议回到对应标准文书补齐后重新生成。' }}</span>
         </div>
+
+        <!-- 展示页面免责声明 -->
+        <ContentDisclaimer type="sop" />
       </section>
     </div>
   </div>
@@ -62,6 +66,8 @@
 
 <script setup>
 import { computed } from 'vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
+import { renderMarkdown } from '@/utils/markdown';
 
 const props = defineProps({
   doc: { type: Object, default: null },
@@ -69,6 +75,8 @@ const props = defineProps({
 });
 
 defineEmits(['back', 'delete']);
+
+const renderedBody = computed(() => renderMarkdown(props.doc?.rendered_content || ''));
 
 const templateName = computed(
   () => props.templateNameOf?.(props.doc?.template_id) || props.doc?.template_id || '标准文书'

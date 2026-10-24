@@ -50,10 +50,10 @@ gateway:
     - scenario: "products.publish"
       version: "v1.0.0"
       domain: "products"
-      description: "发布新独立创客作品至橱窗 (微内核 DAG 编排驱动)"
+      description: "发布新独立创客作品至橱窗（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:product_publish_adapter"
-      required_permission: "gallery:submit"
+      required_permission: "content:publish"
 
     - scenario: "products.upvote"
       version: "v1.0.0"
@@ -86,10 +86,10 @@ gateway:
     - scenario: "policies.publish"
       version: "v1.0.0"
       domain: "policies"
-      description: "发布最新政府扶持与补贴政策 (微内核 DAG 编排驱动)"
+      description: "发布政策公文（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:policy_publish_adapter"
-      required_permission: "data:schema_manage"
+      required_permission: "content:publish"
 
     - scenario: "policies.match"
       version: "v1.0.0"
@@ -112,10 +112,10 @@ gateway:
     - scenario: "demands.publish"
       version: "v1.0.0"
       domain: "demands"
-      description: "微内核DAG编排：发布企业外包委托与法律求助"
+      description: "微内核DAG编排：发布企业外包委托与法律求助（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:demand_publish_adapter"
-      required_permission: "market:create_demand"
+      required_permission: "content:publish"
 
     - scenario: "demands.bid"
       version: "v1.0.0"
@@ -275,6 +275,14 @@ gateway:
       handler: "src.core.gateway.adapters:sop_document_render_adapter"
       required_permission: "sop:save_progress"
 
+    - scenario: "sop.document.draft"
+      version: "v1.0.0"
+      domain: "sop"
+      description: "文本编辑器起草：保存自由编辑的私有文书草稿（可选基于标准模板，注册创客可用）"
+      is_default: true
+      handler: "src.core.gateway.adapters:sop_document_draft_adapter"
+      required_permission: "content:publish"
+
 
     - scenario: "sop.document.get"
       version: "v1.0.0"
@@ -306,18 +314,18 @@ gateway:
     - scenario: "sop.document.publish"
       version: "v1.0.0"
       domain: "sop"
-      description: "发布「我的文书」至审核队列（提交后进入待审核状态）"
+      description: "发布「我的文书」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:sop_document_publish_adapter"
-      required_permission: "sop:save_progress"
+      required_permission: "content:publish"
 
     - scenario: "sop.flow.publish"
       version: "v1.0.0"
       domain: "sop"
-      description: "发布「我的流程」至审核队列（提交后进入待审核状态）"
+      description: "发布「我的流程」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:sop_flow_publish_adapter"
-      required_permission: "sop:save_progress"
+      required_permission: "content:publish"
 
     - scenario: "sop.review.queue"
       version: "v1.0.0"
@@ -348,10 +356,10 @@ gateway:
     - scenario: "perks.publish"
       version: "v1.0.0"
       domain: "perks"
-      description: "微内核DAG编排：提报并上线生态优惠公告"
+      description: "提报并上线生态优惠公告（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:perk_publish_adapter"
-      required_permission: "data:schema_manage"
+      required_permission: "content:publish"
 
     - scenario: "perks.claim"
       version: "v1.0.0"
@@ -383,10 +391,10 @@ gateway:
     - scenario: "forum.threads.publish"
       version: "v1.0.0"
       domain: "forum"
-      description: "发布新创客讨论帖与踩坑复盘 (微内核 DAG 编排驱动)"
+      description: "发布新创客讨论帖与踩坑复盘（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
       handler: "src.core.gateway.adapters:forum_thread_publish_adapter"
-      required_permission: "forum:post_comment"
+      required_permission: "content:publish"
 
     - scenario: "forum.threads.get"
       version: "v1.0.0"
@@ -641,6 +649,57 @@ gateway:
       handler: "src.core.gateway.adapters:moderation_restore_adapter"
       required_permission: "review:audit_all"
 
+    - scenario: "moderation.report"
+      version: "v1.0.0"
+      domain: "moderation"
+      description: "用户举报违规/失实内容，进入平台审核队列（用户互动维护内容有效性）"
+      is_default: true
+      handler: "src.core.gateway.adapters:content_report_adapter"
+      required_permission: "content:interact"
+
+    # --------------------------------------------------------------------------
+    # 用户消息箱（发布敏感词校验结果通知）
+    # --------------------------------------------------------------------------
+    - scenario: "notifications.list"
+      version: "v1.0.0"
+      domain: "notifications"
+      description: "查看当前登录用户的消息箱（含发布敏感词校验结果）"
+      is_default: true
+      handler: "src.core.gateway.adapters:notifications_list_adapter"
+      required_permission: "notification:read"
+
+    - scenario: "notifications.unread_count"
+      version: "v1.0.0"
+      domain: "notifications"
+      description: "获取当前登录用户消息箱未读数（导航角标）"
+      is_default: true
+      handler: "src.core.gateway.adapters:notifications_unread_count_adapter"
+      required_permission: "notification:read"
+
+    - scenario: "notifications.mark_read"
+      version: "v1.0.0"
+      domain: "notifications"
+      description: "将指定消息标记为已读（仅限本人消息）"
+      is_default: true
+      handler: "src.core.gateway.adapters:notifications_mark_read_adapter"
+      required_permission: "notification:read"
+
+    - scenario: "notifications.mark_all_read"
+      version: "v1.0.0"
+      domain: "notifications"
+      description: "将当前登录用户全部未读消息标记为已读"
+      is_default: true
+      handler: "src.core.gateway.adapters:notifications_mark_all_read_adapter"
+      required_permission: "notification:read"
+
+    - scenario: "notifications.delete"
+      version: "v1.0.0"
+      domain: "notifications"
+      description: "删除当前登录用户的一条消息"
+      is_default: true
+      handler: "src.core.gateway.adapters:notifications_delete_adapter"
+      required_permission: "notification:read"
+
     # --------------------------------------------------------------------------
     # 10. Compliance (合规法条 / 避坑案例 / 自检)
     # --------------------------------------------------------------------------
@@ -661,9 +720,10 @@ gateway:
     - scenario: "compliance.publish"
       version: "v1.0.0"
       domain: "compliance"
-      description: "登录创客发布法条或避坑案例（kind: law | case）"
+      description: "登录创客发布法条或避坑案例（kind: law | case，统一敏感词预筛门禁）"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.publish_entry"
+      handler: "src.core.gateway.adapters:compliance_publish_adapter"
+      required_permission: "content:publish"
 
     # 向后兼容别名：旧调用方仍可用 compliance.dimensions 读取法条库
     - scenario: "compliance.dimensions"

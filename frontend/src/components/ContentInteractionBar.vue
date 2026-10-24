@@ -39,6 +39,20 @@
         <span class="ci-count">{{ counts.like }}</span>
       </button>
 
+      <!-- 点踩：用户互动维护信息的有效性（内容失实/无帮助的直接信号） -->
+      <button
+        type="button"
+        class="ci-btn ci-dislike"
+        :class="{ active: viewer.disliked }"
+        @click.stop="toggle('DISLIKE')"
+        :title="viewer.disliked ? '取消点踩' : '点踩（信息失实或无帮助）'"
+        :aria-pressed="viewer.disliked"
+      >
+        <InteractionIcon name="dislike" :filled="viewer.disliked" :size="iconSize" />
+        <span v-if="showLabels && variant !== 'band'" class="ci-label">{{ viewer.disliked ? '已点踩' : '点踩' }}</span>
+        <span class="ci-count">{{ counts.dislike }}</span>
+      </button>
+
       <!-- 评论 -->
       <button
         type="button"
@@ -79,6 +93,19 @@
         <InteractionIcon name="favorite" :filled="viewer.favorited" :size="iconSize" />
         <span v-if="showLabels && variant !== 'band'" class="ci-label">{{ viewer.favorited ? '已收藏' : '收藏' }}</span>
         <span class="ci-count">{{ counts.favorite }}</span>
+      </button>
+
+      <!-- 举报：用户互动维护内容有效性，举报进入平台审核队列 -->
+      <button
+        type="button"
+        class="ci-btn ci-report"
+        :disabled="reporting"
+        @click.stop="submitReport"
+        title="举报违规或失实内容"
+        aria-label="举报该内容"
+      >
+        <OpcIcon name="alert" :size="iconSize" />
+        <span v-if="showLabels && variant !== 'band'" class="ci-label">举报</span>
       </button>
 
       <!-- 评分 (read-only score display on cards; 5-star rating lives in detail) -->
@@ -169,6 +196,7 @@ const drawerVisible = ref(false);
 const pendingKind = ref('');
 const hoverRating = ref(0);
 const ratingSaving = ref(false);
+const reporting = ref(false);
 
 const iconSize = computed(() => {
   if (props.variant === 'band') return 17;
@@ -240,6 +268,37 @@ function toNum(value) {
 
 function requireLogin() {
   emit('require-login');
+}
+
+// 举报（用户互动维护内容有效性）：提交到平台审核队列，由运营复核后下架/恢复。
+async function submitReport() {
+  if (!props.authenticated) {
+    requireLogin();
+    return;
+  }
+  if (reporting.value) return;
+  reporting.value = true;
+  try {
+    const res = await dispatchGateway('moderation.report', {
+      target_type: props.targetType,
+      target_id: String(props.targetId),
+      target_title: props.targetTitle || '',
+      snippet_content: props.targetTitle || '',
+    });
+    if (res.ok && res.data) {
+      emit('toast', {
+        title: '举报已提交',
+        message: '感谢反馈：该内容已进入平台审核队列，运营复核后将作下架或恢复处理。',
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', { title: '举报未提交', message: res.error || '请稍后重试。', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '举报异常', message: '举报服务暂时不可用，请稍后重试。', type: 'ERROR' });
+  } finally {
+    reporting.value = false;
+  }
 }
 
 function emitChanged() {
@@ -545,6 +604,16 @@ watch(
 
 .ci-love.active {
   color: var(--accent);
+}
+
+/* 举报：默认弱化展示，悬停提示风险语义色 */
+.ci-report {
+  opacity: 0.75;
+}
+
+.ci-report:hover:not(:disabled) {
+  color: var(--warning, #b25000);
+  opacity: 1;
 }
 
 .ci-comment.active {

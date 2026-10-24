@@ -15,6 +15,10 @@ class PolicyCreate(BaseModel):
     region: Optional[str] = Field(default="全国统一", description="适用地域")
     deadline: Optional[str] = Field(default="常年有效", description="申报截止日期")
     action_text: Optional[str] = Field(default="匹配资格", description="卡片操作文案")
+    # Unified publish provenance (统一发布契约：作者由网关身份绑定，官方标签由角色决定)
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
 
 
 class PolicyResponse(BaseModel):
@@ -30,6 +34,9 @@ class PolicyResponse(BaseModel):
     region: Optional[str] = "全国统一"
     deadline: Optional[str] = "常年有效"
     action_text: Optional[str] = "匹配资格"
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
     like_count: int = 0
     favorite_count: int = 0
     love_count: int = 0

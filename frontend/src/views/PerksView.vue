@@ -1,6 +1,28 @@
 <template>
   <div class="view-panel active perks-view-wrapper">
-    <div class="perks-main-content">
+    <!-- Full-page publishing surface -->
+    <CreatePageLayout
+      v-if="showPublishPage"
+      title="发布生态优惠公告"
+      back-label="生态特权"
+      @back="closePublishPage"
+    >
+      <template #actions>
+        <button type="submit" form="perk-publish-form" class="btn-liquid" :disabled="isPublishing">
+          <span v-if="isPublishing">发布中…</span>
+          <span v-else>发布</span>
+        </button>
+      </template>
+
+      <PublishForm
+        id="perk-publish-form"
+        :model="publishForm"
+        :fields="perkPublishFields"
+        @submit="submitPublishPerk"
+      />
+    </CreatePageLayout>
+
+    <div v-else class="perks-main-content">
       <!-- Dual-column Layout referencing PolicyView (政策中心) -->
       <div class="perks-feed-layout">
         <!-- Main Perks Stream (左侧优惠公告流) -->
@@ -128,13 +150,14 @@
                         </svg>
                         {{ item.provider }}
                       </span>
+                      <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
                   </div>
                 </div>
 
                 <!-- Card Body: Plain Chinese Summary (hover reveals full) -->
                 <div class="card-body">
-                  <HoverRevealText :text="item.summary" :lines="2" />
+                  <HoverRevealText :text="summaryExcerpt(item)" :lines="2" />
                 </div>
 
                 <!-- Card Highlights / Quick Spec Chips -->
@@ -240,8 +263,9 @@
                   <div class="detail-title-row">
                     <h2 class="detail-title">{{ selectedPerk.name }}</h2>
                     <span class="mono-tag version-pill">{{ selectedPerk.id }}</span>
+                    <OfficialBadge :visible="selectedPerk.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                   </div>
-                  <p class="detail-tagline">{{ selectedPerk.summary }}</p>
+                  <p class="detail-tagline">{{ summaryExcerpt(selectedPerk) }}</p>
                   <div class="detail-meta-pills">
                     <span class="detail-cat-pill">{{ formatCategoryLabel(selectedPerk.category) }}</span>
                     <span class="detail-provider-pill">{{ selectedPerk.provider }}</span>
@@ -296,7 +320,8 @@
               <div class="detail-body-scroll">
                 <div class="detail-section">
                   <h4 class="section-title">优惠核心白话要点</h4>
-                  <p class="detail-full-description">{{ selectedPerk.summary }}</p>
+                  <!-- 发布侧为富文本（Markdown），详情统一渲染后展示 -->
+                  <div class="detail-full-description markdown-rendered-content" v-html="renderedPerkSummary"></div>
                 </div>
 
                 <div v-if="selectedPerk.highlights && selectedPerk.highlights.length > 0" class="detail-section">
@@ -354,6 +379,9 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- 展示页面免责声明 -->
+                <ContentDisclaimer type="perk" />
               </div>
             </div>
 
@@ -372,7 +400,7 @@
                 <button v-if="searchQuery || currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
-                <button class="btn-liquid" @click="openPublishModal">
+                <button class="btn-liquid" @click="openPublishPage">
                   提报优惠公告
                 </button>
               </div>
@@ -396,7 +424,7 @@
               </div>
             </div>
 
-            <button class="btn-liquid btn-creator-publish" @click="openPublishModal">
+            <button class="btn-liquid btn-creator-publish" @click="openPublishPage">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -462,138 +490,6 @@
       </div>
     </div>
 
-    <!-- Perks Publish Modal (PolicyView style form) -->
-    <Teleport to="body">
-      <transition name="modal-fade">
-        <div v-if="showPublishModal" class="modal-backdrop" @click="closePublishModal">
-          <div class="modal-window glass-box perks-publish-modal" @click.stop>
-            <div class="modal-header">
-              <div>
-                <h2 class="modal-title">提报与发布生态优惠公告</h2>
-                <p class="modal-subtitle">写入 PostgreSQL 公告主表，经微内核发布门禁与内容合规审查后上架公告板</p>
-              </div>
-              <button class="modal-close-btn" @click="closePublishModal"><OpcIcon name="close" :size="16" /></button>
-            </div>
-
-            <form class="publish-form" @submit.prevent="submitPublishPerk">
-              <div class="form-group">
-                <label class="form-label">公告标题 <span class="req">*</span></label>
-                <input
-                  v-model="publishForm.name"
-                  type="text"
-                  required
-                  class="glass-input"
-                  placeholder="如：火山方舟 豆包大模型 Token 畅用券"
-                />
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">服务商 <span class="req">*</span></label>
-                  <input
-                    v-model="publishForm.provider"
-                    type="text"
-                    required
-                    class="glass-input"
-                    placeholder="如：火山引擎方舟 / 阿里云"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">优惠类别</label>
-                  <select v-model="publishForm.category" class="glass-input glass-select">
-                    <option
-                      v-for="cat in PERK_CATEGORY_ORDER"
-                      :key="cat.key"
-                      :value="cat.key"
-                    >{{ cat.key }} ({{ cat.label }})</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">预估价值 (元)</label>
-                  <input
-                    v-model.number="publishForm.value_cny"
-                    type="number"
-                    min="0"
-                    class="glass-input"
-                    placeholder="0"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">领取配额</label>
-                  <input
-                    v-model.number="publishForm.quota_remaining"
-                    type="number"
-                    min="1"
-                    class="glass-input"
-                    placeholder="100"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">生效时间</label>
-                  <input
-                    v-model="publishForm.effective_start"
-                    type="date"
-                    class="glass-input"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">截止时间</label>
-                  <input
-                    v-model="publishForm.effective_end"
-                    type="date"
-                    class="glass-input"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">领取 / 详情直达链接</label>
-                <input
-                  v-model="publishForm.redeem_url"
-                  type="url"
-                  class="glass-input"
-                  placeholder="如：https://console.volcengine.com/ark"
-                />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">公告摘要 <span class="req">*</span></label>
-                <textarea
-                  v-model="publishForm.summary"
-                  required
-                  rows="3"
-                  class="glass-input"
-                  placeholder="【白话要点】简明扼要说明优惠力度、适用范围与限制条件..."
-                ></textarea>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">核心卖点 (以逗号分隔)</label>
-                <input
-                  v-model="publishForm.highlightsText"
-                  type="text"
-                  class="glass-input"
-                  placeholder="如：豆包 doubao-pro 全系可用, 抵扣额度 ¥5,000, 新老创客均可领取"
-                />
-              </div>
-
-              <div class="form-actions">
-                <button type="button" class="btn-liquid-outline" @click="closePublishModal">取消</button>
-                <button type="submit" class="btn-liquid" :disabled="isPublishing">
-                  {{ isPublishing ? '提交上架中...' : '确认发布上架' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
   </div>
 </template>
 
@@ -601,8 +497,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import PublishForm from '@/components/PublishForm.vue';
+import { PERK_FIELDS } from '@/config/publishForms';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 import {
   PERK_CATEGORIES,
   PERK_CATEGORY_ORDER,
@@ -612,6 +514,19 @@ import {
   PERK_PUBLISH_DEFAULT_PRIORITY,
   PERK_PUBLISH_DEFAULT_QUOTA,
 } from '@/config/ecosystemPerks';
+
+// 发布表单字段由共享 schema 驱动，分类选项复用平台配置，避免在模板里重复渲染。
+const perkPublishFields = computed(() => PERK_FIELDS.map((field) => (
+  field.key === 'category'
+    ? {
+        ...field,
+        options: PERK_CATEGORY_ORDER.map((cat) => ({
+          value: cat.key,
+          label: `${cat.key}（${cat.label}）`,
+        })),
+      }
+    : field
+)));
 
 const emit = defineEmits(['toast', 'open-login']);
 
@@ -839,7 +754,16 @@ function closePerkDetail() {
 
 // Publish Modal
 const selectedPerk = ref(null);
-const showPublishModal = ref(false);
+
+// 详情正文渲染：发布侧为富文本（Markdown）；卡片/标签预览退回纯文本
+const renderedPerkSummary = computed(() =>
+  selectedPerk.value ? renderMarkdown(selectedPerk.value.summary || '') : ''
+);
+
+function summaryExcerpt(item) {
+  return stripMarkdown(item?.summary || '');
+}
+const showPublishPage = ref(false);
 const isPublishing = ref(false);
 
 const publishForm = ref({
@@ -855,7 +779,7 @@ const publishForm = ref({
   highlightsText: '',
 });
 
-function openPublishModal() {
+function openPublishPage() {
   publishForm.value = {
     name: '',
     provider: '',
@@ -868,14 +792,24 @@ function openPublishModal() {
     summary: '',
     highlightsText: '',
   };
-  showPublishModal.value = true;
+  showPublishPage.value = true;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function closePublishModal() {
-  showPublishModal.value = false;
+function closePublishPage() {
+  showPublishPage.value = false;
 }
 
 async function submitPublishPerk() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    emit('toast', {
+      title: '需要登录',
+      message: '请先登录创客账号后再发布生态优惠公告。',
+      type: 'WARNING',
+    });
+    return;
+  }
   isPublishing.value = true;
   try {
     const highlights = publishForm.value.highlightsText
@@ -902,22 +836,22 @@ async function submitPublishPerk() {
     if (res.ok) {
       emit('toast', {
         title: '公告发布成功',
-        message: `《${publishForm.value.name}》已通过微内核门禁并上架生态优惠公告板！`,
+        message: `《${publishForm.value.name}》已通过平台敏感词校验并上架生态优惠公告板。`,
         type: 'SUCCESS',
       });
-      showPublishModal.value = false;
+      showPublishPage.value = false;
       await loadPerks();
     } else {
       emit('toast', {
         title: '发布提示',
-        message: res.error || '公告发布需要管理员权限，请登录管理员账号。',
-        type: 'WARN',
+        message: res.error || '发布未通过平台内容校验，请调整后重试。',
+        type: 'WARNING',
       });
     }
   } catch (e) {
     emit('toast', {
       title: '发布失败',
-      message: e.message || '网络或接口通信异常，请检查权限。',
+      message: e.message || '网络或接口通信异常，请稍后重试。',
       type: 'ERROR',
     });
   } finally {
@@ -1954,13 +1888,6 @@ function validityText(perk) {
   color: var(--text-primary);
 }
 
-.publish-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
 
 .form-group {
   display: flex;

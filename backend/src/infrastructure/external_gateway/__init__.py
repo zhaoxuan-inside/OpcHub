@@ -10,9 +10,11 @@ from .sms_auth_gateway import SMSAuthGateway, sms_auth_gateway
 from .gov_crawler_gateway import GovCrawlerGateway, gov_crawler_gateway, AsyncTokenBucket
 from .content_moderation_gateway import (
     ContentModerationGateway,
+    ContentModerationViolation,
     content_moderation_gateway,
     check_content_safety,
     prescreen_and_scan,
+    prescreen_and_record,
 )
 from .oss_storage_gateway import OSSStorageGateway, oss_storage_gateway
 
@@ -32,9 +34,11 @@ __all__ = [
     "gov_crawler_gateway",
     "AsyncTokenBucket",
     "ContentModerationGateway",
+    "ContentModerationViolation",
     "content_moderation_gateway",
     "check_content_safety",
     "prescreen_and_scan",
+    "prescreen_and_record",
     "OSSStorageGateway",
     "oss_storage_gateway",
 ]

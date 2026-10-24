@@ -154,6 +154,22 @@
 
           <div v-if="userSession" class="nav-island-divider"></div>
 
+          <!-- Message Box (发布敏感词校验结果通知) -->
+          <button
+            v-if="userSession"
+            class="nav-icon-btn nav-inbox-btn"
+            @click="$emit('open-inbox')"
+            :title="unreadCount > 0 ? `消息箱 · ${unreadCount} 条未读` : '消息箱'"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+              <path d="M13.7 21a2 2 0 0 1-3.4 0"></path>
+            </svg>
+            <span v-if="unreadCount > 0" class="nav-inbox-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
+          </button>
+
+          <div v-if="userSession" class="nav-island-divider"></div>
+
           <!-- Theme Switcher (Dark vs Light) -->
           <button
             class="nav-icon-btn"
@@ -219,6 +235,10 @@ const props = defineProps({
     type: Boolean,
     default: false,
   },
+  unreadCount: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const emit = defineEmits([
@@ -227,6 +247,7 @@ const emit = defineEmits([
   'toggle-theme',
   'open-login',
   'open-profile',
+  'open-inbox',
 ]);
 
 function toggleRole() {
@@ -257,5 +278,27 @@ function handleUserClick() {
   font-weight: 600;
   height: 32px;
   box-shadow: 0 2px 10px rgba(0, 113, 227, 0.25);
+}
+
+.nav-inbox-btn {
+  position: relative;
+}
+
+.nav-inbox-badge {
+  position: absolute;
+  top: -4px;
+  right: -5px;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--status-danger, #c0392b);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 15px;
+  text-align: center;
+  box-shadow: 0 2px 6px rgba(192, 57, 43, 0.35);
+  pointer-events: none;
 }
 </style>

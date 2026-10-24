@@ -15,6 +15,7 @@
           <span class="badge-category-sm" :style="pillStyle">
             {{ categoryLabel }}
           </span>
+          <OfficialBadge :visible="post.is_official" label="官方" title="官方发布：由平台官方账号发布" />
           <span v-if="post.semantic_score" class="badge-semantic-score-sm">
             <OpcIcon name="spark" :size="11" /> {{ post.semantic_score }}%
           </span>
@@ -278,6 +279,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue';
 import ForumIcon from '@/components/ForumIcon.vue';
+import OfficialBadge from '@/components/OfficialBadge.vue';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
 import { applyBarChange, applyForumInteractionAliases } from '@/utils/contentInteractions';

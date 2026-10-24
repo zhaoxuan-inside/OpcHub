@@ -49,6 +49,10 @@ class PolicyService:
         """Initialize in-memory catalog from external data seeds and queue DB persistence."""
         for pid, data in DEFAULT_POLICY_SEEDS.items():
             if pid not in self._policies:
+                data = dict(data)
+                # Seed policies are platform-curated government sources → official.
+                data.setdefault("is_official", True)
+                data.setdefault("author_name", "官方发布")
                 policy = PolicyResponse(**data)
                 self._policies[pid] = policy
                 domain_persistence.write("policies.items", pid, policy)
@@ -76,6 +80,9 @@ class PolicyService:
             legal_basis=req.legal_basis,
             deadline=req.deadline or "常年有效",
             action_text=req.action_text or "匹配资格",
+            author_id=req.author_id,
+            author_name=req.author_name,
+            is_official=req.is_official,
         )
         self._policies[pid] = policy
         domain_persistence.write("policies.items", pid, policy)

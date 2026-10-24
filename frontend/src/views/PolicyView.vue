@@ -1,6 +1,32 @@
 <template>
   <div class="view-panel active policy-view-wrapper">
-    <div class="policy-main-content">
+    <!-- Full-page publishing surface (创建发布政策公文) -->
+    <CreatePageLayout
+      v-if="showPublishPage"
+      title="发布政策公文"
+      back-label="政策中心"
+      @back="closePublishPage"
+    >
+      <template #actions>
+        <button
+          type="submit"
+          form="policy-publish-form"
+          class="btn-liquid"
+          :disabled="isPublishing"
+        >
+          {{ isPublishing ? '发布中…' : '发布' }}
+        </button>
+      </template>
+
+      <PublishForm
+        id="policy-publish-form"
+        :model="publishForm"
+        :fields="POLICY_FIELDS"
+        @submit="submitPublishPolicy"
+      />
+    </CreatePageLayout>
+
+    <div v-else class="policy-main-content">
       <!-- Dual-column Layout referencing ShowcaseView (产品橱窗) -->
       <div class="policy-feed-layout">
         <!-- Main Policy Stream (左侧政策流) -->
@@ -127,13 +153,14 @@
                       <span class="badge-region">
                         <OpcIcon name="pin" :size="12" /> {{ item.region || '全国统一' }}
                       </span>
+                      <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
                   </div>
                 </div>
 
                 <!-- Card Body: Plain Chinese Summary (hover reveals full) -->
                 <div class="card-body">
-                  <HoverRevealText :text="item.summary" :lines="2" />
+                  <HoverRevealText :text="summaryExcerpt(item)" :lines="2" />
                 </div>
 
                 <!-- Card Highlights / Quick Spec Chips -->
@@ -236,8 +263,9 @@
                   <div class="detail-title-row">
                     <h2 class="detail-title">{{ selectedPolicy.title }}</h2>
                     <span class="mono-tag version-pill">{{ selectedPolicy.code || 'POL-2026' }}</span>
+                    <OfficialBadge :visible="selectedPolicy.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                   </div>
-                  <p class="detail-tagline">{{ selectedPolicy.summary }}</p>
+                  <p class="detail-tagline">{{ summaryExcerpt(selectedPolicy) }}</p>
                   <div class="detail-meta-pills">
                     <span class="detail-cat-pill">{{ formatCategoryLabel(selectedPolicy.category) }}</span>
                     <span class="detail-level-pill">{{ selectedPolicy.policy_level || '国家级' }}</span>
@@ -316,7 +344,8 @@
 
                 <div class="detail-section">
                   <h4 class="section-title">政策核心白话要点</h4>
-                  <p class="detail-full-description">{{ selectedPolicy.summary }}</p>
+                  <!-- 发布侧为富文本（Markdown），详情统一渲染后展示 -->
+                  <div class="detail-full-description markdown-rendered-content" v-html="renderedPolicySummary"></div>
                 </div>
 
                 <div v-if="selectedPolicy.eligible_conditions && selectedPolicy.eligible_conditions.length > 0" class="detail-section">
@@ -370,6 +399,9 @@
                     </div>
                   </div>
                 </div>
+
+                <!-- 展示页面免责声明 -->
+                <ContentDisclaimer type="policy" />
               </div>
             </div>
 
@@ -392,7 +424,7 @@
                 <button v-if="searchQuery || currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
-                <button class="btn-liquid" @click="openPublishModal">
+                <button class="btn-liquid" @click="openPublishPage">
                   收录新政策
                 </button>
               </div>
@@ -416,7 +448,7 @@
               </div>
             </div>
 
-            <button class="btn-liquid btn-creator-publish" @click="openPublishModal">
+            <button class="btn-liquid btn-creator-publish" @click="openPublishPage">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
                 <line x1="5" y1="12" x2="19" y2="12"></line>
@@ -494,144 +526,16 @@
             <div class="guidelines-footer">
               <span>OpcHub 政策合规标准 v1.0</span>
               <span class="dot-sep">·</span>
-              <span class="link-span" @click="openPublishModal">申报入库</span>
+              <span class="link-span" @click="openPublishPage">申报入库</span>
             </div>
           </div>
+
+          <!-- 4. Disclaimer Card (免责声明) -->
+          <ContentDisclaimer type="policy" mode="card" />
         </aside>
       </div>
     </div>
 
-    <!-- Policy Publish Modal (Showcase style form) -->
-    <Teleport to="body">
-      <transition name="modal-fade">
-        <div v-if="showPublishModal" class="modal-backdrop" @click="closePublishModal">
-          <div class="modal-window glass-box policy-publish-modal" @click.stop>
-            <div class="modal-header">
-              <div>
-                <h2 class="modal-title">收录与发布政务政策</h2>
-                <p class="modal-subtitle">写入 PostgreSQL 政策公文主表并同步向量索引，支持全域语义召回</p>
-              </div>
-              <button class="modal-close-btn" @click="closePublishModal"><OpcIcon name="close" :size="16" /></button>
-            </div>
-
-            <form class="publish-form" @submit.prevent="submitPublishPolicy">
-              <div class="form-group">
-                <label class="form-label">政策公文标题 <span class="req">*</span></label>
-                <input
-                  v-model="publishForm.title"
-                  type="text"
-                  required
-                  class="glass-input"
-                  placeholder="如：国家高新技术企业所得税15%税收优惠"
-                />
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">政策编号</label>
-                  <input
-                    v-model="publishForm.code"
-                    type="text"
-                    class="glass-input"
-                    placeholder="如：POL-2026-130"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">适用区域</label>
-                  <input
-                    v-model="publishForm.region"
-                    type="text"
-                    class="glass-input"
-                    placeholder="如：长三角 / 全国统一 / 深圳南山"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">发文层级</label>
-                  <select v-model="publishForm.policy_level" class="glass-input glass-select">
-                    <option value="国家级">国家级</option>
-                    <option value="省市级">省市级</option>
-                    <option value="园区级">园区级</option>
-                  </select>
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">扶持类别</label>
-                  <select v-model="publishForm.category" class="glass-input glass-select">
-                    <option value="TAX">TAX (税费减免)</option>
-                    <option value="SUBSIDY">SUBSIDY (直接补贴)</option>
-                    <option value="RENT">RENT (场地免租)</option>
-                    <option value="TALENT">TALENT (人才激励)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group flex-1">
-                  <label class="form-label">最高扶持金额 (元)</label>
-                  <input
-                    v-model.number="publishForm.subsidy_amount_max"
-                    type="number"
-                    min="0"
-                    class="glass-input"
-                    placeholder="0"
-                  />
-                </div>
-                <div class="form-group flex-1">
-                  <label class="form-label">申报截止期限</label>
-                  <input
-                    v-model="publishForm.deadline"
-                    type="text"
-                    class="glass-input"
-                    placeholder="如：常年开放申报 / 2026-12-31"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">白话提炼摘要 <span class="req">*</span></label>
-                <textarea
-                  v-model="publishForm.summary"
-                  required
-                  rows="3"
-                  class="glass-input"
-                  placeholder="【白话要点】简明扼要说明红利要点、受惠对象、节税额度与关键指标..."
-                ></textarea>
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">适用资格条件 (以逗号分隔)</label>
-                <input
-                  v-model="publishForm.conditionsText"
-                  type="text"
-                  class="glass-input"
-                  placeholder="如：科技型中小企业, 软件研发从业者, 一人公司"
-                />
-              </div>
-
-              <div class="form-group">
-                <label class="form-label">官方法规公文依据 <span class="req">*</span></label>
-                <input
-                  v-model="publishForm.legal_basis"
-                  type="text"
-                  required
-                  class="glass-input"
-                  placeholder="如：财政部 税务总局公告 2023年第12号"
-                />
-              </div>
-
-              <div class="form-actions">
-                <button type="button" class="btn-liquid-outline" @click="closePublishModal">取消</button>
-                <button type="submit" class="btn-liquid" :disabled="isPublishing">
-                  {{ isPublishing ? '提交入库中...' : '确认发布入库' }}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </transition>
-    </Teleport>
   </div>
 </template>
 
@@ -639,8 +543,14 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import PublishForm from '@/components/PublishForm.vue';
+import { POLICY_FIELDS } from '@/config/publishForms';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
 const emit = defineEmits(['toast', 'open-login']);
 
@@ -698,9 +608,18 @@ const taxResult = ref({
 
 // Modal state
 const selectedPolicy = ref(null);
+
+// 详情正文渲染：发布侧为富文本（Markdown）；卡片/标签预览退回纯文本
+const renderedPolicySummary = computed(() =>
+  selectedPolicy.value ? renderMarkdown(selectedPolicy.value.summary || '') : ''
+);
+
+function summaryExcerpt(item) {
+  return stripMarkdown(item?.summary || item?.description || '');
+}
 const aiSummaryResult = ref(null);
 const isAiSummarizing = ref(false);
-const showPublishModal = ref(false);
+const showPublishPage = ref(false);
 const isPublishing = ref(false);
 
 const publishForm = ref({
@@ -1033,7 +952,7 @@ function closePolicyDetail() {
 }
 
 // Publish Modal
-function openPublishModal() {
+function openPublishPage() {
   publishForm.value = {
     title: '',
     code: `POL-2026-${Math.floor(100 + Math.random() * 900)}`,
@@ -1047,14 +966,24 @@ function openPublishModal() {
     legal_basis: '国家相关部委扶持指引公告',
     action_text: '匹配资格',
   };
-  showPublishModal.value = true;
+  showPublishPage.value = true;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function closePublishModal() {
-  showPublishModal.value = false;
+function closePublishPage() {
+  showPublishPage.value = false;
 }
 
 async function submitPublishPolicy() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    emit('toast', {
+      title: '需要登录',
+      message: '请先登录创客账号后再发布政策公文。',
+      type: 'WARNING',
+    });
+    return;
+  }
   isPublishing.value = true;
   try {
     const conditions = publishForm.value.conditionsText
@@ -1080,22 +1009,22 @@ async function submitPublishPolicy() {
     if (res.ok) {
       emit('toast', {
         title: '政策发布成功',
-        message: `《${publishForm.value.title}》已成功持久化至数据库，并完成向量索引！`,
+        message: `《${publishForm.value.title}》已通过平台敏感词校验并发布；官方账号发布的内容会自动打上官方标签。`,
         type: 'SUCCESS',
       });
-      showPublishModal.value = false;
+      showPublishPage.value = false;
       await loadPolicies();
     } else {
       emit('toast', {
         title: '发布提示',
-        message: res.error || '政策发布需要管理员权限，请登录管理员账号。',
+        message: res.error || '发布未通过平台内容校验，请调整后重试。',
         type: 'WARNING',
       });
     }
   } catch (e) {
     emit('toast', {
       title: '发布失败',
-      message: e.message || '网络或接口通信异常，请检查权限。',
+      message: e.message || '网络或接口通信异常，请稍后重试。',
       type: 'ERROR',
     });
   } finally {
@@ -2349,13 +2278,6 @@ function formatLegalBasis(legal) {
   margin: 4px 0 0 0;
 }
 
-.publish-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
 
 .form-group {
   display: flex;

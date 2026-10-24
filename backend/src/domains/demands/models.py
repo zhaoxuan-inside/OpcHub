@@ -11,12 +11,14 @@ class DemandCreate(BaseModel):
     deadline_days: int = Field(default=14, ge=1)
     creator_id: str
     creator_name: Optional[str] = None
+    is_official: bool = False
 
 
 class DemandResponse(BaseModel):
     id: str
     creator_id: str
     creator_name: Optional[str] = None
+    is_official: bool = False
     title: str
     description: str
     budget_cny: float

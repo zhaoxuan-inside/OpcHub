@@ -13,6 +13,7 @@ from src.domains.sop.models import (
     SOPTemplateCreate,
     SOPTemplatesResponse,
     SOPDocumentCreate,
+    SOPDocumentDraftCreate,
     SOPDocumentResponse,
     SOPNode,
     SOPEdge,
@@ -935,6 +936,7 @@ class SOPService:
             form_data=merged_data,
             rendered_content=rendered,
             compliance_passed=True,
+            category=template.category,
             status="READY",
             created_at=now,
             updated_at=now,
@@ -943,6 +945,101 @@ class SOPService:
         self._documents[doc_id] = document
         domain_persistence.write("sop.documents", doc_id, document)
         return document
+
+    def save_draft_document(self, payload: SOPDocumentDraftCreate) -> SOPDocumentResponse:
+        """Persist a freely-edited document draft from the text editor.
+
+        This is the write path behind 「起草新文书」: the maker may start from a
+        template (``template_id`` records provenance and supplies the category)
+        but the body is the text they actually edited, stored verbatim with no
+        ``{placeholder}`` interpolation. Saving an existing ``doc_id`` updates
+        that private draft in place.
+        """
+        content = (payload.content or "").strip()
+        if not content:
+            raise ValueError("文书正文不能为空，请先撰写内容")
+
+        now = utc_now_iso()
+        template = None
+        if payload.template_id:
+            try:
+                template = self.get_template(payload.template_id)
+            except KeyError:
+                template = None
+
+        category = (
+            payload.category
+            or (template.category if template is not None else "")
+            or "LEGAL"
+        )
+
+        if payload.doc_id:
+            document = self.get_document(payload.doc_id)
+            if document.user_id and payload.user_id and document.user_id != payload.user_id:
+                raise ValueError("只能编辑本人创建的文书")
+            if document.status in (SOP_DOC_STATUS_PENDING_REVIEW, SOP_DOC_STATUS_PUBLISHED):
+                raise ValueError("审核中或已发布的文书不能直接修改")
+            document.document_title = self._draft_title(payload.title, document.document_title)
+            document.rendered_content = content
+            document.template_id = payload.template_id or document.template_id
+            document.category = category
+            document.status = SOP_DOC_STATUS_READY
+            document.updated_at = now
+            domain_persistence.write("sop.documents", document.id, document)
+            return document
+
+        doc_id = str(uuid.uuid4())
+        document = SOPDocumentResponse(
+            id=doc_id,
+            template_id=payload.template_id or "",
+            user_id=payload.user_id,
+            document_title=self._draft_title(payload.title, ""),
+            form_data={},
+            rendered_content=content,
+            compliance_passed=True,
+            category=category,
+            status=SOP_DOC_STATUS_READY,
+            created_at=now,
+            updated_at=now,
+        )
+        self._documents[doc_id] = document
+        domain_persistence.write("sop.documents", doc_id, document)
+        return document
+
+    @staticmethod
+    def _draft_title(title: str, fallback: str) -> str:
+        """Resolve the display title of an edited draft."""
+        clean = (title or "").strip()
+        if clean:
+            return clean[:255]
+        if fallback:
+            return fallback
+        stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
+        return f"未命名文书 {stamp}"
+
+    def snapshot_draft(self, doc_id: str) -> dict:
+        """Capture the mutable fields of a draft for Saga rollback."""
+        doc = self.get_document(doc_id)
+        return {
+            "document_title": doc.document_title,
+            "rendered_content": doc.rendered_content,
+            "template_id": doc.template_id,
+            "category": doc.category,
+            "status": doc.status,
+            "updated_at": doc.updated_at,
+        }
+
+    def restore_draft_snapshot(self, doc_id: str, snapshot: dict) -> bool:
+        """Restore a draft from a snapshot taken before an atomic save."""
+        doc = self._documents.get(str(doc_id))
+        if doc is None or not snapshot:
+            return False
+        for field in ("document_title", "rendered_content", "template_id",
+                      "category", "status", "updated_at"):
+            if field in snapshot:
+                setattr(doc, field, snapshot[field])
+        domain_persistence.write("sop.documents", doc.id, doc)
+        return True
 
     def get_document(self, doc_id: str) -> SOPDocumentResponse:
         """Retrieve persisted document by ID."""
@@ -1000,6 +1097,7 @@ class SOPService:
         title: str,
         content: str,
         author_id: str,
+        is_official: bool = False,
     ) -> SOPReviewItem:
         """Append one submission to the review queue in PENDING_REVIEW state."""
         item = SOPReviewItem(
@@ -1010,6 +1108,7 @@ class SOPService:
             content=content,
             author_id=author_id or "",
             author_name=self._resolve_author_name(author_id),
+            is_official=bool(is_official),
             status=SOP_REVIEW_STATUS_PENDING,
             submitted_at=utc_now_iso(),
         )
@@ -1017,11 +1116,12 @@ class SOPService:
         domain_persistence.write("sop.review_queue", item.id, item)
         return item
 
-    def submit_document_for_review(self, doc_id: str, user_id: str) -> SOPPublishResponse:
+    def submit_document_for_review(self, doc_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
         """Submit one of the maker's own documents for publish review.
 
         The document moves to PENDING_REVIEW (待审核) and a review item is
-        enqueued for the backend consumer to audit.
+        enqueued for the backend consumer to audit. ``is_official`` is decided
+        by the caller's role at the gateway (ADMIN ⇒ 官方发布).
         """
         doc = self.get_document(doc_id)
         if doc.user_id and user_id and doc.user_id != user_id:
@@ -1039,6 +1139,7 @@ class SOPService:
             title=doc.document_title,
             content=f"{doc.document_title}\n{self._flatten_text(doc.rendered_content)}",
             author_id=user_id or doc.user_id,
+            is_official=is_official,
         )
         domain_persistence.write("sop.documents", doc.id, doc)
         return SOPPublishResponse(
@@ -1050,11 +1151,12 @@ class SOPService:
             message="发布成功，文书已进入待审核状态，审核通过后将发布至标准文书库",
         )
 
-    def submit_flow_for_review(self, flow_id: str, user_id: str) -> SOPPublishResponse:
+    def submit_flow_for_review(self, flow_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
         """Submit one of the maker's own flows for publish review.
 
         The flow moves to PENDING_REVIEW (待审核) and a review item is
-        enqueued for the backend consumer to audit.
+        enqueued for the backend consumer to audit. ``is_official`` is decided
+        by the caller's role at the gateway (ADMIN ⇒ 官方发布).
         """
         flow = self.get_flow(flow_id)
         if flow.owner_id and user_id and flow.owner_id != user_id:
@@ -1078,6 +1180,7 @@ class SOPService:
             title=flow.name,
             content=content,
             author_id=user_id or flow.owner_id,
+            is_official=is_official,
         )
         domain_persistence.write("sop.flows", flow.id, flow)
         return SOPPublishResponse(
@@ -1088,6 +1191,30 @@ class SOPService:
             submitted_at=item.submitted_at,
             message="发布成功，流程已进入待审核状态，审核通过后将发布至流程向导",
         )
+
+    def withdraw_review_submission(self, item_id: str) -> bool:
+        """Withdraw a queued review submission (Saga compensation).
+
+        Removes the queue item and returns the owning document/flow to its
+        editable READY / ACTIVE state so the maker can revise and resubmit.
+        """
+        item = self._review_queue.pop(str(item_id), None)
+        if item is None:
+            return False
+        if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
+            doc = self._documents.get(item.target_id)
+            if doc is not None and doc.status == SOP_DOC_STATUS_PENDING_REVIEW:
+                doc.status = SOP_DOC_STATUS_READY
+                doc.updated_at = utc_now_iso()
+                domain_persistence.write("sop.documents", doc.id, doc)
+        else:
+            flow = self._flows.get(item.target_id)
+            if flow is not None and flow.status == SOP_FLOW_STATUS_PENDING_REVIEW:
+                flow.status = SOP_FLOW_STATUS_ACTIVE
+                flow.updated_at = utc_now_iso()
+                domain_persistence.write("sop.flows", flow.id, flow)
+        domain_persistence.delete("sop.review_queue", item.id)
+        return True
 
     def list_review_queue(self, status: Optional[str] = None) -> SOPReviewQueueResponse:
         """List the publish review queue, optionally filtered by status."""
@@ -1154,11 +1281,24 @@ class SOPService:
         return result
 
     async def _audit_review_item(self, item: SOPReviewItem) -> None:
-        """Audit one queued submission: sensitive words + legality/compliance."""
-        from src.infrastructure.external_gateway.content_moderation_gateway import check_content_safety
+        """Audit one queued submission: sensitive words + legality/compliance.
+
+        Uses the unified two-tier moderation gate: the local NLP pre-screen
+        answers CONFIRMED_SAFE / CONFIRMED_VIOLATION itself; only UNCERTAIN
+        content is deferred to the external moderation service.
+        """
+        from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
 
         # 1. Sensitive-word / content-safety gate (敏感词与内容安全).
-        await check_content_safety(item.content, field_name=f"{item.target_type} 发布审核")
+        await prescreen_and_record(
+            item.content,
+            field_name=f"{item.target_type} 发布审核",
+            user_id=item.author_id,
+            scene="流程文书审核",
+            title=item.title,
+            target_type=item.target_type,
+            target_id=item.target_id,
+        )
 
         # 2. Legality & compliance completeness checks (合法性与合规性).
         if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
@@ -1184,14 +1324,14 @@ class SOPService:
         now = utc_now_iso()
         if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
             doc = self.get_document(item.target_id)
-            node_id = self.publish_document_to_catalog(doc)
+            node_id = self.publish_document_to_catalog(doc, is_official=item.is_official)
             doc.status = SOP_DOC_STATUS_PUBLISHED
             doc.updated_at = now
             domain_persistence.write("sop.documents", doc.id, doc)
             item.review_note = f"审核通过：内容合法合规，已发布至标准文书库（{node_id}）"
         else:
             flow = self.get_flow(item.target_id)
-            template_id = self.publish_flow_to_catalog(flow)
+            template_id = self.publish_flow_to_catalog(flow, is_official=item.is_official)
             flow.status = SOP_FLOW_STATUS_PUBLISHED
             flow.updated_at = now
             domain_persistence.write("sop.flows", flow.id, flow)
@@ -1220,13 +1360,20 @@ class SOPService:
         item.moderator_id = "review_engine"
         domain_persistence.write("sop.review_queue", item.id, item)
 
-    def publish_document_to_catalog(self, doc: SOPDocumentResponse) -> str:
+    def publish_document_to_catalog(self, doc: SOPDocumentResponse, is_official: bool = False) -> str:
         """Promote a maker's document into the standard document catalog (标准文书库).
 
         The rendered document becomes a fillable document node in the graph, so it
         shows up in the workbench alongside the curated standard documents.
         """
-        template = self.get_template(doc.template_id)
+        template = None
+        if doc.template_id:
+            try:
+                template = self.get_template(doc.template_id)
+            except KeyError:
+                template = None
+        stage = template.stage if template is not None else 1
+        category = doc.category or (template.category if template is not None else "LEGAL")
         node_id = f"tpl_pub_{uuid.uuid4().hex[:8]}"
         body = self._flatten_text(doc.rendered_content)
         node = SOPNode(
@@ -1234,16 +1381,16 @@ class SOPService:
             kind=SOP_NODE_DOCUMENT,
             code=f"PUB_{uuid.uuid4().hex[:6].upper()}",
             name=doc.document_title,
-            stage=template.stage,
-            category=template.category,
+            stage=stage,
+            category=category,
             description=body[:120],
-            outcome="由创客发布的标准文书，可直接查看与复用",
+            outcome="由创客发布的标准文书，可直接查看与复用" if not is_official else "官方发布的标准文书，可直接查看与复用",
             next_hint="查看文书正文，按需用于商事与合规申报。",
             summary=body[:90] or "创客发布的合规文书",
             author_name=self._resolve_author_name(doc.user_id),
-            author_title="创客发布",
-            publisher_org="创客发布",
-            is_official=False,
+            author_title="官方发布" if is_official else "创客发布",
+            publisher_org="官方发布" if is_official else "创客发布",
+            is_official=is_official,
             published_at=utc_now_iso(),
             template_content=doc.rendered_content,
             required_fields=[],
@@ -1255,7 +1402,7 @@ class SOPService:
         domain_persistence.write("sop.templates", node_id, self._templates[node_id])
         return node_id
 
-    def publish_flow_to_catalog(self, flow: SOPFlow) -> str:
+    def publish_flow_to_catalog(self, flow: SOPFlow, is_official: bool = False) -> str:
         """Promote a maker's flow into the platform flow guide (流程向导)."""
         steps, _missing = self._build_plan_items(
             [(ref.node_id, ref.required) for ref in flow.node_refs]
@@ -1275,11 +1422,11 @@ class SOPService:
                 SOPFlowTemplateRef(node_id=ref.node_id, required=ref.required, note=ref.note)
                 for ref in flow.node_refs
             ],
-            outcome=f"由创客编排的办事流程，共 {len(steps)} 个步骤",
+            outcome=f"由创客编排的办事流程，共 {len(steps)} 个步骤" if not is_official else f"官方编排的办事流程，共 {len(steps)} 个步骤",
             author_name=self._resolve_author_name(flow.owner_id),
-            author_title="创客发布",
-            publisher_org="创客发布",
-            is_official=False,
+            author_title="官方发布" if is_official else "创客发布",
+            publisher_org="官方发布" if is_official else "创客发布",
+            is_official=is_official,
             published_at=utc_now_iso(),
         )
         self._flow_templates[template_id] = template

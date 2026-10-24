@@ -1,4 +1,5 @@
 """Content moderation service managing violation reports and take-down enforcement."""
+import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from fastapi import HTTPException
@@ -9,6 +10,7 @@ from .models import (
     ModerationActionResponse,
 )
 from src.infrastructure.database.persistence import domain_persistence
+from .models import ContentReportRequest, REPORTABLE_TARGET_TYPES
 
 
 def utc_now_iso() -> str:
@@ -30,6 +32,57 @@ class ModerationService:
     def get_item(self, item_id: str) -> Optional[ModerationItemResponse]:
         return self._items.get(item_id)
 
+    def report(self, req: ContentReportRequest) -> ModerationItemResponse:
+        """Record a user report (举报) against a piece of published content.
+
+        Community reports are the user-interaction signal that keeps published
+        information honest: the platform does not verify authenticity itself —
+        reported content lands in the FLAGGED queue for operator disposition
+        (takedown / restore). Reports on the same target are merged into one
+        item whose report_count accumulates.
+        """
+        from .models import ModerationItemResponse as _Item
+
+        tt = str(req.target_type or "").strip().upper()
+        tid = str(req.target_id or "").strip()
+        if tt not in REPORTABLE_TARGET_TYPES:
+            raise ValueError(f"Unsupported report target_type: {req.target_type}")
+        if not tid:
+            raise ValueError("target_id is required for a report")
+
+        now = utc_now_iso()
+        existing = next(
+            (it for it in self._items.values()
+             if it.target_type == tt and it.target_id == tid and it.status == "FLAGGED"),
+            None,
+        )
+        if existing:
+            existing.report_count += 1
+            existing.reported_at = now
+            if req.reason and not existing.reason:
+                existing.reason = req.reason
+            domain_persistence.write("moderation.items", existing.id, existing)
+            return existing
+
+        item_id = f"mod_{uuid.uuid4().hex[:10]}"
+        snippet = (req.snippet_content or req.target_title or "").strip()[:160]
+        item = _Item(
+            id=item_id,
+            target_type=tt,
+            target_id=tid,
+            author_id=req.author_id or "",
+            author_name=req.author_name or "",
+            snippet_content=snippet,
+            violation_type="USER_REPORT",
+            status="FLAGGED",
+            report_count=1,
+            reported_at=now,
+            reason=req.reason or "用户举报：内容疑似违规或失实",
+        )
+        self._items[item_id] = item
+        domain_persistence.write("moderation.items", item_id, item)
+        return item
+
     def revert_takedown(self, item_id: str, prev_status: str = "FLAGGED") -> bool:
         item = self._items.get(item_id)
         if item:
@@ -46,6 +99,23 @@ class ModerationService:
             domain_persistence.write("moderation.items", item_id, item)
             return True
         return False
+
+    def revert_report(self, item_id: str, previous_count: int = 0) -> bool:
+        """Roll back a recorded report (Saga compensation).
+
+        A newly-created report is removed; an incremental report on an existing
+        item is restored to its previous ``report_count``.
+        """
+        item = self._items.get(item_id)
+        if not item:
+            return False
+        if previous_count <= 0:
+            del self._items[item_id]
+            domain_persistence.delete("moderation.items", item_id)
+            return True
+        item.report_count = previous_count
+        domain_persistence.write("moderation.items", item.id, item)
+        return True
 
     def takedown(self, req: TakedownRequest) -> ModerationActionResponse:
         item = self._items.get(req.item_id)

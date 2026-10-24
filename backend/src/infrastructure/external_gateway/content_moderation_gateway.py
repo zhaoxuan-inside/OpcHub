@@ -21,6 +21,23 @@ logger = logging.getLogger("opchub.gateway.moderation")
 DEFAULT_ENDPOINT = "http://127.0.0.1:8099"
 
 
+class ContentModerationViolation(ValueError):
+    """Structured moderation rejection carrying machine-readable evidence."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        hit_words: Optional[List[str]] = None,
+        verdict: str = "CONFIRMED_VIOLATION",
+        field_name: str = "content",
+    ):
+        super().__init__(message)
+        self.hit_words = list(hit_words or [])
+        self.verdict = verdict
+        self.field_name = field_name
+
+
 class ContentModerationGateway:
     """Outbound client connecting to Aliyun Green content security service via standard HTTP."""
 
@@ -169,9 +186,13 @@ async def prescreen_and_scan(content: str, field_name: str = "content") -> Dict[
         }
 
     if nlp["verdict"] == VERDICT_VIOLATION:
-        raise ValueError(
-            f"Content moderation violation: local NLP pre-screen flagged prohibited content "
-            f"{nlp['hit_sensitive'] or nlp['matched_patterns']} in {field_name}"
+        hits = nlp["hit_sensitive"] or nlp["matched_patterns"]
+        raise ContentModerationViolation(
+            f"Content moderation violation: 内容未通过平台敏感词校验（moderation），"
+            f"命中本地预筛强违规词 {hits}，字段「{field_name}」",
+            hit_words=hits,
+            verdict=VERDICT_VIOLATION,
+            field_name=field_name,
         )
 
     # UNCERTAIN → defer to the external service.
@@ -183,10 +204,67 @@ async def prescreen_and_scan(content: str, field_name: str = "content") -> Dict[
             "external_unavailable": True, "nlp": nlp, "external": ext,
         }
     if not ext["passed"]:
-        raise ValueError(
-            f"Content moderation violation: found prohibited keywords {ext['hit_words']} in {field_name}"
+        raise ContentModerationViolation(
+            f"Content moderation violation: 内容未通过平台敏感词校验（moderation），"
+            f"外部审核命中 {ext['hit_words']}，字段「{field_name}」",
+            hit_words=ext.get("hit_words") or [],
+            verdict="UNCERTAIN",
+            field_name=field_name,
         )
     return {
         "verdict": "UNCERTAIN", "passed": True, "external_scan_used": True,
         "external_unavailable": False, "nlp": nlp, "external": ext,
     }
+
+
+async def prescreen_and_record(
+    content: str,
+    field_name: str = "content",
+    *,
+    user_id: str = "",
+    scene: str = "",
+    title: str = "",
+    target_type: str = "",
+    target_id: str = "",
+) -> Dict[str, Any]:
+    """Run the two-tier gate and drop a sensitive-word receipt in the user's inbox.
+
+    Every publish attempt produces exactly one moderation receipt:
+    * PASSED             – 校验通过，内容进入发布流程
+    * PASSED_DEGRADED    – 外部服务不可用，按 fail-open 先行放行
+    * BLOCKED            – 命中敏感词，发布被阻止（附命中词）
+
+    Notification delivery is best-effort: a message-box failure is logged but
+    never blocks or changes the publish decision.
+    """
+    from src.domains.notifications.service import notification_service
+
+    def _record(verdict: str, hit_words: Optional[List[str]] = None, reason: str = "") -> None:
+        if not user_id:
+            return
+        try:
+            notification_service.record_moderation_result(
+                user_id=user_id,
+                scene=scene,
+                title=title,
+                verdict=verdict,
+                hit_words=hit_words,
+                reason=reason,
+                target_type=target_type,
+                target_id=target_id,
+            )
+        except Exception as exc:  # pragma: no cover - defensive best effort
+            logger.warning("[ContentModerationGateway] failed to record notification: %s", exc)
+
+    try:
+        res = await prescreen_and_scan(content, field_name=field_name)
+    except ContentModerationViolation as exc:
+        _record("BLOCKED", exc.hit_words, str(exc))
+        raise
+    except ValueError as exc:
+        _record("BLOCKED", [], str(exc))
+        raise
+
+    verdict = "PASSED_DEGRADED" if res.get("external_unavailable") else "PASSED"
+    _record(verdict)
+    return res

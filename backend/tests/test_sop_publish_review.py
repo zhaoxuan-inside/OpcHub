@@ -55,8 +55,9 @@ def passing_moderation(monkeypatch):
     import importlib
     cg_module = importlib.import_module("src.infrastructure.external_gateway.content_moderation_gateway")
     async def _pass(content: str, field_name: str = "content"):
-        return None
-    monkeypatch.setattr(cg_module, "check_content_safety", _pass)
+        return {"verdict": "CONFIRMED_SAFE", "passed": True, "external_scan_used": False,
+                "external_unavailable": False, "nlp": {}, "external": {}}
+    monkeypatch.setattr(cg_module, "prescreen_and_scan", _pass)
 
 
 @pytest.fixture
@@ -66,7 +67,7 @@ def blocking_moderation(monkeypatch):
     cg_module = importlib.import_module("src.infrastructure.external_gateway.content_moderation_gateway")
     async def _block(content: str, field_name: str = "content"):
         raise ValueError("Content moderation violation: found prohibited keywords")
-    monkeypatch.setattr(cg_module, "check_content_safety", _block)
+    monkeypatch.setattr(cg_module, "prescreen_and_scan", _block)
 
 
 def _make_doc(user_id="usr_review_doc", company="杭州极速微光科技有限公司"):

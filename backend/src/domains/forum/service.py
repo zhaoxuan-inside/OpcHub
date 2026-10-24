@@ -123,6 +123,7 @@ class ForumService:
             category_code=payload.category_code,
             author_id=payload.author_id,
             author_name=payload.author_name,
+            is_official=payload.is_official,
             title=payload.title,
             content=payload.content,
             view_count=0,

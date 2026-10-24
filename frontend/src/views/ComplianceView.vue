@@ -1,198 +1,30 @@
 <template>
   <div class="view-panel active compliance-view-wrapper">
-    <!-- Mode 1: Inline Create View (内容区内联展开发布法条/案例，同论坛"发起新风暴话题") -->
-    <div v-if="currentViewMode === 'create'" class="compliance-create-page">
-      <!-- Top Fluid Navigation & Actions Header -->
-      <div class="glass-box create-page-header">
-        <div class="header-left-cluster">
-          <button class="btn-back-square" @click="closePublishModal" title="返回合规知识库 (不保存可放弃)">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <line x1="19" y1="12" x2="5" y2="12"></line>
-              <polyline points="12 19 5 12 12 5"></polyline>
-            </svg>
-          </button>
+    <!-- Mode 1: Full-page create view (统一发布体验：分区下拉 + 富文本正文) -->
+    <CreatePageLayout
+      v-if="currentViewMode === 'create'"
+      title="发布法条 / 案例"
+      back-label="合规指南"
+      @back="closePublishModal"
+    >
+      <template #actions>
+        <button
+          type="submit"
+          form="compliance-publish-form"
+          class="btn-liquid"
+          :disabled="isPublishing"
+        >
+          {{ isPublishing ? '发布中…' : '发布' }}
+        </button>
+      </template>
 
-          <div class="page-title-cluster">
-            <div class="breadcrumb-row">
-              <span class="crumb-link" @click="closePublishModal">合规指南中心</span>
-              <span class="crumb-separator">/</span>
-              <span class="crumb-current">发布法条 / 案例</span>
-            </div>
-            <h1 class="page-main-title">发布法条或避坑案例</h1>
-          </div>
-        </div>
-
-        <!-- Right Action Controls -->
-        <div class="header-actions-cluster">
-          <button
-            type="button"
-            class="btn-liquid btn-header-publish"
-            :disabled="isPublishing"
-            @click="submitPublish"
-          >
-            <svg v-if="!isPublishing" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-            <span v-else class="loading-spinner"></span>
-            <span>{{ isPublishing ? '正在发布...' : '立即发布入库' }}</span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Main Workspace Container (内容区表单，同论坛发起新风暴) -->
-      <div class="glass-box create-workspace-box">
-        <!-- 1. Kind Selection Row (法条 / 案例) -->
-        <div class="form-row category-selector-row">
-          <label class="section-label">
-            <span>收录类型</span>
-            <span class="required-star">*</span>
-          </label>
-          <div class="categories-pill-row">
-            <button
-              type="button"
-              class="cat-select-btn"
-              :class="{ active: publishForm.kind === 'law' }"
-              @click="publishForm.kind = 'law'"
-            >
-              <span class="cat-dot" style="background: var(--accent)"></span>
-              <span class="cat-name"><OpcIcon name="scroll" :size="14" /> 法条</span>
-              <span class="cat-desc">法律、行政法规、部门规章白话提炼</span>
-            </button>
-            <button
-              type="button"
-              class="cat-select-btn"
-              :class="{ active: publishForm.kind === 'case' }"
-              @click="publishForm.kind = 'case'"
-            >
-              <span class="cat-dot" style="background: var(--text-secondary)"></span>
-              <span class="cat-name"><OpcIcon name="case" :size="14" /> 案例</span>
-              <span class="cat-desc">典型监管处罚与避坑教训</span>
-            </button>
-          </div>
-        </div>
-
-        <!-- 2. Title Input -->
-        <div class="form-row title-input-row">
-          <label class="section-label">
-            <span>标题</span>
-            <span class="required-star">*</span>
-          </label>
-          <div class="title-input-wrapper">
-            <input
-              v-model="publishForm.title"
-              type="text"
-              class="glass-input title-large-input"
-              :placeholder="publishForm.kind === 'law' ? '如：个人信息保护法 · 最小必要原则' : '如：某平台因内嵌资金池涉二清被冻结'"
-            />
-          </div>
-        </div>
-
-        <!-- Law-specific fields -->
-        <template v-if="publishForm.kind === 'law'">
-          <div class="form-row">
-            <label class="section-label">
-              <span>白话要点</span>
-              <span class="required-star">*</span>
-            </label>
-            <input
-              v-model="publishForm.summary"
-              type="text"
-              class="glass-input"
-              placeholder="简明说明法条核心要求与适用对象"
-            />
-          </div>
-
-          <div class="form-grid-2">
-            <div class="form-row">
-              <label class="section-label">效力级别</label>
-              <select v-model="publishForm.level" class="glass-input glass-select">
-                <option value="法律">法律</option>
-                <option value="行政法规">行政法规</option>
-                <option value="部门规章">部门规章</option>
-                <option value="地方性法规">地方性法规</option>
-              </select>
-            </div>
-            <div class="form-row">
-              <label class="section-label">发布机关</label>
-              <input v-model="publishForm.issuer" type="text" class="glass-input" placeholder="如：全国人民代表大会常务委员会" />
-            </div>
-            <div class="form-row">
-              <label class="section-label">发布日期</label>
-              <input v-model="publishForm.published_at" type="text" class="glass-input" placeholder="如：2021-08-20" />
-            </div>
-            <div class="form-row">
-              <label class="section-label">法条编号</label>
-              <input v-model="publishForm.code" type="text" class="glass-input" placeholder="如：LAW-07" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">核心条文内容</label>
-            <textarea v-model="publishForm.content" rows="3" class="glass-input" placeholder="法条核心条文要点..." />
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">违规罚则</label>
-            <input v-model="publishForm.penalties" type="text" class="glass-input" placeholder="违反本法的法律责任..." />
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">
-              <span>官方法条依据</span>
-              <span class="required-star">*</span>
-            </label>
-            <input v-model="publishForm.law_ref" type="text" class="glass-input" placeholder="如：《个人信息保护法》第十三条" />
-          </div>
-        </template>
-
-        <!-- Case-specific fields -->
-        <template v-else>
-          <div class="form-grid-2">
-            <div class="form-row">
-              <label class="section-label">涉及行业</label>
-              <input v-model="publishForm.industry" type="text" class="glass-input" placeholder="如：微支付 / 工具聚合" />
-            </div>
-            <div class="form-row">
-              <label class="section-label">徽章文案</label>
-              <input v-model="publishForm.badge" type="text" class="glass-input" placeholder="如：二清违规冻结 · 涉案 68 万元" />
-            </div>
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">
-              <span>案情背景与违规事实</span>
-              <span class="required-star">*</span>
-            </label>
-            <textarea v-model="publishForm.violation" rows="3" class="glass-input" placeholder="描述违规行为与背景..." />
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">
-              <span>监管处罚结果</span>
-              <span class="required-star">*</span>
-            </label>
-            <input v-model="publishForm.consequence" type="text" class="glass-input" placeholder="处罚结果..." />
-          </div>
-
-          <div class="form-row">
-            <label class="section-label">
-              <span>避坑经验</span>
-              <span class="required-star">*</span>
-            </label>
-            <input v-model="publishForm.lesson" type="text" class="glass-input" placeholder="给创客的避坑建议..." />
-          </div>
-        </template>
-
-        <!-- Footer Actions -->
-        <div class="create-footer-actions">
-          <button type="button" class="btn-liquid-outline" @click="closePublishModal">取消</button>
-          <button type="button" class="btn-liquid" :disabled="isPublishing" @click="submitPublish">
-            {{ isPublishing ? '提交入库中...' : '确认发布入库' }}
-          </button>
-        </div>
-      </div>
-    </div>
+      <PublishForm
+        id="compliance-publish-form"
+        :model="publishForm"
+        :fields="COMPLIANCE_FIELDS"
+        @submit="submitPublish"
+      />
+    </CreatePageLayout>
 
     <!-- Mode 2: List View (双栏知识库流) -->
     <div v-else class="compliance-main-content">
@@ -328,6 +160,7 @@
                         </span>
                         <span class="badge-industry"><OpcIcon name="factory" :size="12" /> {{ item.industry }}</span>
                       </template>
+                      <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
                   </div>
                 </div>
@@ -423,7 +256,8 @@
                 <template v-if="isLaw(selectedItem)">
                   <div class="detail-section">
                     <h4 class="section-title">核心条文要点</h4>
-                    <p class="detail-full-description">{{ selectedItem.content || selectedItem.summary }}</p>
+                    <!-- 正文为富文本编辑器产出的 Markdown，渲染后展示 -->
+                    <div class="detail-full-description markdown-rendered-content" v-html="renderedLawContent"></div>
                   </div>
                   <div class="detail-section">
                     <h4 class="section-title">违规罚则</h4>
@@ -462,7 +296,7 @@
                 <template v-else>
                   <div class="detail-section">
                     <h4 class="section-title">案情背景与违规事实</h4>
-                    <p class="detail-full-description">{{ selectedItem.violation }}</p>
+                    <div class="detail-full-description markdown-rendered-content" v-html="renderedCaseViolation"></div>
                   </div>
                   <div class="detail-section">
                     <h4 class="section-title">监管处罚结果</h4>
@@ -475,6 +309,9 @@
                     </div>
                   </div>
                 </template>
+
+                <!-- 展示页面免责声明 -->
+                <ContentDisclaimer type="compliance" />
               </div>
             </div>
 
@@ -583,6 +420,12 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
+import OfficialBadge from '@/components/OfficialBadge.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
+import PublishForm from '@/components/PublishForm.vue';
+import CreatePageLayout from '@/components/CreatePageLayout.vue';
+import { COMPLIANCE_FIELDS } from '@/config/publishForms';
+import { renderMarkdown } from '@/utils/markdown';
 import {
   COMPLIANCE_LAW_ICONS,
   COMPLIANCE_LEVEL_COLORS,
@@ -591,7 +434,17 @@ import {
   COMPLIANCE_HOT_RANK_LIMIT,
 } from '@/config/compliancePage';
 
-const emit = defineEmits(['switch-tab', 'toast']);
+const emit = defineEmits(['switch-tab', 'toast', 'open-login']);
+
+// 当前登录会话（页面未接收 userSession prop，与 SopView 同样从本地存储读取）
+function safeSession() {
+  try {
+    const raw = localStorage.getItem('opchub_user_session');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // ---- Knowledge base (from PostgreSQL via gateway) ----
 const laws = ref([]);
@@ -605,6 +458,15 @@ const searchQuery = ref('');
 const currentCategory = ref('ALL');
 const currentSort = ref('hot');
 const selectedItem = ref(null);
+
+// 详情正文渲染：发布侧为富文本（Markdown），详情侧统一渲染后展示
+const renderedLawContent = computed(() =>
+  selectedItem.value ? renderMarkdown(selectedItem.value.content || selectedItem.value.summary || '') : ''
+);
+
+const renderedCaseViolation = computed(() =>
+  selectedItem.value ? renderMarkdown(selectedItem.value.violation || '') : ''
+);
 
 const categoryList = [
   { key: 'ALL', label: '全部', icon: 'shield' },
@@ -805,6 +667,15 @@ function closePublishModal() {
 }
 
 async function submitPublish() {
+  if (!safeSession()) {
+    emit('open-login');
+    emit('toast', {
+      title: '需要登录',
+      message: '请先登录创客账号后再发布法条或避坑案例。',
+      type: 'WARNING',
+    });
+    return;
+  }
   isPublishing.value = true;
   try {
     const res = await dispatchGateway('compliance.publish', { ...publishForm.value });
@@ -812,7 +683,7 @@ async function submitPublish() {
       const kindLabel = publishForm.value.kind === 'law' ? '法条' : '案例';
       emit('toast', {
         title: `${kindLabel}发布成功`,
-        message: `《${publishForm.value.title}》已成功持久化至 PostgreSQL 合规知识库！`,
+        message: `《${publishForm.value.title}》已通过平台敏感词校验并收录至合规知识库。`,
         type: 'SUCCESS',
       });
       currentViewMode.value = 'list';
@@ -820,14 +691,14 @@ async function submitPublish() {
     } else {
       emit('toast', {
         title: '发布提示',
-        message: res.error || '请登录创客账号后发布法条或案例。',
+        message: res.error || '发布未通过平台内容校验，请调整后重试。',
         type: 'WARNING',
       });
     }
   } catch (e) {
     emit('toast', {
       title: '发布失败',
-      message: e.message || '网络或接口通信异常，请检查登录状态。',
+      message: e.message || '网络或接口通信异常，请稍后重试。',
       type: 'ERROR',
     });
   } finally {

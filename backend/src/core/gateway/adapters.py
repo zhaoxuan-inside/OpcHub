@@ -19,17 +19,36 @@ from src.core.rag import policy_rag_service, forum_rag_service
 from src.domains.interactions.service import content_interaction_service  # noqa: E402,F401
 
 
+def _publish_identity_fields(
+    inputs: Dict[str, Any],
+    c: Dict[str, Any] = None,
+    author_key: str = "author_id",
+    name_key: str = "author_name",
+) -> None:
+    """Declare the payload identity fields for the identity-guard operator.
+
+    Identity binding and the official tag are now decided inside
+    ``content.publish.identity_guard``, which reads the gateway context that is
+    propagated with the scenario request. Adapters only declare which payload
+    fields carry the author identity.
+    """
+    inputs["_author_key"] = author_key
+    inputs["_author_name_key"] = name_key
+
+
 async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for enterprise outsourcing demand publishing."""
     inputs = dict(p)
     if "demand_payload" in inputs and isinstance(inputs["demand_payload"], dict):
         inputs.update(inputs["demand_payload"])
+    _publish_identity_fields(inputs, c, author_key="creator_id", name_key="creator_name")
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_DEMAND_PUBLISH_PIPELINE",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -43,12 +62,14 @@ async def demand_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any
     inputs = dict(p)
     if "bid_payload" in inputs and isinstance(inputs["bid_payload"], dict):
         inputs.update(inputs["bid_payload"])
+    _publish_identity_fields(inputs, c, author_key="bidder_id", name_key="bidder_name")
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_DEMAND_BID_PIPELINE",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -223,28 +244,68 @@ async def sop_document_render_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
     return res.final_output.get("created_doc") or res.final_output
 
 
+async def sop_document_draft_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Save a freely-edited document draft via the unified draft DAG (起草新文书).
+
+    算子链路：identity_guard → sop.document.draft.guard（正文校验 + 修改前
+    快照）→ draft.persist（新建删除 / 更新回滚）→ telemetry。
+    """
+    inputs = dict(p or {})
+    _publish_identity_fields(inputs, c, author_key="user_id", name_key="author_name")
+    inputs["_publish_metric"] = "sop.document.drafted"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_SOP_DOCUMENT_DRAFT_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "SOP document draft pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_doc") or res.final_output
+
+
 async def sop_document_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Submit one of the maker's own documents for publish review (发布 → 待审核)."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    doc_id = payload.get("doc_id") or ""
-    if not doc_id:
-        raise ValueError("doc_id is required for SOP document publish review")
-    res = sop_service.submit_document_for_review(doc_id, user_id)
-    return res.model_dump()
+    """Submit a maker document for publish review via the unified DAG."""
+    inputs = dict(p or {})
+    _publish_identity_fields(inputs, c, author_key="user_id", name_key="author_name")
+    inputs["_publish_metric"] = "sop.document.submitted"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_SOP_DOCUMENT_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "SOP document publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("review_submission") or res.final_output
 
 
 async def sop_flow_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Submit one of the maker's own flows for publish review (发布 → 待审核)."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    flow_id = payload.get("flow_id") or ""
-    if not flow_id:
-        raise ValueError("flow_id is required for SOP flow publish review")
-    res = sop_service.submit_flow_for_review(flow_id, user_id)
-    return res.model_dump()
+    """Submit a maker flow for publish review via the unified DAG."""
+    inputs = dict(p or {})
+    _publish_identity_fields(inputs, c, author_key="user_id", name_key="author_name")
+    inputs["_publish_metric"] = "sop.flow.submitted"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_SOP_FLOW_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "SOP flow publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("review_submission") or res.final_output
 
 
 async def sop_review_queue_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -289,12 +350,14 @@ async def perk_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     inputs = dict(p)
     if "perk_payload" in inputs and isinstance(inputs["perk_payload"], dict):
         inputs.update(inputs["perk_payload"])
+    _publish_identity_fields(inputs, c)
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_PERK_PUBLISH_PIPELINE",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -320,6 +383,88 @@ async def compliance_audit_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) 
         error_msg = res.error_message or "Compliance audit pipeline failed"
         raise ValueError(error_msg)
     return res.final_output.get("audit_report") or res.final_output
+
+
+async def content_report_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """User report on questionable content via the report DAG (用户举报).
+
+    算子链路：moderation.report.guard（目标/举报人校验）→ report.persist
+    （同目标合并去重，含补偿）→ telemetry。
+    """
+    inputs = dict(p or {})
+    inputs["_publish_metric"] = "moderation.reported"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_MODERATION_REPORT_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Content report pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_report") or res.final_output
+
+
+def _notification_uid(c: Dict[str, Any] = None) -> str:
+    uid = str((c or {}).get("user_id") or "").strip()
+    if not uid:
+        raise PermissionError("请先登录创客账号后查看消息箱")
+    return uid
+
+
+async def notifications_list_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """List the caller's own message-box receipts (消息箱)."""
+    from src.domains.notifications.service import notification_service
+
+    payload = p or {}
+    res = notification_service.list_for_user(
+        _notification_uid(c),
+        status=payload.get("status"),
+        limit=int(payload.get("limit") or 50),
+        offset=int(payload.get("offset") or 0),
+    )
+    return res.model_dump()
+
+
+async def notifications_unread_count_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Return the caller's unread message count (navbar badge)."""
+    from src.domains.notifications.service import notification_service
+
+    return {"unread": notification_service.unread_count(_notification_uid(c))}
+
+
+async def notifications_mark_read_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Mark one/several of the caller's messages as read."""
+    from src.domains.notifications.service import notification_service
+
+    payload = p or {}
+    ids = payload.get("ids")
+    if not isinstance(ids, list):
+        ids = [payload.get("id")] if payload.get("id") else []
+    res = notification_service.mark_read(_notification_uid(c), [str(i) for i in ids if i])
+    return res.model_dump()
+
+
+async def notifications_mark_all_read_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Mark every unread message of the caller as read."""
+    from src.domains.notifications.service import notification_service
+
+    return notification_service.mark_all_read(_notification_uid(c)).model_dump()
+
+
+async def notifications_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Delete one message owned by the caller."""
+    from src.domains.notifications.service import notification_service
+
+    payload = p or {}
+    res = notification_service.delete(
+        _notification_uid(c),
+        str(payload.get("id") or payload.get("notification_id") or ""),
+    )
+    return res.model_dump()
 
 
 async def moderation_takedown_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -386,16 +531,14 @@ async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
         inputs.update(inputs["thread_payload"])
 
     # Bind authenticated user identity if author_id is not explicitly provided
-    if not inputs.get("author_id") and (c or {}).get("user_id"):
-        inputs["author_id"] = c["user_id"]
-    if not inputs.get("author_name"):
-        inputs["author_name"] = (c or {}).get("nickname") or (c or {}).get("username")
+    _publish_identity_fields(inputs, c)
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_FORUM_THREAD_PUBLISH",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -427,12 +570,14 @@ async def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> 
     inputs = dict(p)
     if "comment_payload" in inputs and isinstance(inputs["comment_payload"], dict):
         inputs.update(inputs["comment_payload"])
-    
+    _publish_identity_fields(inputs, c)
+
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_FORUM_COMMENT_PUBLISH",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -446,12 +591,14 @@ async def product_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -
     inputs = dict(p)
     if "product_payload" in inputs and isinstance(inputs["product_payload"], dict):
         inputs.update(inputs["product_payload"])
+    _publish_identity_fields(inputs, c)
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_PRODUCT_PUBLISH_PIPELINE",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
@@ -484,18 +631,44 @@ async def policy_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) ->
     inputs = dict(p)
     if "policy_payload" in inputs and isinstance(inputs["policy_payload"], dict):
         inputs.update(inputs["policy_payload"])
+    _publish_identity_fields(inputs, c)
 
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_POLICY_PUBLISH_PIPELINE",
             version="v1.0.0",
             inputs=inputs,
+            context=dict(c or {}),
         )
     )
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Policy publish pipeline failed"
         raise ValueError(error_msg)
     return res.final_output.get("created_policy") or res.final_output
+
+
+async def compliance_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Publish a legal provision / pitfall case via the unified publish DAG.
+
+    算子链路：content.publish.identity_guard → compliance.publish.guard（两级
+    敏感词门禁）→ compliance.publish.persist（含 Saga 补偿）→ telemetry。
+    """
+    inputs = dict(p or {})
+    _publish_identity_fields(inputs, c)
+    inputs["_publish_metric"] = "compliance.published"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_COMPLIANCE_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Compliance publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_entry") or res.final_output
 
 
 async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
@@ -1020,23 +1193,22 @@ async def content_comments_list_adapter(p: Dict[str, Any], c: Dict[str, Any] = N
 
 
 async def content_comments_create_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Create a comment on a public content target for the caller."""
-    from src.domains.interactions.service import content_interaction_service
+    """Create a comment via the unified comment publish DAG."""
+    inputs = dict(p or {})
+    inputs["_publish_metric"] = "content.comment.created"
 
-    ctx = c or {}
-    user_id = ctx.get("user_id", "")
-    if not user_id:
-        raise PermissionError("请先登录创客账号后再发表评论")
-    payload = p or {}
-    comment = content_interaction_service.create_comment(
-        user_id=str(user_id),
-        target_type=payload.get("target_type", ""),
-        target_id=str(payload.get("target_id", "")),
-        content=payload.get("content", ""),
-        author_name=payload.get("author_name"),
-        parent_id=payload.get("parent_id"),
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_CONTENT_COMMENT_PUBLISH_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
     )
-    return comment.model_dump()
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Content comment pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_comment") or res.final_output
 
 
 async def content_comments_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:

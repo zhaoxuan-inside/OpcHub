@@ -17,6 +17,7 @@ class ProductCreate(BaseModel):
     download_url: Optional[str] = None
     author_name: Optional[str] = None
     author_id: str = ""
+    is_official: bool = False
     screenshots: Optional[List[str]] = None
 
 
@@ -35,6 +36,7 @@ class ProductResponse(BaseModel):
     official_url: Optional[str] = None
     download_url: Optional[str] = None
     author_name: Optional[str] = None
+    is_official: bool = False
     screenshots: Optional[List[str]] = None
     upvote_count: int = 0
     favorite_count: int = 0

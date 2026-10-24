@@ -66,6 +66,10 @@ class PerkService:
         """Initialize in-memory announcement catalog from external data seeds."""
         for pid, data in DEFAULT_PERK_SEEDS.items():
             if pid not in self._perks:
+                data = dict(data)
+                # Seed perks are platform-curated ecosystem announcements → official.
+                data.setdefault("is_official", True)
+                data.setdefault("author_name", "官方发布")
                 perk = PerkResponse(**data)
                 self._perks[pid] = perk
                 domain_persistence.write("perks.items", pid, perk)
@@ -119,6 +123,9 @@ class PerkService:
             priority=req.priority,
             status=req.status,
             highlights=req.highlights,
+            author_id=req.author_id,
+            author_name=req.author_name,
+            is_official=req.is_official,
             created_at=utc_now_iso(),
         )
         self._perks[pid] = perk

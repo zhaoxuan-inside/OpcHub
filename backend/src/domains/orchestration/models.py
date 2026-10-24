@@ -48,6 +48,9 @@ class OperatorModeUpdateRequest(BaseModel):
 class ScenarioExecuteRequest(BaseModel):
     scenario_code: str
     inputs: Dict[str, Any] = Field(default_factory=dict)
+    # Caller/gateway context propagated into every operator (user_id, user_role,
+    # token, trace metadata…). Operators must not read identity from payload.
+    context: Dict[str, Any] = Field(default_factory=dict)
     override_dispatch_mode: Optional[DispatchMode] = None
 
 

@@ -7,6 +7,7 @@ class ForumThreadCreate(BaseModel):
     category_code: str = Field(default="DEV", description="DEV, BIZ, TAX, AGENTS")
     author_id: str = Field(..., description="UUID of author maker")
     author_name: Optional[str] = Field(None, description="Display name of author maker")
+    is_official: bool = Field(False, description="官方标签（由服务端按发布者角色判定）")
     title: str = Field(..., min_length=2, max_length=255, description="Thread title")
     content: str = Field(..., min_length=1, description="Thread markdown content")
 
@@ -16,6 +17,7 @@ class ForumThreadResponse(BaseModel):
     category_code: str
     author_id: str
     author_name: Optional[str] = None
+    is_official: bool = False
     title: str
     content: str
     view_count: int = 0

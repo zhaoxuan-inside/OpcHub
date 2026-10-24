@@ -222,6 +222,9 @@
               <span class="link-span" @click="handleOpenCreatePage">提出探讨</span>
             </div>
           </div>
+
+          <!-- 4. Disclaimer Card (免责声明) -->
+          <ContentDisclaimer type="forum" mode="card" />
         </aside>
       </div>
     </div>
@@ -318,6 +321,7 @@ import ForumIcon from '@/components/ForumIcon.vue';
 import ForumCard from '@/components/ForumCard.vue';
 import ForumDetailView from '@/components/ForumDetailView.vue';
 import ForumCreateView from '@/components/ForumCreateView.vue';
+import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import { dispatchGateway } from '@/api/gateway';
 import { enrichForumInteractions } from '@/utils/contentInteractions';
 

@@ -152,16 +152,18 @@ class OrchestrationService:
         # 5. Forum Thread Publish DAG Pipeline: OPC_FORUM_THREAD_PUBLISH
         topo_forum_thread = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "forum.thread.validate_guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "forum.thread.persist", "type": "STORAGE"},
                 {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
                 {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_invalidate_cache"},
                 {"from": "step_invalidate_cache", "to": "step_telemetry"},
@@ -179,15 +181,17 @@ class OrchestrationService:
         # 6. Forum Comment Publish DAG Pipeline: OPC_FORUM_COMMENT_PUBLISH
         topo_forum_comment = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "forum.comment.validate_guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "forum.comment.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -204,15 +208,17 @@ class OrchestrationService:
         # 7. Product Showcase Publish DAG Pipeline: OPC_PRODUCT_PUBLISH_PIPELINE
         topo_product_publish = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "product.validate_guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "product.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "product.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -256,15 +262,17 @@ class OrchestrationService:
         # 9. Policy Center Publish DAG Pipeline: OPC_POLICY_PUBLISH_PIPELINE
         topo_policy_publish = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "policy.publish.guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "policy.publish.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "policy.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -281,15 +289,17 @@ class OrchestrationService:
         # 10. Demands Publish DAG Pipeline: OPC_DEMAND_PUBLISH_PIPELINE
         topo_demand_publish = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "demand.publish.guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "demand.publish.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "demand.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -306,15 +316,17 @@ class OrchestrationService:
         # 11. Demands Bid DAG Pipeline: OPC_DEMAND_BID_PIPELINE
         topo_demand_bid = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "demand.bid.guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "demand.bid.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "demand.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -381,15 +393,17 @@ class OrchestrationService:
         # 14. Perks Publish DAG Pipeline: OPC_PERK_PUBLISH_PIPELINE
         topo_perk_publish = {
             "topology": "DAG",
-            "entry_node": "step_guard",
+            "entry_node": "step_identity",
             "exit_node": "step_telemetry",
             "enable_saga_compensation": True,
             "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
                 {"id": "step_guard", "action_handler": "perk.publish.guard", "type": "GUARD"},
                 {"id": "step_persist", "action_handler": "perk.publish.persist", "type": "STORAGE"},
                 {"id": "step_telemetry", "action_handler": "perk.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
+                {"from": "step_identity", "to": "step_guard"},
                 {"from": "step_guard", "to": "step_persist"},
                 {"from": "step_persist", "to": "step_telemetry"},
             ],
@@ -634,6 +648,165 @@ class OrchestrationService:
             )
         )
 
+        # 24. Compliance Publish DAG Pipeline: OPC_COMPLIANCE_PUBLISH_PIPELINE
+        #     法条 / 避坑案例发布：身份 → 校验+敏感词 → 持久化 → 度量
+        topo_compliance_publish = {
+            "topology": "DAG",
+            "entry_node": "step_identity",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
+                {"id": "step_guard", "action_handler": "compliance.publish.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "compliance.publish.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_identity", "to": "step_guard"},
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_COMPLIANCE_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_compliance_publish,
+                status="ACTIVE",
+            )
+        )
+
+        # 25. Moderation User Report DAG Pipeline: OPC_MODERATION_REPORT_PIPELINE
+        topo_moderation_report = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "moderation.report.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "moderation.report.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_MODERATION_REPORT_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_moderation_report,
+                status="ACTIVE",
+            )
+        )
+
+        # 26. SOP Free-form Document Draft DAG Pipeline: OPC_SOP_DOCUMENT_DRAFT_PIPELINE
+        topo_sop_draft = {
+            "topology": "DAG",
+            "entry_node": "step_identity",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
+                {"id": "step_guard", "action_handler": "sop.document.draft.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "sop.document.draft.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_identity", "to": "step_guard"},
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_SOP_DOCUMENT_DRAFT_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_sop_draft,
+                status="ACTIVE",
+            )
+        )
+
+        # 27. SOP Document Publish Review DAG Pipeline: OPC_SOP_DOCUMENT_PUBLISH_PIPELINE
+        topo_sop_doc_publish = {
+            "topology": "DAG",
+            "entry_node": "step_identity",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
+                {"id": "step_guard", "action_handler": "sop.document.publish.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "sop.document.publish.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_identity", "to": "step_guard"},
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_SOP_DOCUMENT_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_sop_doc_publish,
+                status="ACTIVE",
+            )
+        )
+
+        # 28. SOP Flow Publish Review DAG Pipeline: OPC_SOP_FLOW_PUBLISH_PIPELINE
+        topo_sop_flow_publish = {
+            "topology": "DAG",
+            "entry_node": "step_identity",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
+                {"id": "step_guard", "action_handler": "sop.flow.publish.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "sop.flow.publish.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_identity", "to": "step_guard"},
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_SOP_FLOW_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_sop_flow_publish,
+                status="ACTIVE",
+            )
+        )
+
+        # 29. Unified Content Comment DAG Pipeline: OPC_CONTENT_COMMENT_PUBLISH_PIPELINE
+        topo_content_comment = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "content.comment.guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "content.comment.persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "content.publish.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_CONTENT_COMMENT_PUBLISH_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_content_comment,
+                status="ACTIVE",
+            )
+        )
+
         # Default frontend layout (no hardcoded demo figures)
         self.save_frontend_layout(
             FrontendLayoutSaveRequest(
@@ -760,6 +933,7 @@ class OrchestrationService:
         res = await microkernel_engine.execute_dag(
             config=dag_config,
             initial_inputs=req.inputs,
+            initial_context=req.context,
             trace_id=tid,
             override_dispatch_mode=req.override_dispatch_mode,
         )

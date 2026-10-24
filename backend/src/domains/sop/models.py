@@ -404,6 +404,23 @@ class SOPDocumentCreate(BaseModel):
     form_data: Dict[str, Any]
 
 
+class SOPDocumentDraftCreate(BaseModel):
+    """Save a freely-edited document draft (起草新文书 / 文本编辑器).
+
+    Unlike ``SOPDocumentCreate`` this does not interpolate a template: the maker
+    writes the body in a text editor, optionally starting from a template, and
+    the edited text is persisted verbatim. ``template_id`` therefore only records
+    provenance and may be empty for a from-scratch document.
+    """
+    title: str = ""
+    content: str = ""
+    template_id: str = ""
+    category: str = ""
+    user_id: str = ""
+    # Present only when re-saving an existing private draft.
+    doc_id: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Standard document catalog (标准文书库)
 #
@@ -455,6 +472,8 @@ class SOPDocumentResponse(BaseModel):
     form_data: Dict[str, Any]
     rendered_content: str
     compliance_passed: bool = True
+    # Document category (inherited from the source template when one was used).
+    category: str = "LEGAL"
     status: str = "READY"
     created_at: str
     updated_at: str
@@ -473,6 +492,7 @@ class SOPReviewItem(BaseModel):
     content: str
     author_id: str
     author_name: str = ""
+    is_official: bool = False
     status: str = SOP_REVIEW_STATUS_PENDING
     submitted_at: str
     reviewed_at: Optional[str] = None

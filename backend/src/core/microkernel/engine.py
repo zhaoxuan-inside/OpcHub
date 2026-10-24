@@ -88,6 +88,7 @@ class MicrokernelEngine:
         initial_inputs: dict[str, Any] | None = None,
         trace_id: str | None = None,
         override_dispatch_mode: Optional[DispatchMode] = None,
+        initial_context: Optional[dict[str, Any]] = None,
     ) -> ExecutionResult:
         start_time = time.perf_counter()
         tid = trace_id or get_current_trace_id()
@@ -100,6 +101,10 @@ class MicrokernelEngine:
             "version": config.version,
             "trace_id": tid,
         }
+        # Merge caller/gateway context last so operators can resolve the
+        # authenticated actor without trusting payload fields.
+        if initial_context:
+            context.update(initial_context)
 
         try:
             order, entry_node, exit_node = self.validate_and_sort(config)

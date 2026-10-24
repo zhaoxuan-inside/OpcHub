@@ -92,6 +92,7 @@ class DemandService:
             id=did,
             creator_id=payload.creator_id,
             creator_name=payload.creator_name,
+            is_official=payload.is_official,
             title=payload.title,
             description=payload.description,
             budget_cny=payload.budget_cny,

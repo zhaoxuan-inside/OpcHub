@@ -58,11 +58,18 @@ class ComplianceService:
     def _init_seeds(self) -> None:
         """Initialize in-memory catalog from external data seeds and queue DB persistence."""
         for data in DEFAULT_COMPLIANCE_SEEDS.get("laws", []):
+            data = dict(data)
+            # Seed laws/cases are platform-curated legal knowledge → official.
+            data.setdefault("is_official", True)
+            data.setdefault("author_name", "官方发布")
             law = ComplianceLaw(**data)
             if not any(l.id == law.id for l in self._laws):
                 self._laws.append(law)
                 self._persist("law", law)
         for data in DEFAULT_COMPLIANCE_SEEDS.get("cases", []):
+            data = dict(data)
+            data.setdefault("is_official", True)
+            data.setdefault("author_name", "官方发布")
             case = ComplianceCase(**data)
             if not any(c.id == case.id for c in self._cases):
                 self._cases.append(case)
@@ -117,6 +124,9 @@ class ComplianceService:
                 law_ref=req.law_ref,
                 icon_name=req.icon_name or "shield",
                 hot_score=0,
+                author_id=req.author_id,
+                author_name=req.author_name,
+                is_official=req.is_official,
             )
             if not any(l.id == law.id for l in self._laws):
                 self._laws.append(law)
@@ -135,6 +145,9 @@ class ComplianceService:
                 lesson=req.lesson,
                 badge_color=req.badge_color or "#5B6472",
                 hot_score=0,
+                author_id=req.author_id,
+                author_name=req.author_name,
+                is_official=req.is_official,
             )
             if not any(c.id == case.id for c in self._cases):
                 self._cases.append(case)
@@ -142,6 +155,26 @@ class ComplianceService:
             return case.model_dump(mode="json")
 
         raise ValueError(f"Unsupported compliance publish kind: {req.kind}")
+
+    def delete_entry(self, kind: str, entity_id: str) -> bool:
+        """Physically remove a published law/case (Saga compensation)."""
+        kind = str(kind or "").strip().lower()
+        eid = str(entity_id or "")
+        if not eid:
+            return False
+        if kind == "law":
+            before = len(self._laws)
+            self._laws = [l for l in self._laws if l.id != eid]
+            deleted = len(self._laws) < before
+        elif kind == "case":
+            before = len(self._cases)
+            self._cases = [c for c in self._cases if c.id != eid]
+            deleted = len(self._cases) < before
+        else:
+            return False
+        if deleted:
+            domain_persistence.delete("compliance.items", eid)
+        return deleted
 
     # ---------------------------------------------------------------- audit (legacy backend capability)
     def evaluate_audit(self, req: AuditEvaluateRequest) -> AuditReportResponse:

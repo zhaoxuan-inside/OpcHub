@@ -1515,6 +1515,26 @@ button,
 }
 
 /* =====================================================================
+ * Unified official-publish badge (官方发布标签) — shared by every content
+ * card (政策 / 法条案例 / 橱窗 / 需求 / 头脑风暴 / 生态特权)。is_official
+ * 由服务端按发布者角色判定，前端只负责展示。
+ * ===================================================================== */
+.official-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 113, 227, 0.1);
+  color: var(--accent);
+  border: 1px solid rgba(0, 113, 227, 0.25);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* =====================================================================
  * Hover reveal host: lifts the whole card above neighbours so its
  * absolute hover-reveal overlay never gets covered by the next row.
  * The card size is untouched on hover (no layout jitter).
