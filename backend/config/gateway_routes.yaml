@@ -399,11 +399,41 @@ gateway:
     - scenario: "forum.threads.get"
       version: "v1.0.0"
       domain: "forum"
-      description: "获取讨论帖详情与物化路径评论树"
+      description: "获取议题详情、知乎式观点回答与物化路径评论树"
       is_default: true
-      handler: "src.domains.forum.service.forum_service:get_thread_detail"
-      args_type: "key"
-      key_name: "thread_id"
+      handler: "src.core.gateway.adapters:forum_thread_get_adapter"
+
+    - scenario: "forum.answers.publish"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "撰写并发布针对议题的知乎式深度观点回答 (微内核 DAG 编排)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_answer_publish_adapter"
+      required_permission: "content:publish"
+
+    - scenario: "forum.answers.accept"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "提问者采纳最佳观点或取消采纳 (微内核 DAG 编排)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_answer_accept_adapter"
+      required_permission: "forum:post_comment"
+
+    - scenario: "forum.vote"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "知乎式互斥赞同 / 反对 / 取消投票 (微内核 DAG 编排)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_vote_adapter"
+      required_permission: "forum:post_comment"
+
+    - scenario: "forum.threads.follow"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "关注/取消关注议题"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_follow_adapter"
+      required_permission: "forum:post_comment"
 
     - scenario: "forum.comments.create"
       version: "v1.0.0"

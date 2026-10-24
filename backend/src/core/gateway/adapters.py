@@ -586,6 +586,92 @@ async def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> 
     return res.final_output.get("created_comment") or res.final_output
 
 
+async def forum_answer_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for posting a Zhihu-style perspective answer."""
+    inputs = dict(p)
+    if "answer_payload" in inputs and isinstance(inputs["answer_payload"], dict):
+        inputs.update(inputs["answer_payload"])
+    _publish_identity_fields(inputs, c)
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_ANSWER_PUBLISH",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum answer publish pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("created_answer") or res.final_output
+
+
+async def forum_answer_accept_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for accepting a best answer."""
+    inputs = dict(p)
+    if not inputs.get("operator_user_id") and (c or {}).get("user_id"):
+        inputs["operator_user_id"] = c["user_id"]
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_ANSWER_ACCEPT_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum answer accept pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
+
+
+async def forum_vote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for mutual upvoting/downvoting."""
+    inputs = dict(p)
+    if not inputs.get("user_id") and (c or {}).get("user_id"):
+        inputs["user_id"] = c["user_id"]
+    if not inputs.get("user_id"):
+        inputs["user_id"] = "usr_guest"
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_VOTE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum vote pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("vote_result") or res.final_output
+
+
+async def forum_thread_get_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Fetch Zhihu-style thread/question details with answers, comments, and caller interactions."""
+    from src.domains.forum.service import forum_service
+    thread_id = str(p.get("thread_id") or p.get("id") or "")
+    if not thread_id:
+        raise ValueError("thread_id is required")
+    user_id = p.get("user_id") or (c or {}).get("user_id")
+    detail = forum_service.get_thread_detail(thread_id, user_id=user_id)
+    if not detail:
+        raise KeyError(f"Forum thread with ID {thread_id} not found")
+    return detail.model_dump()
+
+
+async def forum_follow_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Toggle following a thread/question."""
+    from src.domains.forum.service import forum_service
+    user_id = p.get("user_id") or (c or {}).get("user_id") or "usr_guest"
+    thread_id = str(p.get("thread_id") or "")
+    if not thread_id:
+        raise ValueError("thread_id is required")
+    return forum_service.toggle_follow(user_id, thread_id)
+
+
 async def product_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for product showcase publishing."""
     inputs = dict(p)

@@ -84,3 +84,15 @@
 - **更新时间**：`2026-10-17T10:44:13Z`
 ---
 
+### 任务简述：TASK-FORUM-ZHIHU
+- **标题**：头脑风暴知乎化观点与交流重构
+- **change_size**：`L`
+- **状态**：`COMPLETED`
+- **优先级**：P1
+- **负责人**：agent
+- **核心目标**：头脑风暴知乎化观点与交流重构
+- **详情索引**：`_02_task_detail/_01_TASK-FORUM-ZHIHU/_00_task_detail.md`
+- **上下文包**：`_03_task_context_pack/_01_TASK-FORUM-ZHIHU/_00_context_pack.md`
+- **更新时间**：`2026-10-24T11:59:48Z`
+---
+

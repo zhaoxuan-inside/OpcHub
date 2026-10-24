@@ -205,6 +205,91 @@ class OrchestrationService:
             )
         )
 
+        # 6.1 Zhihu-style Answer Publish DAG Pipeline: OPC_FORUM_ANSWER_PUBLISH
+        topo_forum_answer = {
+            "topology": "DAG",
+            "entry_node": "step_identity",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_identity", "action_handler": "content.publish.identity_guard", "type": "GUARD"},
+                {"id": "step_guard", "action_handler": "forum.answer.validate_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.answer.persist", "type": "STORAGE"},
+                {"id": "step_hot_recalc", "action_handler": "forum.hot_score.recalculate", "type": "BIZ"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_identity", "to": "step_guard"},
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_hot_recalc"},
+                {"from": "step_hot_recalc", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_ANSWER_PUBLISH",
+                version="v1.0.0",
+                topology_graph=topo_forum_answer,
+                status="ACTIVE",
+            )
+        )
+
+        # 6.2 Zhihu-style Answer Accept Pipeline: OPC_FORUM_ANSWER_ACCEPT_PIPELINE
+        topo_forum_accept = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": True,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.answer.accept_guard", "type": "GUARD"},
+                {"id": "step_accept", "action_handler": "forum.answer.accept_persist", "type": "STORAGE"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_accept"},
+                {"from": "step_accept", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_ANSWER_ACCEPT_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_accept,
+                status="ACTIVE",
+            )
+        )
+
+        # 6.3 Zhihu-style Mutual Vote Pipeline: OPC_FORUM_VOTE_PIPELINE
+        topo_forum_vote = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.vote.validate_guard", "type": "GUARD"},
+                {"id": "step_vote", "action_handler": "forum.vote.persist", "type": "STORAGE"},
+                {"id": "step_hot_recalc", "action_handler": "forum.hot_score.recalculate", "type": "BIZ"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_vote"},
+                {"from": "step_vote", "to": "step_hot_recalc"},
+                {"from": "step_hot_recalc", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_VOTE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_vote,
+                status="ACTIVE",
+            )
+        )
+
         # 7. Product Showcase Publish DAG Pipeline: OPC_PRODUCT_PUBLISH_PIPELINE
         topo_product_publish = {
             "topology": "DAG",

@@ -202,3 +202,155 @@ def test_forum_nested_comments_materialized_path_dag(client):
     assert len(c2_node["children"]) == 1
     c3_node = c2_node["children"][0]
     assert c3_node["id"] == c3["id"]
+
+
+def test_forum_answer_publish_and_accept_via_dag(client):
+    """Verify posting a Zhihu-style perspective answer and accepting it via microkernel DAGs."""
+    threads = forum_service.list_threads()
+    thread_id = threads[0].id
+
+    # 1. Post answer via OPC_FORUM_ANSWER_PUBLISH
+    ans_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.answers.publish",
+            "version": "v1.0.0",
+            "payload": {
+                "thread_id": thread_id,
+                "author_id": "usr_maker_expert",
+                "author_name": "实战老兵",
+                "author_title": "10年独立架构师",
+                "content": "根据税总局 2026 年最新发票办法，一人有限责任公司季度免税核算时，必须在电子发票管理系统中完成《免税备案》，否则即使在限额内也会触发系统预警。",
+            },
+        },
+    )
+    assert ans_resp.status_code == 200, ans_resp.text
+    ans_data = ans_resp.json()["data"]
+    answer_id = ans_data["id"]
+    assert ans_data["thread_id"] == thread_id
+    assert ans_data["word_count"] > 10
+    assert ans_data["is_accepted"] is False
+
+    # 2. Accept answer via OPC_FORUM_ANSWER_ACCEPT_PIPELINE
+    accept_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.answers.accept",
+            "version": "v1.0.0",
+            "payload": {
+                "thread_id": thread_id,
+                "answer_id": answer_id,
+                "operator_user_id": threads[0].author_id,
+            },
+        },
+    )
+    assert accept_resp.status_code == 200, accept_resp.text
+    acc_data = accept_resp.json()["data"]
+    assert acc_data["is_accepted"] is True
+    assert acc_data["action"] == "ACCEPTED"
+
+    # Verify thread detail reflects accepted answer
+    detail_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.threads.get",
+            "version": "v1.0.0",
+            "payload": {"thread_id": thread_id},
+        },
+    )
+    assert detail_resp.status_code == 200
+    detail = detail_resp.json()["data"]
+    assert detail["thread"]["accepted_answer_id"] == answer_id
+    accepted_ans = next(a for a in detail["answers"] if a["id"] == answer_id)
+    assert accepted_ans["is_accepted"] is True
+
+
+def test_forum_vote_mutual_exclusivity_via_dag(client):
+    """Verify Zhihu-style mutual upvote/downvote and cancel via OPC_FORUM_VOTE_PIPELINE."""
+    threads = forum_service.list_threads()
+    thread_id = threads[0].id
+    user_id = "usr_voter_888"
+
+    # 1. UPVOTE
+    v1_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.vote",
+            "version": "v1.0.0",
+            "payload": {
+                "user_id": user_id,
+                "target_type": "THREAD",
+                "target_id": thread_id,
+                "vote_type": "UPVOTE",
+            },
+        },
+    )
+    assert v1_resp.status_code == 200
+    v1 = v1_resp.json()["data"]
+    assert v1["user_vote"] == "UPVOTE"
+    up_cnt_1 = v1["upvote_count"]
+    down_cnt_1 = v1["downvote_count"]
+
+    # 2. Switch to DOWNVOTE (mutual exclusivity: upvote -1, downvote +1)
+    v2_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.vote",
+            "version": "v1.0.0",
+            "payload": {
+                "user_id": user_id,
+                "target_type": "THREAD",
+                "target_id": thread_id,
+                "vote_type": "DOWNVOTE",
+            },
+        },
+    )
+    assert v2_resp.status_code == 200
+    v2 = v2_resp.json()["data"]
+    assert v2["user_vote"] == "DOWNVOTE"
+    assert v2["upvote_count"] == up_cnt_1 - 1
+    assert v2["downvote_count"] == down_cnt_1 + 1
+
+    # 3. Repeat DOWNVOTE (toggles to cancel)
+    v3_resp = client.post(
+        "/api/welcom/opc_world",
+        json={
+            "scenario": "forum.vote",
+            "version": "v1.0.0",
+            "payload": {
+                "user_id": user_id,
+                "target_type": "THREAD",
+                "target_id": thread_id,
+                "vote_type": "DOWNVOTE",
+            },
+        },
+    )
+    assert v3_resp.status_code == 200
+    v3 = v3_resp.json()["data"]
+    assert v3["user_vote"] is None
+    assert v3["downvote_count"] == down_cnt_1
+
+
+@pytest.mark.asyncio
+async def test_forum_answer_saga_rollback_on_failure():
+    """Verify Saga reverse compensation deletes persisted answer when downstream fails."""
+    threads = forum_service.list_threads()
+    thread_id = threads[0].id
+
+    exec_req = ScenarioExecuteRequest(
+        scenario_code="OPC_FORUM_ANSWER_PUBLISH",
+        version="v1.0.0",
+        inputs={
+            "thread_id": thread_id,
+            "author_id": "usr_saga_answer_tester",
+            "content": "这是一篇将要在下游失败测试回滚的深度观点回答内容...",
+            "simulate_downstream_failure": True,
+        },
+    )
+
+    res = await orchestration_service.execute_scenario(exec_req)
+    assert res.status == "ROLLED_BACK"
+    assert len(res.compensation_traces) > 0
+    # Answer must NOT exist
+    answers = [a for a in forum_service._answers.values() if a.author_id == "usr_saga_answer_tester"]
+    assert len(answers) == 0

@@ -645,7 +645,7 @@ class AtomicRegistry:
         async def forum_thread_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             title = inputs.get("title", "").strip()
             content = inputs.get("content", "").strip()
-            category = inputs.get("category_code", "GENERAL")
+            category = inputs.get("category_code", "DEV")
             if len(title) < 5:
                 raise ValueError("Forum thread title must be at least 5 characters long")
             if len(content) < 10:
@@ -668,6 +668,9 @@ class AtomicRegistry:
                 "content": content,
                 "category_code": category,
                 "author_id": inputs.get("author_id", ""),
+                "author_name": inputs.get("author_name"),
+                "author_title": inputs.get("author_title"),
+                "is_official": bool(inputs.get("is_official", False)),
             }
         self.register("forum.thread.validate_guard", forum_thread_validate_guard, domain="forum", description="头脑风暴发帖准入校验与敏感词审查门禁")
 
@@ -676,10 +679,12 @@ class AtomicRegistry:
             from src.domains.forum.models import ForumThreadCreate
             author_id = inputs.get("author_id") or (context or {}).get("user_id") or ""
             author_name = inputs.get("author_name") or (context or {}).get("nickname") or (context or {}).get("username")
+            author_title = inputs.get("author_title")
             payload = ForumThreadCreate(
-                category_code=inputs.get("category_code", "GENERAL"),
+                category_code=inputs.get("category_code", "DEV"),
                 author_id=author_id,
                 author_name=author_name,
+                author_title=author_title,
                 is_official=bool(inputs.get("is_official", False)),
                 title=inputs.get("title", ""),
                 content=inputs.get("content", ""),
@@ -707,6 +712,174 @@ class AtomicRegistry:
             compensator=forum_thread_persist_compensate,
         )
 
+        # Zhihu-style Answer Operators
+        async def forum_answer_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            thread_id = str(inputs.get("thread_id") or "").strip()
+            content = str(inputs.get("content") or "").strip()
+            if not thread_id:
+                raise ValueError("thread_id is required for answering a question")
+            if len(content) < 5:
+                raise ValueError("Answer content must be at least 5 characters long")
+
+            from src.domains.forum.service import forum_service
+            forum_service.get_thread(thread_id, record_view=False)
+
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+            await prescreen_and_record(
+                content,
+                field_name="forum answer",
+                user_id=(context or {}).get("user_id", ""),
+                scene="头脑风暴回答",
+                title="观点回答",
+                target_type="FORUM_ANSWER",
+                target_id=thread_id,
+            )
+            return {
+                "guard_passed": True,
+                "thread_id": thread_id,
+                "content": content,
+                "author_id": inputs.get("author_id", "") or (context or {}).get("user_id", ""),
+                "author_name": inputs.get("author_name") or (context or {}).get("nickname"),
+                "author_title": inputs.get("author_title"),
+            }
+        self.register("forum.answer.validate_guard", forum_answer_validate_guard, domain="forum", description="头脑风暴观点回答准入校验与内容合规门禁")
+
+        async def forum_answer_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            from src.domains.forum.models import ForumAnswerCreate
+            author_id = inputs.get("author_id") or (context or {}).get("user_id") or ""
+            author_name = inputs.get("author_name") or (context or {}).get("nickname")
+            payload = ForumAnswerCreate(
+                thread_id=inputs.get("thread_id", ""),
+                author_id=author_id,
+                author_name=author_name,
+                author_title=inputs.get("author_title"),
+                content=inputs.get("content", ""),
+            )
+            created = forum_service.create_answer(payload)
+            return {
+                "answer_id": created.id,
+                "thread_id": created.thread_id,
+                "created_answer": created.model_dump(),
+                "status": "PUBLISHED",
+            }
+
+        async def forum_answer_persist_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            answer_id = inputs.get("answer_id") or (inputs.get("created_answer", {}).get("id"))
+            if answer_id:
+                deleted = forum_service.delete_answer(answer_id)
+                return {"answer_id": answer_id, "compensated": deleted, "action": "ROLLED_BACK"}
+            return {"compensated": False, "reason": "No answer_id to rollback"}
+
+        self.register(
+            "forum.answer.persist",
+            forum_answer_persist,
+            domain="forum",
+            description="头脑风暴深度观点回答持久化算子",
+            compensator=forum_answer_persist_compensate,
+        )
+
+        async def forum_answer_accept_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            thread_id = str(inputs.get("thread_id") or "").strip()
+            answer_id = str(inputs.get("answer_id") or "").strip()
+            operator_id = inputs.get("operator_user_id") or (context or {}).get("user_id") or ""
+            if not thread_id or not answer_id:
+                raise ValueError("Both thread_id and answer_id are required to accept an answer")
+            return {
+                "guard_passed": True,
+                "thread_id": thread_id,
+                "answer_id": answer_id,
+                "operator_user_id": operator_id,
+            }
+        self.register("forum.answer.accept_guard", forum_answer_accept_guard, domain="forum", description="头脑风暴观点采纳前置鉴权门禁")
+
+        async def forum_answer_accept_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            thread_id = inputs["thread_id"]
+            answer_id = inputs["answer_id"]
+            operator_id = inputs["operator_user_id"]
+            ok, msg = forum_service.accept_answer(thread_id, answer_id, operator_id)
+            return {
+                "success": ok,
+                "thread_id": thread_id,
+                "answer_id": answer_id,
+                "action": msg,
+                "is_accepted": (msg == "ACCEPTED"),
+            }
+
+        async def forum_answer_accept_compensate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            thread_id = inputs.get("thread_id")
+            answer_id = inputs.get("answer_id")
+            operator_id = inputs.get("operator_user_id", "")
+            if thread_id and answer_id and inputs.get("action") == "ACCEPTED":
+                forum_service.accept_answer(thread_id, answer_id, operator_id)
+                return {"compensated": True, "action": "ROLLED_BACK_ACCEPT"}
+            return {"compensated": False}
+
+        self.register(
+            "forum.answer.accept_persist",
+            forum_answer_accept_persist,
+            domain="forum",
+            description="头脑风暴最佳观点采纳状态持久化算子",
+            compensator=forum_answer_accept_compensate,
+        )
+
+        # Zhihu-style Vote Operators (赞同 / 反对 / 取消)
+        async def forum_vote_validate_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            user_id = inputs.get("user_id") or (context or {}).get("user_id") or ""
+            if not user_id:
+                raise ValueError("Authenticated user is required to vote on forum discussions")
+            target_type = str(inputs.get("target_type") or "THREAD").upper()
+            target_id = str(inputs.get("target_id") or "").strip()
+            vote_type = str(inputs.get("vote_type") or "UPVOTE").upper()
+            if not target_id:
+                raise ValueError("target_id is required for voting")
+            if target_type not in ("THREAD", "ANSWER", "COMMENT"):
+                raise ValueError(f"Invalid vote target_type: {target_type}")
+            if vote_type not in ("UPVOTE", "DOWNVOTE", "CANCEL"):
+                raise ValueError(f"Invalid vote_type: {vote_type}")
+            return {
+                "guard_passed": True,
+                "user_id": user_id,
+                "target_type": target_type,
+                "target_id": target_id,
+                "vote_type": vote_type,
+            }
+        self.register("forum.vote.validate_guard", forum_vote_validate_guard, domain="forum", description="头脑风暴投票鉴权与互斥防刷门禁")
+
+        async def forum_vote_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            res = forum_service.execute_vote(
+                user_id=inputs["user_id"],
+                target_type=inputs["target_type"],
+                target_id=inputs["target_id"],
+                vote_type=inputs["vote_type"],
+            )
+            return {
+                "vote_result": res.model_dump(),
+                "target_type": res.target_type,
+                "target_id": res.target_id,
+                "user_vote": res.user_vote,
+                "upvote_count": res.upvote_count,
+                "downvote_count": res.downvote_count,
+            }
+        self.register("forum.vote.persist", forum_vote_persist, domain="forum", description="头脑风暴知乎式互斥赞同与反对持久化算子")
+
+        async def forum_hot_score_recalculate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            ttype = inputs.get("target_type", "THREAD")
+            tid = inputs.get("target_id") or inputs.get("thread_id") or ""
+            score = forum_service.recalculate_hot_score(ttype, tid)
+            return {
+                "hot_score_updated": True,
+                "target_type": ttype,
+                "target_id": tid,
+                "hot_score": score,
+            }
+        self.register("forum.hot_score.recalculate", forum_hot_score_recalculate, domain="forum", description="头脑风暴牛顿冷却算法实时热度重算算子")
+
         async def validate_create_comment(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             """原子算子：校验发评论参数合法性并进行文本合规审查"""
             from src.domains.forum.service import forum_service
@@ -732,6 +905,8 @@ class AtomicRegistry:
             payload = ForumCommentCreate(
                 author_id=inputs.get("author_id", ""),
                 content=inputs.get("content", ""),
+                target_type=inputs.get("target_type", "ANSWER"),
+                target_id=inputs.get("target_id"),
                 parent_id=inputs.get("parent_id"),
                 reply_to_user_id=inputs.get("reply_to_user_id"),
             )
@@ -739,6 +914,8 @@ class AtomicRegistry:
             return {
                 "comment_id": created.id,
                 "thread_id": thread_id,
+                "target_type": created.target_type,
+                "target_id": created.target_id,
                 "materialized_path": created.materialized_path,
                 "depth": created.depth,
                 "created_comment": created.model_dump(),
@@ -765,7 +942,7 @@ class AtomicRegistry:
             # Trigger downstream failure for Saga rollback verification if requested
             if inputs.get("simulate_downstream_failure", False):
                 raise RuntimeError("Simulated downstream telemetry failure to trigger Saga rollback")
-            target_id = inputs.get("thread_id") or inputs.get("comment_id", "unknown")
+            target_id = inputs.get("thread_id") or inputs.get("answer_id") or inputs.get("comment_id", "unknown")
             return {
                 "telemetry_recorded": True,
                 "metric": "community.interaction.count",

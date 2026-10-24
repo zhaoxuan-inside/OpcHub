@@ -152,11 +152,24 @@
       {{ post.title }}
     </h3>
 
+    <!-- 2.3 Zhihu High-Vote Perspective Preview (精选观点回答) -->
+    <div v-if="topAnswer" class="zhihu-answer-author-preview">
+      <div class="answer-avatar-micro">
+        {{ (topAnswer.author_name || '客')[0] }}
+      </div>
+      <div class="answer-author-meta">
+        <span class="answer-author-name">{{ topAnswer.author_name || '实战创客' }}</span>
+        <span class="dot-sep">·</span>
+        <span class="answer-author-title">{{ topAnswer.author_title || '已认证超级个体' }}</span>
+        <span v-if="topAnswer.is_accepted" class="badge-accepted-tag">✓ 提问者已采纳</span>
+      </div>
+    </div>
+
     <!-- 2.4 Excerpt with Inline Markdown Expand/Collapse (知乎核心体验：卡片内原地阅读全文) -->
     <div class="zhihu-card-content" @click.stop>
       <!-- Collapsed: 3-line rich excerpt -->
       <div v-if="!isExpanded" class="snippet-wrapper">
-        <HoverRevealText :text="post.snippet || post.content" :lines="3" />
+        <HoverRevealText :text="displayContent" :lines="3" />
         <button type="button" class="btn-read-full" @click="toggleExpand">
           <span>阅读全文</span>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4">
@@ -185,6 +198,60 @@
     <!-- 2.6 Zhihu Signature Action Toolbar -->
     <div class="zhihu-action-bar">
       <div class="action-buttons-group">
+        <!-- Zhihu Mutual Vote Pill -->
+        <div class="zhihu-vote-group" @click.stop>
+          <button
+            type="button"
+            class="btn-zhihu-vote btn-zhihu-upvote"
+            :class="{ active: userVote === 'UPVOTE' }"
+            @click="handleVote('UPVOTE')"
+            title="赞同此议题与实战观点"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 4L3 18h18L12 4z"/>
+            </svg>
+            <span>赞同 {{ currentUpvotes }}</span>
+          </button>
+          <button
+            type="button"
+            class="btn-zhihu-vote btn-zhihu-downvote"
+            :class="{ active: userVote === 'DOWNVOTE' }"
+            @click="handleVote('DOWNVOTE')"
+            title="反对 / 不赞同"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 20l9-14H3l9 14z"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Answers count -->
+        <button
+          type="button"
+          class="btn-zhihu-action"
+          @click.stop="$emit('select', post)"
+          title="查看所有创客回答观点"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+            <line x1="9" y1="21" x2="15" y2="21"/>
+          </svg>
+          <span>{{ post.answer_count || (post.top_answers ? post.top_answers.length : 0) }} 个回答</span>
+        </button>
+
+        <!-- Comments -->
+        <button
+          type="button"
+          class="btn-zhihu-action"
+          @click.stop="$emit('select', post)"
+          title="查看探讨评论"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+          <span>{{ post.comment_count || post.replies || 0 }} 条探讨</span>
+        </button>
+
         <!-- Share -->
         <button
           type="button"
@@ -284,6 +351,7 @@ import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
 import { applyBarChange, applyForumInteractionAliases } from '@/utils/contentInteractions';
 import { renderMarkdown } from '@/utils/markdown';
+import { dispatchGateway } from '@/api/gateway';
 
 const props = defineProps({
   post: {
@@ -318,24 +386,99 @@ const canDelete = computed(() => {
   return false;
 });
 
-const isUpvoted = ref(Boolean(props.post.is_upvoted));
+const userVote = ref(props.post.user_vote || (props.post.is_upvoted ? 'UPVOTE' : null));
 const currentUpvotes = ref(props.post.upvotes ?? props.post.upvote_count ?? 0);
 const isBookmarked = ref(Boolean(props.post.is_bookmarked));
 const isCopied = ref(false);
 const isExpanded = ref(false);
 let copyTimer = null;
 
+const topAnswer = computed(() => {
+  if (props.post.top_answers && Array.isArray(props.post.top_answers) && props.post.top_answers.length > 0) {
+    return props.post.top_answers[0];
+  }
+  return null;
+});
+
+const displayContent = computed(() => {
+  if (topAnswer.value && topAnswer.value.content) {
+    return topAnswer.value.content;
+  }
+  return props.post.snippet || props.post.content || '';
+});
+
 watch(
   () => props.post,
   (newP) => {
     if (newP) {
-      isUpvoted.value = Boolean(newP.is_upvoted);
+      userVote.value = newP.user_vote || (newP.is_upvoted ? 'UPVOTE' : null);
       currentUpvotes.value = newP.upvotes ?? newP.upvote_count ?? 0;
       isBookmarked.value = Boolean(newP.is_bookmarked);
     }
   },
   { deep: true }
 );
+
+async function handleVote(vtype) {
+  if (!currentUserId.value) {
+    emit('require-login');
+    emit('toast', { title: '需要登录', message: '请先登录以进行观点赞同或投票互动', type: 'INFO' });
+    return;
+  }
+
+  const prevVote = userVote.value;
+  const prevCount = currentUpvotes.value;
+
+  if (vtype === 'UPVOTE') {
+    if (userVote.value === 'UPVOTE') {
+      userVote.value = null;
+      currentUpvotes.value = Math.max(0, currentUpvotes.value - 1);
+    } else {
+      userVote.value = 'UPVOTE';
+      currentUpvotes.value += 1;
+    }
+  } else if (vtype === 'DOWNVOTE') {
+    if (userVote.value === 'DOWNVOTE') {
+      userVote.value = null;
+    } else {
+      if (userVote.value === 'UPVOTE') {
+        currentUpvotes.value = Math.max(0, currentUpvotes.value - 1);
+      }
+      userVote.value = 'DOWNVOTE';
+    }
+  }
+
+  try {
+    const res = await dispatchGateway('forum.vote', {
+      user_id: currentUserId.value,
+      target_type: 'THREAD',
+      target_id: String(props.post.id),
+      vote_type: vtype,
+    }, { silent: true });
+
+    if (res.ok && res.data) {
+      userVote.value = res.data.user_vote;
+      currentUpvotes.value = res.data.upvote_count;
+      props.post.user_vote = res.data.user_vote;
+      props.post.upvote_count = res.data.upvote_count;
+      props.post.upvotes = res.data.upvote_count;
+      props.post.is_upvoted = (res.data.user_vote === 'UPVOTE');
+      emit('upvote', {
+        post: props.post,
+        isUpvoted: (res.data.user_vote === 'UPVOTE'),
+        count: res.data.upvote_count,
+      });
+    } else {
+      userVote.value = prevVote;
+      currentUpvotes.value = prevCount;
+      emit('toast', { title: '投票失败', message: res.error || '无法记录投票，请重试', type: 'ERROR' });
+    }
+  } catch (e) {
+    userVote.value = prevVote;
+    currentUpvotes.value = prevCount;
+    emit('toast', { title: '操作异常', message: '网络或服务异常，请重试', type: 'ERROR' });
+  }
+}
 
 function toggleExpand(e) {
   if (e) e.stopPropagation();
@@ -1200,5 +1343,106 @@ async function handleShare() {
 [data-theme="dark"] .compact-btn-delete:hover {
   color: var(--status-danger) !important;
   background: var(--status-danger-soft) !important;
+}
+
+/* Zhihu Answer Author Preview & Dual-Pill Vote Group */
+.zhihu-answer-author-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 8px;
+}
+
+.answer-avatar-micro {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--glass-surface-hover, rgba(0, 113, 227, 0.12));
+  color: var(--accent, #0071E3);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.answer-author-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.answer-author-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.answer-author-title {
+  color: var(--text-secondary);
+}
+
+.badge-accepted-tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(52, 199, 89, 0.12);
+  color: #34c759;
+  border: 1px solid rgba(52, 199, 89, 0.25);
+}
+
+.zhihu-vote-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(0, 113, 227, 0.08);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+  overflow: hidden;
+}
+
+.btn-zhihu-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border: none;
+  background: transparent;
+  color: var(--accent, #0071E3);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-zhihu-vote:hover {
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.btn-zhihu-vote.active {
+  background: var(--accent, #0071E3);
+  color: #ffffff;
+}
+
+.btn-zhihu-downvote {
+  padding: 5px 7px;
+  border-left: 1px solid rgba(0, 113, 227, 0.15);
+}
+
+[data-theme="dark"] .zhihu-vote-group {
+  background: rgba(41, 151, 255, 0.1);
+  border-color: rgba(41, 151, 255, 0.2);
+}
+
+[data-theme="dark"] .btn-zhihu-vote {
+  color: var(--accent, #2997FF);
+}
+
+[data-theme="dark"] .btn-zhihu-vote.active {
+  background: var(--accent, #2997FF);
+  color: #ffffff;
 }
 </style>

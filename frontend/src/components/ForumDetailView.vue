@@ -214,6 +214,34 @@
           </button>
 
           <button
+            type="button"
+            class="btn-liquid btn-action-big btn-write-answer-primary"
+            @click="isWritingAnswer = !isWritingAnswer"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M12 20h9"></path>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
+            </svg>
+            <span>{{ isWritingAnswer ? '收起回答框' : '撰写深度观点' }}</span>
+          </button>
+
+          <button
+            type="button"
+            class="btn-outline-action"
+            :class="{ active: isFollowing }"
+            @click="handleToggleFollow"
+            title="关注该议题动态"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
+            </svg>
+            <span>{{ isFollowing ? '已关注议题' : '关注议题' }}</span>
+          </button>
+
+          <button
             v-if="canDelete"
             type="button"
             class="btn-outline-action btn-delete-action"
@@ -223,10 +251,258 @@
               <polyline points="3 6 5 6 21 6"></polyline>
               <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
             </svg>
-            <span>删除帖子</span>
+            <span>删除议题</span>
           </button>
         </div>
       </article>
+
+      <!-- Zhihu-style Answer Composer Panel (当点击撰写观点时展开) -->
+      <section v-if="isWritingAnswer" class="glass-box answer-composer-card">
+        <div class="composer-header">
+          <div class="composer-user-meta">
+            <span class="composer-avatar">{{ (currentUserNick || '创')[0] }}</span>
+            <div>
+              <h3 class="composer-title">撰写关于该议题的实战见解与回答</h3>
+              <p class="composer-sub">您的观点将以独立回答的形式展示在知乎式观点流中，并支持被提问者采纳</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-composer" @click="isWritingAnswer = false">×</button>
+        </div>
+
+        <div class="composer-body">
+          <textarea
+            v-model="answerDraft"
+            class="glass-input composer-textarea"
+            rows="6"
+            placeholder="围绕该议题阐述您的实操经验、技术方案或踩坑复盘...（支持 Markdown 排版、代码块与要点列表）"
+          ></textarea>
+        </div>
+
+        <div class="composer-footer">
+          <div class="composer-stats">
+            <span>字数：{{ answerDraft.length }}</span>
+            <span class="dot-sep">·</span>
+            <span>预估阅读：{{ Math.max(1, Math.ceil(answerDraft.length / 300)) }} 分钟</span>
+          </div>
+          <div class="composer-actions">
+            <button
+              type="button"
+              class="btn-outline-action"
+              :disabled="isSubmittingAnswer"
+              @click="isWritingAnswer = false"
+            >
+              取消
+            </button>
+            <button
+              type="button"
+              class="btn-liquid btn-submit-answer"
+              :disabled="!answerDraft.trim() || answerDraft.trim().length < 5 || isSubmittingAnswer"
+              @click="submitAnswer"
+            >
+              <svg v-if="!isSubmittingAnswer" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+              <span>{{ isSubmittingAnswer ? '正在编排流水线发布...' : '发布观点回答' }}</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Zhihu-style Answers Section (独立创客深度观点与回答流) -->
+      <section class="glass-box answers-stream-section">
+        <div class="answers-stream-header">
+          <div class="answers-title-wrap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a2 2 0 0 1-2 2h-4a2 2 0 0 1-2-2v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7z"/>
+              <line x1="9" y1="21" x2="15" y2="21"/>
+            </svg>
+            <h2 class="answers-title">全部深度观点与回答</h2>
+            <span class="answers-badge">{{ answersList.length }} 个实战见解</span>
+          </div>
+
+          <div class="answers-sort-group">
+            <button
+              type="button"
+              class="sort-tab-btn"
+              :class="{ active: answersSort === 'upvotes' }"
+              @click="answersSort = 'upvotes'"
+            >
+              高赞优先
+            </button>
+            <button
+              type="button"
+              class="sort-tab-btn"
+              :class="{ active: answersSort === 'latest' }"
+              @click="answersSort = 'latest'"
+            >
+              最新发布
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty Answers Prompt -->
+        <div v-if="answersList.length === 0" class="answers-empty-box">
+          <div class="empty-icon-ring">💡</div>
+          <h4>暂无创客发布深度观点</h4>
+          <p>成为第一个针对该议题发表实战经验与避坑复盘的创客！</p>
+          <button type="button" class="btn-liquid" @click="isWritingAnswer = true">
+            <span>立即撰写第一个回答</span>
+          </button>
+        </div>
+
+        <!-- Answers List Cards -->
+        <div v-else class="answers-card-list">
+          <article
+            v-for="ans in sortedAnswersList"
+            :key="ans.id"
+            class="answer-item-card"
+            :class="{ 'is-accepted-answer': ans.is_accepted }"
+          >
+            <!-- Answer Author Meta -->
+            <div class="answer-item-header">
+              <div class="ans-author-left">
+                <div class="ans-author-avatar">
+                  {{ (ans.author_name || '客')[0] }}
+                </div>
+                <div class="ans-author-meta">
+                  <div class="ans-author-line">
+                    <span class="ans-name">{{ ans.author_name || '实战创客' }}</span>
+                    <span class="ans-title">{{ ans.author_title || '已认证超级个体' }}</span>
+                    <span v-if="ans.is_accepted" class="ans-accepted-pill">
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                      </svg>
+                      <span>提问者已采纳最佳观点</span>
+                    </span>
+                  </div>
+                  <div class="ans-sub-line">
+                    <span>发表于 {{ formatTime(ans.created_at) }}</span>
+                    <span class="dot-sep">·</span>
+                    <span>约 {{ ans.word_count || 120 }} 字</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Accept Button (If Question Author or Admin) -->
+              <div v-if="canAccept" class="ans-author-right">
+                <button
+                  type="button"
+                  class="btn-accept-toggle"
+                  :class="{ accepted: ans.is_accepted }"
+                  @click="handleAcceptAnswer(ans)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                  <span>{{ ans.is_accepted ? '取消采纳' : '采纳此回答' }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Answer Markdown Body -->
+            <div
+              class="answer-body-content markdown-rendered-content"
+              v-html="renderMarkdown(ans.content)"
+            ></div>
+
+            <!-- Zhihu Signature Dock for each Answer -->
+            <div class="answer-dock-bar">
+              <!-- Dual-pill vote group -->
+              <div class="zhihu-vote-group">
+                <button
+                  type="button"
+                  class="btn-zhihu-vote btn-zhihu-upvote"
+                  :class="{ active: ans.user_vote === 'UPVOTE' }"
+                  @click="handleAnswerVote(ans, 'UPVOTE')"
+                  title="赞同此见解"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 4L3 18h18L12 4z"/>
+                  </svg>
+                  <span>赞同 {{ ans.upvote_count || 0 }}</span>
+                </button>
+                <button
+                  type="button"
+                  class="btn-zhihu-vote btn-zhihu-downvote"
+                  :class="{ active: ans.user_vote === 'DOWNVOTE' }"
+                  @click="handleAnswerVote(ans, 'DOWNVOTE')"
+                  title="反对"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 20l9-14H3l9 14z"/>
+                  </svg>
+                </button>
+              </div>
+
+              <!-- Answer Comments Toggle -->
+              <button
+                type="button"
+                class="btn-dock-action"
+                :class="{ active: activeAnswerCommentId === ans.id }"
+                @click="toggleAnswerComments(ans.id)"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                </svg>
+                <span>{{ ans.comment_count || 0 }} 条探讨</span>
+              </button>
+
+              <button
+                type="button"
+                class="btn-dock-action"
+                @click="handleCopyLink"
+                title="分享此回答"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="18" cy="5" r="3"></circle>
+                  <circle cx="6" cy="12" r="3"></circle>
+                  <circle cx="18" cy="19" r="3"></circle>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                </svg>
+                <span>分享</span>
+              </button>
+            </div>
+
+            <!-- Expandable Nested Discussion under this specific answer -->
+            <div v-if="activeAnswerCommentId === ans.id" class="answer-sub-comments-box">
+              <div class="sub-comment-input-row">
+                <input
+                  v-model="subCommentDraft[ans.id]"
+                  type="text"
+                  class="glass-input sub-input"
+                  placeholder="针对该观点写下您的探讨与交流..."
+                  @keydown.enter="submitSubComment(ans)"
+                />
+                <button
+                  type="button"
+                  class="btn-liquid btn-sub-submit"
+                  :disabled="!subCommentDraft[ans.id] || !subCommentDraft[ans.id].trim()"
+                  @click="submitSubComment(ans)"
+                >
+                  发送
+                </button>
+              </div>
+
+              <!-- List of comments for this answer -->
+              <div v-if="getAnswerComments(ans.id).length > 0" class="sub-comments-list">
+                <div
+                  v-for="c in getAnswerComments(ans.id)"
+                  :key="c.id"
+                  class="sub-comment-row"
+                >
+                  <div class="sub-c-header">
+                    <span class="sub-c-name">{{ c.author_name || '独立创客' }}</span>
+                    <span class="sub-c-time">{{ formatTime(c.created_at) }}</span>
+                  </div>
+                  <div class="sub-c-text">{{ c.content }}</div>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
 
       <!-- Discussions & Comments Section -->
       <section class="glass-box discussions-section-card">
@@ -402,6 +678,10 @@ const currentUserId = computed(() => {
   return props.userSession?.uid || props.userSession?.id || props.userSession?.user?.id || props.userSession?.user?.uid || '';
 });
 
+const currentUserNick = computed(() => {
+  return props.userSession?.nickname || props.userSession?.username || props.userSession?.user?.nickname || '认证创客';
+});
+
 const currentUserRole = computed(() => {
   return (props.userSession?.role || props.userSession?.user?.role || localStorage.getItem('opchub_current_role') || 'MAKER').toUpperCase();
 });
@@ -414,13 +694,44 @@ const canDelete = computed(() => {
   return false;
 });
 
+const canAccept = computed(() => {
+  if (currentUserRole.value === 'ADMIN') return true;
+  if (currentUserId.value && props.post?.author_id && String(props.post.author_id) === String(currentUserId.value)) {
+    return true;
+  }
+  return false;
+});
+
 const threadUpvoted = ref(false);
 const threadUpvoteCount = ref(0);
 const threadBookmarked = ref(false);
 const threadLoved = ref(false);
 const threadLoveCount = ref(0);
+const isFollowing = ref(false);
 const isCopied = ref(false);
 let copyTimer = null;
+
+// Answers state
+const answersList = ref([]);
+const answersSort = ref('upvotes');
+const isWritingAnswer = ref(false);
+const answerDraft = ref('');
+const isSubmittingAnswer = ref(false);
+const activeAnswerCommentId = ref(null);
+const subCommentDraft = ref({});
+
+const sortedAnswersList = computed(() => {
+  const list = [...answersList.value];
+  if (answersSort.value === 'latest') {
+    list.sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+  } else {
+    list.sort((a, b) => {
+      if (a.is_accepted !== b.is_accepted) return b.is_accepted ? 1 : -1;
+      return (b.upvote_count || 0) - (a.upvote_count || 0);
+    });
+  }
+  return list;
+});
 
 const replyText = ref('');
 const replyTarget = ref(null);
@@ -466,98 +777,269 @@ watch(
   { immediate: true }
 );
 
-function loadThreadDetail(post) {
-  if (post.id === 1 || post.title.includes('工商年报')) {
-    commentTree.value = [
-      {
-        id: 'c-101',
-        author_name: '财税极客_老王',
-        ip_location: '来自 杭州',
-        created_at: '15分钟前',
-        is_accepted: true,
-        upvote_count: 36,
-        upvoted: true,
-        content: '亲测小规模纳税人免税申报，务必在填报《增值税及附加税费申报表》时勾选“小微企业免税政策代码”，如果填在应税收入栏会被税务系统自动阻断！',
-        children: [
-          {
-            id: 'c-101-1',
-            author_name: 'SoloDev_Z',
-            reply_to_name: '财税极客_老王',
-            ip_location: '来自 深圳',
-            created_at: '8分钟前',
-            upvote_count: 7,
-            upvoted: false,
-            content: '非常感谢提醒！我们上个月差点误填到应税收入里，省下了两千多块附加税。',
-          },
-        ],
-      },
-      {
-        id: 'c-102',
-        author_name: '合规小管家',
-        ip_location: '来自 北京',
-        created_at: '25分钟前',
-        is_accepted: false,
-        upvote_count: 14,
-        upvoted: false,
-        content: '另外提示大家：年报公示截止时间是6月30日，逾期不仅进经营异常名录，连企业名下的微信商户号和支付宝商户都会被冻结清算权限。',
-        children: [],
-      },
-    ];
-  } else if (post.id === 2 || post.title.includes('算力补贴')) {
-    commentTree.value = [
-      {
-        id: 'c-201',
-        author_name: 'AI_Innovator',
-        ip_location: '来自 苏州',
-        created_at: '28分钟前',
-        is_accepted: true,
-        upvote_count: 22,
-        upvoted: false,
-        content: '建议大家在申报时把租用 GPU 算力合同里的“AI 模型微调与推理测试”单列出来，审核部门对这一项的补贴核准通过率几乎是 100%。',
-        children: [],
-      },
-    ];
-  } else {
-    commentTree.value = [
-      {
-        id: 'c-301',
-        author_name: 'VectorPilot',
-        ip_location: '来自 深圳',
-        created_at: '1小时前',
-        is_accepted: true,
-        upvote_count: 19,
-        upvoted: false,
-        content: '核心要点在于：在微内核里将合规校验做成前置 Guard 算子，出现风控拦截就走异步补偿流水线，这样既不阻塞前台请求，又能保证数据可追溯。',
-        children: [],
-      },
-    ];
+function formatTime(isoStr) {
+  if (!isoStr) return '刚刚';
+  try {
+    const diff = Date.now() - new Date(isoStr).getTime();
+    if (isNaN(diff)) return '刚刚';
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return '刚刚';
+    if (mins < 60) return `${mins} 分钟前`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} 小时前`;
+    const days = Math.floor(hours / 24);
+    if (days < 30) return `${days} 天前`;
+    return new Date(isoStr).toLocaleDateString('zh-CN');
+  } catch (e) {
+    return '刚刚';
   }
+}
 
-  // Attempt to fetch from real backend gateway
-  if (post.id && typeof post.id === 'string' && post.id.length > 10) {
-    dispatchGateway('forum.threads.get', { thread_id: post.id }, { silent: true }).then((res) => {
-      if (res.ok && res.data && res.data.comments) {
+function loadThreadDetail(post) {
+  if (!post || !post.id) return;
+  const tid = String(post.id);
+
+  // Fetch real details from backend microkernel gateway
+  dispatchGateway('forum.threads.get', { thread_id: tid }, { silent: true }).then((res) => {
+    if (res.ok && res.data) {
+      if (Array.isArray(res.data.answers)) {
+        answersList.value = res.data.answers;
+      }
+      if (Array.isArray(res.data.comments)) {
         commentTree.value = res.data.comments.map((node) => ({
           id: node.id,
-          author_name: node.author_id ? `创客_${node.author_id.slice(0, 6)}` : '实战创客',
+          target_type: node.target_type,
+          target_id: node.target_id,
+          author_name: node.author_name || (node.author_id ? `创客_${node.author_id.slice(0, 6)}` : '实战创客'),
           ip_location: '来自 浙江',
-          created_at: '刚刚',
+          created_at: formatTime(node.created_at),
           is_accepted: Boolean(node.is_accepted),
           upvote_count: node.upvote_count || 0,
           upvoted: false,
           content: node.content,
           children: (node.children || []).map((sub) => ({
             id: sub.id,
-            author_name: sub.author_id ? `创客_${sub.author_id.slice(0, 6)}` : '出海创客',
+            target_type: sub.target_type,
+            target_id: sub.target_id,
+            author_name: sub.author_name || (sub.author_id ? `创客_${sub.author_id.slice(0, 6)}` : '出海创客'),
             ip_location: '来自 浙江',
-            created_at: '刚刚',
+            created_at: formatTime(sub.created_at),
             upvote_count: sub.upvote_count || 0,
             upvoted: false,
             content: sub.content,
           })),
         }));
       }
+      if (res.data.thread) {
+        isFollowing.value = Boolean(res.data.thread.is_following);
+        threadUpvoted.value = (res.data.thread.user_vote === 'UPVOTE');
+        threadUpvoteCount.value = res.data.thread.upvote_count || 0;
+        threadBookmarked.value = Boolean(res.data.thread.is_bookmarked);
+      }
+    }
+  }).catch(() => {});
+}
+
+async function handleToggleFollow() {
+  if (!currentUserId.value) {
+    emit('toast', { title: '需要登录', message: '请先登录以关注该议题', type: 'INFO' });
+    return;
+  }
+  try {
+    const res = await dispatchGateway('forum.threads.follow', { thread_id: String(props.post.id) });
+    if (res.ok && res.data) {
+      isFollowing.value = Boolean(res.data.is_following);
+      emit('toast', {
+        title: isFollowing.value ? '已关注议题' : '已取消关注',
+        message: isFollowing.value ? '新创客发表观点回答时将提醒您' : '已取消对该议题的关注',
+        type: 'SUCCESS',
+      });
+    }
+  } catch (e) {
+    emit('toast', { title: '操作失败', message: '关注服务异常，请重试', type: 'ERROR' });
+  }
+}
+
+async function submitAnswer() {
+  if (!currentUserId.value) {
+    emit('toast', { title: '需要登录', message: '请先登录以发布深度见解', type: 'INFO' });
+    return;
+  }
+  const text = answerDraft.value.trim();
+  if (text.length < 5) {
+    emit('toast', { title: '内容过短', message: '回答内容至少需要 5 个字', type: 'WARNING' });
+    return;
+  }
+
+  isSubmittingAnswer.value = true;
+  try {
+    const res = await dispatchGateway('forum.answers.publish', {
+      thread_id: String(props.post.id),
+      content: text,
+      author_id: currentUserId.value,
+      author_name: currentUserNick.value,
+      author_title: '已认证超级个体',
     });
+
+    if (res.ok && res.data) {
+      answersList.value.unshift(res.data);
+      answerDraft.value = '';
+      isWritingAnswer.value = false;
+      if (props.post) {
+        props.post.answer_count = (props.post.answer_count || 0) + 1;
+      }
+      emit('toast', {
+        title: '观点回答发布成功',
+        message: '您的实战见解已通过微内核 DAG 编排流水线完成安全审查与持久化归档！',
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', { title: '发布失败', message: res.error || '发布异常，请重试', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '系统异常', message: '流水线服务暂不可用，请稍后重试', type: 'ERROR' });
+  } finally {
+    isSubmittingAnswer.value = false;
+  }
+}
+
+async function handleAcceptAnswer(answer) {
+  try {
+    const res = await dispatchGateway('forum.answers.accept', {
+      thread_id: String(props.post.id),
+      answer_id: String(answer.id),
+      operator_user_id: currentUserId.value,
+    });
+    if (res.ok && res.data) {
+      const isAccepted = Boolean(res.data.is_accepted);
+      // Update local state
+      answersList.value.forEach((a) => {
+        if (a.id === answer.id) {
+          a.is_accepted = isAccepted;
+        } else if (isAccepted) {
+          a.is_accepted = false;
+        }
+      });
+      if (props.post) {
+        props.post.accepted_answer_id = isAccepted ? answer.id : null;
+      }
+      emit('toast', {
+        title: isAccepted ? '已采纳最佳观点' : '已取消采纳',
+        message: isAccepted ? '该观点已被标记为题主推荐实战方案' : '已更新采纳状态',
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', { title: '操作失败', message: res.error || '无法采纳该见解', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '操作异常', message: '服务异常，请稍后重试', type: 'ERROR' });
+  }
+}
+
+async function handleAnswerVote(answer, voteType) {
+  if (!currentUserId.value) {
+    emit('toast', { title: '需要登录', message: '请先登录以进行赞同或反对', type: 'INFO' });
+    return;
+  }
+
+  const prevVote = answer.user_vote;
+  const prevUp = answer.upvote_count || 0;
+  const prevDown = answer.downvote_count || 0;
+
+  if (voteType === 'UPVOTE') {
+    if (answer.user_vote === 'UPVOTE') {
+      answer.user_vote = null;
+      answer.upvote_count = Math.max(0, prevUp - 1);
+    } else {
+      if (answer.user_vote === 'DOWNVOTE') {
+        answer.downvote_count = Math.max(0, prevDown - 1);
+      }
+      answer.user_vote = 'UPVOTE';
+      answer.upvote_count = prevUp + 1;
+    }
+  } else if (voteType === 'DOWNVOTE') {
+    if (answer.user_vote === 'DOWNVOTE') {
+      answer.user_vote = null;
+      answer.downvote_count = Math.max(0, prevDown - 1);
+    } else {
+      if (answer.user_vote === 'UPVOTE') {
+        answer.upvote_count = Math.max(0, prevUp - 1);
+      }
+      answer.user_vote = 'DOWNVOTE';
+      answer.downvote_count = prevDown + 1;
+    }
+  }
+
+  try {
+    const res = await dispatchGateway('forum.vote', {
+      user_id: currentUserId.value,
+      target_type: 'ANSWER',
+      target_id: String(answer.id),
+      vote_type: voteType,
+    }, { silent: true });
+
+    if (res.ok && res.data) {
+      answer.user_vote = res.data.user_vote;
+      answer.upvote_count = res.data.upvote_count;
+      answer.downvote_count = res.data.downvote_count;
+    } else {
+      answer.user_vote = prevVote;
+      answer.upvote_count = prevUp;
+      answer.downvote_count = prevDown;
+    }
+  } catch (e) {
+    answer.user_vote = prevVote;
+    answer.upvote_count = prevUp;
+    answer.downvote_count = prevDown;
+  }
+}
+
+function toggleAnswerComments(ansId) {
+  if (activeAnswerCommentId.value === ansId) {
+    activeAnswerCommentId.value = null;
+  } else {
+    activeAnswerCommentId.value = ansId;
+  }
+}
+
+function getAnswerComments(ansId) {
+  return commentTree.value.filter((c) => String(c.target_id) === String(ansId));
+}
+
+async function submitSubComment(answer) {
+  const draft = subCommentDraft.value[answer.id];
+  if (!draft || !draft.trim()) return;
+  if (!currentUserId.value) {
+    emit('toast', { title: '需要登录', message: '请先登录以发表交流探讨', type: 'INFO' });
+    return;
+  }
+
+  try {
+    const res = await dispatchGateway('forum.comments.create', {
+      thread_id: String(props.post.id),
+      target_type: 'ANSWER',
+      target_id: String(answer.id),
+      content: draft.trim(),
+      author_id: currentUserId.value,
+    });
+    if (res.ok && res.data) {
+      commentTree.value.push({
+        id: res.data.id || res.data.comment_id,
+        target_type: 'ANSWER',
+        target_id: String(answer.id),
+        author_name: currentUserNick.value,
+        ip_location: '来自 浙江',
+        created_at: '刚刚',
+        content: draft.trim(),
+        upvote_count: 0,
+        children: [],
+      });
+      answer.comment_count = (answer.comment_count || 0) + 1;
+      subCommentDraft.value[answer.id] = '';
+      emit('toast', { title: '探讨已发表', message: '您的观点补充已成功发表！', type: 'SUCCESS' });
+    }
+  } catch (e) {
+    emit('toast', { title: '发表失败', message: '网络服务异常', type: 'ERROR' });
   }
 }
 
@@ -1529,5 +2011,419 @@ async function submitReply() {
   .article-title {
     font-size: 22px;
   }
+}
+
+/* Zhihu Answer Composer & Answer Stream Styles */
+.answer-composer-card {
+  padding: 24px;
+  border-radius: var(--radius-lg, 16px);
+  margin-bottom: 24px;
+  background: var(--glass-surface);
+  border: 1px solid var(--accent);
+  box-shadow: 0 4px 20px rgba(0, 113, 227, 0.08);
+}
+
+.composer-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.composer-user-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.composer-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.composer-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 2px 0;
+}
+
+.composer-sub {
+  font-size: 12.5px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.btn-close-composer {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.composer-textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  resize: vertical;
+  min-height: 120px;
+}
+
+.composer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+}
+
+.composer-stats {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.composer-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.answers-stream-section {
+  padding: 28px;
+  border-radius: var(--radius-lg, 16px);
+  margin-bottom: 24px;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+}
+
+.answers-stream-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  margin-bottom: 20px;
+}
+
+.answers-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.answers-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.answers-badge {
+  font-size: 11.5px;
+  color: var(--accent);
+  background: rgba(0, 113, 227, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+}
+
+.answers-sort-group {
+  display: flex;
+  gap: 6px;
+}
+
+.sort-tab-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.16s ease;
+}
+
+.sort-tab-btn.active {
+  background: var(--glass-surface-subtle);
+  color: var(--accent);
+  font-weight: 600;
+  border-color: var(--glass-border-subtle);
+}
+
+.answers-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.answer-item-card {
+  padding: 22px;
+  border-radius: var(--radius-md, 12px);
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
+  transition: all 0.2s ease;
+}
+
+.answer-item-card.is-accepted-answer {
+  border-color: rgba(52, 199, 89, 0.45);
+  box-shadow: 0 2px 14px rgba(52, 199, 89, 0.08);
+}
+
+.answer-item-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.ans-author-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ans-author-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--glass-surface-hover);
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ans-author-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ans-author-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ans-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--text-primary);
+}
+
+.ans-title {
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.ans-accepted-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(52, 199, 89, 0.15);
+  color: #34c759;
+  border: 1px solid rgba(52, 199, 89, 0.3);
+}
+
+.ans-sub-line {
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+}
+
+.btn-accept-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-accept-toggle:hover {
+  background: rgba(0, 113, 227, 0.1);
+}
+
+.btn-accept-toggle.accepted {
+  background: rgba(52, 199, 89, 0.12);
+  border-color: #34c759;
+  color: #34c759;
+}
+
+.answer-body-content {
+  font-size: 14.5px;
+  line-height: 1.7;
+  color: var(--text-primary);
+  margin-bottom: 16px;
+}
+
+.answer-dock-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--glass-border-subtle);
+}
+
+.btn-dock-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+
+.btn-dock-action:hover,
+.btn-dock-action.active {
+  color: var(--accent);
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.answer-sub-comments-box {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.sub-comment-input-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sub-input {
+  flex: 1;
+  font-size: 13px;
+  padding: 6px 10px;
+}
+
+.btn-sub-submit {
+  font-size: 12px;
+  padding: 6px 14px;
+}
+
+.sub-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sub-comment-row {
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.sub-c-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  margin-bottom: 4px;
+}
+
+.sub-c-name {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.sub-c-time {
+  color: var(--text-tertiary);
+}
+
+.sub-c-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+/* Zhihu Vote Group */
+.zhihu-vote-group {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 6px;
+  background: rgba(0, 113, 227, 0.08);
+  border: 1px solid rgba(0, 113, 227, 0.15);
+  overflow: hidden;
+}
+
+.btn-zhihu-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 9px;
+  border: none;
+  background: transparent;
+  color: var(--accent, #0071E3);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-zhihu-vote:hover {
+  background: rgba(0, 113, 227, 0.16);
+}
+
+.btn-zhihu-vote.active {
+  background: var(--accent, #0071E3);
+  color: #ffffff;
+}
+
+.btn-zhihu-downvote {
+  padding: 5px 7px;
+  border-left: 1px solid rgba(0, 113, 227, 0.15);
+}
+
+[data-theme="dark"] .answer-composer-card,
+[data-theme="dark"] .answers-stream-section {
+  background: rgba(26, 29, 36, 0.72);
+}
+
+[data-theme="dark"] .answer-item-card {
+  background: rgba(18, 20, 29, 0.65);
+}
+
+[data-theme="dark"] .zhihu-vote-group {
+  background: rgba(41, 151, 255, 0.1);
+  border-color: rgba(41, 151, 255, 0.2);
+}
+
+[data-theme="dark"] .btn-zhihu-vote {
+  color: var(--accent, #2997FF);
+}
+
+[data-theme="dark"] .btn-zhihu-vote.active {
+  background: var(--accent, #2997FF);
+  color: #ffffff;
 }
 </style>
