@@ -15,12 +15,20 @@ ENV/
 htmlcov/
 
 # Node / Web temporary files
-node_modules/
-dist/
+**/node_modules
+**/dist
 .DS_Store
 *.log
+*.pid
 
-# Local runtime databases & scratch
+# Local runtime databases & scratch (backend/data/seeds 必须保留进镜像——启动引导持久化的数据源)
 *.sqlite-journal
+backend/data/*.sqlite
+backend/data/*.sqlite-journal
+backend/data/*.db
 brain/
 scratch/
+frontend/data
+data/
+.zcode
+hs-dev-skill
