@@ -30,11 +30,9 @@ from src.domains.sop.models import (
     SOPMyFlowCard,
     SOPFlowTemplateCatalogResponse,
     SOPFlowTemplateDetail,
-    SOPFlowTemplateInteractionResponse,
     SOPFlowTemplateStep,
     SOPDocumentCard,
     SOPDocumentCatalogResponse,
-    SOPInteractionResponse,
     SOPReviewItem,
     SOPReviewQueueResponse,
     SOPReviewProcessResult,
@@ -132,12 +130,6 @@ class SOPService:
         # Background consumer that audits and promotes approved submissions.
         self._review_consumer_task = None
         self._review_consumer_running = False
-        # (user_id, node_id) pairs for likes and favourites.
-        self._likes: Set[tuple] = set()
-        self._favorites: Set[tuple] = set()
-        # (user_id, flow_template_id) pairs for flow likes and favourites.
-        self._flow_likes: Set[tuple] = set()
-        self._flow_favorites: Set[tuple] = set()
         self._init_seeds()
 
     # ------------------------------------------------------------------
@@ -325,8 +317,6 @@ class SOPService:
                     # any document instance persisted on this deployment adds to it.
                     usage_count=node.usage_count + live_usage.get(node.id, 0),
                     field_count=len(node.required_fields),
-                    liked=bool(user_id) and (user_id, node.id) in self._likes,
-                    favorited=bool(user_id) and (user_id, node.id) in self._favorites,
                 )
             )
 
@@ -340,56 +330,6 @@ class SOPService:
         for doc in self._documents.values():
             counts[doc.template_id] = counts.get(doc.template_id, 0) + 1
         return counts
-
-    def toggle_like(self, user_id: str, node_id: str) -> SOPInteractionResponse:
-        """Toggle the caller's like on a standard document."""
-        node = self.get_node(node_id)
-        if node.kind != SOP_NODE_DOCUMENT:
-            raise ValueError("只有标准文书支持喜欢操作")
-        key = (user_id, node_id)
-        if key in self._likes:
-            self._likes.discard(key)
-            node.like_count = max(0, node.like_count - 1)
-        else:
-            self._likes.add(key)
-            node.like_count += 1
-        domain_persistence.write("sop.likes", f"{user_id}:{node_id}", {"user_id": user_id, "node_id": node_id})
-        return self._interaction_state(user_id, node)
-
-    def toggle_favorite(self, user_id: str, node_id: str) -> SOPInteractionResponse:
-        """Toggle the caller's favourite on a standard document."""
-        node = self.get_node(node_id)
-        if node.kind != SOP_NODE_DOCUMENT:
-            raise ValueError("只有标准文书支持收藏操作")
-        key = (user_id, node_id)
-        if key in self._favorites:
-            self._favorites.discard(key)
-            node.favorite_count = max(0, node.favorite_count - 1)
-        else:
-            self._favorites.add(key)
-            node.favorite_count += 1
-        domain_persistence.write("sop.favorites", f"{user_id}:{node_id}", {"user_id": user_id, "node_id": node_id})
-        return self._interaction_state(user_id, node)
-
-    def _interaction_state(self, user_id: str, node: SOPNode) -> SOPInteractionResponse:
-        return SOPInteractionResponse(
-            node_id=node.id,
-            liked=(user_id, node.id) in self._likes,
-            favorited=(user_id, node.id) in self._favorites,
-            like_count=node.like_count,
-            favorite_count=node.favorite_count,
-            usage_count=node.usage_count + self._usage_counts().get(node.id, 0),
-        )
-
-    def hydrate_likes(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._likes.add((r.get("user_id", ""), r.get("node_id", "")))
-        return len(rows)
-
-    def hydrate_favorites(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._favorites.add((r.get("user_id", ""), r.get("node_id", "")))
-        return len(rows)
 
     # ------------------------------------------------------------------
     # Platform flow templates (平台流程模板)
@@ -432,8 +372,6 @@ class SOPService:
                     like_count=flow.like_count,
                     favorite_count=flow.favorite_count,
                     usage_count=flow.usage_count + self._flow_usage_counts().get(flow.id, 0),
-                    liked=bool(user_id) and (user_id, flow.id) in self._flow_likes,
-                    favorited=bool(user_id) and (user_id, flow.id) in self._flow_favorites,
                 )
             )
             void = missing
@@ -499,50 +437,6 @@ class SOPService:
                 counts[template_id] = counts.get(template_id, 0) + 1
         return counts
 
-    def toggle_flow_like(self, user_id: str, flow_id: str) -> SOPFlowTemplateInteractionResponse:
-        """Toggle the caller's like on a platform flow template."""
-        flow = self.get_flow_template(flow_id)
-        key = (user_id, flow_id)
-        if key in self._flow_likes:
-            self._flow_likes.discard(key)
-            flow.like_count = max(0, flow.like_count - 1)
-        else:
-            self._flow_likes.add(key)
-            flow.like_count += 1
-        domain_persistence.write(
-            "sop.flow_likes", f"{user_id}:{flow_id}",
-            {"user_id": user_id, "node_id": flow_id},
-        )
-        return self._flow_interaction_state(user_id, flow)
-
-    def toggle_flow_favorite(self, user_id: str, flow_id: str) -> SOPFlowTemplateInteractionResponse:
-        """Toggle the caller's favourite on a platform flow template."""
-        flow = self.get_flow_template(flow_id)
-        key = (user_id, flow_id)
-        if key in self._flow_favorites:
-            self._flow_favorites.discard(key)
-            flow.favorite_count = max(0, flow.favorite_count - 1)
-        else:
-            self._flow_favorites.add(key)
-            flow.favorite_count += 1
-        domain_persistence.write(
-            "sop.flow_favorites", f"{user_id}:{flow_id}",
-            {"user_id": user_id, "node_id": flow_id},
-        )
-        return self._flow_interaction_state(user_id, flow)
-
-    def _flow_interaction_state(
-        self, user_id: str, flow: SOPFlowTemplate
-    ) -> SOPFlowTemplateInteractionResponse:
-        return SOPFlowTemplateInteractionResponse(
-            node_id=flow.id,
-            liked=(user_id, flow.id) in self._flow_likes,
-            favorited=(user_id, flow.id) in self._flow_favorites,
-            like_count=flow.like_count,
-            favorite_count=flow.favorite_count,
-            usage_count=flow.usage_count + self._flow_usage_counts().get(flow.id, 0),
-        )
-
     def get_flow_template(self, flow_id: str) -> SOPFlowTemplate:
         """Fetch a platform flow template by ID."""
         if flow_id not in self._flow_templates:
@@ -552,16 +446,6 @@ class SOPService:
     def hydrate_flow_templates(self, rows: List[Dict]) -> int:
         for r in rows:
             self._flow_templates[r["id"]] = SOPFlowTemplate(**r)
-        return len(rows)
-
-    def hydrate_flow_likes(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._flow_likes.add((r.get("user_id", ""), r.get("node_id", "")))
-        return len(rows)
-
-    def hydrate_flow_favorites(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._flow_favorites.add((r.get("user_id", ""), r.get("node_id", "")))
         return len(rows)
 
     def expand_subgraph(self, node_id: str, _seen: Optional[Set[str]] = None) -> List[SOPNode]:
@@ -1560,12 +1444,8 @@ sop_service = SOPService()
 domain_persistence.register("sop.templates", sop_service.hydrate_templates)
 domain_persistence.register("sop.documents", sop_service.hydrate_documents)
 domain_persistence.register("sop.flows", sop_service.hydrate_flows)
-domain_persistence.register("sop.likes", sop_service.hydrate_likes)
-domain_persistence.register("sop.favorites", sop_service.hydrate_favorites)
 domain_persistence.register("sop.nodes", sop_service.hydrate_nodes)
 domain_persistence.register("sop.edges", sop_service.hydrate_edges)
 domain_persistence.register("sop.goals", sop_service.hydrate_goals)
 domain_persistence.register("sop.flow_templates", sop_service.hydrate_flow_templates)
-domain_persistence.register("sop.flow_likes", sop_service.hydrate_flow_likes)
-domain_persistence.register("sop.flow_favorites", sop_service.hydrate_flow_favorites)
 domain_persistence.register("sop.review_queue", sop_service.hydrate_review_queue)

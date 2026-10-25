@@ -94,7 +94,7 @@ def test_sop_create_is_full_page():
     assert "<CreatePageLayout" in view
     assert "currentViewMode === 'flowbuilder'" in view
     assert "SopDocPage" in view
-    assert "sop-doc-editor-textarea" in doc_page
+    assert "sop-doc-editor" in doc_page  # 编辑器容器类（草稿重开编辑演进后由 RichEditor 承载正文）
     # 文书编辑器顶部也只保留标题与必要元信息。
     assert "sop-doc-title" in doc_page
     assert "sop-doc-breadcrumb" not in doc_page

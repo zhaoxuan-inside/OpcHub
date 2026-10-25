@@ -33,23 +33,24 @@
           </div>
           <span class="dot-sep">·</span>
           <span class="compact-time">{{ post.updated_at || '刚刚' }}</span>
-          <span class="dot-sep">·</span>
-          <span class="compact-ip">{{ post.ip_location || '来自 浙江' }}</span>
-
-          <!-- Primary Highlight Metric in Compact View -->
-          <template v-if="computedMetrics.length > 0">
-            <span class="dot-sep">·</span>
-            <span class="compact-metric-pill" :class="`metric-${computedMetrics[0].type || 'info'}`">
-              <span class="metric-icon"><OpcIcon :name="computedMetrics[0].icon" :size="12" /></span>
-              <span class="metric-label">{{ computedMetrics[0].label }}:</span>
-              <strong class="metric-val">{{ computedMetrics[0].val }}</strong>
-            </span>
-          </template>
         </div>
       </div>
 
-      <!-- Compact functional actions (share / delete) -->
+      <!-- Compact functional actions (vote / share / delete) -->
       <div class="compact-actions-col" @click.stop>
+        <button
+          type="button"
+          class="compact-btn-vote"
+          :class="{ active: userVote === 'UPVOTE' }"
+          @click="handleVote('UPVOTE')"
+          :title="userVote === 'UPVOTE' ? '取消赞同' : '赞同此议题'"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 4L3 18h18L12 4z"/>
+          </svg>
+          <span>{{ currentUpvotes }}</span>
+        </button>
+
         <button
           type="button"
           class="compact-btn-icon"
@@ -88,19 +89,17 @@
         :target-type="'FORUM_THREAD'"
         :target-id="post.id"
         :target-title="post.title"
-        :like-count="post.like_count ?? post.upvote_count ?? post.upvotes ?? 0"
+        :target-snippet="post.snippet || ''"
+        :kinds="['LOVE', 'FAVORITE']"
         :favorite-count="post.favorite_count ?? post.bookmark_count ?? 0"
         :love-count="post.love_count ?? 0"
         :comment-count="post.comment_count ?? post.replies ?? 0"
-        :dislike-count="post.dislike_count ?? 0"
         :rating-avg="post.rating_avg ?? 0"
         :rating-count="post.rating_count ?? 0"
         :my-rating="post.viewer?.rating ?? 0"
-        :liked="post.viewer ? post.viewer.liked : Boolean(post.is_upvoted)"
         :favorited="post.viewer ? post.viewer.favorited : Boolean(post.is_bookmarked)"
         :loved="post.viewer ? post.viewer.loved : Boolean(post.is_loved)"
         :commented="post.viewer ? post.viewer.commented : Boolean(post.is_commented)"
-        :disliked="post.viewer?.disliked ?? false"
         :authenticated="Boolean(currentUserId)"
         compact
         comment-mode="emit"
@@ -159,8 +158,6 @@
       </div>
       <div class="answer-author-meta">
         <span class="answer-author-name">{{ topAnswer.author_name || '实战创客' }}</span>
-        <span class="dot-sep">·</span>
-        <span class="answer-author-title">{{ topAnswer.author_title || '已认证超级个体' }}</span>
         <span v-if="topAnswer.is_accepted" class="badge-accepted-tag">✓ 提问者已采纳</span>
       </div>
     </div>
@@ -198,7 +195,7 @@
     <!-- 2.6 Zhihu Signature Action Toolbar -->
     <div class="zhihu-action-bar">
       <div class="action-buttons-group">
-        <!-- Zhihu Mutual Vote Pill -->
+        <!-- Zhihu Mutual Vote Pill (唯一投票链路：论坛域 forum.vote) -->
         <div class="zhihu-vote-group" @click.stop>
           <button
             type="button"
@@ -239,19 +236,6 @@
           <span>{{ post.answer_count || (post.top_answers ? post.top_answers.length : 0) }} 个回答</span>
         </button>
 
-        <!-- Comments -->
-        <button
-          type="button"
-          class="btn-zhihu-action"
-          @click.stop="$emit('select', post)"
-          title="查看探讨评论"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span>{{ post.comment_count || post.replies || 0 }} 条探讨</span>
-        </button>
-
         <!-- Share -->
         <button
           type="button"
@@ -284,53 +268,26 @@
           </svg>
           <span>删除</span>
         </button>
-
-        <!-- Deep Dive Action Link -->
-        <button
-          type="button"
-          class="btn-zhihu-deep"
-          @click.stop="$emit('select', post)"
-          title="查看完整评论与探讨方案"
-        >
-          <span>深入探讨 →</span>
-        </button>
-      </div>
-
-      <!-- Right Discussion Info or Collapse Button -->
-      <div class="action-right-wrap">
-        <button
-          v-if="isExpanded"
-          type="button"
-          class="btn-collapse-corner"
-          @click.stop="toggleExpand"
-        >
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-            <polyline points="18 15 12 9 6 15"></polyline>
-          </svg>
-          <span>收起全文</span>
-        </button>
       </div>
     </div>
 
-    <!-- 2.7 Unified Interaction Band (bottom) -->
+    <!-- 2.7 Unified Interaction Band (bottom: 收藏 / 喜欢 / 评论 / 举报 / 评分) -->
     <div class="zhihu-interaction-row" @click.stop>
       <ContentInteractionBar
         :target-type="'FORUM_THREAD'"
         :target-id="post.id"
         :target-title="post.title"
-        :like-count="post.like_count ?? post.upvote_count ?? post.upvotes ?? 0"
+        :target-snippet="post.snippet || ''"
+        :kinds="['LOVE', 'FAVORITE']"
         :favorite-count="post.favorite_count ?? post.bookmark_count ?? 0"
         :love-count="post.love_count ?? 0"
         :comment-count="post.comment_count ?? post.replies ?? 0"
-        :dislike-count="post.dislike_count ?? 0"
         :rating-avg="post.rating_avg ?? 0"
         :rating-count="post.rating_count ?? 0"
         :my-rating="post.viewer?.rating ?? 0"
-        :liked="post.viewer ? post.viewer.liked : Boolean(post.is_upvoted)"
         :favorited="post.viewer ? post.viewer.favorited : Boolean(post.is_bookmarked)"
         :loved="post.viewer ? post.viewer.loved : Boolean(post.is_loved)"
         :commented="post.viewer ? post.viewer.commented : Boolean(post.is_commented)"
-        :disliked="post.viewer?.disliked ?? false"
         :authenticated="Boolean(currentUserId)"
         variant="band"
         comment-mode="emit"
@@ -368,7 +325,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['select', 'upvote', 'bookmark', 'delete', 'toast', 'interaction', 'require-login']);
+const emit = defineEmits(['select', 'vote', 'delete', 'toast', 'interaction', 'require-login']);
 
 const currentUserId = computed(() => {
   return props.userSession?.uid || props.userSession?.id || props.userSession?.user?.id || props.userSession?.user?.uid || '';
@@ -388,7 +345,6 @@ const canDelete = computed(() => {
 
 const userVote = ref(props.post.user_vote || (props.post.is_upvoted ? 'UPVOTE' : null));
 const currentUpvotes = ref(props.post.upvotes ?? props.post.upvote_count ?? 0);
-const isBookmarked = ref(Boolean(props.post.is_bookmarked));
 const isCopied = ref(false);
 const isExpanded = ref(false);
 let copyTimer = null;
@@ -413,7 +369,6 @@ watch(
     if (newP) {
       userVote.value = newP.user_vote || (newP.is_upvoted ? 'UPVOTE' : null);
       currentUpvotes.value = newP.upvotes ?? newP.upvote_count ?? 0;
-      isBookmarked.value = Boolean(newP.is_bookmarked);
     }
   },
   { deep: true }
@@ -457,17 +412,7 @@ async function handleVote(vtype) {
     }, { silent: true });
 
     if (res.ok && res.data) {
-      userVote.value = res.data.user_vote;
-      currentUpvotes.value = res.data.upvote_count;
-      props.post.user_vote = res.data.user_vote;
-      props.post.upvote_count = res.data.upvote_count;
-      props.post.upvotes = res.data.upvote_count;
-      props.post.is_upvoted = (res.data.user_vote === 'UPVOTE');
-      emit('upvote', {
-        post: props.post,
-        isUpvoted: (res.data.user_vote === 'UPVOTE'),
-        count: res.data.upvote_count,
-      });
+      applyVoteState(res.data);
     } else {
       userVote.value = prevVote;
       currentUpvotes.value = prevCount;
@@ -480,6 +425,21 @@ async function handleVote(vtype) {
   }
 }
 
+function applyVoteState(data) {
+  userVote.value = data.user_vote;
+  currentUpvotes.value = data.upvote_count;
+  props.post.user_vote = data.user_vote;
+  props.post.upvote_count = data.upvote_count;
+  props.post.upvotes = data.upvote_count;
+  props.post.is_upvoted = (data.user_vote === 'UPVOTE');
+  emit('vote', {
+    post: props.post,
+    userVote: data.user_vote,
+    upvoteCount: data.upvote_count,
+    downvoteCount: data.downvote_count,
+  });
+}
+
 function toggleExpand(e) {
   if (e) e.stopPropagation();
   isExpanded.value = !isExpanded.value;
@@ -488,9 +448,6 @@ function toggleExpand(e) {
 function onInteractionChanged(payload) {
   applyBarChange(props.post, payload);
   applyForumInteractionAliases(props.post);
-  isUpvoted.value = Boolean(props.post.viewer?.liked);
-  currentUpvotes.value = Number(props.post.like_count || 0);
-  isBookmarked.value = Boolean(props.post.viewer?.favorited);
   emit('interaction', { post: props.post, ...payload });
 }
 
@@ -538,97 +495,6 @@ const pillStyle = computed(() => {
     border: '1px solid var(--glass-border-subtle)',
   };
 });
-
-// High-Density Metric Badges Resolution
-const computedMetrics = computed(() => {
-  if (props.post.metrics && Array.isArray(props.post.metrics) && props.post.metrics.length > 0) {
-    return props.post.metrics;
-  }
-  const list = [];
-  const t = props.post.title || '';
-  const c = props.post.snippet || props.post.content || '';
-
-  if (t.includes('免征') || t.includes('年报') || c.includes('30 万')) {
-    list.push({ label: '季度免征额', val: '¥300,000', icon: 'coin', type: 'success' });
-    list.push({ label: '申报耗时', val: '15分钟', icon: 'timer', type: 'info' });
-    list.push({ label: '综合税负', val: '0%', icon: 'chart-bar', type: 'accent' });
-  } else if (t.includes('算力') || c.includes('算力券')) {
-    list.push({ label: '财政直拨', val: '¥120,000', icon: 'gift', type: 'success' });
-    list.push({ label: '审批周期', val: '45天', icon: 'calendar', type: 'info' });
-    list.push({ label: '资质要件', val: '软著+科技型', icon: 'pen', type: 'warning' });
-  } else if (t.includes('Stripe') || t.includes('对公户') || c.includes('结汇')) {
-    list.push({ label: '结汇时效', val: 'T+1 自动到账', icon: 'bolt', type: 'success' });
-    list.push({ label: '综合费率', val: '4.8% → 1.9%', icon: 'cash', type: 'accent' });
-    list.push({ label: '合规阻断', val: '0% 拦截', icon: 'shield', type: 'info' });
-  } else if (t.includes('pgvector') || t.includes('PostgreSQL')) {
-    list.push({ label: '检索延迟', val: '120ms → 18ms', icon: 'bolt', type: 'success' });
-    list.push({ label: '节点容量', val: '200万向量', icon: 'database', type: 'info' });
-    list.push({ label: '基础设施', val: '$42/月', icon: 'chart-down', type: 'accent' });
-  } else if (t.includes('FastAPI') || t.includes('SQLite') || t.includes('全栈')) {
-    list.push({ label: '承载峰值', val: '100,000 MAU', icon: 'users', type: 'success' });
-    list.push({ label: '硬件规格', val: '2核4G 单机', icon: 'monitor', type: 'info' });
-    list.push({ label: '运维精力', val: '< 5% 时长', icon: 'rocket', type: 'accent' });
-  } else if (t.includes('定价') || t.includes('Freemium') || c.includes('留存')) {
-    list.push({ label: '跟踪样本', val: '1,200 付费创客', icon: 'chart-bar', type: 'info' });
-    list.push({ label: 'LTV提升', val: '3.2 倍', icon: 'coin', type: 'success' });
-    list.push({ label: '年度留存', val: '68.4%', icon: 'chart-up', type: 'accent' });
-  }
-  return list;
-});
-
-const computedTags = computed(() => {
-  if (props.post.tags && Array.isArray(props.post.tags) && props.post.tags.length > 0) {
-    return props.post.tags;
-  }
-  const list = [];
-  const t = props.post.title || '';
-  if (t.includes('Stripe')) list.push('Stripe跨境', '万里汇对公户');
-  if (t.includes('pgvector') || t.includes('PostgreSQL')) list.push('pgvector', 'PostgreSQL', 'HNSW');
-  if (t.includes('年报') || t.includes('免征')) list.push('合规免税', '税务年报', '小微优惠');
-  if (t.includes('算力')) list.push('算力券补贴', '科技入库', '软著申报');
-  if (t.includes('Agent')) list.push('AI智能体', 'RAG架构');
-  if (t.includes('出海')) list.push('出海定价', 'SaaS留存');
-  if (list.length === 0) list.push('实战落地', '避坑指南');
-  return list.slice(0, 4);
-});
-
-function handleToggleUpvote() {
-  if (isUpvoted.value) {
-    isUpvoted.value = false;
-    currentUpvotes.value = Math.max(0, currentUpvotes.value - 1);
-  } else {
-    isUpvoted.value = true;
-    currentUpvotes.value += 1;
-  }
-  emit('upvote', { post: props.post, isUpvoted: isUpvoted.value, count: currentUpvotes.value });
-}
-
-function handleToggleBookmark() {
-  isBookmarked.value = !isBookmarked.value;
-  props.post.is_bookmarked = isBookmarked.value;
-
-  try {
-    const raw = localStorage.getItem('opchub_forum_bookmarks');
-    let bookmarks = raw ? JSON.parse(raw) : [];
-    const sid = String(props.post.id);
-    if (isBookmarked.value) {
-      if (!bookmarks.some((b) => (typeof b === 'object' ? String(b.id) === sid : String(b) === sid))) {
-        bookmarks.push({
-          id: props.post.id,
-          title: props.post.title,
-          category: categoryLabel.value,
-          author: props.post.author,
-          created_at: new Date().toISOString(),
-        });
-      }
-    } else {
-      bookmarks = bookmarks.filter((b) => (typeof b === 'object' ? String(b.id) !== sid : String(b) !== sid));
-    }
-    localStorage.setItem('opchub_forum_bookmarks', JSON.stringify(bookmarks));
-  } catch (e) {}
-
-  emit('bookmark', { post: props.post, isBookmarked: isBookmarked.value });
-}
 
 async function handleShare() {
   const origin = window.location.origin || '';
@@ -814,27 +680,6 @@ async function handleShare() {
   color: var(--text-secondary, #4B4E56);
 }
 
-.compact-metric-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: rgba(0, 113, 227, 0.08);
-  color: var(--accent, #0071E3);
-}
-
-.compact-metric-pill.metric-success {
-  background: var(--status-success-soft);
-  color: var(--status-success);
-}
-
-.compact-metric-pill.metric-warning {
-  background: var(--status-warning-soft);
-  color: var(--status-warning);
-}
-
 .compact-actions-col {
   display: flex;
   align-items: center;
@@ -842,27 +687,6 @@ async function handleShare() {
   flex-shrink: 0;
 }
 
-.compact-btn-upvote {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
-  border-radius: 4px;
-  background: rgba(0, 113, 227, 0.08);
-  color: var(--accent, #0071E3);
-  border: none;
-  font-size: 11.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.compact-btn-upvote.active {
-  background: var(--accent, #0071E3);
-  color: #fff;
-}
-
-.compact-btn-action,
 .compact-btn-icon {
   display: inline-flex;
   align-items: center;
@@ -877,7 +701,6 @@ async function handleShare() {
   transition: all 0.15s ease;
 }
 
-.compact-btn-action:hover,
 .compact-btn-icon:hover {
   background: rgba(0, 0, 0, 0.04);
   color: var(--accent, #0071E3);
@@ -885,6 +708,30 @@ async function handleShare() {
 
 .compact-btn-icon.active {
   color: var(--accent, #0071E3);
+}
+
+.compact-btn-vote {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 4px;
+  background: rgba(0, 113, 227, 0.08);
+  color: var(--accent, #0071E3);
+  border: none;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.compact-btn-vote:hover {
+  background: rgba(0, 113, 227, 0.15);
+}
+
+.compact-btn-vote.active {
+  background: var(--accent, #0071E3);
+  color: #fff;
 }
 
 /* ========================================================
@@ -955,16 +802,6 @@ async function handleShare() {
   color: var(--text-primary, #121316);
 }
 
-.author-badge {
-  font-size: 10px;
-  font-weight: 500;
-  color: var(--accent, #0071E3);
-  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
-  border: 1px solid rgba(0, 113, 227, 0.16);
-  padding: 1px 5px;
-  border-radius: 3px;
-}
-
 .dot-sep {
   opacity: 0.5;
 }
@@ -1022,55 +859,6 @@ async function handleShare() {
   color: var(--accent, #0071E3);
 }
 
-/* 2.3 Executive Practical Metric Chips */
-.zhihu-metrics-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
-  margin-bottom: 9px;
-}
-
-.metric-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11.5px;
-  padding: 2px 8px;
-  border-radius: 5px;
-  background: rgba(0, 113, 227, 0.06);
-  border: 1px solid rgba(0, 113, 227, 0.12);
-  color: var(--text-secondary, #333);
-}
-
-.metric-chip strong {
-  color: var(--accent, #0071E3);
-  font-weight: 600;
-}
-
-.metric-chip.chip-success {
-  background: var(--status-success-soft);
-  border-color: var(--status-success);
-}
-.metric-chip.chip-success strong {
-  color: var(--status-success);
-}
-
-.metric-chip.chip-warning {
-  background: var(--status-warning-soft);
-  border-color: var(--status-warning);
-}
-.metric-chip.chip-warning strong {
-  color: var(--status-warning);
-}
-
-.metric-chip.chip-accent {
-  background: var(--accent-glass);
-  border-color: rgba(0, 113, 227, 0.16);
-}
-.metric-chip.chip-accent strong {
-  color: var(--accent);
-}
-
 /* 2.4 Excerpt & In-Place Expand */
 .zhihu-card-content {
   margin-bottom: 10px;
@@ -1080,18 +868,6 @@ async function handleShare() {
   display: flex;
   flex-direction: column;
   gap: 4px;
-}
-
-.snippet-text {
-  font-size: 13.5px;
-  line-height: 1.62;
-  color: var(--text-secondary, #44474E);
-  margin: 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .btn-read-full {
@@ -1161,30 +937,6 @@ async function handleShare() {
   background: rgba(0, 113, 227, 0.15);
 }
 
-/* 2.5 Keywords */
-.zhihu-keywords-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 11px;
-}
-
-.keyword-tag {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-tertiary, #7D828D);
-  background: var(--glass-surface-subtle, rgba(0, 0, 0, 0.025));
-  border: 1px solid var(--glass-border-subtle, rgba(0, 0, 0, 0.05));
-  padding: 2px 7px;
-  border-radius: 4px;
-  transition: all 0.16s ease;
-}
-
-.keyword-tag:hover {
-  color: var(--accent, #0071E3);
-  border-color: rgba(0, 113, 227, 0.2);
-}
-
 /* 2.6 Signature Action Bar */
 .zhihu-action-bar {
   display: flex;
@@ -1207,35 +959,6 @@ async function handleShare() {
 .zhihu-interaction-row {
   padding-top: 10px;
   margin-top: 2px;
-}
-
-.btn-zhihu-upvote {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  border-radius: var(--radius-sm, 6px);
-  background: rgba(0, 113, 227, 0.08);
-  color: var(--accent, #0071E3);
-  border: 1px solid transparent;
-  font-size: 12.5px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.16s ease;
-}
-
-.btn-zhihu-upvote:hover {
-  background: rgba(0, 113, 227, 0.14);
-}
-
-.btn-zhihu-upvote.active {
-  background: var(--accent, #0071E3);
-  color: #ffffff;
-  box-shadow: 0 2px 6px rgba(0, 113, 227, 0.25);
-}
-
-.btn-zhihu-upvote.active svg path {
-  fill: #ffffff;
 }
 
 .btn-zhihu-action {
@@ -1263,53 +986,6 @@ async function handleShare() {
   font-weight: 600;
 }
 
-.btn-zhihu-deep {
-  display: inline-flex;
-  align-items: center;
-  padding: 5px 8px;
-  border-radius: var(--radius-sm, 6px);
-  background: transparent;
-  color: var(--accent, #0071E3);
-  border: none;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.16s ease;
-}
-
-.btn-zhihu-deep:hover {
-  text-decoration: underline;
-}
-
-.action-right-wrap {
-  display: flex;
-  align-items: center;
-}
-
-.discuss-heat-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11px;
-  color: var(--text-tertiary, #7D828D);
-}
-
-.btn-collapse-corner {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 11.5px;
-  color: var(--accent, #0071E3);
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  font-weight: 500;
-}
-
-.btn-collapse-corner:hover {
-  text-decoration: underline;
-}
-
 /* Dark mode adjustments */
 [data-theme="dark"] .zhihu-post-card,
 [data-theme="dark"] .compact-post-row {
@@ -1317,12 +993,6 @@ async function handleShare() {
   border-color: rgba(255, 255, 255, 0.08);
 }
 
-[data-theme="dark"] .compact-btn-upvote,
-[data-theme="dark"] .btn-zhihu-upvote {
-  background: rgba(0, 113, 227, 0.15);
-}
-
-[data-theme="dark"] .compact-btn-action:hover,
 [data-theme="dark"] .compact-btn-icon:hover,
 [data-theme="dark"] .btn-zhihu-action:hover {
   background: rgba(255, 255, 255, 0.06);
@@ -1377,10 +1047,6 @@ async function handleShare() {
 .answer-author-name {
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.answer-author-title {
-  color: var(--text-secondary);
 }
 
 .badge-accepted-tag {

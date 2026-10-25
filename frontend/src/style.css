@@ -142,7 +142,8 @@ body {
 }
 
 /* ---------------- Navigation Bar & Sub-Bar ---------------- */
-header {
+/* 仅命中顶部导航栏；裸元素选择器会波及 Teleport 弹窗内的 <header> */
+header.app-topbar {
   position: fixed;
   top: 12px;
   left: 0;
@@ -1791,4 +1792,40 @@ button,
   display: none;
   width: 0;
   height: 0;
+}
+
+/* ============================================================
+   Global UX hard rules (2026-10-25):
+   1) Functional labels / buttons / pills NEVER wrap.
+   2) Overflowing strips scroll horizontally/vertically,
+      but scrollbars are never visible anywhere.
+   ============================================================ */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* legacy Edge */
+}
+
+*::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+/* Functional controls never wrap their captions */
+button,
+select,
+label,
+.form-label,
+.mono-tag,
+[class*="pill-label"],
+[class$="-pill"],
+[class*="-tag "],
+.pill,
+[class^="palette-"] .mono-tag {
+  white-space: nowrap;
+}
+
+/* Long select options degrade to ellipsis instead of wrapping */
+select {
+  text-overflow: ellipsis;
 }

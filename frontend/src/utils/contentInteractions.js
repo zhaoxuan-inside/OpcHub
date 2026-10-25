@@ -86,18 +86,15 @@ export function applyBarChange(item, payload) {
 }
 
 /**
- * Forum cards keep their legacy field names (upvotes / replies / is_upvoted)
- * for sorting and detail navigation. Keep those aliases in sync with the
- * unified interaction state.
+ * Forum cards keep legacy field names (replies / bookmark_count) for sorting and
+ * detail navigation. 赞同/反对 (upvotes / user_vote) is the forum domain's own vote
+ * ledger and is never aliased from the unified counters.
  */
 export function applyForumInteractionAliases(post) {
   if (!post) return post;
   const viewer = post.viewer || {};
-  post.upvotes = Number(post.like_count || 0);
-  post.upvote_count = Number(post.like_count || 0);
   post.replies = Number(post.comment_count || 0);
   post.bookmark_count = Number(post.favorite_count || 0);
-  post.is_upvoted = Boolean(viewer.liked);
   post.is_bookmarked = Boolean(viewer.favorited);
   post.is_loved = Boolean(viewer.loved);
   post.is_commented = Boolean(viewer.commented);

@@ -47,9 +47,9 @@ def test_policy_view_source_code_layout_and_cards():
     assert "增值税免税即时测算" in content
     assert "政策中心智库公约" in content
 
-    # 4. Modals
-    assert "policy-detail-modal" in content
-    assert "policy-publish-modal" in content
+    # 4. Publish via full-page CreatePageLayout (弹窗体系已移除)
+    assert "CreatePageLayout" in content
+    assert "policies.publish" in content
 
 
 def test_policy_view_compiled_dist():

@@ -7,9 +7,13 @@ fast in-memory index and mirrors every mutation into the platform's
 
 Design notes
 ------------
-* Existing domain counters (forum upvotes/bookmarks, product upvotes, SOP
-  likes/favorites) are treated as legacy seed data the first time a target is
-  touched. This preserves all historical numbers without a destructive migration.
+* ``FORUM_THREAD`` targets: the Zhihu-style mutual UPVOTE/DOWNVOTE ledger lives in
+  the forum domain (``forum.vote`` pipeline) and forum comments live in the forum
+  domain too. This service only owns FAVORITE (收藏) / LOVE (喜欢) / RATING for
+  forum threads, mirroring those counters back via ``_sync_domain``; the comment
+  count is always read live from the owning thread so it never goes stale.
+* Other target types (products, policies, demands, SOP, perks) own their full
+  LIKE/FAVORITE/LOVE counters here, seeded from legacy fields on first touch.
 * Aggregate counters live in ``content.interaction_stats``; per-user toggles live
   in ``content.interaction_records``; comments live in ``content.comments``.
 * ``LIKE`` and ``FAVORITE`` and ``LOVE`` are independent toggles. ``LIKE`` is
@@ -146,7 +150,7 @@ def _legacy_counts(target_type: str, target_id: str) -> Dict[str, int]:
         counts["love_count"] = int(getattr(obj, "love_count", 0) or 0)
         counts["comment_count"] = int(getattr(obj, "comment_count", 0) or 0)
     elif target_type == "FORUM_THREAD":
-        counts["like_count"] = int(getattr(obj, "upvote_count", 0) or 0)
+        # 赞同/反对归论坛域投票账本，这里不播种 like_count（论坛卡片不再使用 LIKE）。
         counts["favorite_count"] = int(getattr(obj, "bookmark_count", 0) or 0)
         counts["love_count"] = int(getattr(obj, "love_count", 0) or 0)
         counts["comment_count"] = int(getattr(obj, "comment_count", 0) or 0)
@@ -176,24 +180,6 @@ def _legacy_viewer(user_id: str, target_type: str, target_id: str) -> Dict[str, 
         return state
     uid = str(user_id)
     tid = str(target_id)
-    try:
-        if target_type == "FORUM_THREAD":
-            from src.domains.forum.service import forum_service
-
-            state["liked"] = (uid, "THREAD", tid) in forum_service._upvotes
-            state["favorited"] = (uid, tid) in forum_service._bookmarks
-        elif target_type == "SOP_DOCUMENT":
-            from src.domains.sop.service import sop_service
-
-            state["loved"] = (uid, tid) in sop_service._likes
-            state["favorited"] = (uid, tid) in sop_service._favorites
-        elif target_type == "SOP_FLOW":
-            from src.domains.sop.service import sop_service
-
-            state["loved"] = (uid, tid) in sop_service._flow_likes
-            state["favorited"] = (uid, tid) in sop_service._flow_favorites
-    except Exception:
-        pass
     return state
 
 
@@ -361,6 +347,11 @@ class ContentInteractionService:
         tt = _normalize_target_type(target_type)
         tid = str(target_id)
         counts = self._ensure_stats(tt, tid)
+        if tt == "FORUM_THREAD":
+            # 论坛评论数以论坛域实时值为准（评论走 forum.comments 域，不经过本服务）。
+            obj = _lookup_target(tt, tid)
+            if obj is not None:
+                counts["comment_count"] = int(getattr(obj, "comment_count", 0) or 0)
         self._ensure_viewer(user_id or "", tt, tid)
         return InteractionState(
             target_type=tt,
@@ -543,10 +534,10 @@ class ContentInteractionService:
             domain_persistence.write("demands.items", target_id, obj)
             demand_service.invalidate_cache()
         elif target_type == "FORUM_THREAD":
-            obj.upvote_count = counts["like_count"]
+            # 赞同(upvote_count)与评论数(comment_count)归论坛域账本，不在此覆写；
+            # 收藏与喜欢由统一互动系统镜像回帖子实体。
             obj.bookmark_count = counts["favorite_count"]
             obj.love_count = counts["love_count"]
-            obj.comment_count = counts["comment_count"]
             domain_persistence.write("forum.threads", target_id, obj)
         elif target_type == "SOP_DOCUMENT":
             obj.like_count = counts["love_count"]

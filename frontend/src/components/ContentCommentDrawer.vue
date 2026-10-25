@@ -260,9 +260,12 @@ if (typeof window !== 'undefined') {
   background: var(--glass-surface, rgba(255, 255, 255, 0.9));
   box-shadow: -24px 0 60px rgba(0, 0, 0, 0.18);
   overflow: hidden;
+  padding: 0;
+  margin: 0;
 }
 
 .ccd-header {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

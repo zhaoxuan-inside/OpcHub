@@ -9,6 +9,7 @@
       :authenticated="Boolean(currentUserSession)"
       :user-id="currentUserSession?.uid || ''"
       :creation-mode="docCreationMode"
+      :draft="docDraftDoc"
       @back="handleBackFromDoc"
       @pick="handlePickDocument"
       @saved="handleDocumentSaved"
@@ -55,6 +56,7 @@
       :template-name-of="templateNameOf"
       @back="handleBackFromMyDoc"
       @delete="handleDeleteMyDocument"
+      @edit="handleEditMyDocument"
     />
 
     <div v-else class="sop-main-content">
@@ -177,9 +179,6 @@
                 <p class="empty-desc">
                   {{ searchQuery ? `没有找到与 “${searchQuery}” 匹配的文书。` : '标准文书库中暂无可用文书。' }}
                 </p>
-                <div class="empty-actions">
-                  <button v-if="searchQuery" class="btn-liquid-outline" @click="handleClearSearch">清除搜索条件</button>
-                </div>
               </div>
             </div>
           </template>
@@ -278,9 +277,6 @@
                 <p class="empty-desc">
                   {{ flowSearchQuery ? `没有找到与 “${flowSearchQuery}” 匹配的流程。` : '标准流程库中暂无可用流程。' }}
                 </p>
-                <div class="empty-actions">
-                  <button v-if="flowSearchQuery" class="btn-liquid-outline" @click="handleFlowClearSearch">清除搜索条件</button>
-                </div>
               </div>
             </div>
           </template>
@@ -352,9 +348,6 @@
                 <p class="empty-desc">
                   {{ myDocSearchQuery ? `没有找到与 “${myDocSearchQuery}” 匹配的文书。` : '你还没有起草过文书。点右侧「起草新文书」，直接在编辑器里撰写，或选择模板后修改保存，就会出现在这里。' }}
                 </p>
-                <div class="empty-actions">
-                  <button v-if="myDocSearchQuery" class="btn-liquid-outline" @click="handleMyDocClearSearch">清除搜索条件</button>
-                </div>
               </div>
             </div>
           </template>
@@ -429,9 +422,6 @@
                 <p class="empty-desc">
                   {{ myFlowSearchQuery ? `没有找到与 “${myFlowSearchQuery}” 匹配的流程。` : '你还没有创建过流程。点右侧「创建流程」，从节点库中挑选文书组成你的专属办理流程。' }}
                 </p>
-                <div class="empty-actions">
-                  <button v-if="myFlowSearchQuery" class="btn-liquid-outline" @click="handleMyFlowClearSearch">清除搜索条件</button>
-                </div>
               </div>
             </div>
           </template>
@@ -849,6 +839,8 @@ const docReturnMode = ref('workspace');
 // Creation entry (创建文书 / 发布新文档): keep the writing area open and show
 // templates as a right-side panel instead of a full-page picker takeover.
 const docCreationMode = ref(false);
+// Existing private draft reopened in the editor (null = brand new document).
+const docDraftDoc = ref(null);
 
 
 const CATEGORY_LABELS = {
@@ -1177,26 +1169,6 @@ function handleBackFromFlow() {
   flowOwnerMode.value = false;
 }
 
-async function handleLikeFlow(flow) {
-  const res = await dispatchGateway('sop.flow.like', { flow_id: flow.id });
-  if (res.ok && res.data) {
-    flow.liked = res.data.liked;
-    flow.like_count = res.data.like_count;
-  } else {
-    emit('toast', { title: '操作未完成', message: res.error || '喜欢操作未成功，请稍后重试。', type: 'ERROR' });
-  }
-}
-
-async function handleFavoriteFlow(flow) {
-  const res = await dispatchGateway('sop.flow.favorite', { flow_id: flow.id });
-  if (res.ok && res.data) {
-    flow.favorited = res.data.favorited;
-    flow.favorite_count = res.data.favorite_count;
-  } else {
-    emit('toast', { title: '操作未完成', message: res.error || '收藏操作未成功，请稍后重试。', type: 'ERROR' });
-  }
-}
-
 function handleFlowSearch() {
   const query = flowSearchQuery.value.trim();
   if (!query) {
@@ -1216,26 +1188,6 @@ function handleFlowClearSearch() {
 function handleFlowRefresh() {
   loadFlowCatalog();
   emit('toast', { title: '已刷新', message: '已同步最新标准流程库。', type: 'INFO' });
-}
-
-async function handleLikeDocument(doc) {
-  const res = await dispatchGateway('sop.document.like', { node_id: doc.id });
-  if (res.ok && res.data) {
-    doc.liked = res.data.liked;
-    doc.like_count = res.data.like_count;
-  } else {
-    emit('toast', { title: '操作未完成', message: res.error || '喜欢操作未成功，请稍后重试。', type: 'ERROR' });
-  }
-}
-
-async function handleFavoriteDocument(doc) {
-  const res = await dispatchGateway('sop.document.favorite', { node_id: doc.id });
-  if (res.ok && res.data) {
-    doc.favorited = res.data.favorited;
-    doc.favorite_count = res.data.favorite_count;
-  } else {
-    emit('toast', { title: '操作未完成', message: res.error || '收藏操作未成功，请稍后重试。', type: 'ERROR' });
-  }
 }
 
 function handleOpenNode(payload) {
@@ -1324,8 +1276,9 @@ async function handlePublishMyDocument(doc) {
 }
 
 function templateNameOf(templateId) {
+  if (!templateId) return '自由起草';
   const node = nodes.value.find((n) => n.id === templateId);
-  return node?.name || templateId || '标准文书';
+  return node?.name || templateId;
 }
 
 // ---------------------------------------------------------------------------
@@ -1561,6 +1514,7 @@ function openDocPage(node) {
   // page — a flow step keeps the flow page, everything else keeps the tab.
   docReturnMode.value = currentViewMode.value === 'flow' ? 'flow' : 'workspace';
   docCreationMode.value = false;
+  docDraftDoc.value = null;
   docPageNode.value = target;
   docPageChildren.value = target.kind === 'subgraph' ? subgraphChildren(target) : [];
   currentViewMode.value = 'doc';
@@ -1607,6 +1561,7 @@ async function handleDocumentSaved(savedDoc) {
   // sees the new document appear in the (already refreshed) list.
   if (docCreationMode.value) {
     docCreationMode.value = false;
+    docDraftDoc.value = null;
     docReturnMode.value = 'mydocs';
     docPageNode.value = null;
     docPageChildren.value = [];
@@ -1620,6 +1575,7 @@ function handleBackFromDoc() {
   currentViewMode.value = docReturnMode.value || 'workspace';
   docReturnMode.value = 'workspace';
   docCreationMode.value = false;
+  docDraftDoc.value = null;
   docPageNode.value = null;
   docPageChildren.value = [];
   window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1639,6 +1595,7 @@ function openDocByCategory(category) {
 function openDocFromCatalog() {
   docReturnMode.value = 'workspace';
   docCreationMode.value = true;
+  docDraftDoc.value = null;
   docPageNode.value = null;
   docPageChildren.value = [];
   currentViewMode.value = 'doc';
@@ -1652,6 +1609,22 @@ function openDocFromCatalog() {
 function createNewMyDocument() {
   docReturnMode.value = 'mydocs';
   docCreationMode.value = true;
+  docDraftDoc.value = null;
+  docPageNode.value = null;
+  docPageChildren.value = [];
+  currentViewMode.value = 'doc';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/**
+ * Reopen one of the maker's private drafts in the text editor for revision.
+ * Saving updates that document in place instead of creating a new one.
+ */
+function handleEditMyDocument(doc) {
+  if (!doc) return;
+  docReturnMode.value = 'mydocs';
+  docCreationMode.value = true;
+  docDraftDoc.value = doc;
   docPageNode.value = null;
   docPageChildren.value = [];
   currentViewMode.value = 'doc';
@@ -1853,7 +1826,9 @@ onUnmounted(() => {
   margin-bottom: 12px;
   border-radius: var(--radius-md, 14px);
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   background: var(--glass-surface);
   border: 1px solid var(--glass-border);
 }
@@ -2101,11 +2076,6 @@ onUnmounted(() => {
   margin: 0;
 }
 
-.empty-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 8px;
-}
 
 /* Sidebar */
 .sidebar-card {

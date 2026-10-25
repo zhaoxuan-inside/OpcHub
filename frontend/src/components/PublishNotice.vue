@@ -2,7 +2,7 @@
   <div class="publish-notice" role="note">
     <span class="publish-notice-mark">发布公约</span>
     <p class="publish-notice-text">
-      所有注册用户均可发布。平台仅进行敏感词校验，不对信息真实性背书；内容的有效性由
+      所有注册用户均可发布。平台仅进行内容合规校验，不对信息真实性背书；内容的有效性由
       点赞、点踩、评分与举报等社区互动共同维护。官方账号发布的内容会显示「官方」标签。
     </p>
   </div>

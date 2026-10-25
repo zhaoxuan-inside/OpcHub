@@ -9,7 +9,7 @@ client = TestClient(app)
 
 
 def test_home_overview_dispatched_via_gateway():
-    """Verify that scenario 'home.overview' is no longer registered in gateway routes and returns 404."""
+    """Verify that scenario 'home.overview' is registered in gateway routes and aggregates real metrics."""
     req = {
         "scenario": "home.overview",
         "version": "v1.0.0",
@@ -19,8 +19,21 @@ def test_home_overview_dispatched_via_gateway():
     resp = client.post("/api/welcom/opc_world", json=req)
     assert resp.status_code == 200
     data = resp.json()
-    assert data["code"] == 404
-    assert "Unknown scenario 'home.overview'" in data["message"]
+    assert data["code"] == 200
+    payload = data["data"]
+    assert payload["orchestrated_by"] == "OPC_HOME_OVERVIEW_PIPELINE"
+    for field in (
+        "active_makers_count",
+        "active_dags_count",
+        "matched_policies_count",
+        "demands_orders_count",
+        "perks_saved_cny",
+        "products_count",
+        "forum_threads_count",
+    ):
+        assert field in payload, f"missing metric field: {field}"
+        assert payload[field] >= 0
+    assert len(payload.get("quick_links", [])) >= 7
 
 
 @pytest.mark.asyncio
@@ -41,5 +54,17 @@ async def test_home_overview_direct_microkernel_dag_execution():
         "home.sitemap.builder",
         "home.overview.aggregator",
     ]
-    assert res.final_output.get("orchestrated_by") == "OPC_HOME_OVERVIEW_PIPELINE"
-    assert len(res.final_output.get("quick_links", [])) >= 7
+    final_output = res.final_output
+    assert final_output.get("orchestrated_by") == "OPC_HOME_OVERVIEW_PIPELINE"
+    assert len(final_output.get("quick_links", [])) >= 7
+    # 指标必须来自真实服务数据而非硬编码：与各域服务当前规模一致
+    from src.domains.products.service import product_service
+    from src.domains.policies.service import policy_service
+    from src.domains.forum.service import forum_service
+    from src.domains.perks.service import perk_service
+
+    assert final_output.get("products_count") == len(product_service.list_products())
+    assert final_output.get("matched_policies_count") == len(policy_service.list_policies())
+    assert final_output.get("forum_threads_count") == len(forum_service.list_threads())
+    expected_perks_value = sum(float(p.value_cny or 0) for p in perk_service.list_perks())
+    assert abs(final_output.get("perks_saved_cny", -1.0) - expected_perks_value) < 1e-6

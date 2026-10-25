@@ -76,7 +76,6 @@
         />
         <ComplianceView
           v-else-if="activeTab === 'compliance'"
-          @switch-tab="handleSwitchTab"
           @open-login="showLoginModal = true"
           @toast="showToast"
         />
@@ -85,13 +84,20 @@
           @logout="handleLogout"
           @navigate="handleSwitchTab"
           @toast="showToast"
+          @session-updated="userSession = $event"
         />
       </template>
 
       <!-- 3. Authenticated Admin / Governance Views -->
       <template v-else-if="userSession && currentRole === 'ADMIN'">
         <ConsoleView
-          v-if="activeTab === 'backend-orch' || activeTab === 'console' || activeTab === 'frontend-orch'"
+          v-if="activeTab === 'backend-orch' || activeTab === 'console'"
+          :user-session="userSession"
+          @toast="showToast"
+        />
+
+        <FrontendOrchView
+          v-else-if="activeTab === 'frontend-orch'"
           @toast="showToast"
         />
         <OpsView
@@ -102,6 +108,7 @@
           @logout="handleLogout"
           @navigate="handleSwitchTab"
           @toast="showToast"
+          @session-updated="userSession = $event"
         />
       </template>
     </main>
@@ -203,6 +210,7 @@ import SopView from '@/views/SopView.vue';
 import PerksView from '@/views/PerksView.vue';
 import ComplianceView from '@/views/ComplianceView.vue';
 import ConsoleView from '@/views/ConsoleView.vue';
+import FrontendOrchView from '@/views/FrontendOrchView.vue';
 import OpsView from '@/views/OpsView.vue';
 import ProfileView from '@/views/ProfileView.vue';
 import { dispatchGateway } from '@/api/gateway';
@@ -416,7 +424,7 @@ function onRegisterSuccess(data) {
   handleSwitchTab('profile');
   showToast({
     title: '商用入驻成功',
-    message: `恭喜创客 ${data.email}，已完成商用认证并持久化落库 PostgreSQL 18！`,
+    message: data.message || `恭喜创客 ${data.email}，已完成商用认证，欢迎入驻！`,
     type: 'SUCCESS',
   });
 }

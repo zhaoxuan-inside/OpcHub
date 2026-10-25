@@ -55,16 +55,6 @@ gateway:
       handler: "src.core.gateway.adapters:product_publish_adapter"
       required_permission: "content:publish"
 
-    - scenario: "products.upvote"
-      version: "v1.0.0"
-      domain: "products"
-      description: "为独立作品点赞打榜"
-      is_default: true
-      handler: "src.domains.products.service.product_service:upvote_product"
-      required_permission: "gallery:upvote"
-      args_type: "key"
-      key_name: "product_id"
-
     - scenario: "products.search.semantic"
       version: "v1.0.0"
       domain: "products"
@@ -159,37 +149,9 @@ gateway:
       args_type: "key"
       key_name: "flow_id"
 
-    - scenario: "sop.flow.like"
-      version: "v1.0.0"
-      domain: "sop"
-      description: "喜欢/取消喜欢一个平台流程模板"
-      is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_like_adapter"
-      required_permission: "sop:save_progress"
 
-    - scenario: "sop.flow.favorite"
-      version: "v1.0.0"
-      domain: "sop"
-      description: "收藏/取消收藏一个平台流程模板"
-      is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_favorite_adapter"
-      required_permission: "sop:save_progress"
 
-    - scenario: "sop.document.like"
-      version: "v1.0.0"
-      domain: "sop"
-      description: "喜欢/取消喜欢一份标准文书"
-      is_default: true
-      handler: "src.core.gateway.adapters:sop_document_like_adapter"
-      required_permission: "sop:save_progress"
 
-    - scenario: "sop.document.favorite"
-      version: "v1.0.0"
-      domain: "sop"
-      description: "收藏/取消收藏一份标准文书"
-      is_default: true
-      handler: "src.core.gateway.adapters:sop_document_favorite_adapter"
-      required_permission: "sop:save_progress"
 
     - scenario: "sop.graph"
       version: "v1.0.0"
@@ -443,21 +405,38 @@ gateway:
       handler: "src.core.gateway.adapters:forum_comment_adapter"
       required_permission: "forum:post_comment"
 
-    - scenario: "forum.upvote"
+    - scenario: "forum.threads.update"
       version: "v1.0.0"
       domain: "forum"
-      description: "对讨论帖或评论进行 Upvote 点赞/取消 (已认证创客互动)"
+      description: "编辑头脑风暴讨论帖标题/正文/分区 (限作者或管理员，微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_upvote_adapter"
-      required_permission: "forum:post_comment"
+      handler: "src.core.gateway.adapters:forum_thread_update_adapter"
+      required_permission: "content:publish"
+      owner_check:
+        resource_type: "thread"
+        id_field: "thread_id"
 
-    - scenario: "forum.bookmark"
+    - scenario: "forum.answers.delete"
       version: "v1.0.0"
       domain: "forum"
-      description: "收藏/取消收藏讨论帖至个人收藏夹 (已认证创客互动)"
+      description: "删除观点回答及其评论与投票 (限回答作者或管理员，微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_bookmark_adapter"
+      handler: "src.core.gateway.adapters:forum_answer_delete_adapter"
       required_permission: "forum:post_comment"
+      owner_check:
+        resource_type: "answer"
+        id_field: "answer_id"
+
+    - scenario: "forum.comments.delete"
+      version: "v1.0.0"
+      domain: "forum"
+      description: "删除评论及其子评论树与投票 (限评论作者或管理员，微内核 DAG 编排)"
+      is_default: true
+      handler: "src.core.gateway.adapters:forum_comment_delete_adapter"
+      required_permission: "forum:post_comment"
+      owner_check:
+        resource_type: "comment"
+        id_field: "comment_id"
 
     - scenario: "forum.threads.delete"
       version: "v1.0.0"
@@ -552,6 +531,13 @@ gateway:
       handler: "src.core.gateway.adapters:ops_dashboard_adapter"
       required_permission: "review:audit_all"
 
+    - scenario: "home.overview"
+      version: "v1.0.0"
+      domain: "home"
+      description: "首页全域宏观指标聚合与功能空间地图 (由微内核 DAG OPC_HOME_OVERVIEW_PIPELINE 驱动)"
+      is_default: true
+      handler: "src.core.gateway.adapters:home_overview_adapter"
+
     # --------------------------------------------------------------------------
     # 8. User Profile & Entitlements (创客档案与权益)
     # --------------------------------------------------------------------------
@@ -634,6 +620,13 @@ gateway:
       description: "创客邮箱与密码身份鉴权及会话 Token 签发"
       is_default: true
       handler: "src.core.gateway.adapters:auth_login_adapter"
+
+    - scenario: "auth.change_password"
+      version: "v1.0.0"
+      domain: "auth"
+      description: "轮换登录密码并清除内置管理员首登强制改密标记"
+      is_default: true
+      handler: "src.core.gateway.adapters:auth_change_password_adapter"
 
     - scenario: "auth.session"
       version: "v1.0.0"
@@ -820,6 +813,172 @@ gateway:
       description: "执行低代码平台编排的有向无环图场景流水线"
       is_default: true
       handler: "src.core.gateway.adapters:async_scenario_executor"
+      required_permission: "page:orchestrate"
+
+    # ----------------------------------------------------------------------
+    # 11.1 Orchestration Catalog — 三层编排资产目录（算子/子图/场景）+ 排他锁
+    #       展示（读取）完全开放；变更（创建/删除/版本/发布）需持有排他锁并
+    #       经 OPC_ORCHESTRATION_CATALOG_PIPELINE（guard → persist → telemetry）执行
+    # ----------------------------------------------------------------------
+    # 读取：算子目录（内置 + 自建，含锁定状态）
+    - scenario: "orchestration.catalog.operators"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·算子清单：内置算子与自建算子及版本/锁定状态（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_operators_list_adapter"
+
+    - scenario: "orchestration.catalog.operator"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·算子详情：定义、版本历史与锁定状态（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_operator_detail_adapter"
+
+    # 读取：子图目录
+    - scenario: "orchestration.catalog.subgraphs"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·子图清单：算子编排子流水线及版本/锁定状态（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_subgraphs_list_adapter"
+
+    - scenario: "orchestration.catalog.subgraph"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·子图详情：图结构、版本历史与编译产物（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_subgraph_detail_adapter"
+
+    # 读取：场景目录（管理中的场景 + 运行时内置管线，均只读展示）
+    - scenario: "orchestration.catalog.scenarios"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·场景清单：管理场景与运行时管线及版本/锁定状态（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_scenarios_list_adapter"
+
+    - scenario: "orchestration.catalog.scenario"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·场景详情：图结构、版本历史与运行时拓扑（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_scenario_detail_adapter"
+
+    # 读取：全局排他锁看板（展示锁定状态与锁定人）
+    - scenario: "orchestration.catalog.locks"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·活跃排他锁清单：锁定资产、锁定人与剩余时长（展示开放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_locks_list_adapter"
+
+    # 排他锁获取/释放（心跳续期同 acquire；管理员可强制释放他人锁）
+    - scenario: "orchestration.locks.acquire"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "获取（或心跳续期）编排资产的排他编辑锁，避免多人同时编排"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_lock_acquire_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.locks.release"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "释放编排资产排他锁（持有人释放；管理员可强制释放）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_lock_release_adapter"
+      required_permission: "page:orchestrate"
+
+    # 算子生命周期（写走 OPC_ORCHESTRATION_CATALOG_PIPELINE，需持锁）
+    - scenario: "orchestration.operators.create"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·创建自建算子（沙箱脚本），DRAFT 起步，需先锁定算子名"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.operators.version.save"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·保存算子草稿版本（新建或更新 DRAFT），需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.operators.publish"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·发布算子版本：沙箱复检并注册进运行时算子池，需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.operators.delete"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·删除自建算子（被已发布子图/场景引用时拒绝），需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    # 子图生命周期
+    - scenario: "orchestration.subgraphs.create"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·创建子图（算子编排子流水线），需先锁定子图编码"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.subgraphs.version.save"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·保存子图草稿版本（编排算子节点/连线），需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.subgraphs.publish"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·发布子图版本：编译为算子级扁平图供场景编排，需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    # 场景生命周期
+    - scenario: "orchestration.scenarios.create"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·创建场景（算子与子图混合编排），需先锁定场景编码"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.scenarios.version.save"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·保存场景草稿版本（编排算子/子图节点与连线），需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.scenarios.publish"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·发布场景版本：子图内联展开编译并部署为执行 DAG，需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.scenarios.delete"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "编排目录·删除场景（连同其运行时 DAG 配置版本），需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
       required_permission: "page:orchestrate"
 
     - scenario: "frontend.layouts.get"

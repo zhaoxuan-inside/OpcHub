@@ -94,7 +94,9 @@ def test_gateway_siliconflow_summarize_scenario():
     assert data["code"] == 200
     res_data = data["data"]
     assert "plain_summary" in res_data
-    assert "增值税" in res_data["plain_summary"]
+    # Mock 模式必须自我标注（mocked=True），不编造与所查政策无关的要点
+    assert res_data["mocked"] is True
+    assert "开发存证模式" in res_data["plain_summary"]
 
 
 def test_frontend_console_serves_ai_buttons():

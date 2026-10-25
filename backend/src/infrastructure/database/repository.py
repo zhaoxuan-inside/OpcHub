@@ -178,6 +178,15 @@ class DatabaseRepository:
             stmt = select(User).order_by(User.created_at.asc()).limit(limit)
             return list((await session.execute(stmt)).scalars().all())
 
+    async def count_makers(self) -> int:
+        """Count persisted non-ADMIN users; campaign ordinals must skip the built-in admin."""
+        if not await self.is_ready():
+            return 0
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(User.uid).where(User.role != "ADMIN")
+            return len(list((await session.execute(stmt)).scalars().all()))
+
     async def update_user_fields(
         self,
         uid: str,

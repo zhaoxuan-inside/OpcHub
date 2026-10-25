@@ -51,12 +51,12 @@ def test_frontend_dist_contains_home_promotional_content():
     for kw in promotional_keywords:
         assert kw in combined_js, f"Promotional keyword '{kw}' missing from compiled frontend bundle"
 
-    # Requirement 3: 首页的风格可以参考内容展示类平台的设计思路 (Bento grid, Exhibition, Metrics, Journey)
+    # Requirement 3: 首页的风格可以参考内容展示类平台的设计思路 (Bento grid, Exhibition, Journey)
+    # 「创客心声」假证言区块已按全站 Mock 清理删除，不再作为契约指标。
     content_showcase_indicators = [
       "四大核心支柱",
       "精选展厅",
       "一人公司演进路径",
-      "听听来自前线创客的真实声音",
     ]
     for indicator in content_showcase_indicators:
         assert indicator in combined_js, f"Showcase element '{indicator}' missing from bundle"

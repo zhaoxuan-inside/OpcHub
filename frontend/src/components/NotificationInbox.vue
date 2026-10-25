@@ -6,7 +6,7 @@
           <header class="inbox-head">
             <div class="inbox-head-text">
               <h2 class="inbox-title">消息箱</h2>
-              <p class="inbox-subtitle">发布内容的敏感词校验结果与平台通知</p>
+              <p class="inbox-subtitle">发布内容的审核结果与平台通知</p>
             </div>
             <div class="inbox-head-actions">
               <button
@@ -45,7 +45,7 @@
             <div v-if="loading" class="inbox-empty">正在加载消息…</div>
             <div v-else-if="items.length === 0" class="inbox-empty">
               <div class="inbox-empty-title">暂无消息</div>
-              <p class="inbox-empty-desc">发布内容后，敏感词校验结果会在这里通知你。</p>
+              <p class="inbox-empty-desc">发布内容后，审核结果会在这里通知你。</p>
             </div>
             <ul v-else class="inbox-list">
               <li
@@ -217,9 +217,12 @@ watch(() => props.visible, (open) => {
   overflow: hidden;
   background: var(--glass-surface-solid, rgba(255, 255, 255, 0.9));
   box-shadow: 0 28px 80px rgba(10, 16, 30, 0.28), var(--glass-specular);
+  padding: 0;
+  margin: 0;
 }
 
 .inbox-head {
+  position: relative;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

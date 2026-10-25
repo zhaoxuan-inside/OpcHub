@@ -184,7 +184,7 @@ const isTemplateMenuOpen = ref(false);
 
 // Computed Properties
 const authorName = computed(() => {
-  return props.userSession?.nickname || props.userSession?.username || '认证创客';
+  return props.userSession?.nickname || props.userSession?.username || '我';
 });
 
 const authorId = computed(() => {
@@ -382,7 +382,7 @@ async function handleSubmit() {
     if (!res.ok) {
       emit('toast', {
         title: '发布未成功',
-        message: res.error || '网络或网关异常，请稍后重试',
+        message: res.error || '网络异常，请稍后重试',
         type: 'ERROR',
       });
       return;
@@ -398,11 +398,12 @@ async function handleSubmit() {
       content: finalContent,
       author: res.data?.author_name || authorName.value,
       author_id: res.data?.author_id || authorId.value,
-      ip_location: '来自 浙江',
-      replies: 0,
-      upvotes: 1,
-      is_upvoted: true,
-      pinned: null,
+      comment_count: res.data?.comment_count ?? 0,
+      answer_count: res.data?.answer_count ?? 0,
+      upvote_count: res.data?.upvote_count ?? 0,
+      downvote_count: res.data?.downvote_count ?? 0,
+      user_vote: res.data?.user_vote || null,
+      pinned: res.data?.is_pinned ? '置顶' : null,
       created_at: res.data?.created_at || nowIso,
       updated_at: '刚刚',
       tags: [...tagsList.value],
@@ -422,7 +423,7 @@ async function handleSubmit() {
     console.error('Submit thread error:', err);
     emit('toast', {
       title: '发布失败',
-      message: err.message || '网络或网关异常，请稍后重试',
+      message: err.message || '网络异常，请稍后重试',
       type: 'ERROR',
     });
   } finally {

@@ -1,6 +1,7 @@
 """User, authentication, and entitlement management service."""
 import re
 import uuid
+from datetime import datetime, timedelta
 from typing import Dict, Set, Optional, Any, List
 
 from src.core.config import settings
@@ -25,6 +26,19 @@ from src.domains.user.verification import (
     PasswordPolicyService,
     LegalAgreementsRepository,
 )
+
+# 内置画像头像标识（20 种常见创客用户画像，前端 PersonaAvatar 组件按 id 渲染）
+BUILTIN_AVATAR_IDS = frozenset({
+    "dev", "designer", "writer", "founder", "ecommerce", "consultant",
+    "photographer", "illustrator", "video", "musician", "teacher",
+    "finance", "legal", "crossborder", "researcher", "craftsman",
+    "fitness", "foodie", "traveler", "farmer",
+})
+
+# 创始创客活动赠礼对应的权益（auth.user.entitlements.activate 的 ENT_VIP 别名同指此条）
+FOUNDING_VIP_ENTITLEMENT_ID = "ent_black_diamond_priority"
+FOUNDING_VIP_TIER_NAME = "黑钻创客 VIP"
+_ENTITLEMENT_EXPIRY_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 
 class UserService:
@@ -64,11 +78,11 @@ class UserService:
         self._users_by_uid[admin_uid] = admin
         self._users_by_email[admin["email"]] = admin
 
-    @staticmethod
-    def _record_from_db_user(db_user: Any) -> Dict[str, Any]:
+    @classmethod
+    def _record_from_db_user(cls, db_user: Any) -> Dict[str, Any]:
         """Project a persisted User row into the service's in-memory record shape."""
         meta = db_user.metadata_payload or {}
-        return {
+        record = {
             "uid": db_user.uid,
             "email": db_user.email,
             "nickname": db_user.nickname,
@@ -81,8 +95,46 @@ class UserService:
             "industry_track": meta.get("industry_track", ""),
             "password_hash": db_user.password_hash or "",
             "active_entitlements": set(meta.get("active_entitlements", [])),
+            "entitlement_expiries": dict(meta.get("entitlement_expiries", {})),
             "must_change_password": bool(meta.get("must_change_password", False)),
+            "avatar_id": meta.get("avatar_id", ""),
         }
+        cls._prune_expired_entitlements(record)
+        return record
+
+    @staticmethod
+    def _entitlement_window_elapsed(expiries: Dict[str, Any], ent_id: str) -> bool:
+        """True when a granted entitlement's validity window has passed (absent entry = permanent)."""
+        raw = (expiries or {}).get(ent_id, "")
+        if not raw:
+            return False
+        try:
+            return datetime.strptime(str(raw), _ENTITLEMENT_EXPIRY_FORMAT) < datetime.now()
+        except ValueError:
+            return False
+
+    @classmethod
+    def _prune_expired_entitlements(cls, record: Dict[str, Any]) -> None:
+        """Drop entitlements whose validity window elapsed and demote the VIP tier label.
+
+        Read-side normalization: persisted metadata keeps the historical grant, so this
+        runs idempotently on every record load / profile read.
+        """
+        expiries = record.get("entitlement_expiries") or {}
+        if not expiries:
+            return
+        active = record.get("active_entitlements") or set()
+        for ent_id in [k for k in expiries if cls._entitlement_window_elapsed(expiries, k)]:
+            active.discard(ent_id)
+            expiries.pop(ent_id, None)
+        if FOUNDING_VIP_ENTITLEMENT_ID not in active and record.get("tier_name") == FOUNDING_VIP_TIER_NAME:
+            record["tier_name"] = "标准创客"
+
+    async def _next_registration_ordinal(self) -> int:
+        """1-based sequence number the next MAKER registration will occupy (built-in admin excluded)."""
+        db_count = await db_repository.count_makers()
+        memory_count = sum(1 for rec in self._users_by_email.values() if rec.get("role") != "ADMIN")
+        return max(db_count, memory_count) + 1
 
     async def hydrate_from_db(self) -> int:
         """Rebuild the in-memory user index from the canonical ``users`` table on startup."""
@@ -228,9 +280,24 @@ class UserService:
         pwd_hash = hash_password(req.password)
         uid = str(uuid.uuid4())
 
+        # 7. Founding member campaign: the first N registered makers receive a 1-year VIP gift
+        registration_ordinal = await self._next_registration_ordinal()
+        founding_vip = registration_ordinal <= settings.founding_member_quota
+        entitlements_active: Set[str] = set()
+        entitlement_expiries: Dict[str, str] = {}
+        vip_expiry = ""
+        tier_name = "标准创客"
+        if founding_vip:
+            entitlements_active.add(FOUNDING_VIP_ENTITLEMENT_ID)
+            vip_expiry = (datetime.now() + timedelta(days=settings.founding_member_vip_days)).strftime(
+                _ENTITLEMENT_EXPIRY_FORMAT
+            )
+            entitlement_expiries[FOUNDING_VIP_ENTITLEMENT_ID] = vip_expiry
+            tier_name = FOUNDING_VIP_TIER_NAME
+
         metadata = {
             "tier": "STANDARD",
-            "tier_name": "标准创客",
+            "tier_name": tier_name,
             "account_type": account_type,
             "industry_track": industry_track,
             "phone": phone,
@@ -243,6 +310,8 @@ class UserService:
                 "client_ip": req.client_ip or "127.0.0.1",
             },
             "created_source": "COMMERCIAL_REG",
+            "active_entitlements": sorted(entitlements_active),
+            "entitlement_expiries": entitlement_expiries,
         }
 
         # 7. Persist to PostgreSQL database (Mandatory Commercial Strong Persistence)
@@ -267,11 +336,12 @@ class UserService:
             "company_name": company,
             "phone": phone,
             "credit_code": credit_code,
-            "tier_name": "标准创客",
+            "tier_name": tier_name,
             "account_type": account_type,
             "industry_track": industry_track,
             "password_hash": pwd_hash,
-            "active_entitlements": set(),
+            "active_entitlements": entitlements_active,
+            "entitlement_expiries": entitlement_expiries,
         }
         self._users_by_email[email] = user_record
         self._users_by_uid[uid] = user_record
@@ -285,6 +355,14 @@ class UserService:
             "account_type": account_type,
         })
 
+        if founding_vip:
+            register_message = (
+                f"商用创客账号注册成功！您是平台第 {registration_ordinal} 位创始创客，"
+                f"已赠送 1 年黑钻 VIP 权益（有效期至 {vip_expiry[:10]}）"
+            )
+        else:
+            register_message = "商用创客账号注册成功，已初始化超级个体工作区！"
+
         return AuthSessionResponse(
             token=token,
             uid=uid,
@@ -292,10 +370,10 @@ class UserService:
             nickname=nickname,
             role="MAKER",
             company_name=company,
-            tier_name="标准创客",
+            tier_name=tier_name,
             account_type=account_type,
             industry_track=industry_track,
-            message="商用创客账号注册成功，已初始化超级个体工作区！",
+            message=register_message,
         )
 
     async def _fetch_user_record_by_email(self, email: str) -> Optional[Dict[str, Any]]:
@@ -484,6 +562,7 @@ class UserService:
                 tier_name="访客创客",
                 account_type="MAKER",
                 industry_track="",
+                avatar_id="",
                 phone="",
                 email="",
                 entitlements=ent_list,
@@ -491,6 +570,8 @@ class UserService:
 
         user_record = self._users_by_uid.get(uid)
         if user_record:
+            # 长驻进程内存档案跨过有效期时同样需要读时修剪
+            self._prune_expired_entitlements(user_record)
             nickname = user_record.get("nickname", "创客")
             role = user_record.get("role", "MAKER")
             company = user_record.get("company_name", "")
@@ -498,8 +579,10 @@ class UserService:
             tier_name = user_record.get("tier_name", "标准创客")
             account_type = user_record.get("account_type", "MAKER")
             industry_track = user_record.get("industry_track", "")
+            avatar_id = user_record.get("avatar_id", "")
             phone = user_record.get("phone", "")
             email = user_record.get("email", "")
+            agreement_version = (user_record.get("agreement_consent") or {}).get("version", "")
         else:
             nickname = "创客"
             role = "MAKER"
@@ -508,8 +591,10 @@ class UserService:
             tier_name = "标准创客"
             account_type = "MAKER"
             industry_track = ""
+            avatar_id = ""
             phone = ""
             email = ""
+            agreement_version = ""
 
         ent_list = []
         for e in self._entitlements.values():
@@ -527,8 +612,10 @@ class UserService:
             tier_name=tier_name,
             account_type=account_type,
             industry_track=industry_track,
+            avatar_id=avatar_id,
             phone=phone,
             email=email,
+            agreement_version=agreement_version,
             entitlements=ent_list,
         )
 
@@ -569,6 +656,11 @@ class UserService:
             user_record["credit_code"] = req.credit_code.strip()
         if req.industry_track is not None:
             user_record["industry_track"] = req.industry_track.strip()
+        if req.avatar_id is not None:
+            normalized_avatar = req.avatar_id.strip()
+            if normalized_avatar and normalized_avatar not in BUILTIN_AVATAR_IDS:
+                raise ValueError("不支持的头像标识，请从平台内置画像头像中选择")
+            user_record["avatar_id"] = normalized_avatar
 
         # Update DB if available
         metadata_patch: Dict[str, Any] = {}
@@ -578,6 +670,8 @@ class UserService:
             metadata_patch["credit_code"] = req.credit_code.strip()
         if req.industry_track is not None:
             metadata_patch["industry_track"] = req.industry_track.strip()
+        if req.avatar_id is not None:
+            metadata_patch["avatar_id"] = req.avatar_id.strip()
         await db_repository.update_user_fields(
             uid,
             nickname=req.nickname.strip() if req.nickname is not None else None,
@@ -603,12 +697,15 @@ class UserService:
             if "active_entitlements" not in rec:
                 rec["active_entitlements"] = set()
             rec["active_entitlements"].add(ent_id)
+            # 付费激活清空旧赠期窗口，权益转为永久有效
+            rec.setdefault("entitlement_expiries", {}).pop(ent_id, None)
             if ent_id == "ent_black_diamond_priority":
                 rec["tier_name"] = "黑钻创客 VIP"
             await db_repository.update_user_fields(
                 req.user_id,
                 metadata_patch={
                     "active_entitlements": sorted(rec.get("active_entitlements", set())),
+                    "entitlement_expiries": rec.get("entitlement_expiries", {}),
                     "tier_name": rec.get("tier_name", "标准创客"),
                 },
             )

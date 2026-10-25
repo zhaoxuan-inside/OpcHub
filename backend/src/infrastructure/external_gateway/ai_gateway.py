@@ -95,17 +95,16 @@ class SiliconFlowGateway(BaseOutboundClient):
         target_model = model or self.default_model
 
         def mock_summary(_):
+            # Mock 模式必须自我标注：不编造与所查政策无关的"要点"，只声明服务未配置。
             return {
                 "status": "SUCCESS",
                 "policy_title": policy_title,
                 "model_used": target_model,
-                "plain_summary": (
-                    "【政策要点】针对小微企业与一人创客，本通知明确符合条件的主体可享受阶段性增值税减按1%征收，"
-                    "月销售额10万元以下免征，重点支持科技软件与出海数字化研发申报。"
-                ),
-                "target_audience": "个体工商户 / 一人有限公司 / 科技型小微企业",
-                "max_benefit": "年减免最高 15 万元",
-                "tokens_consumed": 260
+                "mocked": True,
+                "plain_summary": "【开发存证模式】SiliconFlow AI 凭据未配置，无法生成真实政策提炼。",
+                "target_audience": "—",
+                "max_benefit": "—",
+                "tokens_consumed": 0
             }
 
         prompt = (

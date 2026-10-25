@@ -54,7 +54,9 @@ async def test_siliconflow_ai_gateway_chat_and_summarize():
     )
     assert summary_res["status"] == "SUCCESS"
     assert "plain_summary" in summary_res
-    assert "增值税" in summary_res["plain_summary"]
+    # Mock 模式必须自我标注（mocked=True），不编造与所查政策无关的要点
+    assert summary_res["mocked"] is True
+    assert "开发存证模式" in summary_res["plain_summary"]
 
 
 @pytest.mark.asyncio

@@ -66,12 +66,12 @@
                   type="button"
                   class="btn-liquid semantic-search-btn"
                   @click="handleSearch"
-                  title="关键词检索"
+                  title="关键词本地筛选"
                 >
                   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
                   </svg>
-                  <span>检索</span>
+                  <span>筛选</span>
                 </button>
               </div>
 
@@ -109,7 +109,7 @@
           <!-- Semantic Search Status Banner -->
           <div v-if="isSearchActive" class="semantic-search-banner glass-box">
             <div class="banner-left">
-              <span class="sparkle-badge"><OpcIcon name="search" :size="13" /> 检索结果</span>
+              <span class="sparkle-badge"><OpcIcon name="search" :size="13" /> 筛选结果</span>
               <span class="banner-text">
                 已为您找到与「<strong>{{ activeSearchQuery }}</strong>」相关的 <strong>{{ sortedDisplayItems.length }}</strong> 条法条/案例
               </span>
@@ -150,13 +150,13 @@
                     </div>
                     <div class="card-badges-line">
                       <template v-if="isLaw(item)">
-                        <span class="badge-law" :style="lawColorStyle(item)">{{ item.name || '法条' }}</span>
-                        <span class="badge-level" :style="levelColorStyle(item)">{{ item.level || '国家级' }}</span>
+                        <span class="badge-law" :style="lawColorStyle(item)">{{ item.name }}</span>
+                        <span class="badge-level" :style="levelColorStyle(item)">{{ item.level }}</span>
                         <span class="mono-tag badge-code">{{ item.code || item.id }}</span>
                       </template>
                       <template v-else>
                         <span class="badge-case" :style="{ background: `${item.badge_color}18`, color: item.badge_color, border: `1px solid ${item.badge_color}40` }">
-                          {{ item.badge || '避坑案例' }}
+                          {{ item.badge }}
                         </span>
                         <span class="badge-industry"><OpcIcon name="factory" :size="12" /> {{ item.industry }}</span>
                       </template>
@@ -170,7 +170,7 @@
                   <template v-if="isLaw(item)">
                     <p class="compliance-summary" :title="item.summary">{{ item.summary }}</p>
                     <div class="compliance-issuer-row">
-                      <span class="issuer-pill"><OpcIcon name="landmark" :size="12" /> {{ item.issuer || '发布机关' }}</span>
+                      <span class="issuer-pill"><OpcIcon name="landmark" :size="12" /> {{ item.issuer || '—' }}</span>
                       <span class="issuer-pill"><OpcIcon name="calendar" :size="12" /> {{ item.published_at || '—' }}</span>
                     </div>
                   </template>
@@ -197,8 +197,8 @@
                   <div class="issuer-cell">
                     <div class="issuer-avatar"><OpcIcon :name="isLaw(item) ? 'scroll' : 'case'" :size="18" /></div>
                     <div class="issuer-text">
-                      <span class="issuer-name">{{ isLaw(item) ? (item.issuer || '发布机关') : '典型踩坑案例' }}</span>
-                      <span class="issuer-level-tag">{{ isLaw(item) ? (item.level || '国家级') : '监管处罚' }}</span>
+                      <span class="issuer-name">{{ isLaw(item) ? (item.issuer || '—') : '典型踩坑案例' }}</span>
+                      <span class="issuer-level-tag">{{ isLaw(item) ? (item.level) : '监管处罚' }}</span>
                     </div>
                   </div>
                   <div class="card-actions-cell">
@@ -236,20 +236,11 @@
                   </div>
                   <p class="detail-tagline">{{ isLaw(selectedItem) ? selectedItem.summary : `${selectedItem.industry} · ${selectedItem.badge}` }}</p>
                   <div class="detail-meta-pills">
-                    <span class="detail-cat-pill">{{ isLaw(selectedItem) ? (selectedItem.name || '法条') : '避坑案例' }}</span>
-                    <span class="detail-level-pill">{{ isLaw(selectedItem) ? (selectedItem.level || '国家级') : '监管处罚' }}</span>
+                    <span class="detail-cat-pill">{{ isLaw(selectedItem) ? (selectedItem.name) : '避坑案例' }}</span>
+                    <span class="detail-level-pill">{{ isLaw(selectedItem) ? (selectedItem.level) : '监管处罚' }}</span>
                     <span class="detail-region-pill"><OpcIcon name="flame" :size="12" /> 热度 {{ selectedItem.hot_score || 0 }}</span>
                   </div>
                 </div>
-              </div>
-
-              <div class="detail-action-bar">
-                <button type="button" class="btn-liquid action-btn primary-action" @click="openPublishModal">
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                  </svg>
-                  <span>发布法条 / 案例</span>
-                </button>
               </div>
 
               <div class="detail-body-scroll">
@@ -268,7 +259,7 @@
                     <div class="spec-grid">
                       <div class="spec-item">
                         <span class="spec-label">效力级别</span>
-                        <span class="spec-value">{{ selectedItem.level || '国家级' }}</span>
+                        <span class="spec-value">{{ selectedItem.level }}</span>
                       </div>
                       <div class="spec-item">
                         <span class="spec-label">发布机关</span>
@@ -287,8 +278,8 @@
                         <span class="spec-value">{{ selectedItem.law_ref }}</span>
                       </div>
                       <div class="spec-item" style="grid-column: span 2;">
-                        <span class="spec-label">数据存储</span>
-                        <span class="spec-value spec-success">PostgreSQL 合规库持久化</span>
+                        <span class="spec-label">收录审核</span>
+                        <span class="spec-value spec-success">平台审核收录 · 来源官方可溯</span>
                       </div>
                     </div>
                   </div>
@@ -325,10 +316,10 @@
               </div>
               <h3 class="empty-title">当前筛选下暂无合规知识</h3>
               <p class="empty-desc">
-                {{ searchQuery ? `没有检索到与 “${searchQuery}” 匹配的法条或案例。` : '当前分类下暂无已收录内容。' }}
+                {{ searchQuery ? `没有筛选到与 “${searchQuery}” 匹配的法条或案例。` : '当前分类下暂无已收录内容。' }}
               </p>
               <div class="empty-actions">
-                <button v-if="searchQuery || currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
+                <button v-if="!isSearchActive && currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
               </div>
@@ -352,13 +343,6 @@
               </div>
             </div>
 
-            <button class="btn-liquid btn-creator-publish" @click="openPublishModal">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>
-              <span>发布法条 / 案例</span>
-            </button>
-
             <div class="creator-quick-links">
               <span class="quick-pill" @click="selectCategory('LAW')">法条</span>
               <span class="quick-pill" @click="selectCategory('CASE')">案例</span>
@@ -376,7 +360,7 @@
                 <span class="hot-badge-fire"><OpcIcon name="flame" :size="14" /></span>
                 <h4 class="sidebar-title">今日合规打榜</h4>
               </div>
-              <span class="hot-subtitle">实时更新</span>
+              <span class="hot-subtitle">热度排行</span>
             </div>
 
             <div class="hot-ranking-list">
@@ -392,7 +376,7 @@
                   <div class="hot-item-meta">
                     <span><OpcIcon name="flame" :size="12" /> {{ item.hot_score || 0 }} 热度</span>
                     <span class="dot-sep">·</span>
-                    <span>{{ isLaw(item) ? (item.name || '法条') : '案例' }}</span>
+                    <span>{{ isLaw(item) ? (item.name) : '案例' }}</span>
                   </div>
                 </div>
               </div>
@@ -407,8 +391,6 @@
             </p>
             <div class="guidelines-footer">
               <span>OpcHub 合规中心 v2.1</span>
-              <span class="dot-sep">·</span>
-              <span class="link-span" @click="openPublishModal">补充收录</span>
             </div>
           </div>
         </aside>
@@ -434,7 +416,7 @@ import {
   COMPLIANCE_HOT_RANK_LIMIT,
 } from '@/config/compliancePage';
 
-const emit = defineEmits(['switch-tab', 'toast', 'open-login']);
+const emit = defineEmits(['toast', 'open-login']);
 
 // 当前登录会话（页面未接收 userSession prop，与 SopView 同样从本地存储读取）
 function safeSession() {
@@ -539,11 +521,6 @@ async function loadAll() {
 
 async function handleManualRefresh() {
   await loadAll();
-  emit('toast', {
-    title: '合规库已更新',
-    message: '已从 PostgreSQL 数据库同步最新法条与案例。',
-    type: 'SUCCESS',
-  });
 }
 
 function selectCategory(catKey) {
@@ -644,7 +621,7 @@ function openPublishModal() {
   publishForm.value = {
     kind: 'law',
     title: '',
-    code: `LAW-${Math.floor(10 + Math.random() * 90)}`,
+    code: '',
     summary: '',
     content: '',
     level: '法律',
@@ -683,7 +660,7 @@ async function submitPublish() {
       const kindLabel = publishForm.value.kind === 'law' ? '法条' : '案例';
       emit('toast', {
         title: `${kindLabel}发布成功`,
-        message: `《${publishForm.value.title}》已通过平台敏感词校验并收录至合规知识库。`,
+        message: `《${publishForm.value.title}》已通过平台审核并收录至合规知识库。`,
         type: 'SUCCESS',
       });
       currentViewMode.value = 'list';
@@ -789,7 +766,9 @@ function levelColorStyle(item) {
   padding: 8px 14px;
   border-radius: var(--radius-md, 14px);
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   background: var(--glass-surface);
   backdrop-filter: var(--blur-strength, blur(16px) saturate(160%));
   border: 1px solid var(--glass-border);
@@ -1675,25 +1654,6 @@ function levelColorStyle(item) {
   font-size: 11.5px;
 }
 
-/* ---------------- Inline Create View (内容区内联发布，同论坛"发起新风暴话题") ---------------- */
-.compliance-create-page {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  width: 100%;
-  height: 100%;
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: none;
-  animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.compliance-create-page::-webkit-scrollbar {
-  display: none;
-}
-
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -1705,69 +1665,10 @@ function levelColorStyle(item) {
   }
 }
 
-/* Header Bar */
-.create-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 24px;
-  gap: 16px;
-  flex-wrap: wrap;
-  flex-shrink: 0;
-}
-
 .header-left-cluster {
   display: flex;
   align-items: center;
   gap: 14px;
-}
-
-.btn-back-square {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-sm);
-  background: var(--glass-surface-subtle);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition: var(--transition-liquid, all 0.2s ease);
-}
-
-.btn-back-square:hover {
-  background: var(--glass-surface-hover);
-  color: var(--accent);
-  transform: translateX(-2px);
-}
-
-.page-title-cluster {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.breadcrumb-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 11.5px;
-  color: var(--text-tertiary);
-}
-
-.crumb-link {
-  cursor: pointer;
-  transition: color 0.2s ease;
-}
-
-.crumb-link:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-.crumb-separator {
-  opacity: 0.5;
 }
 
 .crumb-current {
@@ -1781,36 +1682,6 @@ function levelColorStyle(item) {
   color: var(--text-primary);
   letter-spacing: -0.02em;
   margin: 0;
-}
-
-.header-actions-cluster {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.btn-header-publish {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 18px;
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: var(--radius-full);
-}
-
-.btn-header-publish:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-/* Main Workspace Box */
-.create-workspace-box {
-  padding: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  flex-shrink: 0;
 }
 
 /* Form Rows */
@@ -1838,30 +1709,6 @@ function levelColorStyle(item) {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px;
-}
-
-.cat-select-btn {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  padding: 10px 14px;
-  border-radius: var(--radius-md);
-  background: var(--glass-surface-subtle);
-  border: 1px solid var(--glass-border);
-  cursor: pointer;
-  transition: var(--transition-liquid, all 0.2s ease);
-  text-align: left;
-}
-
-.cat-select-btn:hover {
-  background: var(--glass-surface-hover);
-  border-color: var(--accent);
-}
-
-.cat-select-btn.active {
-  background: var(--glass-surface-solid);
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent), var(--glass-shadow, 0 4px 16px rgba(0, 0, 0, 0.08));
 }
 
 .cat-dot {
@@ -1892,38 +1739,12 @@ function levelColorStyle(item) {
   position: relative;
 }
 
-.title-large-input {
-  font-size: 15px !important;
-  padding: 12px 14px !important;
-  border-radius: var(--radius-md) !important;
-}
-
-/* Two-column grid for form fields */
-.form-grid-2 {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 14px;
-}
-
 .glass-select {
   height: 38px;
 }
 
-/* Footer Actions */
-.create-footer-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 6px;
-  padding-top: 16px;
-  border-top: 1px solid var(--glass-border-subtle);
-}
-
 /* Responsive */
 @media (max-width: 960px) {
-  .form-grid-2 {
-    grid-template-columns: 1fr;
-  }
   .compliance-feed-layout {
     flex-direction: column;
   }

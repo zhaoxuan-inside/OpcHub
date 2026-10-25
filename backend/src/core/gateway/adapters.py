@@ -161,48 +161,8 @@ async def sop_flow_template_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] 
     return detail.model_dump()
 
 
-async def sop_flow_like_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle the caller's like on a platform flow template."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    flow_id = payload.get("flow_id") or payload.get("node_id") or ""
-    if not flow_id:
-        raise ValueError("flow_id is required for SOP flow like")
-    return sop_service.toggle_flow_like(user_id, flow_id).model_dump()
 
 
-async def sop_flow_favorite_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle the caller's favourite on a platform flow template."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    flow_id = payload.get("flow_id") or payload.get("node_id") or ""
-    if not flow_id:
-        raise ValueError("flow_id is required for SOP flow favorite")
-    return sop_service.toggle_flow_favorite(user_id, flow_id).model_dump()
-
-
-async def sop_document_like_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle the caller's like on a standard document."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    node_id = payload.get("node_id") or payload.get("template_id") or ""
-    if not node_id:
-        raise ValueError("node_id is required for SOP document like")
-    return sop_service.toggle_like(user_id, node_id).model_dump()
-
-
-async def sop_document_favorite_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle the caller's favourite on a standard document."""
-    from src.domains.sop.service import sop_service
-    payload = p or {}
-    user_id = (c or {}).get("user_id") or payload.get("user_id") or ""
-    node_id = payload.get("node_id") or payload.get("template_id") or ""
-    if not node_id:
-        raise ValueError("node_id is required for SOP document favorite")
-    return sop_service.toggle_favorite(user_id, node_id).model_dump()
 
 
 async def sop_node_context_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -568,8 +528,6 @@ async def forum_feed_stream_adapter(p: Dict[str, Any], c: Dict[str, Any] = None)
 async def forum_comment_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Executes the microkernel DAG pipeline for forum comment publishing."""
     inputs = dict(p)
-    if "comment_payload" in inputs and isinstance(inputs["comment_payload"], dict):
-        inputs.update(inputs["comment_payload"])
     _publish_identity_fields(inputs, c)
 
     res = await orchestration_service.execute_scenario(
@@ -645,6 +603,9 @@ async def forum_vote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any
     )
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Forum vote pipeline failed"
+        # The engine flattens node exceptions into a message; restore 404 semantics.
+        if "not found" in error_msg.lower():
+            raise KeyError(error_msg)
         raise ValueError(error_msg)
     return res.final_output.get("vote_result") or res.final_output
 
@@ -670,6 +631,61 @@ async def forum_follow_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     if not thread_id:
         raise ValueError("thread_id is required")
     return forum_service.toggle_follow(user_id, thread_id)
+
+
+async def forum_thread_update_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for editing a forum thread (author or ADMIN)."""
+    inputs = dict(p)
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_THREAD_UPDATE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum thread update pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output.get("updated_thread") or res.final_output
+
+
+async def forum_answer_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for deleting a Zhihu-style answer."""
+    inputs = dict(p)
+    if not inputs.get("operator_user_id") and (c or {}).get("user_id"):
+        inputs["operator_user_id"] = c["user_id"]
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_ANSWER_DELETE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum answer delete pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
+
+
+async def forum_comment_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Executes the microkernel DAG pipeline for deleting a forum comment subtree."""
+    inputs = dict(p)
+    if not inputs.get("operator_user_id") and (c or {}).get("user_id"):
+        inputs["operator_user_id"] = c["user_id"]
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_FORUM_COMMENT_DELETE_PIPELINE",
+            version="v1.0.0",
+            inputs=inputs,
+            context=dict(c or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        error_msg = res.error_message or "Forum comment delete pipeline failed"
+        raise ValueError(error_msg)
+    return res.final_output
 
 
 async def product_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -773,6 +789,8 @@ async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
             "matched_policies_count": 0,
             "demands_orders_count": 0,
             "perks_saved_cny": 0.0,
+            "products_count": 0,
+            "forum_threads_count": 0,
             "quick_links": [],
             "orchestrated": False,
         }
@@ -815,6 +833,7 @@ async def user_profile_update_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
         company_name=p.get("company_name"),
         credit_code=p.get("credit_code"),
         industry_track=p.get("industry_track"),
+        avatar_id=p.get("avatar_id"),
     )
     profile = await user_service.update_profile(req=req, token=token)
     return profile.model_dump()
@@ -1099,24 +1118,6 @@ async def auth_change_password_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
     return res.model_dump()
 
 
-async def forum_upvote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle an upvote on a forum thread or comment (authenticated maker)."""
-    from src.domains.forum.service import forum_service
-    user_id = p.get("user_id") or (c or {}).get("user_id") or "usr_guest"
-    target_id = str(p.get("target_id") or "")
-    res = forum_service.toggle_upvote(user_id, p.get("target_type", "THREAD"), target_id)
-    return res.model_dump()
-
-
-async def forum_bookmark_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Toggle a bookmark on a forum thread (authenticated maker)."""
-    from src.domains.forum.service import forum_service
-    user_id = p.get("user_id") or (c or {}).get("user_id") or "usr_guest"
-    thread_id = str(p.get("thread_id") or "")
-    res = forum_service.toggle_bookmark(user_id, thread_id, p.get("folder_name", "默认收藏夹"))
-    return res.model_dump()
-
-
 async def forum_thread_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Delete a forum thread and cascade delete its comments (ADMIN or author)."""
     from src.domains.forum.service import forum_service
@@ -1135,6 +1136,169 @@ async def operator_mode_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> 
     req = OperatorModeUpdateRequest(**p)
     res = orchestration_service.update_operator_mode(req)
     return res.model_dump()
+
+
+# ==========================================
+# Orchestration Catalog (三层编排资产目录：算子/子图/场景 + 排他锁)
+# ==========================================
+def _actor_display_name(uid: str) -> str:
+    """Resolve the operator's display name for lock-holder visibility (展示锁定人)."""
+    if not uid:
+        return ""
+    try:
+        profile = user_service.get_profile(uid=uid)
+        if profile and getattr(profile, "nickname", ""):
+            return str(profile.nickname)
+    except Exception:
+        pass
+    return uid
+
+
+def catalog_operators_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List the managed operator catalog (builtin + custom) with lock status (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    rows = [o.model_dump() for o in catalog_service.list_operators()]
+    return {"operators": rows, "total": len(rows)}
+
+
+def catalog_operator_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Fetch one operator asset with its full version history (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    name = str((p or {}).get("name") or "")
+    if not name:
+        raise ValueError("name is required")
+    return catalog_service.get_operator(name).model_dump()
+
+
+def catalog_subgraphs_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List all subgraph assets with lock status (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    rows = [s.model_dump() for s in catalog_service.list_subgraphs()]
+    return {"subgraphs": rows, "total": len(rows)}
+
+
+def catalog_subgraph_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Fetch one subgraph asset with its version history and compiled graphs (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    code = str((p or {}).get("code") or "")
+    if not code:
+        raise ValueError("code is required")
+    return catalog_service.get_subgraph(code).model_dump()
+
+
+def catalog_scenarios_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List managed scenarios plus read-only runtime pipelines with lock status (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    rows = catalog_service.list_scenarios()
+    return {"scenarios": rows, "total": len(rows)}
+
+
+def catalog_scenario_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Fetch one scenario (managed or runtime) with versions / runtime topology (公开只读)."""
+    from src.domains.orchestration.catalog import catalog_service
+    code = str((p or {}).get("code") or "")
+    if not code:
+        raise ValueError("code is required")
+    return catalog_service.get_scenario(code)
+
+
+def catalog_locks_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List every active exclusive edit lock with holder info (公开只读，展示锁定人)."""
+    from src.domains.orchestration.locks import lock_manager
+    locks = [lk.model_dump() for lk in lock_manager.list_active()]
+    return {"locks": locks, "total": len(locks)}
+
+
+async def catalog_lock_acquire_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Acquire (or heartbeat-renew) the exclusive edit lock for one catalog asset."""
+    from src.domains.orchestration.locks import (
+        DEFAULT_TTL_SECONDS,
+        LockConflictError,
+        conflict_message,
+        lock_manager,
+    )
+
+    ctx = c or {}
+    uid = str(ctx.get("user_id") or "")
+    if not uid:
+        raise PermissionError("请先登录后再获取编辑锁")
+    raw_ttl = (p or {}).get("ttl_seconds")
+    try:
+        lock = lock_manager.acquire(
+            entity_type=str((p or {}).get("entity_type") or ""),
+            entity_key=str((p or {}).get("entity_key") or ""),
+            holder_id=uid,
+            holder_name=_actor_display_name(uid),
+            ttl_seconds=int(raw_ttl) if raw_ttl else DEFAULT_TTL_SECONDS,
+        )
+    except LockConflictError as exc:
+        raise PermissionError(conflict_message(exc)) from exc
+    return lock.model_dump()
+
+
+async def catalog_lock_release_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Release an edit lock (holder always; others need ADMIN force)."""
+    from src.domains.orchestration.locks import LockConflictError, conflict_message, lock_manager
+
+    ctx = c or {}
+    uid = str(ctx.get("user_id") or "")
+    if not uid:
+        raise PermissionError("请先登录后再释放编辑锁")
+    is_admin = str(ctx.get("user_role") or "").upper() == "ADMIN"
+    force = bool((p or {}).get("force")) and is_admin
+    try:
+        released = lock_manager.release(
+            entity_type=str((p or {}).get("entity_type") or ""),
+            entity_key=str((p or {}).get("entity_key") or ""),
+            holder_id=uid,
+            force=force,
+        )
+    except LockConflictError as exc:
+        raise PermissionError(conflict_message(exc)) from exc
+    return {"released": released, "forced": force}
+
+
+async def catalog_write_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Execute one catalog mutation via the OPC_ORCHESTRATION_CATALOG_PIPELINE DAG.
+
+    写走 DAG：guard（动作/身份）→ persist（排他锁校验 + 变更）→ telemetry。
+    引擎会把节点异常压平成字符串，这里把 LOCKED / UNLOCKED / UNAUTHORIZED
+    前缀还原成语义化错误。
+    """
+    from src.domains.orchestration.locks import humanize_lock_error
+
+    # 写走 DAG：guard（动作/身份）→ persist（排他锁校验 + 变更）→ telemetry。
+    # ensure_catalog_pipeline 幂等确保元管线已注册（catalog 模块可能懒加载）。
+    from src.domains.orchestration.catalog import ensure_catalog_pipeline
+
+    ensure_catalog_pipeline()
+
+    action = str((p or {}).get("action") or "")
+    ctx = dict(c or {})
+    uid = str(ctx.get("user_id") or "")
+    if uid:
+        ctx.setdefault("user_name", _actor_display_name(uid))
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_ORCHESTRATION_CATALOG_PIPELINE",
+            version="v1.0.0",
+            inputs={"action": action, "payload": (p or {}).get("payload") or {}},
+            context=ctx,
+        )
+    )
+    if res.status != "SUCCESS":
+        message = res.error_message or "Orchestration catalog pipeline failed"
+        hint = humanize_lock_error(message)
+        if hint:
+            raise PermissionError(hint)
+        # 剥掉执行引擎附加的英文节点前缀，把校验原文（中文）交给前端展示
+        for prefix in ("Node step_persist execution error: ", "Node step_guard execution error: ", "Guard check failed: "):
+            if message.startswith(prefix):
+                message = message[len(prefix):]
+                break
+        raise ValueError(message)
+    return res.final_output.get("catalog_result") or res.final_output
 
 
 async def framework_hot_reload_status_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:

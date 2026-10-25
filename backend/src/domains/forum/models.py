@@ -64,7 +64,6 @@ class ForumThreadResponse(BaseModel):
     hot_score: float = 0.0
     top_answers: List[ForumAnswerResponse] = Field(default_factory=list)
     user_vote: Optional[str] = None
-    is_bookmarked: bool = False
     is_following: bool = False
     created_at: str
     updated_at: str
@@ -72,6 +71,8 @@ class ForumThreadResponse(BaseModel):
 
 class ForumCommentCreate(BaseModel):
     author_id: str = Field(..., description="UUID of replying maker")
+    author_name: Optional[str] = Field(None, description="Display name of replying maker")
+    author_title: Optional[str] = Field(None, description="Maker role or bio")
     content: str = Field(..., min_length=1, description="Reply markdown content")
     target_type: Literal["THREAD", "ANSWER"] = Field("ANSWER", description="Target type being commented on")
     target_id: Optional[str] = Field(None, description="UUID of target thread or answer")
@@ -121,6 +122,7 @@ class CommentTreeNode(BaseModel):
     status: str = "ACTIVE"
     created_at: str
     updated_at: str
+    user_vote: Optional[str] = None
     children: List["CommentTreeNode"] = Field(default_factory=list)
 
 
@@ -148,20 +150,6 @@ class VoteResponse(BaseModel):
     target_id: str
 
 
-# Backwards compatibility models
-class UpvoteRequest(BaseModel):
-    user_id: str
-    target_type: Literal["THREAD", "COMMENT", "ANSWER"]
-    target_id: str
-
-
-class UpvoteResponse(BaseModel):
-    is_upvoted: bool
-    upvote_count: int
-    target_type: Literal["THREAD", "COMMENT", "ANSWER"]
-    target_id: str
-
-
 class AnswerAcceptRequest(BaseModel):
     thread_id: str
     answer_id: str
@@ -173,16 +161,3 @@ class AnswerAcceptResponse(BaseModel):
     answer_id: str
     is_accepted: bool
     status: str
-
-
-class BookmarkRequest(BaseModel):
-    user_id: str
-    thread_id: str
-    folder_name: str = "默认收藏夹"
-
-
-class BookmarkResponse(BaseModel):
-    is_bookmarked: bool
-    bookmark_count: int
-    thread_id: str
-    folder_name: str

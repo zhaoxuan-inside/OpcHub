@@ -267,7 +267,8 @@ def test_frontend_no_fake_data_and_profile_persistence_e2e():
     assert prof_data["company_name"] == "杭州实测云软工作室"
     assert prof_data["credit_code"] == ""  # Zero fake random credit code
     assert prof_data["phone"] == ""        # Zero fake phone
-    assert prof_data["tier_name"] == "标准创客"
+    # 创始创客活动下新注册用户可能落在配额内获赠黑钻 VIP，档案等级须与注册响应一致
+    assert prof_data["tier_name"] == reg_payload["tier_name"]
 
     # 4. Update profile via user.profile.update
     update_resp = client.post("/api/welcom/opc_world", json={

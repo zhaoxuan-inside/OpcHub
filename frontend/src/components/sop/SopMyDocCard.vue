@@ -127,7 +127,7 @@ const publishTitle = computed(() => {
 });
 
 const statusHint = computed(() => {
-  if (statusKey.value === 'PENDING_REVIEW') return '已提交审核，等待平台合法性与敏感词检查';
+  if (statusKey.value === 'PENDING_REVIEW') return '已提交审核，等待平台合规审核';
   if (statusKey.value === 'PUBLISHED') return '审核通过，已发布至标准文书库';
   if (statusKey.value === 'REJECTED') return '审核未通过，可修改后重新发布';
   return '私有文书，可发布至标准文书库';

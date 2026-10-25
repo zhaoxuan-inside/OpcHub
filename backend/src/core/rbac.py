@@ -118,6 +118,10 @@ def resolve_resource_owner(resource_type: str, resource_id: str) -> Optional[str
             forum_service._ensure_seed_thread(resource_id)
             obj = forum_service._threads.get(resource_id)
             return obj.author_id if obj else None
+        if rt in ("answer", "answers", "forum_answer"):
+            from src.domains.forum.service import forum_service
+            obj = forum_service._answers.get(resource_id)
+            return obj.author_id if obj else None
         if rt in ("comment", "comments", "forum_comment"):
             from src.domains.forum.service import forum_service
             obj = forum_service._comments.get(resource_id)

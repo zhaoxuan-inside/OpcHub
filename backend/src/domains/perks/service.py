@@ -193,6 +193,7 @@ class PerkService:
             raise ValueError(f"Perk {perk.name} is fully redeemed")
 
         perk.quota_remaining -= 1
+        perk.claim_count += 1
         voucher = "OPC-" + uuid.uuid4().hex[:6].upper() + "-2026"
         cid = str(uuid.uuid4())
         claim = PerkClaimResponse(
@@ -227,6 +228,7 @@ class PerkService:
             domain_persistence.delete("perks.claims", f"{user_id}|{perk_id}")
             if perk_id in self._perks:
                 self._perks[perk_id].quota_remaining += 1
+                self._perks[perk_id].claim_count = max(0, self._perks[perk_id].claim_count - 1)
                 domain_persistence.write("perks.items", perk_id, self._perks[perk_id])
             return True
         return False

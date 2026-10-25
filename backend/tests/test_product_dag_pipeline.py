@@ -126,18 +126,18 @@ def test_product_upvote_and_listing(client):
     target_prod = prods[-1]
     initial_upvotes = target_prod.upvote_count
 
-    # Upvote via gateway
+    # Like via unified interactions (single ledger, mirrors back to upvote_count)
     upvote_resp = client.post(
         "/api/welcom/opc_world",
         json={
-            "scenario": "products.upvote",
+            "scenario": "content.interaction.toggle",
             "version": "v1.0.0",
-            "payload": {"product_id": target_prod.id},
+            "payload": {"target_type": "PRODUCT", "target_id": target_prod.id, "kind": "LIKE"},
         },
     )
     assert upvote_resp.status_code == 200
     upvoted_data = upvote_resp.json()["data"]
-    assert upvoted_data["upvote_count"] == initial_upvotes + 1
+    assert upvoted_data["active"] is True
 
     # List products via gateway
     list_resp = client.post(
@@ -189,14 +189,14 @@ def test_product_pagination_and_caching(client):
     assert d2["from_cache"] is True
     assert len(d2["items"]) == len(d1["items"])
 
-    # 3. Upvote to trigger cache invalidation
+    # 3. Like to trigger cache invalidation (unified interactions sync domain counters)
     prod_id = d1["items"][0]["id"]
     client.post(
         "/api/welcom/opc_world",
         json={
-            "scenario": "products.upvote",
+            "scenario": "content.interaction.toggle",
             "version": "v1.0.0",
-            "payload": {"product_id": prod_id},
+            "payload": {"target_type": "PRODUCT", "target_id": prod_id, "kind": "LIKE"},
         },
     )
 

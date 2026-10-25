@@ -1,5 +1,5 @@
 <template>
-  <header>
+  <header class="app-topbar">
     <div class="nav-glass-bar">
       <!-- 1. Left VisionOS Island: 晨昏线外 Beyond the Line -->
       <div
@@ -201,10 +201,12 @@
             @click="handleUserClick"
             :title="`${userSession.nickname || userSession.email} · 查看创客档案`"
           >
-            <div
-              style="width: 22px; height: 22px; border-radius: 50%; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; color: #fff; background: var(--accent); box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);"
-            >
-              {{ (userSession.nickname || userSession.email || 'M')[0].toUpperCase() }}
+            <div style="width: 22px; height: 22px; border-radius: 50%; overflow: hidden; box-shadow: 0 2px 8px rgba(0, 113, 227, 0.4);">
+              <PersonaAvatar
+                :id="userSession?.profile?.avatar_id || ''"
+                :name="userSession?.nickname || userSession?.email || 'M'"
+                :size="22"
+              />
             </div>
             <span class="nav-user-badge online"></span>
           </button>
@@ -217,6 +219,7 @@
 <script setup>
 import { ref } from 'vue';
 import BrandLogo from './BrandLogo.vue';
+import PersonaAvatar from './PersonaAvatar.vue';
 
 const props = defineProps({
   activeTab: {

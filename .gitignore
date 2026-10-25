@@ -42,3 +42,12 @@ mock_server/storage/
 
 # Local agent skill state
 hs-dev-skill/state/
+
+# ZCode agent workspace state
+/.zcode/
+
+# RAG runtime vector cache (frontend fallback store)
+/frontend/data/
+
+# Docker runtime secrets
+.env.docker

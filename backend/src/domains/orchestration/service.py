@@ -273,12 +273,14 @@ class OrchestrationService:
                 {"id": "step_guard", "action_handler": "forum.vote.validate_guard", "type": "GUARD"},
                 {"id": "step_vote", "action_handler": "forum.vote.persist", "type": "STORAGE"},
                 {"id": "step_hot_recalc", "action_handler": "forum.hot_score.recalculate", "type": "BIZ"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
                 {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
                 {"from": "step_guard", "to": "step_vote"},
                 {"from": "step_vote", "to": "step_hot_recalc"},
-                {"from": "step_hot_recalc", "to": "step_telemetry"},
+                {"from": "step_hot_recalc", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
             ],
         }
         self.save_dag_config(
@@ -286,6 +288,85 @@ class OrchestrationService:
                 scenario_code="OPC_FORUM_VOTE_PIPELINE",
                 version="v1.0.0",
                 topology_graph=topo_forum_vote,
+                status="ACTIVE",
+            )
+        )
+
+        # 6.4 Forum Thread Edit Pipeline: OPC_FORUM_THREAD_UPDATE_PIPELINE
+        topo_forum_thread_update = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.thread.update_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.thread.update_persist", "type": "STORAGE"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_THREAD_UPDATE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_thread_update,
+                status="ACTIVE",
+            )
+        )
+
+        # 6.5 Forum Answer Delete Pipeline: OPC_FORUM_ANSWER_DELETE_PIPELINE
+        topo_forum_answer_delete = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.answer.delete_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.answer.delete_persist", "type": "STORAGE"},
+                {"id": "step_invalidate_cache", "action_handler": "forum.cache.invalidate_operator", "type": "CACHE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_invalidate_cache"},
+                {"from": "step_invalidate_cache", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_ANSWER_DELETE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_answer_delete,
+                status="ACTIVE",
+            )
+        )
+
+        # 6.6 Forum Comment Delete Pipeline: OPC_FORUM_COMMENT_DELETE_PIPELINE
+        topo_forum_comment_delete = {
+            "topology": "DAG",
+            "entry_node": "step_guard",
+            "exit_node": "step_telemetry",
+            "enable_saga_compensation": False,
+            "nodes": [
+                {"id": "step_guard", "action_handler": "forum.comment.delete_guard", "type": "GUARD"},
+                {"id": "step_persist", "action_handler": "forum.comment.delete_persist", "type": "STORAGE"},
+                {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
+            ],
+            "edges": [
+                {"from": "step_guard", "to": "step_persist"},
+                {"from": "step_persist", "to": "step_telemetry"},
+            ],
+        }
+        self.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code="OPC_FORUM_COMMENT_DELETE_PIPELINE",
+                version="v1.0.0",
+                topology_graph=topo_forum_comment_delete,
                 status="ACTIVE",
             )
         )
@@ -703,10 +784,11 @@ class OrchestrationService:
         )
 
         # 23. Forum Infinite Stream Feed & Multi-tier Cache DAG Pipeline: OPC_FORUM_FEED_STREAM_PIPELINE
+        #     共享缓存回写在前，观察者标注在后，保证缓存内容与具体用户无关。
         topo_forum_feed = {
             "topology": "DAG",
             "entry_node": "step_guard",
-            "exit_node": "step_telemetry",
+            "exit_node": "step_annotate",
             "enable_saga_compensation": False,
             "nodes": [
                 {"id": "step_guard", "action_handler": "forum.feed.cursor_guard", "type": "GUARD"},
@@ -714,6 +796,7 @@ class OrchestrationService:
                 {"id": "step_fetch", "action_handler": "forum.feed.stream_fetch", "type": "STORAGE"},
                 {"id": "step_enrich", "action_handler": "forum.feed.enrich_prefetch_meta", "type": "BIZ"},
                 {"id": "step_write", "action_handler": "forum.feed.cache_write", "type": "CACHE"},
+                {"id": "step_annotate", "action_handler": "forum.feed.viewer_annotate", "type": "BIZ"},
                 {"id": "step_telemetry", "action_handler": "forum.telemetry.incr", "type": "BIZ"},
             ],
             "edges": [
@@ -721,7 +804,8 @@ class OrchestrationService:
                 {"from": "step_cache", "to": "step_fetch"},
                 {"from": "step_fetch", "to": "step_enrich"},
                 {"from": "step_enrich", "to": "step_write"},
-                {"from": "step_write", "to": "step_telemetry"},
+                {"from": "step_write", "to": "step_annotate"},
+                {"from": "step_annotate", "to": "step_telemetry"},
             ],
         }
         self.save_dag_config(
@@ -945,6 +1029,22 @@ class OrchestrationService:
             domain_persistence.delete("orchestration.dag_configs", f"{scenario_code}@@{version}")
             return True
         return False
+
+    def activate_dag_config(self, scenario_code: str, version: str) -> DAGConfigRecord:
+        """Mark one config ACTIVE, supersede siblings, and re-order it as the
+        execution resolver's last-inserted candidate (latest ACTIVE wins)."""
+        key = (scenario_code, version)
+        for (c, v), rec in list(self._dag_configs.items()):
+            if c == scenario_code and v != version and rec.status == "ACTIVE":
+                rec.status = "SUPERSEDED"
+                domain_persistence.write("orchestration.dag_configs", f"{c}@@{v}", rec)
+        if key not in self._dag_configs:
+            raise KeyError(f"DAG config for scenario {scenario_code} version {version} not found")
+        rec = self._dag_configs.pop(key)
+        rec.status = "ACTIVE"
+        self._dag_configs[key] = rec
+        domain_persistence.write("orchestration.dag_configs", f"{scenario_code}@@{version}", rec)
+        return rec
 
     def list_operators(self) -> List[OperatorDescriptor]:
         """List all registered atomic operator descriptors across all domains."""

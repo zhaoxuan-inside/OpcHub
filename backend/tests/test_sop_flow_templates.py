@@ -60,55 +60,42 @@ def test_flow_template_step_carries_the_note():
     assert detail.steps[0].note, "each step should explain what it achieves"
 
 
-def test_flow_like_toggle_is_idempotent_per_user():
+def test_flow_like_via_unified_interactions():
+    """流程模板喜欢/收藏统一走 content interactions；计数经 _sync_domain 镜像回模板实体。"""
+    from src.domains.interactions.service import content_interaction_service
+
     flow_id = "flow_soft_copyright_only"
-    before = sop_service.get_flow_template(flow_id).like_count
+    baseline = sop_service.get_flow_template(flow_id).like_count
     try:
-        first = sop_service.toggle_flow_like("usr_like_test", flow_id)
-        assert first.liked is True
-        assert first.like_count == before + 1
+        first = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
+        assert first.active is True
+        assert first.viewer.loved is True
+        assert sop_service.get_flow_template(flow_id).like_count == first.love_count
+        assert first.love_count == baseline + 1
 
-        second = sop_service.toggle_flow_like("usr_like_test", flow_id)
-        assert second.liked is False
-        assert second.like_count == before
+        second = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
+        assert second.active is False
+        assert sop_service.get_flow_template(flow_id).like_count == baseline
+
+        fav = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "FAVORITE")
+        assert fav.active is True
+        assert fav.viewer.favorited is True
     finally:
-        if (("usr_like_test", flow_id)) in sop_service._flow_likes:
-            sop_service.toggle_flow_like("usr_like_test", flow_id)
+        content_interaction_service.clear()
 
 
-def test_flow_favorite_is_independent_of_like():
-    flow_id = "flow_cross_border_settlement"
-    try:
-        liked = sop_service.toggle_flow_like("usr_fav_test", flow_id)
-        fav = sop_service.toggle_flow_favorite("usr_fav_test", flow_id)
-        assert liked.liked is True and liked.favorited is False
-        assert fav.liked is True and fav.favorited is True
-    finally:
-        if (("usr_fav_test", flow_id)) in sop_service._flow_likes:
-            sop_service.toggle_flow_like("usr_fav_test", flow_id)
-        if (("usr_fav_test", flow_id)) in sop_service._flow_favorites:
-            sop_service.toggle_flow_favorite("usr_fav_test", flow_id)
+def test_flow_catalog_counts_reflect_unified_sync():
+    from src.domains.interactions.service import content_interaction_service
 
-
-def test_flow_catalog_marks_caller_interactions():
     flow_id = "flow_full_lifecycle_compliance"
+    baseline = sop_service.get_flow_template(flow_id).like_count
     try:
-        sop_service.toggle_flow_like("usr_mark_test", flow_id)
-        sop_service.toggle_flow_favorite("usr_mark_test", flow_id)
-        catalog = sop_service.list_flow_template_cards(user_id="usr_mark_test")
+        content_interaction_service.toggle("usr_mark_test", "SOP_FLOW", flow_id, "LOVE")
+        catalog = sop_service.list_flow_template_cards()
         target = next(i for i in catalog.items if i.id == flow_id)
-        assert target.liked is True
-        assert target.favorited is True
-
-        other = sop_service.list_flow_template_cards(user_id="usr_other_test")
-        other_target = next(i for i in other.items if i.id == flow_id)
-        assert other_target.liked is False
-        assert other_target.favorited is False
+        assert target.like_count == baseline + 1
     finally:
-        if (("usr_mark_test", flow_id)) in sop_service._flow_likes:
-            sop_service.toggle_flow_like("usr_mark_test", flow_id)
-        if (("usr_mark_test", flow_id)) in sop_service._flow_favorites:
-            sop_service.toggle_flow_favorite("usr_mark_test", flow_id)
+        content_interaction_service.clear()
 
 
 def test_unknown_flow_template_raises_key_error():

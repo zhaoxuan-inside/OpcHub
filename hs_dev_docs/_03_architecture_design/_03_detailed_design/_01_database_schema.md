@@ -246,7 +246,13 @@ CREATE INDEX idx_forum_upvotes_user ON forum_upvotes(user_id);
 CREATE INDEX idx_forum_upvotes_target ON forum_upvotes(target_type, target_id);
 ```
 
-### 1.10 创客收藏归档表 (`forum_bookmarks` · 防重唯一索引)
+### 1.10 创客收藏归档表 (`forum_bookmarks` · 防重唯一索引 · 已退役)
+
+> **2026-10 退役说明**：头脑风暴的「收藏」能力已统一由内容互动域承载
+> （`content.interaction_records` 中的 `FAVORITE` 记录 + `content.interaction_stats`
+> 聚合计数，见 `_02_unified_interactions.md`）。本表仅为历史数据归档保留的 DDL
+> 契约，运行时不再写入；新建部署可不创建该表。
+
 ```sql
 CREATE TABLE IF NOT EXISTS forum_bookmarks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

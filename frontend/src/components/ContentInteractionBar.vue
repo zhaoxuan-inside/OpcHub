@@ -27,6 +27,7 @@
     <div class="ci-bar" :class="{ 'ci-bar-compact': compact, 'ci-bar-band': variant === 'band' }">
       <!-- 点赞 -->
       <button
+        v-if="showKind('LIKE')"
         type="button"
         class="ci-btn ci-like"
         :class="{ active: viewer.liked }"
@@ -41,6 +42,7 @@
 
       <!-- 点踩：用户互动维护信息的有效性（内容失实/无帮助的直接信号） -->
       <button
+        v-if="showKind('DISLIKE')"
         type="button"
         class="ci-btn ci-dislike"
         :class="{ active: viewer.disliked }"
@@ -69,6 +71,7 @@
 
       <!-- 喜欢 -->
       <button
+        v-if="showKind('LOVE')"
         type="button"
         class="ci-btn ci-love"
         :class="{ active: viewer.loved }"
@@ -83,6 +86,7 @@
 
       <!-- 收藏 -->
       <button
+        v-if="showKind('FAVORITE')"
         type="button"
         class="ci-btn ci-favorite"
         :class="{ active: viewer.favorited }"
@@ -146,6 +150,10 @@ const props = defineProps({
   targetType: { type: String, required: true },
   targetId: { type: [String, Number], required: true },
   targetTitle: { type: String, default: '' },
+  targetSnippet: { type: String, default: '' },
+  // 需要渲染的互动类型子集（LIKE/DISLIKE/LOVE/FAVORITE）；null = 全部渲染。
+  // 例如论坛帖子传 ['LOVE','FAVORITE']，赞同/反对由论坛域 forum.vote 独立承载。
+  kinds: { type: Array, default: null },
   likeCount: { type: [Number, String], default: 0 },
   favoriteCount: { type: [Number, String], default: 0 },
   loveCount: { type: [Number, String], default: 0 },
@@ -202,6 +210,10 @@ const iconSize = computed(() => {
   if (props.variant === 'band') return 17;
   return props.compact ? 13 : 16;
 });
+
+function showKind(kind) {
+  return !props.kinds || props.kinds.includes(kind);
+}
 
 const displayRating = computed(() => hoverRating.value || viewer.rating || Math.round(rating.avg) || 0);
 
@@ -283,7 +295,8 @@ async function submitReport() {
       target_type: props.targetType,
       target_id: String(props.targetId),
       target_title: props.targetTitle || '',
-      snippet_content: props.targetTitle || '',
+      snippet_content: props.targetSnippet || props.targetTitle || '',
+      reason: '用户举报：疑似违规或内容失实',
     });
     if (res.ok && res.data) {
       emit('toast', {

@@ -295,8 +295,6 @@ class SOPFlowTemplateCard(BaseModel):
     like_count: int = 0
     favorite_count: int = 0
     usage_count: int = 0
-    liked: bool = False
-    favorited: bool = False
 
 
 class SOPMyFlowCard(BaseModel):
@@ -326,16 +324,6 @@ class SOPFlowTemplateCatalogResponse(BaseModel):
     """The platform flow catalog plus the caller's own interactions."""
     items: List[SOPFlowTemplateCard] = Field(default_factory=list)
     total: int = 0
-
-
-class SOPFlowTemplateInteractionResponse(BaseModel):
-    """Result of a like / favourite toggle on a platform flow template."""
-    node_id: str
-    liked: bool = False
-    favorited: bool = False
-    like_count: int = 0
-    favorite_count: int = 0
-    usage_count: int = 0
 
 
 class SOPFlowTemplateStep(BaseModel):
@@ -444,8 +432,6 @@ class SOPDocumentCard(BaseModel):
     favorite_count: int = 0
     usage_count: int = 0
     field_count: int = 0
-    liked: bool = False
-    favorited: bool = False
 
 
 class SOPDocumentCatalogResponse(BaseModel):
@@ -454,14 +440,7 @@ class SOPDocumentCatalogResponse(BaseModel):
     total: int = 0
 
 
-class SOPInteractionResponse(BaseModel):
-    """Result of a like / favourite toggle on a standard document."""
-    node_id: str
-    liked: bool = False
-    favorited: bool = False
-    like_count: int = 0
-    favorite_count: int = 0
-    usage_count: int = 0
+
 
 
 class SOPDocumentResponse(BaseModel):

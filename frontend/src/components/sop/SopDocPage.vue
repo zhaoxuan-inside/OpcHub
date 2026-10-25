@@ -14,7 +14,7 @@
           <h2 class="sop-doc-title">{{ crumbTitle }}</h2>
           <div class="sop-doc-meta">
             <template v-if="isEditorMode">
-              <span class="sop-doc-category-pill new">新文书</span>
+              <span class="sop-doc-category-pill" :class="{ new: !draft }">{{ draft ? '编辑草稿' : '新文书' }}</span>
               <span class="sop-doc-dot">·</span>
               <span>{{ draftStats }}</span>
             </template>
@@ -347,6 +347,9 @@ const props = defineProps({
   // the template library as a right-side panel. This is the true drafting path:
   // the maker writes the body, optionally seeded from a template.
   creationMode: { type: Boolean, default: false },
+  // An existing private draft to reopen in the editor (编辑草稿). When present
+  // the editor is prefilled and saving updates the same document in place.
+  draft: { type: Object, default: null },
 });
 
 const emit = defineEmits(['back', 'pick', 'saved', 'toast', 'require-login']);
@@ -482,11 +485,21 @@ function startBlank() {
   resetEditor();
 }
 
-// A different creation session always starts clean.
+// A different creation session always starts clean, unless an existing private
+// draft is being reopened for editing.
 watch(
-  () => [props.creationMode, props.node?.id],
+  () => [props.creationMode, props.node?.id, props.draft?.id],
   ([creationMode]) => {
-    if (creationMode) resetEditor();
+    if (!creationMode) return;
+    if (props.draft) {
+      draftTitle.value = props.draft.document_title || '';
+      draftContent.value = props.draft.rendered_content || '';
+      selectedTemplateId.value = props.draft.template_id || '';
+      selectedCategory.value = props.draft.category || '';
+      seededContent.value = draftContent.value;
+    } else {
+      resetEditor();
+    }
   },
   { immediate: true }
 );
@@ -597,6 +610,7 @@ async function persistDraft() {
   saving.value = true;
   try {
     const res = await dispatchGateway('sop.document.draft', {
+      doc_id: props.draft?.id || undefined,
       title: draftTitle.value.trim(),
       content: draftContent.value,
       template_id: selectedTemplateId.value || '',
@@ -1001,29 +1015,6 @@ onUnmounted(() => {
 .sop-doc-title-input::placeholder {
   color: var(--text-tertiary);
   font-weight: 500;
-}
-
-.sop-doc-editor-textarea {
-  flex: 1;
-  min-height: 320px;
-  width: 100%;
-  padding: 16px 18px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border);
-  background: var(--glass-surface-solid);
-  color: var(--text-primary);
-  font-family: var(--font-mono, monospace);
-  font-size: 13px;
-  line-height: 1.95;
-  resize: none;
-  outline: none;
-  box-sizing: border-box;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.sop-doc-editor-textarea:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow);
 }
 
 .sop-doc-editor-footer {

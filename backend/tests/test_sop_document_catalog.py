@@ -81,69 +81,45 @@ def test_catalog_usage_count_combines_baseline_and_live_instances():
         assert item.usage_count == baseline + usage.get(item.id, 0)
 
 
-def test_like_toggle_is_idempotent_per_user():
+def test_document_like_via_unified_interactions():
+    """喜欢/收藏统一走 content interactions；计数经 _sync_domain 镜像回节点。"""
+    from src.domains.interactions.service import content_interaction_service
+
     node_id = "tpl_invoice_quota"
-    before = sop_service.get_node(node_id).like_count
-
-    first = sop_service.toggle_like("usr_like_test", node_id)
-    assert first.liked is True
-    assert first.like_count == before + 1
-
-    second = sop_service.toggle_like("usr_like_test", node_id)
-    assert second.liked is False
-    assert second.like_count == before
-
-
-def test_like_is_per_user():
-    node_id = "tpl_invoice_quota"
-    before = sop_service.get_node(node_id).like_count
+    baseline_like = sop_service.get_node(node_id).like_count
+    baseline_fav = sop_service.get_node(node_id).favorite_count
     try:
-        sop_service.toggle_like("usr_like_a", node_id)
-        sop_service.toggle_like("usr_like_b", node_id)
-        assert sop_service.get_node(node_id).like_count == before + 2
+        first = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
+        assert first.active is True
+        assert first.viewer.loved is True
+        # 统一 LOVE 计数镜像到 SOP 节点的 like_count 字段
+        assert sop_service.get_node(node_id).like_count == first.love_count
+        assert first.love_count == baseline_like + 1
+
+        second = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
+        assert second.active is False
+        assert sop_service.get_node(node_id).like_count == baseline_like
+
+        fav = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "FAVORITE")
+        assert fav.active is True
+        assert fav.favorite_count == baseline_fav + 1
     finally:
-        sop_service.toggle_like("usr_like_a", node_id)
-        sop_service.toggle_like("usr_like_b", node_id)
+        content_interaction_service.clear()
 
 
-def test_favorite_toggle_is_independent_of_like():
-    node_id = "tpl_tax_registration"
-    try:
-        liked = sop_service.toggle_like("usr_fav_test", node_id)
-        fav = sop_service.toggle_favorite("usr_fav_test", node_id)
-        assert liked.liked is True and liked.favorited is False
-        assert fav.liked is True and fav.favorited is True
-    finally:
-        sop_service.toggle_like("usr_fav_test", node_id)
-        sop_service.toggle_favorite("usr_fav_test", node_id)
+def test_catalog_counts_reflect_unified_sync():
+    """目录卡片的 like_count / favorite_count 来自节点实体（由统一互动镜像）。"""
+    from src.domains.interactions.service import content_interaction_service
 
-
-def test_interaction_rejects_subgraph():
-    """Only standard documents can be liked or favourited."""
-    with pytest.raises(ValueError):
-        sop_service.toggle_like("usr_x", "sub_cross_border")
-    with pytest.raises(ValueError):
-        sop_service.toggle_favorite("usr_x", "sub_cross_border")
-
-
-def test_catalog_marks_caller_interactions():
     node_id = "tpl_soft_copyright_application"
+    baseline_like = sop_service.get_node(node_id).like_count
     try:
-        sop_service.toggle_like("usr_mark_test", node_id)
-        sop_service.toggle_favorite("usr_mark_test", node_id)
-        catalog = sop_service.list_document_cards(user_id="usr_mark_test")
+        content_interaction_service.toggle("usr_mark_test", "SOP_DOCUMENT", node_id, "LOVE")
+        catalog = sop_service.list_document_cards()
         target = next(i for i in catalog.items if i.id == node_id)
-        assert target.liked is True
-        assert target.favorited is True
-
-        # Another user sees the counts but not the flags.
-        other = sop_service.list_document_cards(user_id="usr_other_test")
-        other_target = next(i for i in other.items if i.id == node_id)
-        assert other_target.liked is False
-        assert other_target.favorited is False
+        assert target.like_count == baseline_like + 1
     finally:
-        sop_service.toggle_like("usr_mark_test", node_id)
-        sop_service.toggle_favorite("usr_mark_test", node_id)
+        content_interaction_service.clear()
 
 
 def test_hydrate_nodes_rebuilds_documents():

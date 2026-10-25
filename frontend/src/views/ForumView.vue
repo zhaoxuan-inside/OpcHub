@@ -15,8 +15,9 @@
       :post="activePost"
       :user-session="currentUserSession"
       @back="handleBackToList"
-      @upvote="handleDetailUpvote"
-      @bookmark="handleDetailBookmark"
+      @vote="handleThreadVote"
+      @interaction="handleCardInteraction"
+      @require-login="$emit('open-register')"
       @update-post="handlePostUpdated"
       @delete="handleDeletePost"
       @toast="$emit('toast', $event)"
@@ -42,6 +43,28 @@
               </button>
             </div>
             <div class="feed-filter-right">
+              <!-- Density Mode Switch (舒适文章流 / 极速高密行) -->
+              <div class="density-segmented" role="group" aria-label="列表密度切换">
+                <button
+                  type="button"
+                  class="density-pill"
+                  :class="{ active: viewDensity === 'comfortable' }"
+                  @click="setDensity('comfortable')"
+                  title="知乎文章流深度模式"
+                >
+                  舒适
+                </button>
+                <button
+                  type="button"
+                  class="density-pill"
+                  :class="{ active: viewDensity === 'compact' }"
+                  @click="setDensity('compact')"
+                  title="极速高密单行模式"
+                >
+                  紧凑
+                </button>
+              </div>
+
               <!-- Search Box -->
               <div class="semantic-search-box">
                 <div class="search-input-wrap">
@@ -120,8 +143,7 @@
                 :user-session="currentUserSession"
                 @select="handleSelectPost"
                 @mouseenter="handlePostHover(post)"
-                @upvote="handleCardUpvote"
-                @bookmark="handleDetailBookmark"
+                @vote="handleThreadVote"
                 @interaction="handleCardInteraction"
                 @delete="handleDeletePost"
                 @require-login="$emit('open-register')"
@@ -201,9 +223,9 @@
                 <div class="hot-item-content">
                   <h5 class="hot-item-title">{{ item.title }}</h5>
                   <div class="hot-item-meta">
-                    <span><OpcIcon name="flame" :size="12" /> {{ (item.upvotes || 0) * 3 + (item.replies || 0) * 5 + 42 }} 热度</span>
+                    <span><OpcIcon name="flame" :size="12" /> 热度 {{ Math.round(item.hot_score || 0) }}</span>
                     <span class="dot-sep">·</span>
-                    <span>{{ item.upvotes || 0 }} 点赞</span>
+                    <span>{{ item.upvotes || 0 }} 赞同</span>
                   </div>
                 </div>
               </div>
@@ -214,12 +236,10 @@
           <div class="glass-box sidebar-card guidelines-card">
             <h4 class="sidebar-title-sm">超级个体实战指南</h4>
             <p class="guidelines-desc">
-              头脑风暴社区倡导<strong>「真实代码落盘、真实财务申报、真实踩坑复盘」</strong>。所有涉及税收减免与出海合规方案均支持一键归档至个人知识库。
+              头脑风暴社区倡导<strong>「真实代码落地、真实财务申报、真实踩坑复盘」</strong>。所有涉及税收减免与出海合规方案均支持一键归档至个人知识库。
             </p>
             <div class="guidelines-footer">
               <span>OpcHub 创客治理协议 v1.0</span>
-              <span class="dot-sep">·</span>
-              <span class="link-span" @click="handleOpenCreatePage">提出探讨</span>
             </div>
           </div>
 
@@ -279,7 +299,7 @@
               <line x1="12" y1="16" x2="12.01" y2="16"/>
             </svg>
             <div class="delete-warning-text">
-              该操作将彻底从 OpcHub 知识库与网关节点中注销此帖，相关的点赞与创客回复将同步归档或清理，<strong>此操作不可逆</strong>。
+              该操作将彻底从平台删除此帖，相关的点赞与创客回复将同步归档或清理，<strong>此操作不可逆</strong>。
             </div>
           </div>
 
@@ -374,9 +394,8 @@ const isSemanticSearchActive = ref(false);
 const activeSearchQuery = ref('');
 
 // Drawer & Full-Page View States
-const isDrawerVisible = ref(false);
 const activePost = ref(null);
-const currentViewMode = ref('list'); // 'list' | 'create'
+const currentViewMode = ref('list'); // 'list' | 'create' | 'detail'
 
 
 // Density Mode Switch
@@ -458,29 +477,24 @@ function transformThread(t) {
     snippet: snippet,
     content: t.content || '',
     metrics: Array.isArray(t.metrics) ? t.metrics : [],
-    author: t.author_name || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
+    author: t.author_name || t.author || (t.author_id ? `创客_${t.author_id.slice(0, 6)}` : '实战创客'),
     author_id: t.author_id || '',
-    author_title: t.author_title || '认证创客',
-    ip_location: t.ip_location || '来自 浙江',
+    author_title: t.author_title || '',
     replies: t.comment_count ?? 0,
     comment_count: t.comment_count ?? 0,
     answer_count: t.answer_count ?? (Array.isArray(t.top_answers) ? t.top_answers.length : 0),
     top_answers: Array.isArray(t.top_answers) ? t.top_answers : [],
     accepted_answer_id: t.accepted_answer_id || null,
+    // 赞同/反对是论坛域独立投票账本（forum.vote），收藏/喜欢/评分由统一互动系统在 enrich 时补齐
     upvotes: t.upvote_count ?? 0,
     upvote_count: t.upvote_count ?? 0,
     downvote_count: t.downvote_count ?? 0,
     user_vote: t.user_vote || null,
-    like_count: t.upvote_count ?? 0,
-    bookmark_count: t.bookmark_count ?? 0,
-    favorite_count: t.bookmark_count ?? 0,
-    love_count: t.love_count ?? 0,
-    is_loved: Boolean(t.is_loved),
-    is_bookmarked: Boolean(t.is_bookmarked),
+    is_upvoted: t.user_vote === 'UPVOTE',
     is_following: Boolean(t.is_following),
+    love_count: t.love_count ?? 0,
     view_count: t.view_count ?? 0,
     hot_score: t.hot_score ?? 0,
-    is_upvoted: Boolean(t.is_upvoted || t.user_vote === 'UPVOTE'),
     created_at: t.created_at || new Date().toISOString(),
     updated_at: formatTimeAgo(t.updated_at || t.created_at),
     tags: Array.isArray(t.tags) && t.tags.length ? t.tags : [categoryName],
@@ -802,11 +816,7 @@ function initScrollObserver() {
   scrollObserver.observe(infiniteScrollSentinel.value);
 }
 
-// Category counts
-function getCategoryCount(code) {
-  if (code === 'ALL') return totalCount.value || postsList.value.length;
-  return postsList.value.filter((p) => (p.category_code || '').toUpperCase() === code).length;
-}
+// Category counts are rendered server-side; the sidebar hot rank derives from the live list.
 
 // Filtered and Sorted list
 const filteredAndSortedPosts = computed(() => {
@@ -830,7 +840,8 @@ const filteredAndSortedPosts = computed(() => {
   }
 
   // 3. Sorting
-  if (isSemanticSearchActive.value && currentSort.value !== 'new' && currentSort.value !== 'featured') {
+  if (isSemanticSearchActive.value) {
+    // 语义搜索结果始终按相关度排序（排序选项在搜索态下不适用）
     list.sort((a, b) => (b.semantic_score || 0) - (a.semantic_score || 0));
   } else if (currentSort.value === 'hot') {
     list.sort((a, b) => {
@@ -845,7 +856,7 @@ const filteredAndSortedPosts = computed(() => {
       const scoreB = (b.upvotes || 0) * 2 + (b.replies || 0) * 3;
       return scoreB - scoreA;
     });
-  } else if (currentSort.value === 'new') {
+  } else if (currentSort.value === 'latest') {
     list.sort((a, b) => {
       if (a.pinned && !b.pinned) return -1;
       if (!a.pinned && b.pinned) return 1;
@@ -857,6 +868,7 @@ const filteredAndSortedPosts = computed(() => {
   } else if (currentSort.value === 'featured') {
     list = list.filter((p) => p.pinned);
   }
+  // 'unanswered' 由服务端 sort_by 直接返回过滤结果，客户端保持服务端顺序
 
   return list;
 });
@@ -898,28 +910,26 @@ function handleBackToList() {
   });
 }
 
-function handleDetailUpvote({ post, isUpvoted, count }) {
-  if (post) {
-    post.is_upvoted = isUpvoted;
-    post.upvotes = count;
-    post.upvote_count = count;
-  }
-  const found = postsList.value.find((p) => String(p.id) === String(post?.id));
-  if (found) {
-    found.is_upvoted = isUpvoted;
-    found.upvotes = count;
-    found.upvote_count = count;
-  }
-}
+// Thread vote sync (赞同/反对来自卡片或详情页，post 对象为共享引用，这里保持列表与缓存一致)
+function handleThreadVote({ post, userVote, upvoteCount, downvoteCount }) {
+  if (!post) return;
+  post.user_vote = userVote;
+  post.upvote_count = upvoteCount;
+  post.upvotes = upvoteCount;
+  post.downvote_count = downvoteCount;
+  post.is_upvoted = (userVote === 'UPVOTE');
 
-function handleDetailBookmark({ post, isBookmarked }) {
-  if (post) {
-    post.is_bookmarked = isBookmarked;
-  }
   const found = postsList.value.find((p) => String(p.id) === String(post?.id));
   if (found) {
-    found.is_bookmarked = isBookmarked;
+    found.user_vote = userVote;
+    found.upvote_count = upvoteCount;
+    found.upvotes = upvoteCount;
+    found.downvote_count = downvoteCount;
+    found.is_upvoted = (userVote === 'UPVOTE');
   }
+  try {
+    clientFeedCache.clear();
+  } catch (e) {}
 }
 
 function handlePostUpdated(updatedPost) {
@@ -930,26 +940,9 @@ function handlePostUpdated(updatedPost) {
 }
 
 function handleCardInteraction(payload) {
+  // 互动条已通过共享 post 对象应用服务端状态；这里只需同步 activePost 并清理客户端缓存
   if (!payload?.post) return;
   const post = payload.post;
-  const found = postsList.value.find((p) => String(p.id) === String(post.id));
-  if (found) {
-    Object.assign(found, {
-      like_count: post.like_count,
-      favorite_count: post.favorite_count,
-      love_count: post.love_count,
-      comment_count: post.comment_count,
-      viewer: post.viewer,
-      upvotes: post.upvotes,
-      upvote_count: post.upvote_count,
-      replies: post.replies,
-      bookmark_count: post.bookmark_count,
-      is_upvoted: post.is_upvoted,
-      is_bookmarked: post.is_bookmarked,
-      is_loved: post.is_loved,
-      is_commented: post.is_commented,
-    });
-  }
   if (activePost.value && String(activePost.value.id) === String(post.id)) {
     Object.assign(activePost.value, post);
   }
@@ -1009,43 +1002,11 @@ async function confirmExecuteDelete() {
   } catch (err) {
     emit('toast', {
       title: '删除失败',
-      message: err.message || '网络或网关响应异常',
+      message: err.message || '网络异常，请稍后重试',
       type: 'ERROR',
     });
   } finally {
     isDeleting.value = false;
-  }
-}
-
-// Card Upvote Toggle
-function handleCardUpvote({ post, isUpvoted, count }) {
-  post.is_upvoted = isUpvoted;
-  post.upvotes = count;
-  post.upvote_count = count;
-
-  try {
-    const raw = localStorage.getItem('opchub_forum_upvotes');
-    let upvotes = raw ? JSON.parse(raw) : [];
-    const sid = String(post.id);
-    if (isUpvoted) {
-      if (!upvotes.includes(sid)) upvotes.push(sid);
-    } else {
-      upvotes = upvotes.filter((id) => id !== sid);
-    }
-    localStorage.setItem('opchub_forum_upvotes', JSON.stringify(upvotes));
-  } catch (e) {}
-
-  emit('toast', {
-    title: isUpvoted ? '已点赞灵感' : '已取消点赞',
-    message: isUpvoted ? `您为《${post.title}》投出了一票！` : '已更新您的投票状态',
-    type: 'SUCCESS',
-  });
-
-  if (post.id) {
-    dispatchGateway('forum.upvote', {
-      target_type: 'THREAD',
-      target_id: String(post.id),
-    }, { silent: true });
   }
 }
 
@@ -1065,34 +1026,18 @@ function handleOpenCreatePage() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-// New Post Created Callback (发布成功后，全页面居中展示该文章)
-function handleNewPostSuccess(newThread) {
+// New Post Created Callback (发布成功后，统一变换 + 互动润色，再全页面居中展示该文章)
+async function handleNewPostSuccess(newThread) {
   clientFeedCache.clear();
   prefetchBuffer.clear();
-  postsList.value.unshift(newThread);
-  activePost.value = newThread;
+  const transformed = transformThread(newThread);
+  // 本会话新建的帖子在热榜排序中置顶
+  transformed.is_new = true;
+  await enrichForumInteractions([transformed]);
+  postsList.value.unshift(transformed);
+  activePost.value = transformed;
   currentViewMode.value = 'detail';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function syncStoredInteractions(list) {
-  try {
-    const rawUpvotes = localStorage.getItem('opchub_forum_upvotes');
-    const upvotedIds = rawUpvotes ? JSON.parse(rawUpvotes) : [];
-    const rawBookmarks = localStorage.getItem('opchub_forum_bookmarks');
-    const bookmarks = rawBookmarks ? JSON.parse(rawBookmarks) : [];
-    const bookmarkedIds = bookmarks.map((b) => (typeof b === 'object' ? String(b.id) : String(b)));
-
-    list.forEach((p) => {
-      const sid = String(p.id);
-      if (upvotedIds.includes(sid)) {
-        p.is_upvoted = true;
-      }
-      if (bookmarkedIds.includes(sid)) {
-        p.is_bookmarked = true;
-      }
-    });
-  } catch (e) {}
 }
 
 function checkUrlForPost() {
@@ -1113,7 +1058,13 @@ function onWindowHashChange() {
 }
 
 watch(currentSort, () => {
-  fetchFeedStream(true);
+  if (isSemanticSearchActive.value && searchKeyword.value.trim()) {
+    // 搜索态下切换排序：重跑语义搜索（结果按相关度排序）
+    handleSemanticSearch();
+  } else {
+    isSemanticSearchActive.value = false;
+    fetchFeedStream(true);
+  }
 });
 
 watch(currentViewMode, (mode) => {
@@ -1129,9 +1080,6 @@ onMounted(async () => {
   if (currentViewMode.value === 'list') {
     document.body.classList.add('fixed-screen-feed');
   }
-  try {
-    localStorage.removeItem('opchub_forum_deleted_threads');
-  } catch (e) {}
   window.addEventListener('hashchange', onWindowHashChange);
   await fetchFeedStream(true);
   nextTick(() => {
@@ -1782,7 +1730,9 @@ onUnmounted(() => {
   border-radius: var(--radius-md, 14px);
   margin-bottom: 14px;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .category-tabs-scroll {
@@ -1974,6 +1924,35 @@ onUnmounted(() => {
 }
 
 .sort-pill.active {
+  background: var(--glass-surface-solid);
+  color: var(--text-primary);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  font-weight: 600;
+}
+
+.density-segmented {
+  display: flex;
+  gap: 3px;
+  background: var(--glass-surface-subtle);
+  padding: 3px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--glass-border-subtle);
+  flex-shrink: 0;
+}
+
+.density-pill {
+  padding: 4px 10px;
+  font-size: 11.5px;
+  border-radius: var(--radius-full);
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+
+.density-pill.active {
   background: var(--glass-surface-solid);
   color: var(--text-primary);
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);

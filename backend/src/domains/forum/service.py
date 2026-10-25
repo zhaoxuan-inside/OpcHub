@@ -1,4 +1,8 @@
-"""Forum service managing Zhihu-style threads/questions, answers/perspectives, nested comments, votes, and bookmarks."""
+"""Forum service managing Zhihu-style threads/questions, answers/perspectives, nested comments, and votes.
+
+收藏 (FAVORITE)、喜欢 (LOVE) 与评分 (RATING) 由统一互动域
+``src.domains.interactions.service`` 承载；本域只负责知乎式互斥赞同/反对投票体系。
+"""
 import uuid
 from datetime import datetime, timezone
 import time
@@ -17,8 +21,6 @@ from src.domains.forum.models import (
     CommentTreeNode,
     ThreadDetailResponse,
     VoteResponse,
-    UpvoteResponse,
-    BookmarkResponse,
 )
 from src.infrastructure.database.persistence import domain_persistence
 
@@ -58,11 +60,8 @@ class ForumService:
         # Key: comment_id -> ForumCommentResponse
         self._comments: Dict[str, ForumCommentResponse] = {}
         # Key: (user_id, target_type, target_id) -> "UPVOTE" | "DOWNVOTE"
+        # Single vote ledger; the UPVOTE subset is derivable by value lookup.
         self._votes: Dict[Tuple[str, str, str], str] = {}
-        # Key: (user_id, target_type, target_id) - backward compatibility upvote set
-        self._upvotes: Set[Tuple[str, str, str]] = set()
-        # Key: (user_id, thread_id) -> folder_name
-        self._bookmarks: Dict[Tuple[str, str], str] = {}
         # Key: (user_id, thread_id)
         self._follows: Set[Tuple[str, str]] = set()
         self._deleted_thread_ids: Set[str] = set()
@@ -155,8 +154,6 @@ class ForumService:
         self._answers.clear()
         self._comments.clear()
         self._votes.clear()
-        self._upvotes.clear()
-        self._bookmarks.clear()
         self._follows.clear()
         self._deleted_thread_ids.clear()
         self._deleted_answer_ids.clear()
@@ -221,7 +218,6 @@ class ForumService:
         th_dict = thread.model_dump()
         if user_id:
             th_dict["user_vote"] = self._votes.get((user_id, "THREAD", tid))
-            th_dict["is_bookmarked"] = (user_id, tid) in self._bookmarks
             th_dict["is_following"] = (user_id, tid) in self._follows
 
         # Gather answers for this thread
@@ -413,21 +409,36 @@ class ForumService:
         return True, msg
 
     def delete_answer(self, answer_id: str) -> bool:
+        """Delete an answer, its attached comments and all related votes."""
         aid = str(answer_id)
-        if aid in self._answers:
-            answer = self._answers.pop(aid)
-            self._deleted_answer_ids.add(aid)
-            tid = answer.thread_id
-            if tid in self._threads:
-                thread = self._threads[tid]
-                if thread.accepted_answer_id == aid:
-                    thread.accepted_answer_id = None
-                thread.answer_count = sum(1 for a in self._answers.values() if a.thread_id == tid and a.id not in self._deleted_answer_ids)
-                domain_persistence.write("forum.threads", tid, thread)
-            domain_persistence.delete("forum.answers", aid)
-            domain_persistence.write_raw("forum.tombstones", aid, {"id": aid, "type": "ANSWER"})
-            return True
-        return False
+        answer = self._answers.get(aid)
+        if answer is None:
+            return False
+        self._answers.pop(aid, None)
+        self._deleted_answer_ids.add(aid)
+        self._purge_votes("ANSWER", aid)
+
+        # Remove comments attached to this answer (and their votes)
+        attached_comments = [
+            c for c in self._comments.values()
+            if c.target_type == "ANSWER" and c.target_id == aid
+        ]
+        for c in attached_comments:
+            self._comments.pop(c.id, None)
+            self._purge_votes("COMMENT", c.id)
+            domain_persistence.delete("forum.comments", c.id)
+
+        tid = answer.thread_id
+        if tid in self._threads:
+            thread = self._threads[tid]
+            if thread.accepted_answer_id == aid:
+                thread.accepted_answer_id = None
+            thread.answer_count = sum(1 for a in self._answers.values() if a.thread_id == tid and a.id not in self._deleted_answer_ids)
+            thread.comment_count = max(0, thread.comment_count - len(attached_comments))
+            domain_persistence.write("forum.threads", tid, thread)
+        domain_persistence.delete("forum.answers", aid)
+        domain_persistence.write_raw("forum.tombstones", aid, {"id": aid, "type": "ANSWER"})
+        return True
 
     # -------------------------------------------------------------------------
     # Voting & Interactions (知乎式互斥赞同 / 反对)
@@ -469,7 +480,6 @@ class ForumService:
             # Cancel current vote
             if current_vote == "UPVOTE":
                 target_obj.upvote_count = max(0, target_obj.upvote_count - 1)
-                self._upvotes.discard(key)
             elif current_vote == "DOWNVOTE":
                 target_obj.downvote_count = max(0, target_obj.downvote_count - 1)
             self._votes.pop(key, None)
@@ -479,12 +489,10 @@ class ForumService:
                 target_obj.downvote_count = max(0, target_obj.downvote_count - 1)
             target_obj.upvote_count += 1
             self._votes[key] = "UPVOTE"
-            self._upvotes.add(key)
             new_vote = "UPVOTE"
         elif vtype == "DOWNVOTE":
             if current_vote == "UPVOTE":
                 target_obj.upvote_count = max(0, target_obj.upvote_count - 1)
-                self._upvotes.discard(key)
             target_obj.downvote_count += 1
             self._votes[key] = "DOWNVOTE"
             new_vote = "DOWNVOTE"
@@ -492,11 +500,10 @@ class ForumService:
         # Recalculate hotness
         self.recalculate_hot_score(ttype, tid)
 
-        # Persistence
+        # Persistence — single vote ledger (forum.votes carries the vote_type)
         vote_doc_id = f"{uid}_{ttype}_{tid}"
         if new_vote is None:
             domain_persistence.delete("forum.votes", vote_doc_id)
-            domain_persistence.delete("forum.upvotes", vote_doc_id)
         else:
             domain_persistence.write_raw("forum.votes", vote_doc_id, {
                 "user_id": uid,
@@ -505,15 +512,6 @@ class ForumService:
                 "vote_type": new_vote,
                 "created_at": utc_now_iso(),
             })
-            if new_vote == "UPVOTE":
-                domain_persistence.write_raw("forum.upvotes", vote_doc_id, {
-                    "user_id": uid,
-                    "target_type": ttype,
-                    "target_id": tid,
-                    "created_at": utc_now_iso(),
-                })
-            else:
-                domain_persistence.delete("forum.upvotes", vote_doc_id)
 
         if ttype == "THREAD":
             domain_persistence.write("forum.threads", tid, target_obj)
@@ -532,52 +530,6 @@ class ForumService:
             downvote_count=target_obj.downvote_count,
             target_type=ttype,
             target_id=tid,
-        )
-
-    def toggle_upvote(self, user_id: str, target_type: str, target_id: str) -> UpvoteResponse:
-        """Backward-compatible upvote toggle."""
-        res = self.execute_vote(user_id, target_type, target_id, "UPVOTE")
-        return UpvoteResponse(
-            is_upvoted=(res.user_vote == "UPVOTE"),
-            upvote_count=res.upvote_count,
-            target_type=target_type,
-            target_id=target_id,
-        )
-
-    def toggle_bookmark(self, user_id: str, thread_id: str, folder_name: str = "默认收藏夹") -> BookmarkResponse:
-        """Toggle bookmark on a thread."""
-        uid = str(user_id)
-        tid = str(thread_id)
-        self._ensure_seed_thread(tid)
-        if tid not in self._threads or tid in self._deleted_thread_ids:
-            raise KeyError(f"Forum thread with ID {thread_id} not found")
-
-        thread = self._threads[tid]
-        key = (uid, tid)
-        bookmark_doc_id = f"{uid}_{tid}"
-
-        if key in self._bookmarks:
-            self._bookmarks.pop(key, None)
-            thread.bookmark_count = max(0, thread.bookmark_count - 1)
-            is_bookmarked = False
-            domain_persistence.delete("forum.bookmarks", bookmark_doc_id)
-        else:
-            self._bookmarks[key] = folder_name
-            thread.bookmark_count += 1
-            is_bookmarked = True
-            domain_persistence.write_raw("forum.bookmarks", bookmark_doc_id, {
-                "user_id": uid,
-                "thread_id": tid,
-                "folder_name": folder_name,
-                "created_at": utc_now_iso(),
-            })
-
-        domain_persistence.write("forum.threads", tid, thread)
-        return BookmarkResponse(
-            is_bookmarked=is_bookmarked,
-            bookmark_count=thread.bookmark_count,
-            thread_id=tid,
-            folder_name=folder_name,
         )
 
     def toggle_follow(self, user_id: str, thread_id: str) -> Dict[str, Any]:
@@ -644,9 +596,12 @@ class ForumService:
         cursor: int = 0,
         limit: int = 10,
         sort_by: str = "latest",
-        user_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Fetch Zhihu-style streaming feed with hotness ranking and top answers preview."""
+        """Fetch Zhihu-style streaming feed with hotness ranking and top answers preview.
+
+        The returned payload is viewer-independent (safe for the shared feed cache);
+        per-user vote/follow annotation is applied afterwards by ``annotate_viewer_threads``.
+        """
         target_cat = str(category_code).upper()
         offset = max(0, int(cursor))
         size = max(1, min(int(limit), 50))
@@ -697,21 +652,9 @@ class ForumService:
                 if a.thread_id == t.id and a.id not in self._deleted_answer_ids
             ]
             ans_list.sort(key=lambda a: (a.is_accepted, a.upvote_count, a.created_at), reverse=True)
-            
-            # Decorate answer votes if user_id present
-            dec_answers = []
-            for a in ans_list[:2]:
-                ac = a.model_copy()
-                if user_id:
-                    ac.user_vote = self._votes.get((user_id, "ANSWER", a.id))
-                dec_answers.append(ac)
 
-            t_copy.top_answers = dec_answers
+            t_copy.top_answers = [a.model_copy() for a in ans_list[:2]]
             t_copy.answer_count = len(ans_list)
-            if user_id:
-                t_copy.user_vote = self._votes.get((user_id, "THREAD", t.id))
-                t_copy.is_bookmarked = (user_id, t.id) in self._bookmarks
-                t_copy.is_following = (user_id, t.id) in self._follows
             decorated_items.append(t_copy.model_dump())
 
         return {
@@ -796,7 +739,8 @@ class ForumService:
             target_type=target_type,
             target_id=target_id,
             author_id=payload.author_id,
-            author_name="独立创客",
+            author_name=payload.author_name or "独立创客",
+            author_title=payload.author_title,
             content=payload.content,
             parent_id=payload.parent_id,
             root_id=root_id,
@@ -857,6 +801,8 @@ class ForumService:
                 updated_at=c.updated_at,
                 children=[],
             )
+            if user_id:
+                node.user_vote = self._votes.get((user_id, "COMMENT", c.id))
             nodes[c.id] = node
 
         roots: List[CommentTreeNode] = []
@@ -868,6 +814,61 @@ class ForumService:
                 roots.append(node)
 
         return roots
+
+    def update_thread(
+        self,
+        thread_id: str,
+        title: str,
+        content: str,
+        category_code: Optional[str] = None,
+        editor_id: str = "",
+        is_admin: bool = False,
+    ) -> ForumThreadResponse:
+        """Edit title/content/category of a thread (author or ADMIN only)."""
+        tid = str(thread_id)
+        self._ensure_seed_thread(tid)
+        thread = self._threads.get(tid)
+        if not thread or tid in self._deleted_thread_ids:
+            raise KeyError(f"Forum thread with ID {thread_id} not found")
+        if not is_admin and (not editor_id or str(thread.author_id) != str(editor_id)):
+            raise PermissionError("只能编辑本人发布的讨论帖")
+
+        new_title = str(title or "").strip()
+        new_content = str(content or "").strip()
+        if len(new_title) < 5:
+            raise ValueError("Forum thread title must be at least 5 characters long")
+        if len(new_content) < 10:
+            raise ValueError("Forum thread content must be at least 10 characters long")
+
+        thread.title = new_title
+        thread.content = new_content
+        new_category = str(category_code or "").strip().upper()
+        if new_category and new_category != thread.category_code:
+            thread.category_code = new_category
+        thread.updated_at = utc_now_iso()
+
+        domain_persistence.write("forum.threads", tid, thread)
+        self.invalidate_feed_cache()
+        return thread
+
+    def annotate_viewer_threads(self, items: List[Dict[str, Any]], user_id: Optional[str]) -> None:
+        """Decorate feed thread dicts with the caller's vote/follow state.
+
+        Runs after the shared feed cache write so cached payloads stay viewer-independent.
+        """
+        if not user_id or not items:
+            return
+        uid = str(user_id)
+        for item in items:
+            tid = str(item.get("id") or "")
+            if not tid:
+                continue
+            item["user_vote"] = self._votes.get((uid, "THREAD", tid))
+            item["is_following"] = (uid, tid) in self._follows
+            for answer in (item.get("top_answers") or []):
+                aid = str(answer.get("id") or "")
+                if aid:
+                    answer["user_vote"] = self._votes.get((uid, "ANSWER", aid))
 
     def delete_thread(self, thread_id: str) -> bool:
         tid = str(thread_id)
@@ -892,20 +893,47 @@ class ForumService:
             return True
         return False
 
+    def _purge_votes(self, target_type: str, target_id: str) -> None:
+        """Remove every user's vote records for one target (used on answer/comment deletion)."""
+        tt = str(target_type).upper()
+        tid = str(target_id)
+        doomed = [key for key in self._votes if key[1] == tt and key[2] == tid]
+        for key in doomed:
+            self._votes.pop(key, None)
+            doc_id = f"{key[0]}_{tt}_{tid}"
+            domain_persistence.delete("forum.votes", doc_id)
+
     def delete_comment(self, comment_id: str) -> bool:
+        """Delete a comment together with its whole materialized-path subtree."""
         cid = str(comment_id)
-        if cid in self._comments:
-            comment = self._comments.pop(cid)
-            thread_id = comment.thread_id
-            domain_persistence.delete("forum.comments", comment_id)
-            if thread_id in self._threads:
-                self._threads[thread_id].comment_count = max(0, self._threads[thread_id].comment_count - 1)
-                domain_persistence.write("forum.threads", thread_id, self._threads[thread_id])
-            if comment.target_type == "ANSWER" and comment.target_id in self._answers:
-                self._answers[comment.target_id].comment_count = max(0, self._answers[comment.target_id].comment_count - 1)
-                domain_persistence.write("forum.answers", comment.target_id, self._answers[comment.target_id])
-            return True
-        return False
+        comment = self._comments.get(cid)
+        if comment is None:
+            return False
+
+        prefix = f"{comment.materialized_path}/"
+        to_delete = [
+            c for c in self._comments.values()
+            if c.id == cid or (c.materialized_path or "").startswith(prefix)
+        ]
+
+        thread_id = comment.thread_id
+        answer_decrements: Dict[str, int] = {}
+        for c in to_delete:
+            self._comments.pop(c.id, None)
+            self._purge_votes("COMMENT", c.id)
+            domain_persistence.delete("forum.comments", c.id)
+            if c.target_type == "ANSWER" and c.target_id in self._answers:
+                answer_decrements[c.target_id] = answer_decrements.get(c.target_id, 0) + 1
+
+        if thread_id in self._threads:
+            thread = self._threads[thread_id]
+            thread.comment_count = max(0, thread.comment_count - len(to_delete))
+            domain_persistence.write("forum.threads", thread_id, thread)
+        for aid, removed in answer_decrements.items():
+            answer = self._answers[aid]
+            answer.comment_count = max(0, answer.comment_count - removed)
+            domain_persistence.write("forum.answers", aid, answer)
+        return True
 
     # -------------------------------------------------------------------------
     # Hydration
@@ -965,27 +993,6 @@ class ForumService:
             vtype = r.get("vote_type")
             if uid and ttype and tid and vtype:
                 self._votes[(str(uid), str(ttype).upper(), str(tid))] = str(vtype).upper()
-                if str(vtype).upper() == "UPVOTE":
-                    self._upvotes.add((str(uid), str(ttype).upper(), str(tid)))
-        return len(rows)
-
-    def hydrate_upvotes(self, rows: List[Dict[str, Any]]) -> int:
-        for r in rows:
-            uid = r.get("user_id")
-            ttype = r.get("target_type")
-            tid = r.get("target_id")
-            if uid and ttype and tid:
-                self._upvotes.add((str(uid), str(ttype).upper(), str(tid)))
-                self._votes[(str(uid), str(ttype).upper(), str(tid))] = "UPVOTE"
-        return len(rows)
-
-    def hydrate_bookmarks(self, rows: List[Dict[str, Any]]) -> int:
-        for r in rows:
-            uid = r.get("user_id")
-            tid = r.get("thread_id")
-            folder = r.get("folder_name", "默认收藏夹")
-            if uid and tid:
-                self._bookmarks[(str(uid), str(tid))] = folder
         return len(rows)
 
 
@@ -997,5 +1004,3 @@ domain_persistence.register("forum.threads", forum_service.hydrate_threads)
 domain_persistence.register("forum.answers", forum_service.hydrate_answers)
 domain_persistence.register("forum.comments", forum_service.hydrate_comments)
 domain_persistence.register("forum.votes", forum_service.hydrate_votes)
-domain_persistence.register("forum.upvotes", forum_service.hydrate_upvotes)
-domain_persistence.register("forum.bookmarks", forum_service.hydrate_bookmarks)

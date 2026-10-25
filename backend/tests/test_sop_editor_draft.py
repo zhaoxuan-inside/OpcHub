@@ -154,10 +154,10 @@ def test_editor_frontend_is_a_text_editor_with_template_panel():
     """The drafting page must be an editor with a right-side template library."""
     source = SOP_DOC_PAGE.read_text(encoding="utf-8")
 
-    # 1. A real editable surface + title input.
-    assert "sop-doc-editor-textarea" in source
+    # 1. A real editable surface (rich-text editor) + title input.
+    assert "RichEditor" in source
     assert "sop-doc-title-input" in source
-    assert "v-model=\"draftContent\"" in source
+    assert 'v-model="draftContent"' in source
 
     # 2. Templates load into the editor rather than replacing the page.
     assert "applyTemplate" in source

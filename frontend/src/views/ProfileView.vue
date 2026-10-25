@@ -5,15 +5,54 @@
         创客商用档案与独立工作台
       </h1>
       <p style="font-size: 14px; color: var(--text-secondary);">
-        PostgreSQL 18 实体数据落盘、合规法定义务存证及创客身份标识
+        创客商用档案、资质合规存证与平台身份标识
       </p>
+    </div>
+
+    <!-- 画像头像更换面板 -->
+    <div v-if="avatarPickerOpen" class="glass-panel" style="padding: 22px; margin-bottom: 24px;">
+      <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 4px;">选择画像头像</h3>
+      <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px;">
+        从 20 种内置用户画像中选择你的平台形象；未选择时展示昵称首字头像。
+      </p>
+      <div class="avatar-picker-grid">
+        <button
+          v-for="p in PERSONA_AVATARS"
+          :key="p.id"
+          type="button"
+          class="avatar-picker-cell"
+          :class="{ active: p.id === avatarDraft }"
+          :title="p.label"
+          @click="avatarDraft = p.id"
+        >
+          <PersonaAvatar :id="p.id" :name="p.label" :size="46" />
+          <span class="avatar-picker-label">{{ p.label }}</span>
+        </button>
+      </div>
+      <div style="display: flex; gap: 10px; margin-top: 16px;">
+        <button
+          class="btn-liquid"
+          style="font-size: 12.5px; padding: 7px 18px;"
+          :disabled="avatarDraft === (profile?.avatar_id || '') || isSavingAvatar"
+          @click="saveAvatar"
+        >
+          {{ isSavingAvatar ? '保存中...' : '保存头像' }}
+        </button>
+        <button
+          class="btn-liquid-outline"
+          style="font-size: 12.5px; padding: 7px 18px;"
+          @click="closeAvatarPicker"
+        >
+          取消
+        </button>
+      </div>
     </div>
 
     <div v-if="profile" style="display: grid; grid-template-columns: 1fr 2fr; gap: 24px;">
       <!-- Identity Card -->
       <div class="glass-panel" style="padding: 24px; text-align: center;">
-        <div style="width: 72px; height: 72px; border-radius: 50%; background: var(--accent); margin: 0 auto 16px; display: flex; align-items: center; justify-content: center; font-size: 28px; font-weight: 800; color: #fff;">
-          {{ (profile.nickname || profile.email || 'M')[0].toUpperCase() }}
+        <div style="width: 72px; height: 72px; margin: 0 auto 16px;">
+          <PersonaAvatar :id="profile.avatar_id || ''" :name="profile.nickname || profile.email || 'M'" :size="72" />
         </div>
         <div style="font-size: 18px; font-weight: 700; margin-bottom: 4px;">
           {{ profile.nickname || '未设置昵称' }}
@@ -24,7 +63,16 @@
         <div style="display: inline-block; padding: 4px 12px; border-radius: 12px; background: var(--accent-glass); color: var(--accent); font-size: 12px; font-weight: 600;">
           {{ profile.tier_name || '标准创客' }} · {{ profile.account_type || 'MAKER' }}
         </div>
-        <div style="margin-top: 18px;">
+        <div style="margin-top: 14px;">
+          <button
+            class="btn-liquid-outline"
+            style="width: 100%; font-size: 12px;"
+            @click="openAvatarPicker"
+          >
+            更换画像头像
+          </button>
+        </div>
+        <div style="margin-top: 10px;">
           <button
             class="btn-liquid-outline"
             style="width: 100%; font-size: 12px; color: var(--status-danger); border-color: var(--status-danger-soft);"
@@ -35,10 +83,58 @@
         </div>
       </div>
 
+      <!-- Account Security (密码轮换：内置管理员首登强制改密后解锁高风险编排页) -->
+      <div class="glass-panel" style="padding: 24px;">
+        <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 6px;">账号安全 · 登录密码轮换</h3>
+        <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 14px;">
+          定期轮换登录密码；首次登录的管理员完成轮换后才能进入后端编排等高风险页面。
+        </p>
+        <div style="display: flex; flex-direction: column; gap: 10px; max-width: 360px;">
+          <input
+            v-model="pwdOld"
+            type="password"
+            class="glass-input"
+            style="font-size: 13px; padding: 8px 12px;"
+            placeholder="当前登录密码"
+            autocomplete="current-password"
+          />
+          <input
+            v-model="pwdNew"
+            type="password"
+            class="glass-input"
+            style="font-size: 13px; padding: 8px 12px;"
+            placeholder="新密码（至少 8 位，含字母与数字）"
+            autocomplete="new-password"
+          />
+          <input
+            v-model="pwdConfirm"
+            type="password"
+            class="glass-input"
+            style="font-size: 13px; padding: 8px 12px;"
+            placeholder="再次输入新密码"
+            autocomplete="new-password"
+          />
+          <p
+            v-if="pwdConfirm && pwdConfirm !== pwdNew"
+            style="font-size: 11px; color: var(--status-danger); margin: 0;"
+          >
+            两次输入的新密码不一致
+          </p>
+          <button
+            class="btn-liquid"
+            style="align-self: flex-start; font-size: 12.5px; padding: 7px 16px;"
+            :disabled="!pwdOld || pwdNew.length < 8 || pwdConfirm !== pwdNew || isChangingPwd"
+            @click="changePassword"
+          >
+            {{ isChangingPwd ? '提交中...' : '确认修改密码' }}
+          </button>
+        </div>
+      </div>
+
       <!-- Commercial Credentials -->
       <div class="glass-panel" style="padding: 24px;">
         <h3 style="font-size: 16px; font-weight: 700; margin-bottom: 18px; border-bottom: 1px solid var(--glass-border-subtle); padding-bottom: 10px;">
-          商业资质与合规存证 (PostgreSQL 18 ACID)
+          商业资质与合规存证
         </h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; font-size: 13px;">
           <div>
@@ -117,10 +213,10 @@
               </div>
             </div>
           </div>
-          <div>
+          <div v-if="profile?.agreement_version">
             <span style="color: var(--text-tertiary);">法定义务协议存证:</span>
             <div style="font-weight: 600; color: var(--status-success); margin-top: 2px;">
-              <OpcIcon name="check" :size="13" /> 已签署合规协议 (v1.2.0)
+              <OpcIcon name="check" :size="13" /> 已签署合规协议 ({{ profile.agreement_version }})
             </div>
           </div>
         </div>
@@ -183,8 +279,10 @@
 <script setup>
 import { ref, onMounted } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
+import PersonaAvatar from '@/components/PersonaAvatar.vue';
+import { PERSONA_AVATARS } from '@/components/personaAvatarCatalog';
 
-const emit = defineEmits(['toast', 'logout', 'navigate']);
+const emit = defineEmits(['toast', 'logout', 'navigate', 'session-updated']);
 
 const profile = ref(null);
 const isEditingTrack = ref(false);
@@ -273,6 +371,51 @@ function enableEditCustom() {
   editTrack.value = editCustomInput.value.trim();
 }
 
+const pwdOld = ref('');
+const pwdNew = ref('');
+const pwdConfirm = ref('');
+const isChangingPwd = ref(false);
+
+async function changePassword() {
+  const oldPwd = pwdOld.value;
+  const newPwd = pwdNew.value;
+  if (!oldPwd || newPwd.length < 8 || isChangingPwd.value) return;
+  if (pwdConfirm.value !== newPwd) {
+    emit('toast', { title: '修改未完成', message: '两次输入的新密码不一致，请重新核对。', type: 'ERROR' });
+    return;
+  }
+  isChangingPwd.value = true;
+  try {
+    const res = await dispatchGateway('auth.change_password', {
+      old_password: oldPwd,
+      new_password: newPwd,
+    });
+    if (res.ok) {
+      pwdOld.value = '';
+      pwdNew.value = '';
+      pwdConfirm.value = '';
+      // 服务端返回轮换后的新会话 Token（清除 must_change_password 标记），立即替换本地会话
+      if (res.data?.token) {
+        try {
+          localStorage.setItem('opchub_session_token', res.data.token);
+        } catch (e) {}
+      }
+      emit('toast', {
+        title: '密码已更新',
+        message: '登录密码轮换成功，会话已续期；请使用新密码完成后续登录。',
+        type: 'SUCCESS',
+      });
+      await loadProfile();
+    } else {
+      emit('toast', { title: '修改未完成', message: res.error || '请核对当前密码后重试。', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '修改异常', message: '账号服务暂时不可用，请稍后重试。', type: 'ERROR' });
+  } finally {
+    isChangingPwd.value = false;
+  }
+}
+
 async function saveProfileTrack() {
   trackSaveMsg.value = '';
   trackSaveError.value = false;
@@ -292,7 +435,7 @@ async function saveProfileTrack() {
       if (profile.value) {
         profile.value.industry_track = res.data.industry_track || targetTrack;
       }
-      trackSaveMsg.value = '业务赛道已成功更新并持久化落盘！';
+      trackSaveMsg.value = '业务赛道已更新成功！';
       setTimeout(() => {
         isEditingTrack.value = false;
         trackSaveMsg.value = '';
@@ -320,8 +463,94 @@ async function loadProfile() {
   }
 }
 
+// ---------------- 画像头像更换 ----------------
+const avatarPickerOpen = ref(false);
+const avatarDraft = ref('');
+const isSavingAvatar = ref(false);
+
+function openAvatarPicker() {
+  avatarDraft.value = profile.value?.avatar_id || '';
+  avatarPickerOpen.value = true;
+}
+
+function closeAvatarPicker() {
+  avatarPickerOpen.value = false;
+  avatarDraft.value = '';
+}
+
+async function saveAvatar() {
+  const nextId = avatarDraft.value || '';
+  if (isSavingAvatar.value || nextId === (profile.value?.avatar_id || '')) return;
+  isSavingAvatar.value = true;
+  try {
+    const res = await dispatchGateway('user.profile.update', { avatar_id: nextId });
+    if (res.ok && res.data) {
+      profile.value = res.data;
+      avatarPickerOpen.value = false;
+      avatarDraft.value = '';
+      // 刷新本地会话档案，导航栏等处的当前用户头像即时同步
+      try {
+        const s = await dispatchGateway('auth.session', {}, { silent: true });
+        if (s.ok && s.data) {
+          localStorage.setItem('opchub_user_session', JSON.stringify(s.data));
+          emit('session-updated', s.data);
+        }
+      } catch (e) {}
+      const picked = PERSONA_AVATARS.find((p) => p.id === nextId);
+      emit('toast', {
+        title: '头像已更新',
+        message: picked ? `画像头像已切换为「${picked.label}」。` : '画像头像已更新。',
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', { title: '保存未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '保存异常', message: '账号服务暂时不可用，请稍后重试。', type: 'ERROR' });
+  } finally {
+    isSavingAvatar.value = false;
+  }
+}
+
 onMounted(() => {
   loadProfile();
   loadMyInteractions();
 });
 </script>
+
+<style scoped>
+.avatar-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+}
+.avatar-picker-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px 10px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.avatar-picker-cell:hover {
+  background: var(--accent-glass, rgba(94, 114, 235, 0.08));
+}
+.avatar-picker-cell.active {
+  border-color: var(--accent, #5e72eb);
+  background: var(--accent-glass, rgba(94, 114, 235, 0.10));
+}
+.avatar-picker-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  text-align: center;
+}
+.avatar-picker-cell.active .avatar-picker-label {
+  color: var(--accent, #5e72eb);
+  font-weight: 600;
+}
+</style>

@@ -330,7 +330,7 @@
           :disabled="submitting"
           @click="handleSubmit"
         >
-          {{ submitting ? '商用入驻审核与事务落库中...' : '完成商用入驻注册' }}
+          {{ submitting ? '商用入驻审核中...' : '完成商用入驻注册' }}
         </button>
       </div>
 

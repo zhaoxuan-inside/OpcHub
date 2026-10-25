@@ -135,7 +135,7 @@ def test_all_domain_services_register_their_document_families():
         importlib.import_module(f"src.domains.{module}.service")
 
     expected = {
-        "forum.threads", "forum.comments", "forum.upvotes", "forum.bookmarks",
+        "forum.threads", "forum.comments", "forum.votes",
         "products.items", "policies.items", "demands.items", "demands.bids",
         "perks.items", "perks.claims", "sop.templates", "sop.documents",
         "moderation.items", "orchestration.dag_configs", "orchestration.layouts",
@@ -162,17 +162,19 @@ async def test_hydrator_rebuilds_service_indexes(monkeypatch):
             "updated_at": "2026-01-01T00:00:00+00:00",
         }
     }
-    fake.store["forum.upvotes"] = {
-        "u|THREAD|t1": {"user_id": "u", "target_type": "THREAD", "target_id": "t1"}
+    fake.store["forum.votes"] = {
+        "u|THREAD|t1": {
+            "user_id": "u", "target_type": "THREAD", "target_id": "t1", "vote_type": "UPVOTE",
+        }
     }
 
     product_service._products.clear()
-    forum_service._upvotes.clear()
+    forum_service._votes.clear()
     await persistence_mod.domain_persistence.initialize()
 
     assert product_service._products["p1"].title == "重建产品"
     assert product_service._products["p1"].upvote_count == 3
-    assert ("u", "THREAD", "t1") in forum_service._upvotes
+    assert forum_service._votes[("u", "THREAD", "t1")] == "UPVOTE"
 
     product_service._products.clear()
-    forum_service._upvotes.clear()
+    forum_service._votes.clear()

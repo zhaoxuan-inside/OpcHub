@@ -77,7 +77,7 @@ async def _clean_state(live_db):
 
 @pytest.mark.asyncio
 async def test_forum_state_survives_restart(live_db):
-    """Threads, comments, upvotes and bookmarks round-trip through PostgreSQL."""
+    """Threads, comments and votes round-trip through PostgreSQL."""
     from src.domains.forum.models import ForumThreadCreate, ForumCommentCreate
     from src.domains.forum.service import forum_service
     from src.infrastructure.database.persistence import domain_persistence
@@ -91,8 +91,7 @@ async def test_forum_state_survives_restart(live_db):
     comment = forum_service.create_comment(thread.id, ForumCommentCreate(
         author_id="it_user", content="一级评论内容",
     ))
-    forum_service.toggle_upvote("it_user", "THREAD", thread.id)
-    forum_service.toggle_bookmark("it_user", thread.id, "默认收藏夹")
+    forum_service.execute_vote("it_user", "THREAD", thread.id, "UPVOTE")
     await domain_persistence.flush()
 
     # Simulate a process restart: wipe memory, rebuild from PostgreSQL
@@ -104,10 +103,8 @@ async def test_forum_state_survives_restart(live_db):
     assert restored.title == "持久化线程"
     assert restored.comment_count == 1
     assert restored.upvote_count == 1
-    assert restored.bookmark_count == 1
     assert forum_service._comments[comment.id].content == "一级评论内容"
-    assert ("it_user", "THREAD", thread.id) in forum_service._upvotes
-    assert forum_service._bookmarks[("it_user", thread.id)] == "默认收藏夹"
+    assert forum_service._votes[("it_user", "THREAD", thread.id)] == "UPVOTE"
 
     # Deletion is durable too
     forum_service.delete_thread(thread.id)

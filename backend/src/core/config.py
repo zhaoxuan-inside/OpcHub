@@ -128,6 +128,10 @@ class Settings(BaseSettings):
     audit_secret: str = os.getenv("OPCHUB_AUDIT_SECRET", "")
     audit_archive_batch_size: int = int(os.getenv("OPCHUB_AUDIT_ARCHIVE_BATCH_SIZE", "500"))
 
+    # Founding member campaign (创始创客活动): the first N registered makers get a 1-year VIP gift
+    founding_member_quota: int = int(os.getenv("OPCHUB_FOUNDING_MEMBER_QUOTA", "200"))
+    founding_member_vip_days: int = int(os.getenv("OPCHUB_FOUNDING_MEMBER_VIP_DAYS", "365"))
+
     # Ecosystem Perks Announcement Board domain config (生态特权 优惠公告板)
     perk_categories: List[str] = [
         c.get("key") for c in _PERKS_SECTION.get("categories", [])

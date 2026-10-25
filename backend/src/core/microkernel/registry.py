@@ -596,19 +596,28 @@ class AtomicRegistry:
             from src.domains.demands.service import demand_service
             from src.domains.policies.service import policy_service
             from src.domains.user.service import user_service
-            
+            from src.domains.perks.service import perk_service
+            from src.domains.forum.service import forum_service
+            from src.domains.orchestration.service import orchestration_service
+
             prods = product_service.list_products()
             demands = demand_service.list_demands()
             policies = policy_service.list_policies()
+            threads = forum_service.list_threads()
+            published_perks = perk_service.list_perks()
             real_users_count = len([u for u in user_service._users_by_uid.values() if u.get("role") != "GUEST"])
-            
+            active_dags_count = len([
+                cfg for cfg in orchestration_service.list_dag_configs() if cfg.status == "ACTIVE"
+            ])
+
             return {
                 "active_makers_count": real_users_count,
-                "active_dags_count": 0,
+                "active_dags_count": active_dags_count,
                 "matched_policies_count": len(policies),
                 "demands_orders_count": len(demands),
-                "perks_saved_cny": 0.0,
+                "perks_saved_cny": float(sum(float(p.value_cny or 0) for p in published_perks)),
                 "products_count": len(prods),
+                "forum_threads_count": len(threads),
             }
         self.register("home.metrics.collector", home_metrics_collector, domain="home", description="首页全域宏观核心指标聚合算子")
 
@@ -616,7 +625,9 @@ class AtomicRegistry:
             """极简算子：仅负责拉取论坛条数并委托 sitemap 构造器"""
             from src.domains.forum.service import forum_service
             from src.domains.sitemap_builder import build_sitemap_quick_links
-            threads_count = len(forum_service.list_threads())
+            threads_count = inputs.get("forum_threads_count")
+            if threads_count is None:
+                threads_count = len(forum_service.list_threads())
             quick_links = build_sitemap_quick_links(
                 threads_count=threads_count,
                 products_count=inputs.get("products_count", 0),
@@ -635,6 +646,8 @@ class AtomicRegistry:
                 "matched_policies_count": inputs.get("matched_policies_count", 0),
                 "demands_orders_count": inputs.get("demands_orders_count", 0),
                 "perks_saved_cny": inputs.get("perks_saved_cny", 0.0),
+                "products_count": inputs.get("products_count", 0),
+                "forum_threads_count": inputs.get("forum_threads_count", 0),
                 "quick_links": inputs.get("quick_links", []),
                 "server_time": datetime.now(timezone.utc).isoformat(),
                 "orchestrated_by": "OPC_HOME_OVERVIEW_PIPELINE",
@@ -867,6 +880,145 @@ class AtomicRegistry:
             }
         self.register("forum.vote.persist", forum_vote_persist, domain="forum", description="头脑风暴知乎式互斥赞同与反对持久化算子")
 
+        # Forum Thread Edit Operators (帖子编辑：作者或管理员)
+        async def forum_thread_update_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            thread_id = str(inputs.get("thread_id") or "").strip()
+            title = str(inputs.get("title") or "").strip()
+            content = str(inputs.get("content") or "").strip()
+            if not thread_id:
+                raise ValueError("thread_id is required to update a forum thread")
+            if len(title) < 5:
+                raise ValueError("Forum thread title must be at least 5 characters long")
+            if len(content) < 10:
+                raise ValueError("Forum thread content must be at least 10 characters long")
+
+            from src.domains.forum.service import forum_service
+            thread = forum_service.get_thread(thread_id, record_view=False)
+
+            ctx = context or {}
+            editor_id = inputs.get("editor_id") or ctx.get("user_id") or ""
+            if not editor_id:
+                raise ValueError("Authenticated user is required to update a forum thread")
+            is_admin = str(ctx.get("user_role") or "").upper() == "ADMIN"
+            if not is_admin and str(thread.author_id) != str(editor_id):
+                raise PermissionError("只能编辑本人发布的讨论帖")
+
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+            await prescreen_and_record(
+                f"{title} {content}",
+                field_name="forum thread update",
+                user_id=editor_id,
+                scene="头脑风暴",
+                title=title,
+                target_type="FORUM_THREAD",
+                target_id=thread_id,
+            )
+            return {
+                "guard_passed": True,
+                "thread_id": thread_id,
+                "title": title,
+                "content": content,
+                "category_code": str(inputs.get("category_code") or thread.category_code or "").upper(),
+                "editor_id": editor_id,
+                "is_admin": is_admin,
+            }
+        self.register("forum.thread.update_guard", forum_thread_update_guard, domain="forum", description="头脑风暴帖子编辑准入校验、归属鉴权与敏感词审查门禁")
+
+        async def forum_thread_update_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            updated = forum_service.update_thread(
+                thread_id=inputs["thread_id"],
+                title=inputs["title"],
+                content=inputs["content"],
+                category_code=inputs.get("category_code"),
+                editor_id=inputs.get("editor_id", ""),
+                is_admin=bool(inputs.get("is_admin", False)),
+            )
+            return {
+                "thread_id": updated.id,
+                "updated_thread": updated.model_dump(),
+                "status": "UPDATED",
+            }
+        self.register("forum.thread.update_persist", forum_thread_update_persist, domain="forum", description="头脑风暴帖子编辑持久化算子")
+
+        # Forum Answer Delete Operators (观点回答删除：回答作者或管理员)
+        async def forum_answer_delete_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            answer_id = str(inputs.get("answer_id") or "").strip()
+            if not answer_id:
+                raise ValueError("answer_id is required to delete a forum answer")
+
+            from src.domains.forum.service import forum_service
+            answer = forum_service.get_answer(answer_id)
+
+            ctx = context or {}
+            operator_id = inputs.get("operator_user_id") or ctx.get("user_id") or ""
+            is_admin = str(ctx.get("user_role") or "").upper() == "ADMIN"
+            if not operator_id:
+                raise ValueError("Authenticated user is required to delete a forum answer")
+            if not is_admin and str(answer.author_id) != str(operator_id):
+                raise PermissionError("只能删除本人发表的观点回答")
+
+            thread = forum_service.get_thread(answer.thread_id, record_view=False)
+            return {
+                "guard_passed": True,
+                "answer_id": answer_id,
+                "thread_id": answer.thread_id,
+                "category_code": thread.category_code,
+                "operator_user_id": operator_id,
+            }
+        self.register("forum.answer.delete_guard", forum_answer_delete_guard, domain="forum", description="头脑风暴观点回答删除鉴权门禁")
+
+        async def forum_answer_delete_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            deleted = forum_service.delete_answer(inputs["answer_id"])
+            if not deleted:
+                raise KeyError(f"Forum answer with ID {inputs['answer_id']} not found")
+            return {
+                "answer_deleted": True,
+                "answer_id": inputs["answer_id"],
+                "thread_id": inputs.get("thread_id", ""),
+            }
+        self.register("forum.answer.delete_persist", forum_answer_delete_persist, domain="forum", description="头脑风暴观点回答级联删除算子（含其评论与投票）")
+
+        # Forum Comment Delete Operators (评论删除：评论作者或管理员)
+        async def forum_comment_delete_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            comment_id = str(inputs.get("comment_id") or "").strip()
+            if not comment_id:
+                raise ValueError("comment_id is required to delete a forum comment")
+
+            from src.domains.forum.service import forum_service
+            comment = forum_service._comments.get(comment_id)
+            if comment is None:
+                raise KeyError(f"Forum comment with ID {comment_id} not found")
+
+            ctx = context or {}
+            operator_id = inputs.get("operator_user_id") or ctx.get("user_id") or ""
+            is_admin = str(ctx.get("user_role") or "").upper() == "ADMIN"
+            if not operator_id:
+                raise ValueError("Authenticated user is required to delete a forum comment")
+            if not is_admin and str(comment.author_id) != str(operator_id):
+                raise PermissionError("只能删除本人发表的评论")
+
+            return {
+                "guard_passed": True,
+                "comment_id": comment_id,
+                "thread_id": comment.thread_id,
+                "operator_user_id": operator_id,
+            }
+        self.register("forum.comment.delete_guard", forum_comment_delete_guard, domain="forum", description="头脑风暴评论删除鉴权门禁")
+
+        async def forum_comment_delete_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            from src.domains.forum.service import forum_service
+            deleted = forum_service.delete_comment(inputs["comment_id"])
+            if not deleted:
+                raise KeyError(f"Forum comment with ID {inputs['comment_id']} not found")
+            return {
+                "comment_deleted": True,
+                "comment_id": inputs["comment_id"],
+                "thread_id": inputs.get("thread_id", ""),
+            }
+        self.register("forum.comment.delete_persist", forum_comment_delete_persist, domain="forum", description="头脑风暴评论级联删除算子（含物化路径子评论与投票）")
+
         async def forum_hot_score_recalculate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.forum.service import forum_service
             ttype = inputs.get("target_type", "THREAD")
@@ -896,7 +1048,6 @@ class AtomicRegistry:
             )
             return res
         self.register("forum.comment.validate_guard", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
-        self.register("validate_create_comment", validate_create_comment, domain="forum", description="头脑风暴评论准入校验与物化层级校验门禁")
 
         async def forum_comment_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.forum.service import forum_service
@@ -904,6 +1055,8 @@ class AtomicRegistry:
             thread_id = inputs.get("thread_id", "")
             payload = ForumCommentCreate(
                 author_id=inputs.get("author_id", ""),
+                author_name=inputs.get("author_name"),
+                author_title=inputs.get("author_title"),
                 content=inputs.get("content", ""),
                 target_type=inputs.get("target_type", "ANSWER"),
                 target_id=inputs.get("target_id"),
@@ -965,7 +1118,7 @@ class AtomicRegistry:
             except (ValueError, TypeError):
                 limit_val = 10
             sort_by = str(inputs.get("sort_by") or "latest").lower()
-            if sort_by not in ("latest", "hot", "replies"):
+            if sort_by not in ("latest", "hot", "replies", "unanswered", "featured"):
                 sort_by = "latest"
             user_id = inputs.get("user_id") or (context or {}).get("user_id") or ""
             return {
@@ -1070,6 +1223,24 @@ class AtomicRegistry:
                 "feed_result": feed_result,
             }
         self.register("forum.feed.cache_write", forum_feed_cache_write, domain="forum", description="头脑风暴缓存回写与推测式下一批预热算子")
+
+        async def forum_feed_viewer_annotate(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """观察者标注算子：在共享缓存写入之后，为本次调用者标注投票/关注状态。
+
+            缓存命中时 feed_result 内部仍与缓存对象共享引用，必须深拷贝后再标注，
+            避免观察者状态污染共享缓存。
+            """
+            import copy
+            feed_result = copy.deepcopy(inputs.get("feed_result") or inputs.get("stream_payload") or {})
+            user_id = inputs.get("user_id") or (context or {}).get("user_id") or ""
+            if user_id:
+                from src.domains.forum.service import forum_service
+                forum_service.annotate_viewer_threads(feed_result.get("items") or [], user_id)
+            return {
+                "feed_result": feed_result,
+                "viewer_annotated": bool(user_id),
+            }
+        self.register("forum.feed.viewer_annotate", forum_feed_viewer_annotate, domain="forum", description="头脑风暴流式Feed观察者投票与关注状态标注算子")
 
         async def forum_cache_invalidate_operator(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             from src.domains.forum.service import forum_service
@@ -1746,6 +1917,39 @@ class AtomicRegistry:
                 "simulate_downstream_failure": inputs.get("simulate_downstream_failure", False),
             }
         self.register("orchestration.operators.collect", orchestration_operators_collect, domain="orchestration", description="全域微内核原子算子清单聚合算子")
+
+        async def orchestration_catalog_guard(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """目录写操作守卫：动作合法性 + 操作者身份（锁校验在具体服务方法内）。"""
+            from src.domains.orchestration.catalog import CATALOG_ACTIONS
+
+            action = str(inputs.get("action") or "").strip()
+            if action not in CATALOG_ACTIONS:
+                raise ValueError(f"未知的目录操作动作：{action or '（空）'}")
+            if not (context or {}).get("user_id") and not (inputs.get("payload") or {}).get("actor_id"):
+                raise PermissionError("UNAUTHORIZED:目录变更需要登录后的编排权限")
+            return {
+                "guard_passed": True,
+                "action": action,
+                "payload": inputs.get("payload") or {},
+            }
+        self.register("orchestration.catalog.guard", orchestration_catalog_guard, domain="orchestration", description="编排目录写操作守卫算子（动作与身份校验）")
+
+        async def orchestration_catalog_persist(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            """目录写操作持久化：分发到 CatalogService 的对应变更方法（含排他锁校验）。"""
+            from src.domains.orchestration.catalog import dispatch_catalog_action
+
+            action = str(inputs.get("action") or "")
+            result = dispatch_catalog_action(action, inputs.get("payload") or {}, context or {})
+            return {"catalog_result": result, "action": action}
+        self.register("orchestration.catalog.persist", orchestration_catalog_persist, domain="orchestration", description="编排目录三层资产变更持久化算子")
+
+        async def orchestration_catalog_telemetry_incr(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+            return {
+                "telemetry_recorded": True,
+                "metric": f"orchestration.catalog.{inputs.get('action', 'unknown')}",
+                "increment": 1,
+            }
+        self.register("orchestration.catalog.telemetry.incr", orchestration_catalog_telemetry_incr, domain="orchestration", description="编排目录变更度量打点算子")
 
         # ==================================================================
         # Domain 13: Unified Content Publication (统一创建发布算子)

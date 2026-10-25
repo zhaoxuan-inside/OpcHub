@@ -143,7 +143,20 @@ async def test_home_overview_api():
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         res = await _gw(ac, "home.overview", {})
         body = res.json()
-        assert body["code"] == 404
+        assert body["code"] == 200
+        data = body["data"]
+        assert data["orchestrated_by"] == "OPC_HOME_OVERVIEW_PIPELINE"
+        for field in (
+            "active_makers_count",
+            "matched_policies_count",
+            "demands_orders_count",
+            "perks_saved_cny",
+            "products_count",
+            "forum_threads_count",
+        ):
+            assert field in data
+            assert data[field] >= 0
+        assert len(data.get("quick_links", [])) >= 7
 
 
 @pytest.mark.asyncio
@@ -207,9 +220,12 @@ async def test_products_lifecycle():
         created = await _data(ac, "products.publish", new_prod)
         pid = created["id"]
 
-        # 3. Upvote product
-        upvoted = await _data(ac, "products.upvote", {"product_id": pid})
-        assert upvoted["upvote_count"] == 1
+        # 3. Like product via unified interactions (single ledger)
+        liked = await _data(ac, "content.interaction.toggle", {
+            "user_id": "usr_test_persistence_01", "target_type": "PRODUCT",
+            "target_id": pid, "kind": "LIKE",
+        })
+        assert liked["active"] is True
 
 
 @pytest.mark.asyncio

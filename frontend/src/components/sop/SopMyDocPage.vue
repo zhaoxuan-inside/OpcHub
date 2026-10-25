@@ -33,6 +33,19 @@
       </div>
 
       <div class="sop-doc-header-actions">
+        <button
+          v-if="canEdit"
+          type="button"
+          class="btn-liquid-outline sop-doc-action"
+          @click="$emit('edit', doc)"
+          title="在文本编辑器中继续修改这份文书"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+          </svg>
+          <span>编辑</span>
+        </button>
         <button type="button" class="btn-liquid-outline sop-doc-action danger" @click="$emit('delete', doc)" title="删除这份文书">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <polyline points="3 6 5 6 21 6"></polyline>
@@ -74,7 +87,10 @@ const props = defineProps({
   templateNameOf: { type: Function, default: null },
 });
 
-defineEmits(['back', 'delete']);
+defineEmits(['back', 'delete', 'edit']);
+
+/** Only private drafts that are not already in review/published can be edited. */
+const canEdit = computed(() => ['READY', 'REJECTED'].includes(props.doc?.status || 'READY'));
 
 const renderedBody = computed(() => renderMarkdown(props.doc?.rendered_content || ''));
 

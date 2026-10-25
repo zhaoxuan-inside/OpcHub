@@ -211,15 +211,6 @@ class ProductService:
     def get_product(self, product_id: str) -> Optional[ProductResponse]:
         return self._products.get(product_id)
 
-    def upvote_product(self, product_id: str) -> ProductResponse:
-        if product_id not in self._products:
-            raise KeyError(f"Product {product_id} not found")
-        prod = self._products[product_id]
-        prod.upvote_count += 1
-        domain_persistence.write("products.items", product_id, prod)
-        self.invalidate_cache()
-        return prod
-
     def delete_product(self, product_id: str) -> bool:
         """Physically delete product for Saga reverse compensation."""
         if product_id in self._products:

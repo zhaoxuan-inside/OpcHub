@@ -192,7 +192,7 @@
                     :rating-avg="item.rating_avg ?? 0"
                     :rating-count="item.rating_count ?? 0"
                     :my-rating="item.viewer?.rating ?? 0"
-                    :liked="item.viewer ? item.viewer.liked : isUpvoted(item.id)"
+                    :liked="item.viewer ? item.viewer.liked : false"
                     :favorited="item.viewer?.favorited ?? false"
                     :loved="item.viewer?.loved ?? false"
                     :commented="item.viewer?.commented ?? false"
@@ -309,7 +309,7 @@
                   :rating-avg="selectedProduct.rating_avg ?? 0"
                   :rating-count="selectedProduct.rating_count ?? 0"
                   :my-rating="selectedProduct.viewer?.rating ?? 0"
-                  :liked="selectedProduct.viewer ? selectedProduct.viewer.liked : isUpvoted(selectedProduct.id)"
+                  :liked="selectedProduct.viewer ? selectedProduct.viewer.liked : false"
                   :favorited="selectedProduct.viewer?.favorited ?? false"
                   :loved="selectedProduct.viewer?.loved ?? false"
                   :commented="selectedProduct.viewer?.commented ?? false"
@@ -351,7 +351,7 @@
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">当前版本</span>
-                      <span class="spec-value mono-val">{{ selectedProduct.version || 'v1.0.0' }}</span>
+                      <span class="spec-value mono-val">{{ selectedProduct.version }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">类别属性</span>
@@ -366,8 +366,8 @@
                       <span class="spec-value mono-val">{{ formatDate(selectedProduct.created_at) }}</span>
                     </div>
                     <div class="spec-item" style="grid-column: span 2;">
-                      <span class="spec-label">数据与持久化</span>
-                      <span class="spec-value spec-success">PostgreSQL 库表持久存储</span>
+                      <span class="spec-label">商用交付保障</span>
+                      <span class="spec-value spec-success">官网直达 · 平台审核上架</span>
                     </div>
                   </div>
                 </div>
@@ -448,7 +448,7 @@
                 <span class="hot-badge-fire"><OpcIcon name="flame" :size="14" /></span>
                 <h4 class="sidebar-title">今日作品打榜</h4>
               </div>
-              <span class="hot-subtitle">实时更新</span>
+              <span class="hot-subtitle">打榜排行</span>
             </div>
 
             <div class="hot-ranking-list">
@@ -462,7 +462,7 @@
                 <div class="hot-item-content">
                   <h5 class="hot-item-title">{{ item.title }}</h5>
                   <div class="hot-item-meta">
-                    <span><OpcIcon name="flame" :size="12" /> {{ (item.upvote_count || item.upvotes || 0) * 3 + 42 }} 热度</span>
+                    <span><OpcIcon name="flame" :size="12" /> {{ item.upvote_count || item.upvotes || 0 }} 赞</span>
                     <span class="dot-sep">·</span>
                     <span>{{ item.category }}</span>
                   </div>
@@ -479,8 +479,6 @@
             </p>
             <div class="guidelines-footer">
               <span>OpcHub 商业作品协议 v1.0</span>
-              <span class="dot-sep">·</span>
-              <span class="link-span" @click="handleOpenPublish">申请上架</span>
             </div>
           </div>
 
@@ -550,7 +548,6 @@ const renderedProductDescription = computed(() =>
   selectedProduct.value ? renderMarkdown(selectedProduct.value.description || '') : ''
 );
 const showPublishPage = ref(false);
-const upvotedIds = ref(new Set());
 const sentinelRef = ref(null);
 let observer = null;
 
@@ -906,42 +903,6 @@ function setupIntersectionObserver() {
   }
 }
 
-// Upvote Handler
-async function handleUpvote(item) {
-  if (upvotedIds.value.has(item.id)) {
-    emit('toast', { title: '已打榜', message: `您已经为《${item.title}》投过打榜票了！`, type: 'INFO' });
-    return;
-  }
-  try {
-    const res = await dispatchGateway('products.upvote', { product_id: item.id });
-    if (res.ok) {
-      item.upvote_count = (item.upvote_count || item.upvotes || 0) + 1;
-      item.upvotes = item.upvote_count;
-      upvotedIds.value.add(item.id);
-      saveUpvotedIds();
-      invalidateClientCache();
-      emit('toast', { title: '打榜成功', message: `已成功为《${item.title}》投出宝贵一票！`, type: 'SUCCESS' });
-    } else {
-      item.upvote_count = (item.upvote_count || 0) + 1;
-      item.upvotes = item.upvote_count;
-      upvotedIds.value.add(item.id);
-      saveUpvotedIds();
-      invalidateClientCache();
-      emit('toast', { title: '打榜已记录', message: `感谢支持创客作品《${item.title}》！`, type: 'SUCCESS' });
-    }
-  } catch (e) {
-    item.upvote_count = (item.upvote_count || 0) + 1;
-    item.upvotes = item.upvote_count;
-    upvotedIds.value.add(item.id);
-    saveUpvotedIds();
-    emit('toast', { title: '打榜已记录', message: `已为《${item.title}》累计打榜！`, type: 'SUCCESS' });
-  }
-}
-
-function isUpvoted(id) {
-  return upvotedIds.value.has(id);
-}
-
 function handleInteractionChanged(item, payload) {
   applyBarChange(item, payload);
   if (item) {
@@ -950,25 +911,6 @@ function handleInteractionChanged(item, payload) {
   }
 }
 
-function saveUpvotedIds() {
-  try {
-    localStorage.setItem('opchub_product_upvotes', JSON.stringify([...upvotedIds.value]));
-  } catch (e) {}
-}
-
-function loadUpvotedIds() {
-  try {
-    const raw = localStorage.getItem('opchub_product_upvotes');
-    if (raw) {
-      const list = JSON.parse(raw);
-      if (Array.isArray(list)) {
-        upvotedIds.value = new Set(list);
-      }
-    }
-  } catch (e) {}
-}
-
-// Modal controls
 function openProductDetail(item) {
   selectedProduct.value = item;
 }
@@ -1016,8 +958,6 @@ async function submitPublishProduct() {
       official_url: publishForm.official_url ? publishForm.official_url.trim() : null,
       download_url: publishForm.download_url ? publishForm.download_url.trim() : null,
       demo_url: publishForm.demo_url ? publishForm.demo_url.trim() : null,
-      author_id: currentUserSession.value?.uid || 'usr_maker',
-      author_name: currentUserSession.value?.nickname || currentUserSession.value?.username || '@独立创客',
     };
 
     const res = await dispatchGateway('products.publish', payload);
@@ -1043,14 +983,14 @@ async function submitPublishProduct() {
     } else {
       emit('toast', {
         title: '发布未完成',
-        message: res.raw?.message || '发布流水线校验未通过，请检查所填字段',
+        message: res.raw?.message || '发布校验未通过，请检查所填字段',
         type: 'ERROR',
       });
     }
   } catch (e) {
     emit('toast', {
       title: '发布异常',
-      message: '网关通信失败，请检查后端运行状态。',
+      message: '服务暂时不可用，请稍后重试。',
       type: 'ERROR',
     });
   } finally {
@@ -1153,8 +1093,7 @@ function handleMouseMove(e) {
 
 onMounted(() => {
   document.body.classList.add('fixed-screen-feed');
-  loadUpvotedIds();
-  fetchProductsPage(1, false);
+    fetchProductsPage(1, false);
   nextTick(() => {
     setupIntersectionObserver();
   });
@@ -1217,6 +1156,14 @@ onUnmounted(() => {
 .feed-filter-bar {
   flex-shrink: 0;
   margin-bottom: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
 }
 
 .semantic-search-banner {

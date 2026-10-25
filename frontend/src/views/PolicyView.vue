@@ -148,10 +148,10 @@
                         {{ formatCategoryLabel(item.category) }}
                       </span>
                       <span class="badge-level" :class="getLevelBadgeClass(item.policy_level)">
-                        {{ item.policy_level || '国家级' }}
+                        {{ item.policy_level }}
                       </span>
                       <span class="badge-region">
-                        <OpcIcon name="pin" :size="12" /> {{ item.region || '全国统一' }}
+                        <OpcIcon name="pin" :size="12" /> {{ item.region }}
                       </span>
                       <OfficialBadge :visible="item.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                     </div>
@@ -169,7 +169,7 @@
                     <OpcIcon name="coin" :size="12" /> {{ formatSubsidy(item.subsidy_amount_max) }}
                   </span>
                   <span class="highlight-chip chip-deadline">
-                    <OpcIcon name="calendar" :size="12" /> {{ item.deadline || '常年开放申报' }}
+                    <OpcIcon name="calendar" :size="12" /> {{ item.deadline }}
                   </span>
                 </div>
 
@@ -180,7 +180,7 @@
                       <OpcIcon name="landmark" :size="18" />
                     </div>
                     <div class="issuer-text">
-                      <span class="issuer-name">{{ item.region || '全国统一' }}</span>
+                      <span class="issuer-name">{{ item.region }}</span>
                       <span class="issuer-level-tag">{{ item.policy_level || '政府扶持' }}</span>
                     </div>
                   </div>
@@ -262,14 +262,14 @@
                 <div class="detail-title-block">
                   <div class="detail-title-row">
                     <h2 class="detail-title">{{ selectedPolicy.title }}</h2>
-                    <span class="mono-tag version-pill">{{ selectedPolicy.code || 'POL-2026' }}</span>
+                    <span class="mono-tag version-pill">{{ selectedPolicy.code }}</span>
                     <OfficialBadge :visible="selectedPolicy.is_official" label="官方" title="官方发布：由平台官方账号发布并认证" />
                   </div>
                   <p class="detail-tagline">{{ summaryExcerpt(selectedPolicy) }}</p>
                   <div class="detail-meta-pills">
                     <span class="detail-cat-pill">{{ formatCategoryLabel(selectedPolicy.category) }}</span>
-                    <span class="detail-level-pill">{{ selectedPolicy.policy_level || '国家级' }}</span>
-                    <span class="detail-region-pill"><OpcIcon name="pin" :size="12" /> {{ selectedPolicy.region || '全国统一' }}</span>
+                    <span class="detail-level-pill">{{ selectedPolicy.policy_level }}</span>
+                    <span class="detail-region-pill"><OpcIcon name="pin" :size="12" /> {{ selectedPolicy.region }}</span>
                     <span class="detail-subsidy-pill">{{ formatSubsidy(selectedPolicy.subsidy_amount_max) }}</span>
                   </div>
                 </div>
@@ -324,7 +324,7 @@
                 />
 
                 <div class="legal-badge-pill" :title="selectedPolicy.legal_basis">
-                  <span><OpcIcon name="scroll" :size="12" /> {{ selectedPolicy.legal_basis || '官方正式规章' }}</span>
+                  <span><OpcIcon name="scroll" :size="12" /> {{ selectedPolicy.legal_basis }}</span>
                 </div>
               </div>
 
@@ -332,7 +332,7 @@
                 <div v-if="aiSummaryResult" class="detail-section ai-summary-highlight-box">
                   <div class="ai-box-header">
                     <span class="sparkle-tag"><OpcIcon name="spark" :size="12" /> SiliconFlow 硅基流动大模型提炼</span>
-                    <span class="ai-model-tag">{{ aiSummaryResult.model_used || 'Qwen/Qwen2.5-72B-Instruct' }}</span>
+                    <span class="ai-model-tag">{{ aiSummaryResult.model_used }}</span>
                   </div>
                   <p class="ai-box-text">{{ aiSummaryResult.plain_summary }}</p>
                   <div v-if="aiSummaryResult.target_audience" class="ai-box-footer">
@@ -367,15 +367,15 @@
                   <div class="spec-grid">
                     <div class="spec-item">
                       <span class="spec-label">政策编号</span>
-                      <span class="spec-value mono-val">{{ selectedPolicy.code || 'POL-2026-001' }}</span>
+                      <span class="spec-value mono-val">{{ selectedPolicy.code }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">发文层级</span>
-                      <span class="spec-value">{{ selectedPolicy.policy_level || '国家级' }}</span>
+                      <span class="spec-value">{{ selectedPolicy.policy_level }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">适用区域</span>
-                      <span class="spec-value">{{ selectedPolicy.region || '全国统一' }}</span>
+                      <span class="spec-value">{{ selectedPolicy.region }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">扶持类别</span>
@@ -387,15 +387,15 @@
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">申报截止日期</span>
-                      <span class="spec-value mono-val">{{ selectedPolicy.deadline || '常年有效' }}</span>
+                      <span class="spec-value mono-val">{{ selectedPolicy.deadline }}</span>
                     </div>
                     <div class="spec-item" style="grid-column: span 2;">
                       <span class="spec-label">官方法规依据</span>
                       <span class="spec-value">{{ selectedPolicy.legal_basis }}</span>
                     </div>
                     <div class="spec-item" style="grid-column: span 2;">
-                      <span class="spec-label">微内核数据校验</span>
-                      <span class="spec-value spec-success">PostgreSQL 库表持久化 & 零依赖向量检索</span>
+                      <span class="spec-label">收录审核</span>
+                      <span class="spec-value spec-success">官方公文依据 · 全域语义检索</span>
                     </div>
                   </div>
                 </div>
@@ -421,7 +421,7 @@
                 {{ searchQuery ? `没有检索到与 “${searchQuery}” 匹配的扶持公文。` : '当前分类下暂无已收录的公文条款。' }}
               </p>
               <div class="empty-actions">
-                <button v-if="searchQuery || currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
+                <button v-if="!isSearchActive && currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
                 <button class="btn-liquid" @click="openPublishPage">
@@ -521,12 +521,10 @@
           <div class="glass-box sidebar-card guidelines-card">
             <h4 class="sidebar-title-sm">政策中心智库公约</h4>
             <p class="guidelines-desc">
-              政策中心倡导<strong>「官方公文依据、拒绝中介套路、白话提炼要点」</strong>。所有政务红利均经由微内核发布门禁与持久化算子校验，支持全域语义向量召回与一键合规匹配。
+              政策中心倡导<strong>「官方公文依据、拒绝中介套路、白话提炼要点」</strong>。所有政务红利均经平台审核收录，支持全域语义检索与一键合规匹配。
             </p>
             <div class="guidelines-footer">
               <span>OpcHub 政策合规标准 v1.0</span>
-              <span class="dot-sep">·</span>
-              <span class="link-span" @click="openPublishPage">申报入库</span>
             </div>
           </div>
 
@@ -738,11 +736,11 @@ async function handleSearch() {
     if (res.ok && res.data && Array.isArray(res.data.results) && res.data.results.length > 0) {
       policies.value = res.data.results.map((r) => ({
         id: r.id || r.policy_id,
-        code: r.code || `POL-${(r.id || '').slice(-4).toUpperCase() || '2026'}`,
+        code: r.code || '',
         title: r.title,
         summary: r.summary,
-        region: r.region || '全国统一',
-        deadline: r.deadline || '常年开放申报',
+        region: r.region || '',
+        deadline: r.deadline || '',
         action_text: r.action_text || '匹配资格',
         policy_level: r.policy_level,
         category: r.category,
@@ -750,7 +748,7 @@ async function handleSearch() {
         eligible_conditions: r.eligible_conditions,
         legal_basis: r.legal_basis,
         similarity_score: r.similarity_score,
-        semantic_score: Math.round((r.final_relevance || r.similarity_score || 0.88) * 100),
+        semantic_score: Math.round((r.final_relevance ?? r.similarity_score ?? 0) * 100),
       }));
       await enrichInteractions(policies.value, 'POLICY');
 
@@ -763,31 +761,32 @@ async function handleSearch() {
         type: 'SUCCESS',
       });
     } else {
-      // Local filter fallback
+      // RAG 无召回时诚实回退：加载全量列表后按本地关键词过滤（不注入伪相关度）
       await loadPolicies();
       const qLower = q.toLowerCase();
-      policies.value = policies.value.map((p) => {
-        const text = `${p.title} ${p.summary} ${p.region} ${p.code} ${(p.eligible_conditions || []).join(' ')}`.toLowerCase();
-        const score = text.includes(qLower) ? 95 : 60;
-        return { ...p, semantic_score: score };
-      }).filter((p) => {
+      policies.value = policies.value.filter((p) => {
         const text = `${p.title} ${p.summary} ${p.region} ${p.code}`.toLowerCase();
         return text.includes(qLower);
       });
-      await enrichInteractions(policies.value, 'POLICY');
 
       isSearchActive.value = true;
       activeSearchQuery.value = q;
 
       emit('toast', {
-        title: '搜索完成',
-        message: `已为您完成关键词 “${q}” 的精确比对。`,
+        title: '关键词筛选完成',
+        message: policies.value.length > 0
+          ? `按关键词 “${q}” 本地筛选出 ${policies.value.length} 条政策。`
+          : `未找到与 “${q}” 相关的政策。`,
         type: 'INFO',
       });
     }
   } catch (err) {
-    console.warn('RAG search fallback to local filter:', err);
-    await loadPolicies();
+    isSearchActive.value = false;
+    emit('toast', {
+      title: '语义检索异常',
+      message: '向量检索服务暂时不可用，请稍后重试。',
+      type: 'ERROR',
+    });
   } finally {
     isSearching.value = false;
   }
@@ -817,26 +816,15 @@ function handleMouseMove(e) {
 
 // Manual Refresh
 async function handleManualRefresh() {
+  invalidateClientCache();
   await loadPolicies();
-  emit('toast', {
-    title: '政策库已更新',
-    message: '已从 PostgreSQL 数据库同步最新公文与算力补贴。',
-    type: 'SUCCESS',
-  });
 }
 
 // Tax Calculation
 async function calculateTax() {
   const inc = Number(quarterlyIncome.value) || 0;
-  // Local fallback mirrors the backend fiscal policy threshold (¥300,000 / quarter @ 1%).
-  const fallback = {
-    vat_exempt: inc <= 300000,
-    vat_due: inc <= 300000 ? 0 : Math.round(inc * 0.01 * 100) / 100,
-  };
   try {
-    // `policies.match` is the registered gateway scenario that runs the tax + subsidy
-    // microkernel pipeline. `silent` suppresses the global error toast because this
-    // runs automatically on mount and the UI already degrades to the local fallback.
+    // `policies.match` is the registered gateway scenario running the tax + subsidy pipeline.
     const res = await dispatchGateway(
       'policies.match',
       { quarterly_income: inc },
@@ -845,17 +833,16 @@ async function calculateTax() {
     if (res.ok && res.data) {
       const d = res.data;
       taxResult.value = {
-        vat_exempt: d.is_vat_exempt ?? d.vat_exempt ?? fallback.vat_exempt,
-        vat_due:
-          d.estimated_tax_amount ??
-          d.vat_due ??
-          fallback.vat_due,
+        vat_exempt: Boolean(d.is_vat_exempt ?? d.vat_exempt),
+        vat_due: Number(d.estimated_tax_amount ?? d.vat_due ?? 0),
       };
     } else {
-      taxResult.value = fallback;
+      taxResult.value = null;
+      emit('toast', { title: '测算未完成', message: res.error || '测算服务暂时不可用，请稍后重试。', type: 'ERROR' });
     }
   } catch (e) {
-    taxResult.value = fallback;
+    taxResult.value = null;
+    emit('toast', { title: '测算异常', message: '政策测算服务暂时不可用。', type: 'ERROR' });
   }
 }
 
@@ -863,31 +850,30 @@ async function calculateTax() {
 async function matchEligibility(p) {
   try {
     const res = await dispatchGateway('policies.match', {
-      quarterly_income: Number(quarterlyIncome.value) || 250000,
+      quarterly_income: Number(quarterlyIncome.value) || 0,
       maker_type: 'INDIVIDUAL',
       region: p.region || '全国统一',
       search_query: p.title,
     });
 
     if (res.ok && res.data) {
-      const explanation = res.data.explanation || '当前创客主体指标符合申报条件！';
       emit('toast', {
         title: `资格评估 · ${p.code || p.title}`,
-        message: explanation,
+        message: res.data.explanation || (res.data.eligible ? '当前创客主体指标符合申报条件！' : '暂不符合该政策的申报条件，可查看其他政策。'),
         type: res.data.eligible ? 'SUCCESS' : 'INFO',
       });
     } else {
       emit('toast', {
-        title: '政策资格匹配',
-        message: `正在为您比对【${p.title}】申报要求，当前创客主体指标符合申报条件！`,
-        type: 'SUCCESS',
+        title: '政策资格匹配失败',
+        message: res.error || `未能完成【${p.title}】的资格比对，请稍后重试。`,
+        type: 'ERROR',
       });
     }
   } catch (e) {
     emit('toast', {
-      title: '政策资格比对',
-      message: `已为您完成【${p.title}】资格预审比对，指标符合申报标准！`,
-      type: 'SUCCESS',
+      title: '政策资格比对异常',
+      message: '匹配服务暂时不可用，请稍后重试。',
+      type: 'ERROR',
     });
   }
 }
@@ -914,27 +900,22 @@ async function summarizePolicyWithAI(p) {
       aiSummaryResult.value = res.data;
       emit('toast', {
         title: 'AI 白话提炼完成',
-        message: `已基于 SiliconFlow 大模型提炼出《${p.title}》关键要点！`,
+        message: `已基于 ${res.data.model_used || '平台大模型'} 提炼出《${p.title}》关键要点！`,
         type: 'SUCCESS',
       });
     } else {
-      // Local fallback
-      aiSummaryResult.value = {
-        status: 'SUCCESS',
-        model_used: 'Qwen/Qwen2.5-72B-Instruct',
-        plain_summary: `【大白话要点】${p.summary} 关键受惠点在于法定门槛降低，小微及一人企业可免去繁复纸质报备，线上直通减免。`,
-        target_audience: (p.eligible_conditions || []).join(' / ') || '一人公司与创客',
-        max_benefit: p.subsidy_amount_max > 0 ? `最高补贴 ¥${p.subsidy_amount_max.toLocaleString()}` : '全额免税',
-      };
+      emit('toast', {
+        title: 'AI 提炼未完成',
+        message: res.error || '大模型服务暂时不可用，请稍后重试。',
+        type: 'ERROR',
+      });
     }
   } catch (e) {
-    aiSummaryResult.value = {
-      status: 'SUCCESS',
-      model_used: 'Qwen/Qwen2.5-72B-Instruct',
-      plain_summary: `【大白话要点】${p.summary}`,
-      target_audience: '独立创客 / 小微企业',
-      max_benefit: '法定减免',
-    };
+    emit('toast', {
+      title: 'AI 提炼异常',
+      message: '大模型服务暂时不可用，请稍后重试。',
+      type: 'ERROR',
+    });
   } finally {
     isAiSummarizing.value = false;
   }
@@ -955,7 +936,7 @@ function closePolicyDetail() {
 function openPublishPage() {
   publishForm.value = {
     title: '',
-    code: `POL-2026-${Math.floor(100 + Math.random() * 900)}`,
+    code: '',
     region: '全国统一',
     policy_level: '国家级',
     category: 'TAX',
@@ -1009,7 +990,7 @@ async function submitPublishPolicy() {
     if (res.ok) {
       emit('toast', {
         title: '政策发布成功',
-        message: `《${publishForm.value.title}》已通过平台敏感词校验并发布；官方账号发布的内容会自动打上官方标签。`,
+        message: `《${publishForm.value.title}》已通过平台审核并发布；官方账号发布的内容会自动打上官方标签。`,
         type: 'SUCCESS',
       });
       showPublishPage.value = false;
@@ -1084,10 +1065,7 @@ function formatSubsidy(amount) {
   return `最高补贴 ¥${Number(amount).toLocaleString()}`;
 }
 
-function formatLegalBasis(legal) {
-  if (!legal) return '官方正式依据';
-  return legal.length > 20 ? legal.slice(0, 20) + '...' : legal;
-}
+
 </script>
 
 <style scoped>
@@ -1147,7 +1125,9 @@ function formatLegalBasis(legal) {
   padding: 8px 14px;
   border-radius: var(--radius-md, 14px);
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   background: var(--glass-surface);
   backdrop-filter: var(--blur-strength, blur(16px) saturate(160%));
   border: 1px solid var(--glass-border);
@@ -1887,37 +1867,6 @@ function formatLegalBasis(legal) {
   text-decoration: underline;
 }
 
-/* ---------------- 5. Policy Detail Modal (Apple App Store Style) ---------------- */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.policy-detail-modal {
-  width: 100%;
-  max-width: 680px;
-  max-height: 85vh;
-  border-radius: var(--radius-xl, 24px);
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  box-sizing: border-box;
-  overflow: hidden;
-  background: var(--glass-surface-solid, rgba(255, 255, 255, 0.96));
-  border: 1px solid var(--glass-border);
-}
-
 .detail-header {
   display: flex;
   align-items: flex-start;
@@ -1992,27 +1941,6 @@ function formatLegalBasis(legal) {
   font-weight: 600;
   color: var(--accent);
   background: var(--accent-glass);
-}
-
-.modal-close-btn {
-  border: none;
-  background: var(--glass-surface-subtle);
-  color: var(--text-secondary);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.modal-close-btn:hover {
-  background: var(--glass-surface-hover);
-  color: var(--text-primary);
 }
 
 .detail-action-bar {
@@ -2243,29 +2171,6 @@ function formatLegalBasis(legal) {
   font-size: 11.5px;
 }
 
-/* ---------------- 6. Policy Publish Modal ---------------- */
-.policy-publish-modal {
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  border-radius: var(--radius-xl, 24px);
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  box-sizing: border-box;
-  overflow: hidden;
-  background: var(--glass-surface-solid, rgba(255, 255, 255, 0.98));
-  border: 1px solid var(--glass-border);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
 .modal-title {
   font-size: 19px;
   font-weight: 700;
@@ -2311,30 +2216,6 @@ function formatLegalBasis(legal) {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 10px;
-}
-
-/* Modal animation */
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.modal-fade-enter-from,
-.modal-fade-leave-to {
-  opacity: 0;
-}
-
-.modal-fade-enter-active .modal-window,
-.modal-fade-leave-active .modal-window {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.modal-fade-enter-from .modal-window {
-  transform: scale(0.96) translateY(8px);
-}
-
-.modal-fade-leave-to .modal-window {
-  transform: scale(0.96) translateY(8px);
 }
 
 /* Responsive */

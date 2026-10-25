@@ -19,63 +19,21 @@
           <div class="meta-pills-row">
             <span class="category-pill" :style="pillStyle">{{ categoryLabel }}</span>
             <span v-if="post?.pinned" class="pinned-pill">{{ post.pinned }}</span>
-            <span class="ip-info">{{ post?.ip_location || '来自 浙江' }}</span>
-            <span class="time-info">· 发表于 {{ post?.updated_at || '刚刚' }}</span>
+            <span class="time-info">发表于 {{ post?.updated_at || '刚刚' }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Header Right Actions -->
+      <!-- Header Right Actions (share / edit / delete — 互动与举报统一在下方互动条) -->
       <div class="header-right-actions">
         <button
           type="button"
-          class="btn-header-action"
-          :class="{ active: threadUpvoted }"
-          @click="toggleThreadUpvote"
-          title="点赞此实战经验"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
-          </svg>
-          <span>{{ threadUpvoted ? '已点赞' : '点赞' }}</span>
-          <span class="count-tag">{{ threadUpvoteCount }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="btn-header-action"
-          :class="{ active: threadBookmarked }"
-          @click="toggleThreadBookmark"
-          title="收藏归档至知识库"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" :fill="threadBookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-          </svg>
-          <span>{{ threadBookmarked ? '已收藏' : '收藏' }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="btn-header-action"
-          :class="{ active: threadLoved }"
-          @click="toggleThreadLove"
-          :title="threadLoved ? '取消喜欢' : '喜欢这篇实战经验'"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" :fill="threadLoved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-            <path d="M20.8 5.6a5.2 5.2 0 0 0-7.4 0L12 7l-1.4-1.4a5.2 5.2 0 1 0-7.4 7.4L12 21l8.8-7.9a5.2 5.2 0 0 0 0-7.5Z"></path>
-          </svg>
-          <span>{{ threadLoved ? '已喜欢' : '喜欢' }}</span>
-          <span class="count-tag">{{ threadLoveCount }}</span>
-        </button>
-
-        <button
-          type="button"
-          class="btn-header-action"
+          class="btn-header-ghost-action"
           :class="{ active: isCopied }"
           @click="handleCopyLink"
           title="分享实战帖"
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="18" cy="5" r="3"></circle>
             <circle cx="6" cy="12" r="3"></circle>
             <circle cx="18" cy="19" r="3"></circle>
@@ -85,11 +43,18 @@
           <span>{{ isCopied ? '已复制' : '分享' }}</span>
         </button>
 
-        <button type="button" class="btn-header-ghost-report" @click="handleReport" title="合规举报违规内容">
+        <button
+          v-if="canEdit"
+          type="button"
+          class="btn-header-ghost-action"
+          @click="openEditPanel"
+          title="编辑这篇讨论帖"
+        >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            <path d="M12 20h9"></path>
+            <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
           </svg>
-          <span>举报</span>
+          <span>编辑</span>
         </button>
 
         <button
@@ -108,7 +73,7 @@
       </div>
     </div>
 
-    <!-- Centered Full-Page Article Article Container -->
+    <!-- Centered Full-Page Article Container -->
     <div class="article-center-container">
       <article class="glass-box article-main-card">
         <!-- Post Title -->
@@ -123,15 +88,13 @@
             </div>
             <div class="author-text-meta">
               <div class="author-name-line">
-                <span class="author-name">{{ post?.author || '认证创客' }}</span>
-                <span class="maker-verified-pill">已认证超级个体</span>
+                <span class="author-name">{{ post?.author || '' }}</span>
+                <span v-if="post?.author_title" class="maker-verified-pill">{{ post.author_title }}</span>
               </div>
               <div class="author-sub-line">
-                <span>浏览 {{ post?.view_count || 128 }} 次</span>
+                <span>浏览 {{ post?.view_count || 0 }} 次</span>
                 <span>·</span>
                 <span>{{ commentTree.length }} 条探讨见解</span>
-                <span>·</span>
-                <span>{{ post?.ip_location || '来自 浙江' }}</span>
               </div>
             </div>
           </div>
@@ -157,68 +120,41 @@
 
         <div class="article-divider"></div>
 
-        <!-- Main Post Action Cluster -->
+        <!-- Main Post Action Cluster (赞同/反对是唯一投票链路：论坛域 forum.vote) -->
         <div class="article-bottom-actions">
-          <button
-            type="button"
-            class="btn-liquid btn-action-big"
-            :class="{ active: threadUpvoted }"
-            @click="toggleThreadUpvote"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
-            </svg>
-            <span>{{ threadUpvoted ? '已点赞实战经验' : '点赞实战经验' }}</span>
-            <span class="badge-count">{{ threadUpvoteCount }}</span>
-          </button>
+          <div class="zhihu-vote-group vote-group-big">
+            <button
+              type="button"
+              class="btn-zhihu-vote btn-zhihu-upvote"
+              :class="{ active: threadUserVote === 'UPVOTE' }"
+              @click="handleThreadVote('UPVOTE')"
+              title="赞同此议题与实战观点"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 4L3 18h18L12 4z"/>
+              </svg>
+              <span>赞同 {{ threadUpvoteCount }}</span>
+            </button>
+            <button
+              type="button"
+              class="btn-zhihu-vote btn-zhihu-downvote"
+              :class="{ active: threadUserVote === 'DOWNVOTE' }"
+              @click="handleThreadVote('DOWNVOTE')"
+              title="反对 / 不赞同"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 20l9-14H3l9 14z"/>
+              </svg>
+              <span>反对</span>
+            </button>
+          </div>
 
           <button
             type="button"
-            class="btn-outline-action"
-            :class="{ active: threadBookmarked }"
-            @click="toggleThreadBookmark"
+            class="btn-action-ghost"
+            @click="toggleComposer"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" :fill="threadBookmarked ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
-            </svg>
-            <span>{{ threadBookmarked ? '已收藏归档' : '收藏归档' }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="btn-outline-action"
-            :class="{ active: threadLoved }"
-            @click="toggleThreadLove"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" :fill="threadLoved ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2">
-              <path d="M20.8 5.6a5.2 5.2 0 0 0-7.4 0L12 7l-1.4-1.4a5.2 5.2 0 1 0-7.4 7.4L12 21l8.8-7.9a5.2 5.2 0 0 0 0-7.5Z"></path>
-            </svg>
-            <span>{{ threadLoved ? '已喜欢' : '喜欢' }}</span>
-            <span class="badge-count">{{ threadLoveCount }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="btn-outline-action"
-            :class="{ active: isCopied }"
-            @click="handleCopyLink"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="18" cy="5" r="3"></circle>
-              <circle cx="6" cy="12" r="3"></circle>
-              <circle cx="18" cy="19" r="3"></circle>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-            </svg>
-            <span>{{ isCopied ? '已复制分享' : '分享实战' }}</span>
-          </button>
-
-          <button
-            type="button"
-            class="btn-liquid btn-action-big btn-write-answer-primary"
-            @click="isWritingAnswer = !isWritingAnswer"
-          >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
               <path d="M12 20h9"></path>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
             </svg>
@@ -227,12 +163,12 @@
 
           <button
             type="button"
-            class="btn-outline-action"
+            class="btn-action-ghost"
             :class="{ active: isFollowing }"
             @click="handleToggleFollow"
             title="关注该议题动态"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
               <circle cx="8.5" cy="7" r="4"></circle>
               <line x1="20" y1="8" x2="20" y2="14"></line>
@@ -240,27 +176,88 @@
             </svg>
             <span>{{ isFollowing ? '已关注议题' : '关注议题' }}</span>
           </button>
+        </div>
 
-          <button
-            v-if="canDelete"
-            type="button"
-            class="btn-outline-action btn-delete-action"
-            @click="$emit('delete', post)"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-            <span>删除议题</span>
-          </button>
+        <!-- Unified Interaction Bar (评分 / 收藏 / 喜欢 / 评论 / 举报) -->
+        <div class="detail-interaction-row" @click.stop>
+          <ContentInteractionBar
+            :target-type="'FORUM_THREAD'"
+            :target-id="post?.id"
+            :target-title="post?.title || ''"
+            :target-snippet="post?.snippet || ''"
+            :kinds="['LOVE', 'FAVORITE']"
+            :favorite-count="post?.favorite_count ?? post?.bookmark_count ?? 0"
+            :love-count="post?.love_count ?? 0"
+            :comment-count="post?.comment_count ?? post?.replies ?? 0"
+            :rating-avg="post?.rating_avg ?? 0"
+            :rating-count="post?.rating_count ?? 0"
+            :my-rating="post?.viewer?.rating ?? 0"
+            :favorited="post?.viewer ? post.viewer.favorited : Boolean(post?.is_bookmarked)"
+            :loved="post?.viewer ? post.viewer.loved : Boolean(post?.is_loved)"
+            :commented="post?.viewer ? post.viewer.commented : Boolean(post?.is_commented)"
+            :authenticated="Boolean(currentUserId)"
+            comment-mode="emit"
+            @open-comments="scrollToDiscussions"
+            @changed="onInteractionChanged"
+            @require-login="$emit('require-login')"
+            @toast="$emit('toast', $event)"
+          />
         </div>
       </article>
+
+      <!-- Thread Edit Panel (作者或管理员编辑) -->
+      <section v-if="isEditing" class="glass-box edit-panel-card">
+        <div class="composer-header">
+          <div class="composer-user-meta">
+            <span class="composer-avatar composer-avatar-img"><PersonaAvatar :id="currentUserAvatarId" :name="currentUserNick || '创'" :size="38" /></span>
+            <div>
+              <h3 class="composer-title">编辑讨论帖</h3>
+              <p class="composer-sub">修订标题与正文，保存后立即生效并进入合规复审</p>
+            </div>
+          </div>
+          <button type="button" class="btn-close-composer" @click="cancelEdit">×</button>
+        </div>
+
+        <div class="composer-body edit-panel-body">
+          <input
+            v-model="editTitle"
+            type="text"
+            class="glass-input edit-title-input"
+            placeholder="讨论帖标题（至少 5 个字）"
+          />
+          <textarea
+            v-model="editContent"
+            class="glass-input edit-content-textarea"
+            rows="10"
+            placeholder="正文内容（支持 Markdown 排版，至少 10 个字）"
+          ></textarea>
+        </div>
+
+        <div class="composer-footer">
+          <div class="composer-stats">
+            <span>字数：{{ editContent.length }}</span>
+          </div>
+          <div class="composer-actions">
+            <button type="button" class="btn-action-ghost" :disabled="isSavingEdit" @click="cancelEdit">
+              取消
+            </button>
+            <button
+              type="button"
+              class="btn-liquid btn-save-edit"
+              :disabled="editTitle.trim().length < 5 || editContent.trim().length < 10 || isSavingEdit"
+              @click="saveEdit"
+            >
+              {{ isSavingEdit ? '正在保存...' : '保存修改' }}
+            </button>
+          </div>
+        </div>
+      </section>
 
       <!-- Zhihu-style Answer Composer Panel (当点击撰写观点时展开) -->
       <section v-if="isWritingAnswer" class="glass-box answer-composer-card">
         <div class="composer-header">
           <div class="composer-user-meta">
-            <span class="composer-avatar">{{ (currentUserNick || '创')[0] }}</span>
+            <span class="composer-avatar composer-avatar-img"><PersonaAvatar :id="currentUserAvatarId" :name="currentUserNick || '创'" :size="38" /></span>
             <div>
               <h3 class="composer-title">撰写关于该议题的实战见解与回答</h3>
               <p class="composer-sub">您的观点将以独立回答的形式展示在知乎式观点流中，并支持被提问者采纳</p>
@@ -287,7 +284,7 @@
           <div class="composer-actions">
             <button
               type="button"
-              class="btn-outline-action"
+              class="btn-action-ghost"
               :disabled="isSubmittingAnswer"
               @click="isWritingAnswer = false"
             >
@@ -368,7 +365,7 @@
                 <div class="ans-author-meta">
                   <div class="ans-author-line">
                     <span class="ans-name">{{ ans.author_name || '实战创客' }}</span>
-                    <span class="ans-title">{{ ans.author_title || '已认证超级个体' }}</span>
+                    <span v-if="ans.author_title" class="ans-title">{{ ans.author_title }}</span>
                     <span v-if="ans.is_accepted" class="ans-accepted-pill">
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                         <polyline points="20 6 9 17 4 12"></polyline>
@@ -379,14 +376,15 @@
                   <div class="ans-sub-line">
                     <span>发表于 {{ formatTime(ans.created_at) }}</span>
                     <span class="dot-sep">·</span>
-                    <span>约 {{ ans.word_count || 120 }} 字</span>
+                    <span v-if="ans.word_count">约 {{ ans.word_count }} 字</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Accept Button (If Question Author or Admin) -->
-              <div v-if="canAccept" class="ans-author-right">
+              <!-- Accept / Delete (If Question Author or Admin) -->
+              <div class="ans-author-right">
                 <button
+                  v-if="canAccept"
                   type="button"
                   class="btn-accept-toggle"
                   :class="{ accepted: ans.is_accepted }"
@@ -396,6 +394,18 @@
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
                   <span>{{ ans.is_accepted ? '取消采纳' : '采纳此回答' }}</span>
+                </button>
+                <button
+                  v-if="canManageAnswer(ans)"
+                  type="button"
+                  class="btn-dock-action btn-danger-action"
+                  @click="deleteAnswer(ans)"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>{{ armedDeleteKey === `answer:${ans.id}` ? '确认删除？' : '删除回答' }}</span>
                 </button>
               </div>
             </div>
@@ -408,7 +418,7 @@
 
             <!-- Zhihu Signature Dock for each Answer -->
             <div class="answer-dock-bar">
-              <!-- Dual-pill vote group -->
+              <!-- Dual-pill vote group (论坛域 forum.vote ANSWER) -->
               <div class="zhihu-vote-group">
                 <button
                   type="button"
@@ -446,22 +456,6 @@
                   <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                 </svg>
                 <span>{{ ans.comment_count || 0 }} 条探讨</span>
-              </button>
-
-              <button
-                type="button"
-                class="btn-dock-action"
-                @click="handleCopyLink"
-                title="分享此回答"
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <circle cx="18" cy="5" r="3"></circle>
-                  <circle cx="6" cy="12" r="3"></circle>
-                  <circle cx="18" cy="19" r="3"></circle>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                  <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                </svg>
-                <span>分享</span>
               </button>
             </div>
 
@@ -505,7 +499,7 @@
       </section>
 
       <!-- Discussions & Comments Section -->
-      <section class="glass-box discussions-section-card">
+      <section ref="discussionsSectionRef" class="glass-box discussions-section-card">
         <div class="discussions-header">
           <div class="discussions-title-cluster">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -561,7 +555,6 @@
                 <div class="c-author-info">
                   <span class="c-avatar">{{ (item.author_name || '客')[0] }}</span>
                   <span class="c-name">{{ item.author_name || '独立创客' }}</span>
-                  <span class="c-ip">{{ item.ip_location || '来自 浙江' }}</span>
                   <span v-if="item.is_accepted" class="accepted-badge">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
                       <polyline points="20 6 9 17 4 12"></polyline>
@@ -580,13 +573,13 @@
                 <button
                   type="button"
                   class="btn-c-action"
-                  :class="{ active: item.upvoted }"
+                  :class="{ active: item.user_vote === 'UPVOTE' }"
                   @click="toggleCommentUpvote(item)"
                 >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
                   </svg>
-                  <span>点赞 {{ item.upvote_count || 0 }}</span>
+                  <span>赞同 {{ item.upvote_count || 0 }}</span>
                 </button>
 
                 <button type="button" class="btn-c-action" @click="setReplyTarget(item)">
@@ -595,50 +588,58 @@
                   </svg>
                   <span>回复</span>
                 </button>
+
+                <button
+                  v-if="canManageComment(item)"
+                  type="button"
+                  class="btn-c-action btn-danger-action"
+                  @click="deleteComment(item)"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                  </svg>
+                  <span>{{ armedDeleteKey === `comment:${item.id}` ? '确认删除？' : '删除' }}</span>
+                </button>
               </div>
             </div>
 
-            <!-- Nested Children Replies -->
+            <!-- Nested Children -->
             <div v-if="item.children && item.children.length > 0" class="sub-replies-container">
-              <div
-                v-for="sub in item.children"
-                :key="sub.id"
-                class="sub-reply-card"
-              >
+              <div v-for="child in item.children" :key="child.id" class="sub-reply-card">
                 <div class="comment-head">
                   <div class="c-author-info">
-                    <span class="c-avatar sub-avatar">{{ (sub.author_name || '客')[0] }}</span>
-                    <span class="c-name">{{ sub.author_name || '出海创客' }}</span>
-                    <span v-if="sub.reply_to_name" class="reply-target-text">
-                      回复 <span class="reply-target-tag">@{{ sub.reply_to_name }}</span>
+                    <span class="c-avatar sub-avatar">{{ (child.author_name || '客')[0] }}</span>
+                    <span class="c-name">{{ child.author_name || '独立创客' }}</span>
+                    <span v-if="child.reply_to_name" class="reply-target-text">
+                      回复 <span class="reply-target-tag">@{{ child.reply_to_name }}</span>
                     </span>
-                    <span class="c-ip">{{ sub.ip_location || '来自 浙江' }}</span>
                   </div>
-                  <span class="c-time">{{ sub.created_at || '刚刚' }}</span>
+                  <span class="c-time">{{ child.created_at || '刚刚' }}</span>
                 </div>
-
-                <div class="comment-body-text">
-                  {{ sub.content }}
-                </div>
-
+                <div class="comment-body-text">{{ child.content }}</div>
                 <div class="comment-actions-bar">
                   <button
                     type="button"
                     class="btn-c-action"
-                    :class="{ active: sub.upvoted }"
-                    @click="toggleCommentUpvote(sub)"
+                    :class="{ active: child.user_vote === 'UPVOTE' }"
+                    @click="toggleCommentUpvote(child)"
                   >
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                       <path d="M12 2.8L19.2 11.2C19.8 11.9 19.3 13 18.3 13H15.2V16.2C15.2 16.7 14.8 17.2 14.2 17.2H9.8C9.2 17.2 8.8 16.7 8.8 16.2V13H5.7C4.7 13 4.2 11.9 4.8 11.2L12 2.8Z"></path>
                     </svg>
-                    <span>点赞 {{ sub.upvote_count || 0 }}</span>
+                    <span>赞同 {{ child.upvote_count || 0 }}</span>
                   </button>
-
-                  <button type="button" class="btn-c-action" @click="setReplyTarget(item, sub.author_name)">
-                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                    </svg>
+                  <button type="button" class="btn-c-action" @click="setReplyTarget(item, child.author_name)">
                     <span>回复</span>
+                  </button>
+                  <button
+                    v-if="canManageComment(child)"
+                    type="button"
+                    class="btn-c-action btn-danger-action"
+                    @click="deleteComment(child, item)"
+                  >
+                    <span>{{ armedDeleteKey === `comment:${child.id}` ? '确认删除？' : '删除' }}</span>
                   </button>
                 </div>
               </div>
@@ -658,8 +659,11 @@
 import { ref, computed, watch } from 'vue';
 import { dispatchGateway } from '@/api/gateway';
 import OfficialBadge from '@/components/OfficialBadge.vue';
+import PersonaAvatar from '@/components/PersonaAvatar.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
+import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import { renderMarkdown } from '@/utils/markdown';
+import { applyBarChange, applyForumInteractionAliases } from '@/utils/contentInteractions';
 
 const props = defineProps({
   post: {
@@ -672,41 +676,33 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['back', 'toast', 'upvote', 'bookmark', 'update-post', 'delete']);
+const emit = defineEmits(['back', 'toast', 'vote', 'update-post', 'delete', 'interaction', 'require-login']);
 
 const currentUserId = computed(() => {
   return props.userSession?.uid || props.userSession?.id || props.userSession?.user?.id || props.userSession?.user?.uid || '';
 });
 
+const currentUserAvatarId = computed(() => props.userSession?.profile?.avatar_id || '');
 const currentUserNick = computed(() => {
-  return props.userSession?.nickname || props.userSession?.username || props.userSession?.user?.nickname || '认证创客';
+  return props.userSession?.nickname || props.userSession?.username || props.userSession?.user?.nickname || '我';
 });
 
 const currentUserRole = computed(() => {
   return (props.userSession?.role || props.userSession?.user?.role || localStorage.getItem('opchub_current_role') || 'MAKER').toUpperCase();
 });
 
-const canDelete = computed(() => {
+function ownsResource(authorId) {
   if (currentUserRole.value === 'ADMIN') return true;
-  if (currentUserId.value && props.post?.author_id && String(props.post.author_id) === String(currentUserId.value)) {
-    return true;
-  }
-  return false;
-});
+  return Boolean(currentUserId.value && authorId && String(authorId) === String(currentUserId.value));
+}
 
-const canAccept = computed(() => {
-  if (currentUserRole.value === 'ADMIN') return true;
-  if (currentUserId.value && props.post?.author_id && String(props.post.author_id) === String(currentUserId.value)) {
-    return true;
-  }
-  return false;
-});
+const canDelete = computed(() => ownsResource(props.post?.author_id));
+const canEdit = canDelete;
+const canAccept = canDelete;
 
-const threadUpvoted = ref(false);
+// Thread vote state (知乎式互斥投票，来源：forum.vote / 服务端 user_vote)
+const threadUserVote = ref(null);
 const threadUpvoteCount = ref(0);
-const threadBookmarked = ref(false);
-const threadLoved = ref(false);
-const threadLoveCount = ref(0);
 const isFollowing = ref(false);
 const isCopied = ref(false);
 let copyTimer = null;
@@ -719,6 +715,22 @@ const answerDraft = ref('');
 const isSubmittingAnswer = ref(false);
 const activeAnswerCommentId = ref(null);
 const subCommentDraft = ref({});
+
+// Thread edit state
+const isEditing = ref(false);
+const editTitle = ref('');
+const editContent = ref('');
+const isSavingEdit = ref(false);
+
+// Arm-then-confirm pattern for destructive answer/comment deletion
+const armedDeleteKey = ref('');
+let disarmTimer = null;
+
+const replyText = ref('');
+const replyTarget = ref(null);
+const isSubmitting = ref(false);
+const commentTree = ref([]);
+const discussionsSectionRef = ref(null);
 
 const sortedAnswersList = computed(() => {
   const list = [...answersList.value];
@@ -733,42 +745,22 @@ const sortedAnswersList = computed(() => {
   return list;
 });
 
-const replyText = ref('');
-const replyTarget = ref(null);
-const isSubmitting = ref(false);
-const commentTree = ref([]);
-
-function isPostUpvotedInStorage(postId) {
-  if (!postId) return false;
-  try {
-    const raw = localStorage.getItem('opchub_forum_upvotes');
-    const list = raw ? JSON.parse(raw) : [];
-    return list.includes(String(postId));
-  } catch (e) {
-    return false;
-  }
+function canManageAnswer(answer) {
+  return ownsResource(answer?.author_id);
 }
 
-function isPostBookmarkedInStorage(postId) {
-  if (!postId) return false;
-  try {
-    const raw = localStorage.getItem('opchub_forum_bookmarks');
-    const list = raw ? JSON.parse(raw) : [];
-    return list.some((b) => (typeof b === 'object' ? String(b.id) === String(postId) : String(b) === String(postId)));
-  } catch (e) {
-    return false;
-  }
+function canManageComment(comment) {
+  return ownsResource(comment?.author_id);
 }
 
 watch(
   () => props.post,
   (newPost) => {
     if (newPost) {
-      threadUpvoted.value = Boolean(newPost.viewer?.liked ?? newPost.is_upvoted);
-      threadUpvoteCount.value = newPost.like_count ?? newPost.upvotes ?? newPost.upvote_count ?? 0;
-      threadBookmarked.value = Boolean(newPost.viewer?.favorited ?? newPost.is_bookmarked);
-      threadLoved.value = Boolean(newPost.viewer?.loved ?? newPost.is_loved);
-      threadLoveCount.value = newPost.love_count ?? 0;
+      threadUserVote.value = newPost.user_vote || null;
+      threadUpvoteCount.value = Number(newPost.upvote_count ?? newPost.upvotes ?? 0);
+      isFollowing.value = Boolean(newPost.is_following);
+      isEditing.value = false;
       replyTarget.value = null;
       replyText.value = '';
       loadThreadDetail(newPost);
@@ -799,49 +791,180 @@ function loadThreadDetail(post) {
   if (!post || !post.id) return;
   const tid = String(post.id);
 
-  // Fetch real details from backend microkernel gateway
   dispatchGateway('forum.threads.get', { thread_id: tid }, { silent: true }).then((res) => {
     if (res.ok && res.data) {
       if (Array.isArray(res.data.answers)) {
         answersList.value = res.data.answers;
       }
       if (Array.isArray(res.data.comments)) {
-        commentTree.value = res.data.comments.map((node) => ({
-          id: node.id,
-          target_type: node.target_type,
-          target_id: node.target_id,
-          author_name: node.author_name || (node.author_id ? `创客_${node.author_id.slice(0, 6)}` : '实战创客'),
-          ip_location: '来自 浙江',
-          created_at: formatTime(node.created_at),
-          is_accepted: Boolean(node.is_accepted),
-          upvote_count: node.upvote_count || 0,
-          upvoted: false,
-          content: node.content,
-          children: (node.children || []).map((sub) => ({
-            id: sub.id,
-            target_type: sub.target_type,
-            target_id: sub.target_id,
-            author_name: sub.author_name || (sub.author_id ? `创客_${sub.author_id.slice(0, 6)}` : '出海创客'),
-            ip_location: '来自 浙江',
-            created_at: formatTime(sub.created_at),
-            upvote_count: sub.upvote_count || 0,
-            upvoted: false,
-            content: sub.content,
-          })),
-        }));
+        commentTree.value = res.data.comments.map((node) => mapCommentNode(node));
       }
       if (res.data.thread) {
-        isFollowing.value = Boolean(res.data.thread.is_following);
-        threadUpvoted.value = (res.data.thread.user_vote === 'UPVOTE');
-        threadUpvoteCount.value = res.data.thread.upvote_count || 0;
-        threadBookmarked.value = Boolean(res.data.thread.is_bookmarked);
+        const t = res.data.thread;
+        isFollowing.value = Boolean(t.is_following);
+        threadUserVote.value = t.user_vote || null;
+        threadUpvoteCount.value = Number(t.upvote_count || 0);
+        props.post.user_vote = t.user_vote || null;
+        props.post.upvote_count = Number(t.upvote_count || 0);
+        props.post.upvotes = Number(t.upvote_count || 0);
+        props.post.is_upvoted = (t.user_vote === 'UPVOTE');
+        props.post.answer_count = Number(t.answer_count || 0);
+        props.post.comment_count = Number(t.comment_count || 0);
+        props.post.replies = Number(t.comment_count || 0);
       }
     }
   }).catch(() => {});
 }
 
+function mapCommentNode(node) {
+  return {
+    id: node.id,
+    target_type: node.target_type,
+    target_id: node.target_id,
+    author_id: node.author_id || '',
+    author_name: node.author_name || (node.author_id ? `创客_${node.author_id.slice(0, 6)}` : '实战创客'),
+    created_at: node.created_at,
+    is_accepted: Boolean(node.is_accepted),
+    upvote_count: node.upvote_count || 0,
+    user_vote: node.user_vote || null,
+    content: node.content,
+    children: (node.children || []).map((sub) => ({
+      id: sub.id,
+      target_type: sub.target_type,
+      target_id: sub.target_id,
+      author_id: sub.author_id || '',
+      author_name: sub.author_name || (sub.author_id ? `创客_${sub.author_id.slice(0, 6)}` : '出海创客'),
+      created_at: sub.created_at,
+      upvote_count: sub.upvote_count || 0,
+      user_vote: sub.user_vote || null,
+      content: sub.content,
+      reply_to_name: null,
+    })),
+  };
+}
+
+async function handleThreadVote(vtype) {
+  if (!currentUserId.value) {
+    emit('require-login');
+    emit('toast', { title: '需要登录', message: '请先登录以进行观点赞同或投票互动', type: 'INFO' });
+    return;
+  }
+
+  const prevVote = threadUserVote.value;
+  const prevCount = threadUpvoteCount.value;
+
+  if (vtype === 'UPVOTE') {
+    if (threadUserVote.value === 'UPVOTE') {
+      threadUserVote.value = null;
+      threadUpvoteCount.value = Math.max(0, threadUpvoteCount.value - 1);
+    } else {
+      threadUserVote.value = 'UPVOTE';
+      threadUpvoteCount.value += 1;
+    }
+  } else if (vtype === 'DOWNVOTE') {
+    if (threadUserVote.value === 'DOWNVOTE') {
+      threadUserVote.value = null;
+    } else {
+      if (threadUserVote.value === 'UPVOTE') {
+        threadUpvoteCount.value = Math.max(0, threadUpvoteCount.value - 1);
+      }
+      threadUserVote.value = 'DOWNVOTE';
+    }
+  }
+
+  try {
+    const res = await dispatchGateway('forum.vote', {
+      user_id: currentUserId.value,
+      target_type: 'THREAD',
+      target_id: String(props.post.id),
+      vote_type: vtype,
+    }, { silent: true });
+
+    if (res.ok && res.data) {
+      threadUserVote.value = res.data.user_vote;
+      threadUpvoteCount.value = res.data.upvote_count;
+      props.post.user_vote = res.data.user_vote;
+      props.post.upvote_count = res.data.upvote_count;
+      props.post.upvotes = res.data.upvote_count;
+      props.post.is_upvoted = (res.data.user_vote === 'UPVOTE');
+      emit('vote', {
+        post: props.post,
+        userVote: res.data.user_vote,
+        upvoteCount: res.data.upvote_count,
+        downvoteCount: res.data.downvote_count,
+      });
+    } else {
+      threadUserVote.value = prevVote;
+      threadUpvoteCount.value = prevCount;
+      emit('toast', { title: '投票失败', message: res.error || '无法记录投票，请重试', type: 'ERROR' });
+    }
+  } catch (e) {
+    threadUserVote.value = prevVote;
+    threadUpvoteCount.value = prevCount;
+    emit('toast', { title: '操作异常', message: '网络或服务异常，请重试', type: 'ERROR' });
+  }
+}
+
+function onInteractionChanged(payload) {
+  applyBarChange(props.post, payload);
+  applyForumInteractionAliases(props.post);
+  emit('interaction', { post: props.post, ...payload });
+}
+
+function scrollToDiscussions() {
+  discussionsSectionRef.value?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleComposer() {
+  isEditing.value = false;
+  isWritingAnswer.value = !isWritingAnswer.value;
+}
+
+function openEditPanel() {
+  isWritingAnswer.value = false;
+  editTitle.value = props.post?.title || '';
+  editContent.value = props.post?.content || '';
+  isEditing.value = true;
+}
+
+function cancelEdit() {
+  isEditing.value = false;
+  editTitle.value = '';
+  editContent.value = '';
+}
+
+async function saveEdit() {
+  const title = editTitle.value.trim();
+  const content = editContent.value.trim();
+  if (title.length < 5 || content.length < 10 || isSavingEdit.value) return;
+
+  isSavingEdit.value = true;
+  try {
+    const res = await dispatchGateway('forum.threads.update', {
+      thread_id: String(props.post.id),
+      title,
+      content,
+    });
+    if (res.ok && res.data) {
+      props.post.title = res.data.title || title;
+      props.post.content = res.data.content || content;
+      props.post.updated_at = res.data.updated_at || props.post.updated_at;
+      emit('update-post', props.post);
+      isEditing.value = false;
+      emit('toast', { title: '修改已保存', message: '讨论帖内容已更新并通过合规复审。', type: 'SUCCESS' });
+    } else {
+      emit('toast', { title: '保存失败', message: res.error || '请稍后重试。', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '保存异常', message: '编辑服务暂时不可用，请稍后重试。', type: 'ERROR' });
+  } finally {
+    isSavingEdit.value = false;
+  }
+}
+
 async function handleToggleFollow() {
   if (!currentUserId.value) {
+    emit('require-login');
     emit('toast', { title: '需要登录', message: '请先登录以关注该议题', type: 'INFO' });
     return;
   }
@@ -849,6 +972,7 @@ async function handleToggleFollow() {
     const res = await dispatchGateway('forum.threads.follow', { thread_id: String(props.post.id) });
     if (res.ok && res.data) {
       isFollowing.value = Boolean(res.data.is_following);
+      props.post.is_following = isFollowing.value;
       emit('toast', {
         title: isFollowing.value ? '已关注议题' : '已取消关注',
         message: isFollowing.value ? '新创客发表观点回答时将提醒您' : '已取消对该议题的关注',
@@ -862,6 +986,7 @@ async function handleToggleFollow() {
 
 async function submitAnswer() {
   if (!currentUserId.value) {
+    emit('require-login');
     emit('toast', { title: '需要登录', message: '请先登录以发布深度见解', type: 'INFO' });
     return;
   }
@@ -876,21 +1001,17 @@ async function submitAnswer() {
     const res = await dispatchGateway('forum.answers.publish', {
       thread_id: String(props.post.id),
       content: text,
-      author_id: currentUserId.value,
-      author_name: currentUserNick.value,
-      author_title: '已认证超级个体',
     });
 
     if (res.ok && res.data) {
       answersList.value.unshift(res.data);
       answerDraft.value = '';
       isWritingAnswer.value = false;
-      if (props.post) {
-        props.post.answer_count = (props.post.answer_count || 0) + 1;
-      }
+      props.post.answer_count = (props.post.answer_count || 0) + 1;
+      emit('update-post', props.post);
       emit('toast', {
         title: '观点回答发布成功',
-        message: '您的实战见解已通过微内核 DAG 编排流水线完成安全审查与持久化归档！',
+        message: '您的实战见解已通过平台安全审查并发布！',
         type: 'SUCCESS',
       });
     } else {
@@ -912,7 +1033,6 @@ async function handleAcceptAnswer(answer) {
     });
     if (res.ok && res.data) {
       const isAccepted = Boolean(res.data.is_accepted);
-      // Update local state
       answersList.value.forEach((a) => {
         if (a.id === answer.id) {
           a.is_accepted = isAccepted;
@@ -920,9 +1040,7 @@ async function handleAcceptAnswer(answer) {
           a.is_accepted = false;
         }
       });
-      if (props.post) {
-        props.post.accepted_answer_id = isAccepted ? answer.id : null;
-      }
+      props.post.accepted_answer_id = isAccepted ? answer.id : null;
       emit('toast', {
         title: isAccepted ? '已采纳最佳观点' : '已取消采纳',
         message: isAccepted ? '该观点已被标记为题主推荐实战方案' : '已更新采纳状态',
@@ -938,6 +1056,7 @@ async function handleAcceptAnswer(answer) {
 
 async function handleAnswerVote(answer, voteType) {
   if (!currentUserId.value) {
+    emit('require-login');
     emit('toast', { title: '需要登录', message: '请先登录以进行赞同或反对', type: 'INFO' });
     return;
   }
@@ -1010,6 +1129,7 @@ async function submitSubComment(answer) {
   const draft = subCommentDraft.value[answer.id];
   if (!draft || !draft.trim()) return;
   if (!currentUserId.value) {
+    emit('require-login');
     emit('toast', { title: '需要登录', message: '请先登录以发表交流探讨', type: 'INFO' });
     return;
   }
@@ -1021,26 +1141,211 @@ async function submitSubComment(answer) {
       target_id: String(answer.id),
       content: draft.trim(),
       author_id: currentUserId.value,
+      author_name: currentUserNick.value,
     });
     if (res.ok && res.data) {
-      commentTree.value.push({
-        id: res.data.id || res.data.comment_id,
-        target_type: 'ANSWER',
-        target_id: String(answer.id),
-        author_name: currentUserNick.value,
-        ip_location: '来自 浙江',
-        created_at: '刚刚',
-        content: draft.trim(),
-        upvote_count: 0,
-        children: [],
-      });
+      commentTree.value.push(mapCommentNode(res.data));
       answer.comment_count = (answer.comment_count || 0) + 1;
+      props.post.comment_count = (props.post.comment_count || 0) + 1;
+      props.post.replies = props.post.comment_count;
       subCommentDraft.value[answer.id] = '';
       emit('toast', { title: '探讨已发表', message: '您的观点补充已成功发表！', type: 'SUCCESS' });
+    } else {
+      emit('toast', { title: '发表失败', message: res.error || '请稍后重试', type: 'ERROR' });
     }
   } catch (e) {
     emit('toast', { title: '发表失败', message: '网络服务异常', type: 'ERROR' });
   }
+}
+
+async function toggleCommentUpvote(item) {
+  if (!currentUserId.value) {
+    emit('require-login');
+    emit('toast', { title: '需要登录', message: '请先登录以参与探讨互动', type: 'INFO' });
+    return;
+  }
+
+  const prevVote = item.user_vote || null;
+  const prevCount = item.upvote_count || 0;
+  const vtype = prevVote === 'UPVOTE' ? 'CANCEL' : 'UPVOTE';
+
+  item.user_vote = vtype === 'UPVOTE' ? 'UPVOTE' : null;
+  item.upvote_count = Math.max(0, prevCount + (vtype === 'UPVOTE' ? 1 : -1));
+
+  try {
+    const res = await dispatchGateway('forum.vote', {
+      user_id: currentUserId.value,
+      target_type: 'COMMENT',
+      target_id: String(item.id),
+      vote_type: vtype,
+    }, { silent: true });
+    if (res.ok && res.data) {
+      item.user_vote = res.data.user_vote;
+      item.upvote_count = res.data.upvote_count;
+    } else {
+      item.user_vote = prevVote;
+      item.upvote_count = prevCount;
+    }
+  } catch (e) {
+    item.user_vote = prevVote;
+    item.upvote_count = prevCount;
+  }
+}
+
+function setReplyTarget(parentComment, subAuthorName = null) {
+  replyTarget.value = {
+    parentId: parentComment.id,
+    authorName: subAuthorName || parentComment.author_name,
+  };
+}
+
+async function submitReply() {
+  const content = replyText.value.trim();
+  if (!content) return;
+  if (!currentUserId.value) {
+    emit('require-login');
+    emit('toast', { title: '需要登录', message: '请先登录以发表实战见解', type: 'INFO' });
+    return;
+  }
+
+  isSubmitting.value = true;
+  try {
+    const parentId = replyTarget.value?.parentId || null;
+    const parent = parentId ? commentTree.value.find((c) => c.id === parentId) : null;
+
+    const res = await dispatchGateway('forum.comments.create', {
+      thread_id: String(props.post.id),
+      target_type: parent ? (parent.target_type || 'THREAD') : 'THREAD',
+      target_id: parent ? (parent.target_id || String(props.post.id)) : String(props.post.id),
+      content,
+      author_id: currentUserId.value,
+      author_name: currentUserNick.value,
+      parent_id: parentId,
+      reply_to_user_id: parent ? (parent.author_id || null) : null,
+    });
+
+    if (res.ok && res.data) {
+      const node = mapCommentNode(res.data);
+      node.reply_to_name = replyTarget.value?.authorName || null;
+      if (parent) {
+        if (!parent.children) parent.children = [];
+        parent.children.push(node);
+      } else {
+        commentTree.value.unshift(node);
+      }
+      props.post.comment_count = (props.post.comment_count || 0) + 1;
+      props.post.replies = props.post.comment_count;
+      replyText.value = '';
+      replyTarget.value = null;
+      emit('toast', {
+        title: '发表成功',
+        message: '您的实战见解已通过审查并即时汇入风暴讨论树！',
+        type: 'SUCCESS',
+      });
+    } else {
+      emit('toast', { title: '发表失败', message: res.error || '请稍后重试', type: 'ERROR' });
+    }
+  } catch (e) {
+    emit('toast', { title: '发表失败', message: '网络或服务异常，请稍后重试', type: 'ERROR' });
+  } finally {
+    isSubmitting.value = false;
+  }
+}
+
+function requestConfirm(key, action) {
+  if (armedDeleteKey.value === key) {
+    armedDeleteKey.value = '';
+    clearTimeout(disarmTimer);
+    action();
+    return;
+  }
+  armedDeleteKey.value = key;
+  clearTimeout(disarmTimer);
+  disarmTimer = setTimeout(() => {
+    armedDeleteKey.value = '';
+  }, 3000);
+}
+
+function countSubtree(comment) {
+  let total = 1;
+  for (const child of comment.children || []) {
+    total += countSubtree(child);
+  }
+  return total;
+}
+
+function removeFromCommentTree(commentId) {
+  const idx = commentTree.value.findIndex((c) => c.id === commentId);
+  if (idx !== -1) {
+    const [removed] = commentTree.value.splice(idx, 1);
+    return countSubtree(removed);
+  }
+  for (const root of commentTree.value) {
+    const children = root.children || [];
+    const childIdx = children.findIndex((c) => c.id === commentId);
+    if (childIdx !== -1) {
+      const [removed] = children.splice(childIdx, 1);
+      return countSubtree(removed);
+    }
+  }
+  return 0;
+}
+
+function deleteComment(comment, parentComment = null) {
+  requestConfirm(`comment:${comment.id}`, async () => {
+    if (!currentUserId.value) {
+      emit('require-login');
+      return;
+    }
+    const subtreeSize = countSubtree(comment);
+    try {
+      const res = await dispatchGateway('forum.comments.delete', {
+        comment_id: String(comment.id),
+      });
+      if (res.ok && res.data) {
+        removeFromCommentTree(comment.id);
+        props.post.comment_count = Math.max(0, (props.post.comment_count || 0) - subtreeSize);
+        props.post.replies = props.post.comment_count;
+        emit('toast', { title: '评论已删除', message: '该评论及其子评论已同步移除。', type: 'SUCCESS' });
+      } else {
+        emit('toast', { title: '删除失败', message: res.error || '请稍后重试', type: 'ERROR' });
+      }
+    } catch (e) {
+      emit('toast', { title: '删除异常', message: '服务暂时不可用，请稍后重试', type: 'ERROR' });
+    }
+  });
+}
+
+function deleteAnswer(answer) {
+  requestConfirm(`answer:${answer.id}`, async () => {
+    if (!currentUserId.value) {
+      emit('require-login');
+      return;
+    }
+    try {
+      const res = await dispatchGateway('forum.answers.delete', {
+        answer_id: String(answer.id),
+      });
+      if (res.ok && res.data) {
+        answersList.value = answersList.value.filter((a) => a.id !== answer.id);
+        const removedComments = getAnswerComments(answer.id).length;
+        if (removedComments > 0) {
+          commentTree.value = commentTree.value.filter((c) => String(c.target_id) !== String(answer.id));
+        }
+        props.post.answer_count = Math.max(0, (props.post.answer_count || 0) - 1);
+        props.post.comment_count = Math.max(0, (props.post.comment_count || 0) - removedComments);
+        props.post.replies = props.post.comment_count;
+        if (props.post.accepted_answer_id === answer.id) {
+          props.post.accepted_answer_id = null;
+        }
+        emit('toast', { title: '回答已删除', message: '该观点回答及其探讨与投票已同步移除。', type: 'SUCCESS' });
+      } else {
+        emit('toast', { title: '删除失败', message: res.error || '请稍后重试', type: 'ERROR' });
+      }
+    } catch (e) {
+      emit('toast', { title: '删除异常', message: '服务暂时不可用，请稍后重试', type: 'ERROR' });
+    }
+  });
 }
 
 const fullPostContent = computed(() => {
@@ -1073,128 +1378,6 @@ const replyPlaceholder = computed(() => {
   }
   return '分享您的实战经验、避坑细节或针对该方案提出见解...（支持富文本交流）';
 });
-
-async function toggleThreadUpvote() {
-  const wasUpvoted = threadUpvoted.value;
-  const previousCount = threadUpvoteCount.value;
-  threadUpvoted.value = !wasUpvoted;
-  threadUpvoteCount.value = Math.max(0, previousCount + (wasUpvoted ? -1 : 1));
-  try {
-    const res = await dispatchGateway('content.interaction.toggle', {
-      target_type: 'FORUM_THREAD',
-      target_id: String(props.post.id),
-      kind: 'LIKE',
-      target_title: props.post.title || '',
-    });
-    if (res.ok && res.data) {
-      threadUpvoted.value = Boolean(res.data.viewer?.liked);
-      threadUpvoteCount.value = Number(res.data.like_count || 0);
-      if (props.post) {
-        props.post.is_upvoted = threadUpvoted.value;
-        props.post.upvotes = threadUpvoteCount.value;
-        props.post.upvote_count = threadUpvoteCount.value;
-        props.post.like_count = threadUpvoteCount.value;
-        props.post.viewer = res.data.viewer;
-      }
-      emit('upvote', {
-        post: props.post,
-        isUpvoted: threadUpvoted.value,
-        count: threadUpvoteCount.value,
-      });
-      emit('update-post', props.post);
-    } else {
-      threadUpvoted.value = wasUpvoted;
-      threadUpvoteCount.value = previousCount;
-      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
-      return;
-    }
-  } catch (e) {
-    threadUpvoted.value = wasUpvoted;
-    threadUpvoteCount.value = previousCount;
-    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
-    return;
-  }
-
-  emit('toast', {
-    title: threadUpvoted.value ? '已点赞实战经验' : '已取消点赞',
-    message: threadUpvoted.value ? '感谢对创客实战经验的认可！' : '已更新您的点赞状态',
-    type: 'SUCCESS',
-  });
-}
-
-async function toggleThreadLove() {
-  const wasLoved = threadLoved.value;
-  const previousCount = threadLoveCount.value;
-  threadLoved.value = !wasLoved;
-  threadLoveCount.value = Math.max(0, previousCount + (wasLoved ? -1 : 1));
-  try {
-    const res = await dispatchGateway('content.interaction.toggle', {
-      target_type: 'FORUM_THREAD',
-      target_id: String(props.post.id),
-      kind: 'LOVE',
-      target_title: props.post.title || '',
-    });
-    if (res.ok && res.data) {
-      threadLoved.value = Boolean(res.data.viewer?.loved);
-      threadLoveCount.value = Number(res.data.love_count || 0);
-      if (props.post) {
-        props.post.is_loved = threadLoved.value;
-        props.post.love_count = threadLoveCount.value;
-        props.post.viewer = res.data.viewer;
-      }
-      emit('update-post', props.post);
-    } else {
-      threadLoved.value = wasLoved;
-      threadLoveCount.value = previousCount;
-      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
-    }
-  } catch (e) {
-    threadLoved.value = wasLoved;
-    threadLoveCount.value = previousCount;
-    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
-  }
-}
-
-async function toggleThreadBookmark() {
-  const wasBookmarked = threadBookmarked.value;
-  threadBookmarked.value = !wasBookmarked;
-  try {
-    const res = await dispatchGateway('content.interaction.toggle', {
-      target_type: 'FORUM_THREAD',
-      target_id: String(props.post.id),
-      kind: 'FAVORITE',
-      target_title: props.post.title || '',
-    });
-    if (res.ok && res.data) {
-      threadBookmarked.value = Boolean(res.data.viewer?.favorited);
-      if (props.post) {
-        props.post.is_bookmarked = threadBookmarked.value;
-        props.post.bookmark_count = Number(res.data.favorite_count || 0);
-        props.post.favorite_count = Number(res.data.favorite_count || 0);
-        props.post.viewer = res.data.viewer;
-      }
-      emit('bookmark', {
-        post: props.post,
-        isBookmarked: threadBookmarked.value,
-      });
-      emit('update-post', props.post);
-    } else {
-      threadBookmarked.value = wasBookmarked;
-      emit('toast', { title: '操作未完成', message: res.error || '请稍后重试。', type: 'ERROR' });
-      return;
-    }
-  } catch (e) {
-    threadBookmarked.value = wasBookmarked;
-    emit('toast', { title: '操作异常', message: '互动服务暂时不可用，请稍后重试。', type: 'ERROR' });
-    return;
-  }
-
-  emit('toast', {
-    title: threadBookmarked.value ? '已收藏归档' : '已移出收藏夹',
-    message: threadBookmarked.value ? '该实战帖已归档至您的个人知识库收藏目录！' : '已从知识库收藏目录移除',
-    type: 'SUCCESS',
-  });
-}
 
 async function copyTextToClipboard(text) {
   if (navigator?.clipboard?.writeText && window.isSecureContext) {
@@ -1235,7 +1418,7 @@ async function handleCopyLink() {
     } catch (e) {}
   }
 
-  const shareText = `【OpcHub 头脑风暴实战经验分享】\n《${props.post?.title || '实战经验'}》\n分类：${categoryLabel.value} · 作者：${props.post?.author || '认证创客'}\n查看详情与交流探讨：\n${shareUrl}`;
+  const shareText = `【OpcHub 头脑风暴实战经验分享】\n《${props.post?.title || '实战经验'}》\n分类：${categoryLabel.value} · 作者：${props.post?.author || ''}\n查看详情与交流探讨：\n${shareUrl}`;
 
   const ok = await copyTextToClipboard(shareText);
   if (ok) {
@@ -1256,124 +1439,6 @@ async function handleCopyLink() {
       message: `链接：${shareUrl}`,
       type: 'INFO',
     });
-  }
-}
-
-// 举报进入平台审核队列（moderation.report），由运营复核后下架/恢复，
-// 与全站统一的 ContentInteractionBar 举报走同一条链路。
-async function handleReport() {
-  const post = props.post || {};
-  try {
-    const res = await dispatchGateway('moderation.report', {
-      target_type: 'FORUM_THREAD',
-      target_id: String(post.id || ''),
-      target_title: post.title || '',
-      snippet_content: post.title || '',
-      author_id: post.author_id || '',
-      author_name: post.author_name || '',
-      reason: '头脑风暴帖子被举报：疑似违规或内容失实',
-    });
-    if (res.ok && res.data) {
-      emit('toast', {
-        title: '已提交合规复审',
-        message: '举报已进入平台审核队列，运营复核后将作下架或恢复处理。',
-        type: 'INFO',
-      });
-    } else {
-      emit('toast', {
-        title: '举报未提交',
-        message: res.error || '请稍后重试。',
-        type: 'ERROR',
-      });
-    }
-  } catch (e) {
-    emit('toast', {
-      title: '举报异常',
-      message: '举报服务暂时不可用，请稍后重试。',
-      type: 'ERROR',
-    });
-  }
-}
-
-function toggleCommentUpvote(item) {
-  item.upvoted = !item.upvoted;
-  item.upvote_count = (item.upvote_count || 0) + (item.upvoted ? 1 : -1);
-  if (props.post?.id) {
-    dispatchGateway(
-      'forum.upvote',
-      { target_type: 'COMMENT', target_id: String(item.id) },
-      { silent: true }
-    );
-  }
-}
-
-function setReplyTarget(parentComment, subAuthorName = null) {
-  replyTarget.value = {
-    parentId: parentComment.id,
-    authorName: subAuthorName || parentComment.author_name,
-  };
-}
-
-async function submitReply() {
-  const content = replyText.value.trim();
-  if (!content) return;
-
-  isSubmitting.value = true;
-
-  try {
-    const parentId = replyTarget.value?.parentId || null;
-    const authorName = props.userSession?.nickname || '我的创客号';
-
-    if (parentId) {
-      const parent = commentTree.value.find((c) => c.id === parentId);
-      if (parent) {
-        if (!parent.children) parent.children = [];
-        parent.children.push({
-          id: `c-local-${Date.now()}`,
-          author_name: authorName,
-          reply_to_name: replyTarget.value?.authorName,
-          ip_location: '来自 本地',
-          created_at: '刚刚',
-          upvote_count: 0,
-          upvoted: false,
-          content,
-        });
-      }
-    } else {
-      commentTree.value.unshift({
-        id: `c-local-${Date.now()}`,
-        author_name: authorName,
-        ip_location: '来自 本地',
-        created_at: '刚刚',
-        is_accepted: false,
-        upvote_count: 0,
-        upvoted: false,
-        content,
-        children: [],
-      });
-    }
-
-    if (props.post?.id && typeof props.post.id === 'string' && props.post.id.length > 10) {
-      dispatchGateway('forum.comments.create', {
-        comment_payload: {
-          thread_id: props.post.id,
-          parent_id: parentId,
-          content,
-          author_id: props.userSession?.id || 'maker-local',
-        },
-      }, { silent: true });
-    }
-
-    emit('toast', {
-      title: '发表成功',
-      message: '您的实战见解已通过审查并即时汇入风暴讨论树！',
-      type: 'SUCCESS',
-    });
-
-    replyText.value = '';
-    replyTarget.value = null;
-  } finally {
-    isSubmitting.value = false;
   }
 }
 </script>
@@ -1498,40 +1563,8 @@ async function submitReply() {
   flex-wrap: wrap;
 }
 
-.btn-header-action {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: var(--radius-md);
-  background: var(--glass-surface-subtle);
-  border: 1px solid var(--glass-border);
-  color: var(--text-secondary);
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: var(--transition-liquid);
-}
-
-.btn-header-action:hover {
-  background: var(--glass-surface-hover);
-  color: var(--accent);
-  border-color: var(--accent);
-}
-
-.btn-header-action.active {
-  background: var(--accent);
-  color: #fff;
-  border-color: var(--accent);
-}
-
-.count-tag {
-  font-size: 11px;
-  opacity: 0.85;
-}
-
-.btn-header-ghost-report {
-  display: flex;
+.btn-header-ghost-action {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   padding: 7px 10px;
@@ -1544,9 +1577,10 @@ async function submitReply() {
   transition: all 0.2s ease;
 }
 
-.btn-header-ghost-report:hover {
-  background: var(--status-danger-soft);
-  color: var(--status-danger);
+.btn-header-ghost-action:hover,
+.btn-header-ghost-action.active {
+  background: var(--glass-surface-hover);
+  color: var(--accent);
 }
 
 .btn-header-ghost-delete {
@@ -1566,12 +1600,6 @@ async function submitReply() {
 .btn-header-ghost-delete:hover {
   background: var(--status-danger-soft);
   border-color: var(--status-danger);
-}
-
-.btn-delete-action:hover {
-  border-color: var(--status-danger) !important;
-  color: var(--status-danger) !important;
-  background: var(--status-danger-soft) !important;
 }
 
 /* Equal-Width Article Container (页面等宽统一体系) */
@@ -1690,58 +1718,66 @@ async function submitReply() {
   color: var(--text-primary);
 }
 
-/* Bottom Action Buttons */
+/* Bottom Action Cluster: vote group + write + follow */
 .article-bottom-actions {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 16px;
+  gap: 14px;
   flex-wrap: wrap;
-  padding: 12px 0 6px;
+  padding: 4px 0 10px;
 }
 
-.btn-action-big {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 22px;
-  font-size: 14px;
-  font-weight: 600;
-  border-radius: var(--radius-md);
-}
-
-.badge-count {
-  padding: 2px 7px;
-  border-radius: var(--radius-full);
-  background: rgba(255, 255, 255, 0.2);
-  font-size: 12px;
-}
-
-.btn-outline-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+.vote-group-big .btn-zhihu-vote {
+  padding: 9px 18px;
   font-size: 13.5px;
-  font-weight: 500;
-  border-radius: var(--radius-md);
+  gap: 6px;
+}
+
+.btn-action-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  font-size: 12.5px;
+  font-weight: 600;
+  border-radius: var(--radius-sm, 6px);
   background: var(--glass-surface-subtle);
   border: 1px solid var(--glass-border);
-  color: var(--text-primary);
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: var(--transition-liquid);
+  transition: all 0.18s ease;
 }
 
-.btn-outline-action:hover {
-  background: var(--glass-surface-hover);
+.btn-action-ghost:hover {
   border-color: var(--accent);
   color: var(--accent);
+  background: var(--glass-surface-hover);
 }
 
-.btn-outline-action.active {
+.btn-action-ghost.active {
   background: var(--accent-glass);
   border-color: var(--accent);
   color: var(--accent);
+}
+
+.btn-action-ghost:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.detail-interaction-row {
+  padding-top: 10px;
+  border-top: 1px dashed var(--glass-border-subtle);
+}
+
+.btn-danger-action {
+  color: var(--text-tertiary);
+}
+
+.btn-danger-action:hover {
+  color: var(--status-danger) !important;
+  background: var(--status-danger-soft) !important;
 }
 
 /* Discussions Section */
@@ -2013,6 +2049,39 @@ async function submitReply() {
   }
 }
 
+/* Thread Edit Panel */
+.edit-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.edit-title-input {
+  width: 100%;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 14px;
+}
+
+.edit-content-textarea {
+  width: 100%;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.65;
+  resize: vertical;
+  min-height: 180px;
+}
+
+.btn-save-edit {
+  padding: 9px 20px;
+  font-size: 13px;
+}
+
+.btn-save-edit:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* Zhihu Answer Composer & Answer Stream Styles */
 .answer-composer-card {
   padding: 24px;
@@ -2047,6 +2116,11 @@ async function submitReply() {
   align-items: center;
   justify-content: center;
   font-size: 16px;
+}
+.composer-avatar-img {
+  background: transparent;
+  overflow: hidden;
+  padding: 0;
 }
 
 .composer-title {
@@ -2166,6 +2240,21 @@ async function submitReply() {
   gap: 20px;
 }
 
+.answers-empty-box {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.empty-icon-ring {
+  font-size: 26px;
+}
+
 .answer-item-card {
   padding: 22px;
   border-radius: var(--radius-md, 12px);
@@ -2244,6 +2333,12 @@ async function submitReply() {
 .ans-sub-line {
   font-size: 11.5px;
   color: var(--text-tertiary);
+}
+
+.ans-author-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-accept-toggle {

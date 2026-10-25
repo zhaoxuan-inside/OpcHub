@@ -58,17 +58,14 @@ def test_compliance_view_categories_and_features():
     for label in ("全部", "法条", "案例", "热门"):
         assert f"label: '{label}'" in source or f"'{label}'" in source
 
-    # 2. 右上角发布按钮 + 内容区内联创建视图（同论坛"发起新风暴话题"，非弹窗）
+    # 2. 右上角发布按钮 + 全页 CreatePageLayout 发布视图（非弹窗）
     assert "openPublishModal" in source
     assert "submitPublish" in source
     assert "发布法条 / 案例" in source or "发布法条/案例" in source
     assert "compliance.publish" in source
     assert "currentViewMode" in source
-    assert "compliance-create-page" in source
-    assert "create-page-header" in source
-    assert "create-workspace-box" in source
-    assert "btn-back-square" in source
-    # 弹窗已移除（内容区展开，不再使用 Teleport modal）
+    assert "CreatePageLayout" in source
+    # 弹窗体系已整体移除（发布走 CreatePageLayout，详情为内联展开）
     assert "Teleport" not in source
     assert "modal-backdrop" not in source
 

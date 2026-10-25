@@ -22,8 +22,10 @@ class MakerProfileResponse(BaseModel):
     tier_name: str
     account_type: Optional[str] = "MAKER"
     industry_track: Optional[str] = ""
+    avatar_id: Optional[str] = ""
     phone: Optional[str] = ""
     email: Optional[str] = ""
+    agreement_version: Optional[str] = ""
     entitlements: List[EntitlementItem]
 
 
@@ -34,6 +36,7 @@ class UserProfileUpdateRequest(BaseModel):
     company_name: Optional[str] = None
     credit_code: Optional[str] = None
     industry_track: Optional[str] = None
+    avatar_id: Optional[str] = None
 
 
 

@@ -113,7 +113,7 @@
             <!-- Loading State Indicator -->
             <div v-if="isLoading && displayPerks.length === 0" class="posts-loading-banner glass-box">
               <span class="loading-spinner"></span>
-              <span>正在从网关加载「{{ currentCategoryLabel }}」生态优惠公告...</span>
+              <span>正在加载「{{ currentCategoryLabel }}」生态优惠公告...</span>
             </div>
 
             <!-- Perks Cards Grid (政策中心同款卡片流) -->
@@ -374,8 +374,8 @@
                       <span class="spec-value">{{ selectedPerk.redeem_url || '暂未开放线上直达' }}</span>
                     </div>
                     <div class="spec-item" style="grid-column: span 2;">
-                      <span class="spec-label">微内核数据校验</span>
-                      <span class="spec-value spec-success">PostgreSQL 公告库持久化 & 微内核发布门禁校验</span>
+                      <span class="spec-label">公告审核</span>
+                      <span class="spec-value spec-success">平台审核上架 · 优惠信息可溯源</span>
                     </div>
                   </div>
                 </div>
@@ -397,7 +397,7 @@
                 {{ searchQuery ? `没有检索到与 “${searchQuery}” 匹配的生态优惠公告。` : '当前分类下暂无已上架的优惠公告。' }}
               </p>
               <div class="empty-actions">
-                <button v-if="searchQuery || currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
+                <button v-if="!isSearchActive && currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
                 <button class="btn-liquid" @click="openPublishPage">
@@ -595,7 +595,7 @@ async function loadPerks() {
       perks.value = [];
       emit('toast', {
         title: '公告加载未完成',
-        message: res.error || '未能从网关获取生态优惠公告，请稍后重试。',
+        message: res.error || '未能获取生态优惠公告，请稍后重试。',
         type: 'WARN',
       });
     }
@@ -604,7 +604,7 @@ async function loadPerks() {
     perks.value = [];
     emit('toast', {
       title: '数据同步异常',
-      message: '未能从网关同步优惠公告列表，请稍后重试。',
+      message: '未能同步优惠公告列表，请稍后重试。',
       type: 'ERROR',
     });
   } finally {
@@ -640,11 +640,18 @@ const currentCategoryLabel = computed(() => {
   return c ? c.label : '全部公告';
 });
 
-// Display list with category filter
+// Display list with category filter + local keyword filter (non-destructive)
 const displayPerks = computed(() => {
   let list = [...perks.value];
   if (currentCategory.value !== 'ALL') {
     list = list.filter((p) => (p.category || '').toUpperCase() === currentCategory.value.toUpperCase());
+  }
+  if (isSearchActive.value && activeSearchQuery.value) {
+    const q = activeSearchQuery.value.toLowerCase();
+    list = list.filter((p) => [p.name, p.provider, p.summary, ...(p.highlights || [])]
+      .join(' ')
+      .toLowerCase()
+      .includes(q));
   }
   return list;
 });
@@ -674,40 +681,27 @@ const sortedDisplayPerks = computed(() => {
 });
 
 // Search handling (local keyword filter over the announcement corpus)
-async function handleSearch() {
+function handleSearch() {
   const q = searchQuery.value.trim();
   if (!q) {
     resetSearch();
     return;
   }
+  isSearchActive.value = true;
+  activeSearchQuery.value = q;
+}
 
-  isSearching.value = true;
-  try {
-    const qLower = q.toLowerCase();
-    const matched = perks.value.filter((p) => {
-      const text = [p.name, p.provider, p.summary, ...(p.highlights || [])]
-        .join(' ')
-        .toLowerCase();
-      return text.includes(qLower);
-    });
-    perks.value = matched;
-    isSearchActive.value = true;
-    activeSearchQuery.value = q;
-    emit('toast', {
-      title: '搜索完成',
-      message: `已为您完成关键词 “${q}” 的精确比对，共匹配 ${matched.length} 条优惠公告。`,
-      type: 'INFO',
-    });
-  } finally {
-    isSearching.value = false;
-  }
+function handleClearSearch() {
+  resetSearch();
 }
 
 async function resetSearch() {
   searchQuery.value = '';
   isSearchActive.value = false;
   activeSearchQuery.value = '';
-  await loadPerks();
+  if (perks.value.length === 0) {
+    await loadPerks();
+  }
 }
 
 // Mouse glow effect
@@ -723,24 +717,41 @@ function handleMouseMove(e) {
 // Manual Refresh
 async function handleManualRefresh() {
   await loadPerks();
-  emit('toast', {
-    title: '公告板已更新',
-    message: '已从网关同步最新生态优惠公告。',
-    type: 'SUCCESS',
-  });
 }
 
 // Open external redeem URL
-function openPerkUrl(perk) {
-  if (perk.redeem_url) {
-    window.open(perk.redeem_url, '_blank', 'noopener,noreferrer');
+async function openPerkUrl(perk) {
+  if (!currentUserSession.value) {
+    emit('open-login');
     return;
   }
-  emit('toast', {
-    title: '公告详情',
-    message: `「${perk.name}」暂未开放线上直达领取，请关注平台后续公告或联系对应服务商。`,
-    type: 'INFO',
-  });
+  const uid = currentUserSession.value?.uid || currentUserSession.value?.user?.uid || '';
+  try {
+    const res = await dispatchGateway('perks.claim', { perk_id: perk.id, user_id: uid });
+    if (res.ok && res.data) {
+      emit('toast', {
+        title: '领取成功',
+        message: `兑换凭据 ${res.data.voucher_code} 已生成${res.data.instructions ? `：${res.data.instructions}` : ''}`,
+        type: 'SUCCESS',
+      });
+      await loadPerks();
+      if (perk.redeem_url) {
+        window.open(perk.redeem_url, '_blank', 'noopener,noreferrer');
+      }
+    } else {
+      emit('toast', {
+        title: '领取未完成',
+        message: res.error || `「${perk.name}」领取失败，请稍后重试。`,
+        type: 'ERROR',
+      });
+    }
+  } catch (e) {
+    emit('toast', {
+      title: '领取异常',
+      message: '权益领取服务暂时不可用，请稍后重试。',
+      type: 'ERROR',
+    });
+  }
 }
 
 // Inline Detail
@@ -836,7 +847,7 @@ async function submitPublishPerk() {
     if (res.ok) {
       emit('toast', {
         title: '公告发布成功',
-        message: `《${publishForm.value.name}》已通过平台敏感词校验并上架生态优惠公告板。`,
+        message: `《${publishForm.value.name}》已通过平台审核并上架生态优惠公告板。`,
         type: 'SUCCESS',
       });
       showPublishPage.value = false;
@@ -958,7 +969,9 @@ function validityText(perk) {
   padding: 8px 14px;
   border-radius: var(--radius-md, 14px);
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   background: var(--glass-surface);
   backdrop-filter: var(--blur-strength, blur(16px) saturate(160%));
   border: 1px solid var(--glass-border);
@@ -1818,43 +1831,6 @@ function validityText(perk) {
   font-size: 11.5px;
 }
 
-/* ---------------- Publish Modal ---------------- */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.45);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.perks-publish-modal {
-  width: 100%;
-  max-width: 600px;
-  max-height: 90vh;
-  border-radius: var(--radius-xl, 24px);
-  padding: 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
-  box-sizing: border-box;
-  overflow: hidden;
-  background: var(--glass-surface-solid, rgba(255, 255, 255, 0.98));
-  border: 1px solid var(--glass-border);
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
 .modal-title {
   font-size: 19px;
   font-weight: 700;
@@ -1865,27 +1841,6 @@ function validityText(perk) {
   font-size: 12px;
   color: var(--text-secondary);
   margin: 4px 0 0 0;
-}
-
-.modal-close-btn {
-  border: none;
-  background: var(--glass-surface-subtle);
-  color: var(--text-secondary);
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.modal-close-btn:hover {
-  background: var(--glass-surface-hover);
-  color: var(--text-primary);
 }
 
 

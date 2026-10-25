@@ -131,7 +131,7 @@
                 <!-- Card Top: Category Icon & Basic Info -->
                 <div class="card-header-row">
                   <div class="app-icon-wrapper opc-card-icon">
-                    <div class="app-icon-fallback" :style="getIconFallbackStyle(item)">
+                    <div class="app-icon-fallback" :style="getIconFallbackStyle()">
                       <OpcIcon :name="getCategoryIcon(item.category)" :size="22" />
                     </div>
                   </div>
@@ -171,7 +171,7 @@
                 <!-- Card Footer: Publisher + Bidders + Actions -->
                 <div class="card-footer-row" @click.stop>
                   <div class="author-cell">
-                    <div class="author-avatar" :style="getAuthorAvatarStyle(item)">
+                    <div class="author-avatar" :style="getAuthorAvatarStyle()">
                       {{ getInitials(item.creator_name || item.creator_id) }}
                     </div>
                     <div class="author-text">
@@ -242,7 +242,7 @@
 
               <div class="detail-header">
                 <div class="detail-icon-wrap">
-                  <div class="app-icon-fallback detail-icon-fallback" :style="getIconFallbackStyle(selectedDemand)">
+                  <div class="app-icon-fallback detail-icon-fallback" :style="getIconFallbackStyle()">
                     <OpcIcon :name="getCategoryIcon(selectedDemand.category)" :size="26" />
                   </div>
                 </div>
@@ -331,8 +331,8 @@
                       <span class="spec-value mono-val">{{ formatDate(selectedDemand.created_at) }}</span>
                     </div>
                     <div class="spec-item">
-                      <span class="spec-label">数据与持久化</span>
-                      <span class="spec-value spec-success">PostgreSQL 库表持久存储</span>
+                      <span class="spec-label">交易保障</span>
+                      <span class="spec-value spec-success">平台担保交易 · 全程留痕</span>
                     </div>
                   </div>
                 </div>
@@ -412,7 +412,7 @@
                 <span class="hot-badge-fire"><OpcIcon name="flame" :size="14" /></span>
                 <h4 class="sidebar-title">今日商机热榜</h4>
               </div>
-              <span class="hot-subtitle">实时更新</span>
+              <span class="hot-subtitle">竞标排行</span>
             </div>
 
             <div class="hot-ranking-list">
@@ -426,7 +426,7 @@
                 <div class="hot-item-content">
                   <h5 class="hot-item-title">{{ item.title }}</h5>
                   <div class="hot-item-meta">
-                    <span><OpcIcon name="flame" :size="12" /> {{ (item.bidders_count || 0) * 3 + 42 }} 热度</span>
+                    <span><OpcIcon name="flame" :size="12" /> {{ item.bidders_count || 0 }} 家竞标</span>
                     <span class="dot-sep">·</span>
                     <span>¥{{ formatBudget(item.budget_cny) }}</span>
                   </div>
@@ -443,8 +443,6 @@
             </p>
             <div class="guidelines-footer">
               <span>OpcHub 商机撮合协议 v1.0</span>
-              <span class="dot-sep">·</span>
-              <span class="link-span" @click="handleOpenPublish">发布委托</span>
             </div>
           </div>
 
@@ -537,7 +535,7 @@ import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
 import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
-const emit = defineEmits(['open-register', 'open-login', 'toast']);
+const emit = defineEmits(['open-login', 'toast']);
 
 function handleInteractionChanged(item, payload) {
   applyBarChange(item, payload);
@@ -561,7 +559,6 @@ const totalCount = ref(0);
 const loading = ref(false);
 const loadingMore = ref(false);
 const submitting = ref(false);
-const isCacheHit = ref(false);
 
 const searchQuery = ref('');
 const isSearching = ref(false);
@@ -737,7 +734,7 @@ function getInitials(name) {
   return clean.slice(0, 2).toUpperCase() || '企';
 }
 
-function getIconFallbackStyle(item) {
+function getIconFallbackStyle() {
   return {
     background: 'linear-gradient(135deg, var(--glass-surface-hover) 0%, var(--glass-surface-subtle) 100%)',
     color: 'var(--text-secondary)',
@@ -745,7 +742,7 @@ function getIconFallbackStyle(item) {
   };
 }
 
-function getAuthorAvatarStyle(item) {
+function getAuthorAvatarStyle() {
   return {
     background: 'linear-gradient(135deg, var(--glass-surface-hover) 0%, var(--glass-surface-subtle) 100%)',
     color: 'var(--text-secondary)',
@@ -773,14 +770,10 @@ function handleDemandsScroll(e) {
 function selectCategory(catKey) {
   if (currentCategory.value === catKey) return;
   currentCategory.value = catKey;
-  if (demandsScrollContainerRef.value) {
-    demandsScrollContainerRef.value.scrollTop = 0;
-  }
   if (isSearchActive.value && searchQuery.value.trim()) {
     handleSearch();
-  } else {
-    resetAndReload();
   }
+  // 列表重载统一由 watch(currentCategory) 驱动，避免同一动作双重拉取
 }
 
 async function handleSearch() {
@@ -847,7 +840,6 @@ async function fetchDemandsPage(page, isAppend = false) {
   // 1. Check client memory cache
   const cachedData = getClientCache(cacheKey);
   if (cachedData) {
-    isCacheHit.value = true;
     applyPageData(cachedData, isAppend);
     return;
   }
@@ -869,7 +861,6 @@ async function fetchDemandsPage(page, isAppend = false) {
 
     if (res.ok && res.data) {
       const pagedData = res.data;
-      isCacheHit.value = Boolean(pagedData.from_cache);
       setClientCache(cacheKey, pagedData);
       applyPageData(pagedData, isAppend);
     } else {
@@ -919,13 +910,15 @@ function resetAndReload() {
 // Manual Refresh
 function handleManualRefresh() {
   invalidateClientCache();
-  isCacheHit.value = false;
   resetAndReload();
   emit('toast', { title: '缓存已刷新', message: '已同步最新数据库企业委托与竞标热榜。', type: 'INFO' });
 }
 
 // Watch filters to trigger reload
 watch(currentCategory, () => {
+  if (demandsScrollContainerRef.value) {
+    demandsScrollContainerRef.value.scrollTop = 0;
+  }
   if (!isSearchActive.value) {
     resetAndReload();
   }
@@ -1025,7 +1018,6 @@ async function submitPublishDemand() {
       category: publishForm.category,
       budget_cny: Number(publishForm.budget_cny) || 0,
       deadline_days: Number(publishForm.deadline_days) || 14,
-      creator_id: currentUserSession.value?.uid || 'usr_maker',
       creator_name: currentUserSession.value?.nickname || currentUserSession.value?.username || '@企业委托方',
     };
 
@@ -1092,7 +1084,6 @@ async function submitBid() {
   try {
     const res = await dispatchGateway('demands.bid', {
       demand_id: bidTarget.value.id,
-      bidder_id: currentUserSession.value?.uid || 'usr_maker',
       bid_amount_cny: Number(bidForm.bid_amount_cny) || 0,
       delivery_days: Number(bidForm.delivery_days) || 14,
       proposal_text: bidForm.proposal_text.trim(),
@@ -1233,7 +1224,9 @@ onUnmounted(() => {
   padding: 8px 14px;
   border-radius: var(--radius-md, 14px);
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  min-width: 0;
   background: var(--glass-surface);
   backdrop-filter: var(--blur-strength, blur(16px) saturate(160%));
   border: 1px solid var(--glass-border);
@@ -2267,11 +2260,7 @@ onUnmounted(() => {
 
 @media (max-width: 600px) {
   .feed-filter-bar {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  .feed-filter-right {
-    justify-content: space-between;
+    overflow-x: auto;
   }
 }
 
