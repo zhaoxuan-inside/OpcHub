@@ -51,3 +51,4 @@ hs-dev-skill/state/
 
 # Docker runtime secrets
 .env.docker
+/deploy/

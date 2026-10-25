@@ -1,17 +1,28 @@
 # ==============================================================================
-# OpcHub 生产部署编排 — backend / frontend / postgres / redis 四服务
-# 同一主机，服务间通过 opchub-net Docker 网络以服务名互访：
-#   backend  → postgres:5432, redis:6379（基础设施就绪位）
-#   frontend → backend:8000（/api 反向代理）
-# 端口可通过环境变量覆盖：BACKEND_PORT / FRONTEND_PORT
-# 数据库凭据使用 OPCHUB_PG_* 前缀（与宿主机开发用 .env 的 POSTGRES_* 解耦，
-# 避免开发配置中含 '@' 等特殊字符的密码破坏容器内连接串插值）。
+# OpcHub 生产部署编排（服务器运行版）— backend / frontend / postgres / redis 四服务
+#
+# 服务器上的使用方式（无需源码）：
+#   1. docker load -i opchub-images.tar.gz          # 载入前后端镜像
+#   2. cp .env.example .env && vim .env             # 至少修改数据库密码与密钥
+#   3. docker compose up -d                          # 首次自动 pull pg/redis 并自建
+#   4. 浏览器访问 http://<服务器IP>:3000  （首次用 admin 初始密码登录后强制轮换）
+#
+# 本机重建前后端镜像（在仓库根目录执行，产物即 compose 引用的镜像名）：
+#   docker build -t opchub-backend:latest  -f Dockerfile .
+#   docker build -t opchub-frontend:latest -f frontend/Dockerfile .
+#   docker save opchub-backend:latest opchub-frontend:latest | gzip > opchub-images.tar.gz
+#
+# 说明：
+#   - 数据库凭据用 OPCHUB_PG_* 前缀；密码若含 @ 等特殊字符请改配整体连接串
+#     OPCHUB_DATABASE_URL（密码部分需 URL 转义，如 @ → %40）。
+#   - 网关路由 YAML 已烘焙进后端镜像；如需在服务器热改路由，取消 backend 的
+#     config 挂载注释并提供 ./backend/config 目录。
 # ==============================================================================
 name: opchub
 
 services:
-  # ----------------------------------------------------------------------------
-  # PostgreSQL 16 + pgvector — 关系存储与向量检索 (JSONB / HNSW 余弦距离)
+  # ------------------------------------------------------------------------------
+  # PostgreSQL 18 + pgvector — 关系存储与向量检索 (JSONB / HNSW 余弦距离)
   # ------------------------------------------------------------------------------
   postgres:
     image: pgvector/pgvector:pg18
@@ -24,6 +35,9 @@ services:
     volumes:
       # pg18+ 镜像约定：挂载点为 /var/lib/postgresql（数据落在其子目录，利于 pg_upgrade）
       - pgdata:/var/lib/postgresql
+    # 如需从宿主机直连数据库做管理，取消注释并注意防火墙：
+    # ports:
+    #   - "127.0.0.1:5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${OPCHUB_PG_USER:-opc} -d ${OPCHUB_PG_DB:-opchub}"]
       interval: 10s
@@ -34,7 +48,7 @@ services:
       - opchub-net
 
   # ------------------------------------------------------------------------------
-  # Redis 7 — 缓存/限流基础设施就绪位（后端暂未消费，预留扩展）
+  # Redis 8 — 缓存/限流基础设施就绪位（后端暂未消费，预留扩展）
   # ------------------------------------------------------------------------------
   redis:
     image: redis:8-alpine
@@ -55,9 +69,6 @@ services:
   # Backend — FastAPI 微内核 + 统一网关 (端口 8000)
   # ------------------------------------------------------------------------------
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
     image: opchub-backend:latest
     container_name: opchub-backend
     restart: unless-stopped
@@ -69,7 +80,7 @@ services:
     environment:
       - OPCHUB_SERVER_HOST=0.0.0.0
       - OPCHUB_SERVER_PORT=8000
-      - DATABASE_URL=postgresql+asyncpg://${OPCHUB_PG_USER:-opc}:${OPCHUB_PG_PASSWORD:-opchub_secret}@postgres:5432/${OPCHUB_PG_DB:-opchub}
+      - DATABASE_URL=${OPCHUB_DATABASE_URL:-postgresql+asyncpg://${OPCHUB_PG_USER:-opc}:${OPCHUB_PG_PASSWORD:-opchub_secret}@postgres:5432/${OPCHUB_PG_DB:-opchub}}
       - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY:-}
       - WECHAT_PAY_V3_KEY=${WECHAT_PAY_V3_KEY:-}
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
@@ -82,8 +93,8 @@ services:
     volumes:
       # 运行时数据（RAG 向量库回退存储等）持久化
       - appdata:/app/data
-      # 网关路由 YAML 热更新（宿主机编辑即生效）
-      - ./backend/config:/app/backend/config:ro
+      # 需要在服务器热改网关路由时取消注释并提供目录：
+      # - ./backend/config:/app/backend/config:ro
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')\" || exit 1"]
       interval: 15s
@@ -97,9 +108,6 @@ services:
   # Frontend — Vue 3 dist 静态服务 + /api 反向代理 (端口 3000)
   # ------------------------------------------------------------------------------
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
     image: opchub-frontend:latest
     container_name: opchub-frontend
     restart: unless-stopped
