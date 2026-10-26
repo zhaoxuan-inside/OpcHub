@@ -13,11 +13,9 @@
         >
           <label v-if="field.type !== 'richtext'" class="publish-label" :for="`${id}-${field.key}`">
             {{ field.label }}
-            <span v-if="field.required" class="req">*</span>
           </label>
           <div v-else class="publish-label publish-label-block">
             {{ field.label }}
-            <span v-if="field.required" class="req">*</span>
           </div>
 
           <RichEditor
@@ -25,7 +23,8 @@
             :id="`${id}-${field.key}`"
             v-model="model[field.key]"
             :placeholder="field.placeholder"
-            :min-height="field.minHeight || 300"
+            :min-height="field.minHeight || 320"
+            auto-grow
           />
 
           <IconPicker
@@ -72,6 +71,7 @@
             :step="field.step"
             :maxlength="field.maxlength"
             class="glass-input"
+            :class="{ 'publish-input-lead': field.key === 'title' }"
           />
 
           <span v-if="field.hint" class="publish-hint">{{ field.hint }}</span>
@@ -129,34 +129,53 @@ function optionLabel(opt) {
 .publish-form {
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 26px;
+}
+
+.publish-form > .publish-notice {
+  margin: 0;
 }
 
 .publish-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
+}
+
+.publish-section + .publish-section {
+  padding-top: 24px;
+  border-top: 1px solid var(--glass-border-subtle);
 }
 
 .publish-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
-  letter-spacing: 0.08em;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+}
+
+.publish-section-title::before {
+  content: '';
+  width: 3px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
 }
 
 .publish-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
+  gap: 18px 20px;
 }
 
 .publish-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -165,10 +184,22 @@ function optionLabel(opt) {
 }
 
 .publish-label {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-secondary);
   line-height: 1.4;
+}
+
+.publish-input-lead {
+  height: 48px;
+  padding: 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.publish-input-lead::placeholder {
+  font-weight: 400;
 }
 
 .publish-label-block {

@@ -1,5 +1,5 @@
 <template>
-  <div class="rich-editor" :class="{ 'is-empty': isEmpty && !focused }">
+  <div class="rich-editor" :class="{ 'is-empty': isEmpty && !focused, 'is-auto-grow': autoGrow }">
     <!-- Slim icon-only toolbar: formatting groups on the left, mode + count on the right -->
     <div class="re-toolbar" role="toolbar">
       <div class="re-tool-groups">
@@ -181,6 +181,8 @@ const props = defineProps({
   placeholder: { type: String, default: '开始撰写正文……支持标题、列表、代码块、表格与高亮提示框。' },
   minHeight: { type: Number, default: 320 },
   startMode: { type: String, default: 'wysiwyg' }, // 'wysiwyg' | 'markdown'
+  // Grow with content (no inner scrollbar) and dock the toolbar while the page scrolls.
+  autoGrow: { type: Boolean, default: false },
 });
 
 const emit = defineEmits(['update:modelValue']);
@@ -244,14 +246,27 @@ function onWysiwygBlur() {
   onWysiwygInput();
 }
 
-watch(() => props.modelValue, syncFromModel);
+function fitTextarea() {
+  const ta = textareaRef.value;
+  if (!props.autoGrow || !ta || mode.value !== 'markdown') return;
+  ta.style.height = 'auto';
+  ta.style.height = `${ta.scrollHeight}px`;
+}
+
+watch(() => props.modelValue, () => {
+  syncFromModel();
+  nextTick(fitTextarea);
+});
 
 watch(mode, (m) => {
   closeMenus();
   if (m === 'wysiwyg') {
     nextTick(renderSurface);
   } else {
-    nextTick(() => textareaRef.value?.focus());
+    nextTick(() => {
+      fitTextarea();
+      textareaRef.value?.focus();
+    });
   }
 });
 
@@ -774,6 +789,37 @@ defineExpose({ focusEditor });
   line-height: 1.7;
 }
 
+/* ------------------------------ Auto-grow -------------------------------- */
+
+/* `clip` (not hidden) keeps the rounded corners without becoming a scroll
+   container, which would otherwise pin the sticky toolbar to the editor itself. */
+.rich-editor.is-auto-grow {
+  overflow: clip;
+}
+
+.is-auto-grow .re-toolbar {
+  position: sticky;
+  top: var(--create-sticky-top, 0px);
+  z-index: 5;
+  padding: 6px 10px;
+  background: var(--glass-surface-solid);
+  border-radius: calc(var(--radius-md) - 1px) calc(var(--radius-md) - 1px) 0 0;
+}
+
+.is-auto-grow .re-surface {
+  max-height: none;
+  overflow: visible;
+  padding: 20px 24px 28px;
+  line-height: 1.75;
+}
+
+.is-auto-grow .re-textarea {
+  max-height: none;
+  overflow: hidden;
+  resize: none;
+  padding: 20px 24px 28px;
+}
+
 /* Keep rendered surface typography compact inside the editor */
 .re-surface h1:first-child,
 .re-surface h2:first-child,
@@ -789,6 +835,16 @@ defineExpose({ focusEditor });
 
   .re-count {
     display: none;
+  }
+
+  /* The page header wraps to several rows on small screens, so its height is unknown. */
+  .is-auto-grow .re-toolbar {
+    position: static;
+  }
+
+  .is-auto-grow .re-surface,
+  .is-auto-grow .re-textarea {
+    padding: 16px 16px 22px;
   }
 }
 </style>
