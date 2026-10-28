@@ -1,0 +1,393 @@
+# 内容治理（用户举报 / 下架 / 恢复 / 审核队列 / 本地 NLP 预筛）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+# 身份约定：举报人取 context.user_id；下架/恢复要求 context.user_role == ADMIN。
+
+scenarios:
+  - scenario: OPC_MODERATION_REPORT_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 用户举报违规/失实内容，同一目标合并去重并累计举报次数后进入审核队列
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            target_type: {type: string, required: true, min_length: 2}
+            target_id: {type: string, required: true, min_length: 1}
+            target_title: {type: string, required: false, max_length: 255}
+            snippet_content: {type: string, required: false}
+            reason: {type: string, required: false}
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          target_title: $inputs.target_title
+          snippet_content: $inputs.snippet_content
+          reason: $inputs.reason
+      - id: normalize
+        operator: calc.moderation.normalize_report
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          target_title: $inputs.target_title
+          snippet_content: $inputs.snippet_content
+          reason: $inputs.reason
+          author_id: $inputs.author_id
+          author_name: $inputs.author_name
+      # 同一 (target_type, target_id) 只保留一个 FLAGGED 项：命中即合并计数，
+      # 已下架/已恢复的目标重新举报则新建一条审核项。
+      - id: existing
+        operator: entity.list
+        params:
+          entity: moderation.item
+          query: {limit: 1, order: "-reported_at"}
+        inputs:
+          filters:
+            target_type: $nodes.normalize.target_type
+            target_id: $nodes.normalize.target_id
+            status: FLAGGED
+      - id: merge
+        operator: assemble.moderation.report_merge
+        inputs:
+          existing: $nodes.existing.items
+          report: $nodes.normalize
+      - id: create
+        operator: entity.create
+        params: {entity: moderation.item}
+        when: "nodes.existing.total == 0"
+        inputs:
+          data: $nodes.merge.document
+      - id: update
+        operator: entity.patch
+        params: {entity: moderation.item}
+        when: "nodes.existing.total > 0"
+        inputs:
+          data: $nodes.merge.document
+      - id: metric
+        operator: metric.incr
+        params: {metric: moderation.reported}
+      - id: result
+        operator: assemble.moderation.report_result
+        params: {pipeline: OPC_MODERATION_REPORT_PIPELINE}
+        inputs:
+          created: $nodes.create.entity
+          updated: $nodes.update.entity
+          merged: $nodes.merge.merged
+          previous_count: $nodes.merge.previous_count
+    edges:
+      - [auth, fields]
+      - [fields, normalize]
+      - [normalize, existing]
+      - [existing, merge]
+      - [merge, create]
+      - [merge, update]
+      - [create, metric]
+      - [update, metric]
+      - [metric, result]
+
+  - scenario: OPC_MODERATION_TAKEDOWN_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 管理员对违规内容执行全站下架（FLAGGED/NORMAL -> TAKEN_DOWN）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: admin
+        operator: guard.role
+        params:
+          roles: [ADMIN]
+          message: 权限不足：仅管理员可执行内容下架
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            item_id: {type: string, required: true, min_length: 1}
+            reason: {type: string, required: true, min_length: 2}
+            ban_author: {type: boolean, required: false}
+        inputs:
+          item_id: $inputs.item_id
+          reason: $inputs.reason
+          ban_author: $inputs.ban_author
+      - id: load
+        operator: entity.get
+        params:
+          entity: moderation.item
+          message: 审核项不存在或已被删除
+        inputs:
+          key: $inputs.item_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [FLAGGED, NORMAL]
+          message: 该内容已下架，无需重复操作
+        inputs:
+          current: $nodes.load.entity.status
+      - id: transition
+        operator: policy.moderation.transition
+        params:
+          action: TAKEN_DOWN
+          pipeline: OPC_MODERATION_TAKEDOWN_PIPELINE
+        inputs:
+          item_id: $nodes.load.id
+          current: $nodes.load.entity.status
+          reason: $inputs.reason
+          ban_author: $inputs.ban_author
+      - id: patch
+        operator: entity.patch
+        params: {entity: moderation.item}
+        inputs:
+          data: $nodes.transition.patch
+      - id: audit
+        operator: audit.write
+        params:
+          action: moderation.takedown
+          resource_type: MODERATION_ITEM
+        inputs:
+          resource_id: $nodes.load.id
+          detail:
+            reason: $inputs.reason
+            ban_author: $inputs.ban_author
+      - id: metric
+        operator: metric.incr
+        params: {metric: moderation.takedown}
+      - id: result
+        operator: assemble.moderation.action_result
+        params: {pipeline: OPC_MODERATION_TAKEDOWN_PIPELINE}
+        inputs:
+          item: $nodes.patch.entity
+          note: $nodes.transition.note
+          prev_status: $nodes.transition.prev_status
+          status: $nodes.transition.status
+          moderated_at: $nodes.transition.moderated_at
+    edges:
+      - [auth, admin]
+      - [admin, fields]
+      - [fields, load]
+      - [load, state]
+      - [state, transition]
+      - [transition, patch]
+      - [patch, audit]
+      - [audit, metric]
+      - [metric, result]
+
+  - scenario: OPC_MODERATION_RESTORE_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 管理员撤销误判下架，内容恢复正常展示（TAKEN_DOWN -> NORMAL）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: admin
+        operator: guard.role
+        params:
+          roles: [ADMIN]
+          message: 权限不足：仅管理员可恢复已下架内容
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            item_id: {type: string, required: true, min_length: 1}
+        inputs:
+          item_id: $inputs.item_id
+      - id: load
+        operator: entity.get
+        params:
+          entity: moderation.item
+          message: 审核项不存在或已被删除
+        inputs:
+          key: $inputs.item_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [TAKEN_DOWN]
+          message: 仅已下架内容可以恢复展示
+        inputs:
+          current: $nodes.load.entity.status
+      - id: transition
+        operator: policy.moderation.transition
+        params:
+          action: NORMAL
+          pipeline: OPC_MODERATION_RESTORE_PIPELINE
+        inputs:
+          item_id: $nodes.load.id
+          current: $nodes.load.entity.status
+      - id: patch
+        operator: entity.patch
+        params: {entity: moderation.item}
+        inputs:
+          data: $nodes.transition.patch
+      - id: audit
+        operator: audit.write
+        params:
+          action: moderation.restore
+          resource_type: MODERATION_ITEM
+        inputs:
+          resource_id: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: moderation.restore}
+      - id: result
+        operator: assemble.moderation.action_result
+        params: {pipeline: OPC_MODERATION_RESTORE_PIPELINE}
+        inputs:
+          item: $nodes.patch.entity
+          note: $nodes.transition.note
+          prev_status: $nodes.transition.prev_status
+          status: $nodes.transition.status
+          moderated_at: $nodes.transition.moderated_at
+    edges:
+      - [auth, admin]
+      - [admin, fields]
+      - [fields, load]
+      - [load, state]
+      - [state, transition]
+      - [transition, patch]
+      - [patch, audit]
+      - [audit, metric]
+      - [metric, result]
+
+  - scenario: OPC_MODERATION_LIST_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 管理员查看内容安全审核队列（可按状态/目标类型过滤，传 page 返回分页信封）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: admin
+        operator: guard.role
+        params:
+          roles: [ADMIN]
+          message: 权限不足：仅管理员可查看内容审核队列
+      - id: query
+        operator: calc.moderation.query
+        inputs:
+          status: $inputs.status
+          target_type: $inputs.target_type
+          violation_type: $inputs.violation_type
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: moderation.item
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+          order: $nodes.query.order
+          offset: $nodes.query.offset
+          limit: $nodes.query.limit
+      - id: result
+        operator: assemble.moderation.list
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+          paged: $nodes.query.paged
+    edges:
+      - [auth, admin]
+      - [admin, query]
+      - [query, list]
+      - [list, result]
+
+  - scenario: OPC_MODERATION_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 管理员按 ID 查看单条内容审核记录
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: admin
+        operator: guard.role
+        params:
+          roles: [ADMIN]
+          message: 权限不足：仅管理员可查看内容审核详情
+      - id: load
+        operator: entity.get
+        params:
+          entity: moderation.item
+          message: 审核项不存在或已被删除
+        inputs:
+          key: $inputs.item_id
+      - id: result
+        operator: assemble.moderation.detail
+        inputs:
+          entity: $nodes.load.entity
+    edges:
+      - [auth, admin]
+      - [admin, load]
+      - [load, result]
+
+  - scenario: OPC_MODERATION_PRESCREEN_PIPELINE
+    version: v1.0.0
+    domain: moderation
+    description: 本地 NLP 三态审核预筛（高置信短接；不确定且外部服务不可用时声明式降级为人工审核）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            content: {type: string, required: true, min_length: 1}
+            target_type: {type: string, required: false}
+            target_id: {type: string, required: false}
+            target_title: {type: string, required: false, max_length: 255}
+        inputs:
+          content: $inputs.content
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          target_title: $inputs.target_title
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $inputs.content
+      # 外部审核服务在本轮迁移基线中不接入：UNCERTAIN 由声明式策略降级，
+      # 决策节点显式标注 external_service_required / degraded / degraded_strategy。
+      - id: decision
+        operator: assemble.moderation.prescreen_decision
+        params:
+          external_service_available: false
+        inputs:
+          verdict: $nodes.prescreen
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          target_title: $inputs.target_title
+          snippet_content: $inputs.content
+          author_id: $inputs.author_id
+          author_name: $inputs.author_name
+      - id: enqueue_doc
+        operator: assemble.moderation.prescreen_item
+        inputs:
+          decision: $nodes.decision
+      - id: enqueue
+        operator: entity.create
+        params: {entity: moderation.item}
+        when: "bool(nodes.decision.should_enqueue) and bool(nodes.decision.target_id)"
+        inputs:
+          data: $nodes.enqueue_doc.document
+      - id: metric
+        operator: metric.incr
+        params: {metric: moderation.prescreened}
+      - id: result
+        operator: assemble.moderation.prescreen_result
+        inputs:
+          decision: $nodes.decision
+          created: $nodes.enqueue.entity
+    edges:
+      - [auth, fields]
+      - [fields, prescreen]
+      - [prescreen, decision]
+      - [decision, enqueue_doc]
+      - [enqueue_doc, enqueue]
+      - [decision, metric]
+      - [enqueue, metric]
+      - [metric, result]

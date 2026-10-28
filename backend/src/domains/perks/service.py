@@ -1,19 +1,30 @@
-"""Perks service managing the 优惠公告 (discount announcement) board and claim codes.
+"""Thin compatibility layer for the perks (生态特权) domain.
 
-生态特权页面的数据源：由生态伙伴提报、管理端审核发布的优惠公告（Token 优惠、服务器优惠、
-SaaS 服务优惠、结算支付、AI 算力、基础设施等），创客在前端浏览公告并前往服务商处领取。
+Publishing and claiming are *business flows* and now live entirely in the
+scenario asset ``config/scenarios/perks.yaml`` (operators + entity store).
+This module only keeps the historical import surface alive:
+
+* read/query shims (``list_perks`` / ``list_all`` / ``get_perk``) backed by the
+  generic entity store,
+* a data-level ``create_perk`` / ``delete_perk`` repository shim for legacy
+  callers and test fixtures,
+* persistence hydrators so existing write-behind bookkeeping keeps working.
+
+It must never re-implement a flow. ``perk_service`` remains importable by other
+modules (interactions / telemetry) exactly as before.
 """
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
+from src.core.config import settings
+from src.core.entity import entity_store
+from src.domains.perks.entities import ENTITY_PERK, ENTITY_PERK_CLAIM
 from src.domains.perks.models import (
+    PerkClaimResponse,
     PerkCreate,
     PerkResponse,
-    PerkClaimRequest,
-    PerkClaimResponse,
 )
-from src.core.config import settings
 from src.infrastructure.database.persistence import domain_persistence
 
 # 生态优惠公告分类与状态枚举统一从 backend/config/application.yaml 加载（代码/配置/数据三分离）
@@ -25,41 +36,117 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class PerkService:
-    """Manages ecosystem privilege announcements (discount board) and claims."""
+def _entity_perks() -> Dict[str, PerkResponse]:
+    """Read every announcement currently held by the generic entity store."""
+    try:
+        rows, _total = entity_store.list(ENTITY_PERK, {"limit": 0})
+    except KeyError:
+        return {}
+    docs: Dict[str, PerkResponse] = {}
+    for row in rows:
+        try:
+            docs[str(row.get("id"))] = PerkResponse(**row)
+        except Exception:  # pragma: no cover - defensive against legacy rows
+            continue
+    return docs
 
-    def __init__(self):
-        self._perks: Dict[str, PerkResponse] = {}
-        # Key: (user_id, perk_id)
+
+class _PerkIndex(dict):
+    """Legacy ``_perks`` mapping that mirrors writes into the entity store.
+
+    Historical fixtures seed ``perk_service._perks[pid] = PerkResponse(...)``
+    directly. Mirrored writes keep those seeds visible to the operator
+    scenarios, while reads merge both sources so freshly published
+    announcements are visible to legacy modules too.
+    """
+
+    def merged(self) -> Dict[str, PerkResponse]:
+        docs = _entity_perks()
+        # ``dict.items(self)`` reads the legacy cache without re-entering the
+        # overridden ``keys()`` / ``__iter__`` hooks (which would recurse).
+        docs.update(dict.items(self))
+        return docs
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        dict.__setitem__(self, key, value)
+        try:
+            payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else dict(value)
+            payload["id"] = payload.get("id") or key
+            if entity_store.get(ENTITY_PERK, {"key": payload["id"]}) is None:
+                entity_store.create(ENTITY_PERK, payload)
+            else:
+                entity_store.update(ENTITY_PERK, payload)
+        except Exception:  # pragma: no cover - entity layer is best-effort here
+            pass
+
+    def __delitem__(self, key: str) -> None:
+        dict.pop(self, key, None)
+        try:
+            entity_store.delete(ENTITY_PERK, {"key": key})
+        except Exception:  # pragma: no cover
+            pass
+
+    def clear(self) -> None:
+        keys = list(dict.keys(self))
+        dict.clear(self)
+        for key in keys:
+            try:
+                entity_store.delete(ENTITY_PERK, {"key": key})
+            except Exception:  # pragma: no cover
+                pass
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.merged().get(key, default)
+
+    def values(self):
+        return self.merged().values()
+
+    def items(self):
+        return self.merged().items()
+
+    def keys(self):
+        return self.merged().keys()
+
+    def __len__(self) -> int:
+        return len(self.merged())
+
+    def __iter__(self):
+        return iter(self.merged())
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.merged()
+
+
+class PerkService:
+    """Data / query shim for ecosystem privilege announcements and claims."""
+
+    def __init__(self) -> None:
+        self._perks: _PerkIndex = _PerkIndex()
+        # Key: (user_id, perk_id) — hydrated legacy cache, entity store is authoritative.
         self._claims: Dict[Tuple[str, str], PerkClaimResponse] = {}
 
     def _require_db(self) -> None:
         """Perk content is database-backed; refuse memory-only mutations."""
         domain_persistence.require("perks")
 
+    # ------------------------------------------------------------------
+    # Query shims (read path)
+    # ------------------------------------------------------------------
     def list_perks(self, payload: Optional[Dict[str, Any]] = None) -> List[PerkResponse]:
-        """List published discount announcements, optionally filtered by category.
+        """List published discount announcements for the public board."""
+        # Imported lazily: the operator SDK imports the microkernel registry, which
+        # must not be triggered while the domain service module is still loading.
+        from src.domains.perks.functions import board as assemble_board
 
-        Sorted by display priority (desc) then effective start date (desc) so featured
-        and freshest offers surface first on the 生态特权 announcement board.
-        """
         category = ""
         if isinstance(payload, dict):
             category = str(payload.get("category", "") or "").strip()
-
-        perks = list(self._perks.values())
-        if category and category.upper() != "ALL":
-            perks = [p for p in perks if p.category == category.upper()]
-        # Public board only exposes PUBLISHED announcements
-        perks = [p for p in perks if p.status == "PUBLISHED"]
-        perks.sort(
-            key=lambda p: (
-                p.priority,
-                p.effective_start or "",
-            ),
-            reverse=True,
-        )
-        return perks
+        items = [
+            perk.model_dump(mode="json") if hasattr(perk, "model_dump") else dict(perk)
+            for perk in self._perks.values()
+        ]
+        result = assemble_board({}, {"items": items, "category": category}, {})
+        return [PerkResponse(**item) for item in result.get("items") or []]
 
     def list_all(self) -> List[PerkResponse]:
         """Return every announcement regardless of status (admin / management views)."""
@@ -69,145 +156,51 @@ class PerkService:
             reverse=True,
         )
 
-    def create_perk(self, req: PerkCreate) -> PerkResponse:
-        """Create and publish a new ecosystem discount announcement."""
-        self._require_db()
-        pid = f"perk_{uuid.uuid4().hex[:8]}"
-        perk = PerkResponse(
-            id=pid,
-            name=req.name,
-            provider=req.provider,
-            value_cny=req.value_cny,
-            category=req.category,
-            summary=req.summary,
-            quota_remaining=req.quota_remaining,
-            effective_start=req.effective_start,
-            effective_end=req.effective_end,
-            redeem_url=req.redeem_url,
-            priority=req.priority,
-            status=req.status,
-            highlights=req.highlights,
-            author_id=req.author_id,
-            author_name=req.author_name,
-            is_official=req.is_official,
-            created_at=utc_now_iso(),
-        )
-        self._perks[pid] = perk
-        domain_persistence.write("perks.items", pid, perk)
-        return perk
-
-    def validate_publish_payload(self, inputs: dict) -> dict:
-        name = str(inputs.get("name", "")).strip()
-        provider = str(inputs.get("provider", "")).strip()
-        val = float(inputs.get("value_cny", 0.0))
-        summary = str(inputs.get("summary", "")).strip()
-        category = str(inputs.get("category", settings.perk_default_category)).strip().upper()
-        quota_remaining = int(inputs.get("quota_remaining", settings.perk_default_quota))
-        priority = int(inputs.get("priority", settings.perk_default_priority))
-        status = str(inputs.get("status", settings.perk_default_status)).strip().upper()
-
-        if len(name) < 2:
-            raise ValueError("Announcement name must be at least 2 characters long")
-        if len(provider) < 2:
-            raise ValueError("Announcement provider must be at least 2 characters long")
-        if val < 0:
-            raise ValueError("Announcement value_cny cannot be negative")
-        if len(summary) < 5:
-            raise ValueError("Announcement summary must be at least 5 characters long")
-        if quota_remaining < 1:
-            raise ValueError("Announcement quota_remaining must be at least 1")
-        if priority < 0 or priority > 100:
-            raise ValueError("Announcement priority must be within 0..100")
-        if status not in PERK_STATUSES:
-            raise ValueError("Announcement status must be one of: " + ", ".join(sorted(PERK_STATUSES)))
-
-        redeem_url = str(inputs.get("redeem_url") or "").strip() or None
-        effective_start = str(inputs.get("effective_start") or "").strip() or None
-        effective_end = str(inputs.get("effective_end") or "").strip() or None
-        highlights = inputs.get("highlights") or []
-        if isinstance(highlights, list):
-            highlights = [str(h).strip() for h in highlights if str(h).strip()][:8]
-
-        return {
-            "guard_passed": True,
-            "name": name,
-            "provider": provider,
-            "value_cny": val,
-            "category": category,
-            "summary": summary,
-            "quota_remaining": quota_remaining,
-            "effective_start": effective_start,
-            "effective_end": effective_end,
-            "redeem_url": redeem_url,
-            "priority": priority,
-            "status": status,
-            "highlights": highlights,
-        }
-
-    def claim_perk(self, req: PerkClaimRequest) -> PerkClaimResponse:
-        self._require_db()
-        if req.perk_id not in self._perks:
-            raise KeyError(f"Perk {req.perk_id} not found")
-        perk = self._perks[req.perk_id]
-
-        key = (req.user_id, req.perk_id)
-        if key in self._claims:
-            return self._claims[key]
-
-        if perk.quota_remaining <= 0:
-            raise ValueError(f"Perk {perk.name} is fully redeemed")
-
-        perk.quota_remaining -= 1
-        perk.claim_count += 1
-        voucher = "OPC-" + uuid.uuid4().hex[:6].upper() + "-2026"
-        cid = str(uuid.uuid4())
-        claim = PerkClaimResponse(
-            claim_id=cid,
-            perk_id=perk.id,
-            perk_name=perk.name,
-            user_id=req.user_id,
-            voucher_code=voucher,
-            status="ACTIVATED",
-            instructions=f"核销说明：请在 {perk.provider} 控制台优惠券兑换入口输入此凭据。",
-            created_at=utc_now_iso(),
-        )
-        self._claims[key] = claim
-        domain_persistence.write("perks.items", perk.id, perk)
-        domain_persistence.write_raw("perks.claims", f"{req.user_id}|{req.perk_id}", claim.model_dump(mode="json"))
-        return claim
-
     def get_perk(self, perk_id: str) -> Optional[PerkResponse]:
         return self._perks.get(perk_id)
 
+    # ------------------------------------------------------------------
+    # Data-level repository shims (no business flow)
+    # ------------------------------------------------------------------
+    def create_perk(self, req: PerkCreate) -> PerkResponse:
+        """Insert one announcement document. Business rules live in the scenario."""
+        self._require_db()
+        payload = req.model_dump(mode="json")
+        payload.setdefault("id", f"perk_{uuid.uuid4().hex[:8]}")
+        try:
+            doc = entity_store.create(ENTITY_PERK, payload)
+        except KeyError:  # pragma: no cover - entity specs not booted
+            doc = payload
+        perk = PerkResponse(**doc)
+        self._perks[perk.id] = perk
+        return perk
+
     def delete_perk(self, perk_id: str) -> bool:
+        """Delete one announcement document (data only)."""
         self._require_db()
-        if perk_id in self._perks:
-            del self._perks[perk_id]
-            domain_persistence.delete("perks.items", perk_id)
-            return True
-        return False
+        deleted = False
+        try:
+            deleted = entity_store.delete(ENTITY_PERK, {"key": perk_id})
+        except KeyError:  # pragma: no cover
+            deleted = False
+        in_cache = perk_id in dict.keys(self._perks)
+        if in_cache:
+            dict.pop(self._perks, perk_id, None)
+        return bool(deleted or in_cache)
 
-    def revoke_claim(self, user_id: str, perk_id: str) -> bool:
-        self._require_db()
-        key = (user_id, perk_id)
-        if key in self._claims:
-            del self._claims[key]
-            domain_persistence.delete("perks.claims", f"{user_id}|{perk_id}")
-            if perk_id in self._perks:
-                self._perks[perk_id].quota_remaining += 1
-                self._perks[perk_id].claim_count = max(0, self._perks[perk_id].claim_count - 1)
-                domain_persistence.write("perks.items", perk_id, self._perks[perk_id])
-            return True
-        return False
-
+    # ------------------------------------------------------------------
+    # Persistence hydration (entity store owns the runtime truth)
+    # ------------------------------------------------------------------
     def hydrate_perks(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._perks[r["id"]] = PerkResponse(**r)
+        for row in rows:
+            perk = PerkResponse(**row)
+            dict.__setitem__(self._perks, perk.id, perk)
         return len(rows)
 
     def hydrate_claims(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._claims[(r["user_id"], r["perk_id"])] = PerkClaimResponse(**r)
+        for row in rows:
+            claim = PerkClaimResponse(**row)
+            self._claims[(claim.user_id, claim.perk_id)] = claim
         return len(rows)
 
 

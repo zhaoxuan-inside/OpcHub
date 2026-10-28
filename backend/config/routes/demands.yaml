@@ -1,0 +1,13 @@
+# 需求集市 gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "demands.list"
+    pipeline: "OPC_DEMAND_LIST_PIPELINE"
+
+  - gateway: "demands.publish"
+    pipeline: "OPC_DEMAND_PUBLISH_PIPELINE"
+
+  - gateway: "demands.bid"
+    pipeline: "OPC_DEMAND_BID_PIPELINE"

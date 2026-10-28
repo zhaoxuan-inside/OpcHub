@@ -1,0 +1,22 @@
+# 消息箱 gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "notifications.list"
+    pipeline: "OPC_NOTIFICATION_LIST_PIPELINE"
+
+  - gateway: "notifications.unread_count"
+    pipeline: "OPC_NOTIFICATION_UNREAD_COUNT_PIPELINE"
+
+  - gateway: "notifications.mark_read"
+    pipeline: "OPC_NOTIFICATION_MARK_READ_PIPELINE"
+
+  - gateway: "notifications.mark_all_read"
+    pipeline: "OPC_NOTIFICATION_MARK_ALL_READ_PIPELINE"
+
+  - gateway: "notifications.delete"
+    pipeline: "OPC_NOTIFICATION_DELETE_PIPELINE"
+
+# ``notifications.create`` is an internal delivery entry (used by the
+# notification service / moderation gate), not a public gateway route.

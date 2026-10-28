@@ -86,6 +86,51 @@ class AuditEvaluateRequest(BaseModel):
     passed_item_ids: List[str] = Field(default_factory=list)
 
 
+class ComplianceItem(BaseModel):
+    """Unified document stored in the legacy ``compliance.items`` family.
+
+    Legacy snapshots mixed laws, pitfall cases and audit checkpoints in one
+    family and marked the type with a ``_kind`` field. The unified item keeps
+    that storage layout and promotes the marker to an explicit ``kind``
+    discriminator (``law`` | ``case`` | ``checkpoint``) so the generic entity
+    store can filter a single family without splitting persistence.
+    """
+
+    id: str
+    kind: str = "law"
+    # law
+    code: str = ""
+    name: str = ""
+    title: str = ""
+    summary: str = ""
+    content: str = ""
+    level: str = "国家级"
+    issuer: str = ""
+    published_at: str = ""
+    penalties: str = ""
+    law_ref: str = ""
+    icon_name: str = ""
+    hot_score: int = 0
+    # case
+    badge: str = ""
+    industry: str = ""
+    violation: str = ""
+    consequence: str = ""
+    lesson: str = ""
+    badge_color: str = "#5B6472"
+    # checkpoint
+    dimension_id: str = ""
+    description: str = ""
+    severity: str = ""
+    weight: int = 0
+    advice: str = ""
+    legal_basis: str = ""
+    # unified publish provenance
+    author_id: str = ""
+    author_name: Optional[str] = None
+    is_official: bool = False
+
+
 class AuditReportResponse(BaseModel):
     score: int
     grade: str  # "EXCELLENT", "GOOD", "WARNING", "CRITICAL"

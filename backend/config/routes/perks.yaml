@@ -1,0 +1,65 @@
+# Perks (生态特权 / 优惠公告) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "perks.list"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "获取生态优惠公告列表（Token 优惠 / 服务器优惠 / SaaS 服务优惠等，支持按分类过滤）"
+    is_default: true
+    pipeline: "OPC_PERK_LIST_PIPELINE"
+
+  - gateway: "perks.list_all"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "管理端获取全部优惠公告（含已下线）"
+    is_default: true
+    pipeline: "OPC_PERK_LIST_ALL_PIPELINE"
+    required_permission: "review:audit_all"
+
+  - gateway: "perks.get"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "按 ID 读取单条优惠公告"
+    is_default: true
+    pipeline: "OPC_PERK_DETAIL_PIPELINE"
+
+  - gateway: "perks.publish"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "提报并上线生态优惠公告（所有注册用户可发布，管理员发布自动打官方标签）"
+    is_default: true
+    pipeline: "OPC_PERK_PUBLISH_PIPELINE"
+    required_permission: "content:publish"
+
+  - gateway: "perks.claim"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "领取特权并生成专属兑换凭据（防重复领取、校验有效期与库存）"
+    is_default: true
+    pipeline: "OPC_PERK_CLAIM_PIPELINE"
+    required_permission: "perk:claim_coupon"
+
+  - gateway: "perks.claims.mine"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "查看当前创客已领取的优惠凭据"
+    is_default: true
+    pipeline: "OPC_PERK_CLAIMS_MINE_PIPELINE"
+
+  - gateway: "perks.claim.revoke"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "撤销一条领取记录并回补优惠额度（本人或管理员）"
+    is_default: true
+    pipeline: "OPC_PERK_REVOKE_CLAIM_PIPELINE"
+    required_permission: "perk:claim_coupon"
+
+  - gateway: "perks.delete"
+    version: "v1.0.0"
+    domain: "perks"
+    description: "删除优惠公告（仅发布者或管理员）"
+    is_default: true
+    pipeline: "OPC_PERK_DELETE_PIPELINE"
+    required_permission: "content:publish"

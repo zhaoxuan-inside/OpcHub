@@ -1,5 +1,5 @@
 """Data models and schemas for Content Moderation domain."""
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
@@ -26,6 +26,10 @@ class ModerationItemResponse(BaseModel):
     moderated_at: Optional[str] = None
     reason: Optional[str] = None
     moderator_id: Optional[str] = None
+    # Reporting metadata: the latest reporter bound from ``context.user_id`` plus
+    # the de-duplicated reporter set accumulated while reports merge by target.
+    reporter_id: str = Field(default="", description="最近一次举报人（网关身份绑定）")
+    reporters: List[str] = Field(default_factory=list, description="去重后的举报人 ID 集合")
 
 
 class ContentReportRequest(BaseModel):

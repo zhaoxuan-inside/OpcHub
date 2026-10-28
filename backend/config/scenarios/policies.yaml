@@ -1,0 +1,182 @@
+# 政策中心（政策雷达 / 资质测算）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+
+scenarios:
+  - scenario: OPC_POLICY_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: policies
+    description: 发布政府扶持/税收减免政策（作者由网关身份绑定，管理员发布自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            title: {type: string, required: true, min_length: 2, max_length: 255}
+            summary: {type: string, required: true, min_length: 5}
+            legal_basis: {type: string, required: true, min_length: 2}
+            subsidy_amount_max: {type: number, required: false, min: 0}
+            eligible_conditions: {type: list, required: false}
+        inputs:
+          title: $inputs.title
+          summary: $inputs.summary
+          legal_basis: $inputs.legal_basis
+          subsidy_amount_max: $inputs.subsidy_amount_max
+          eligible_conditions: $inputs.eligible_conditions
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "'代开假发票' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'内嵌自设资金池' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'洗钱' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'非法集资' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+        inputs:
+          title: $inputs.title
+          summary: $inputs.summary
+          legal_basis: $inputs.legal_basis
+      - id: normalize
+        operator: calc.policy.normalize_publish
+        inputs:
+          title: $inputs.title
+          policy_level: $inputs.policy_level
+          category: $inputs.category
+          subsidy_amount_max: $inputs.subsidy_amount_max
+          summary: $inputs.summary
+          eligible_conditions: $inputs.eligible_conditions
+          legal_basis: $inputs.legal_basis
+          code: $inputs.code
+          region: $inputs.region
+          deadline: $inputs.deadline
+          action_text: $inputs.action_text
+          author_name: $inputs.author_name
+      - id: create
+        operator: entity.create
+        params: {entity: policy.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: policy.published}
+      - id: published
+        operator: assemble.policy.published
+        inputs:
+          entity: $nodes.create.entity
+      - id: response
+        operator: response.build
+        params: {source: created_policy}
+        inputs:
+          created_policy: $nodes.published.created_policy
+    edges:
+      - [auth, fields]
+      - [fields, moderation]
+      - [moderation, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, published]
+      - [published, response]
+
+  - scenario: OPC_POLICY_LIST_PIPELINE
+    version: v1.0.0
+    domain: policies
+    description: 分页检索政府扶持与税收减免政策列表
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.policy.query
+        inputs:
+          category: $inputs.category
+          policy_level: $inputs.policy_level
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: policy.item
+          query: {limit: 0}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+      - id: page
+        operator: calc.policy.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+      - id: response
+        operator: response.build
+        params: {source: page}
+        inputs:
+          page: $nodes.page
+    edges:
+      - [query, list]
+      - [list, page]
+      - [page, response]
+
+  - scenario: OPC_POLICY_MATCH_PIPELINE
+    version: v1.0.0
+    domain: policies
+    description: 测算创客免税资格、预计减免额并排序匹配扶持政策
+    saga: false
+    nodes:
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            quarterly_income: {type: number, required: true, min: 0}
+            maker_type: {type: string, required: false}
+            region: {type: string, required: false}
+            search_query: {type: string, required: false}
+            industry_keywords: {type: list, required: false}
+        inputs:
+          quarterly_income: $inputs.quarterly_income
+          maker_type: $inputs.maker_type
+          region: $inputs.region
+          search_query: $inputs.search_query
+          industry_keywords: $inputs.industry_keywords
+      - id: tax
+        operator: calc.policy.tax_assessment
+        inputs:
+          quarterly_income: $inputs.quarterly_income
+      - id: list
+        operator: entity.list
+        params:
+          entity: policy.item
+          query: {limit: 0}
+      - id: rank
+        operator: calc.policy.rank_matches
+        inputs:
+          policies: $nodes.list.items
+          region: $inputs.region
+          is_vat_free: $nodes.tax.eligible
+          search_query: $inputs.search_query
+          industry_keywords: $inputs.industry_keywords
+      - id: assess
+        operator: assemble.policy.match_response
+        inputs:
+          assessment: $nodes.tax
+          ranking: $nodes.rank
+      - id: metric
+        operator: metric.incr
+        params: {metric: policy.matched}
+      - id: response
+        operator: response.build
+        params: {source: assessment}
+        inputs:
+          assessment: $nodes.assess
+    edges:
+      - [fields, tax]
+      - [fields, list]
+      - [tax, rank]
+      - [list, rank]
+      - [rank, assess]
+      - [assess, metric]
+      - [metric, response]

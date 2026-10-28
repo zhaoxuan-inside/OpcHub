@@ -1,0 +1,326 @@
+# 合规指南（法条 / 避坑案例 / 上线自检）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 敏感词门禁边界：这里只用 validate.expression 做声明式关键词预筛（fast fail），
+# 不替代 moderation 领域的本地 NLP 预审与外部内容安全服务；正式内容审核仍由
+# moderation 域拥有。NLP 预筛判为 UNCERTAIN 的内容本域不会外呼审核。
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # 发布法条 / 避坑案例
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_COMPLIANCE_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: compliance
+    description: 登录创客发布法条或避坑案例（作者取 context.user_id，管理员自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            kind: {type: string, required: true, enum: [law, case], message: "kind 仅支持 law（法条）或 case（避坑案例）"}
+            title: {type: string, required: true, min_length: 2, max_length: 255}
+            summary: {type: string, required: false, max_length: 4000}
+            content: {type: string, required: false, max_length: 20000}
+            level: {type: string, required: false}
+            industry: {type: string, required: false, max_length: 64}
+            violation: {type: string, required: false, max_length: 4000}
+            consequence: {type: string, required: false, max_length: 4000}
+            lesson: {type: string, required: false, max_length: 4000}
+        inputs:
+          kind: $inputs.kind
+          title: $inputs.title
+          summary: $inputs.summary
+          content: $inputs.content
+          level: $inputs.level
+          industry: $inputs.industry
+          violation: $inputs.violation
+          consequence: $inputs.consequence
+          lesson: $inputs.lesson
+      - id: sensitive
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "'洗钱' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'非法集资' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'诈骗' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'传销' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'代开发票' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'虚开发票' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'跑分' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'毒品' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'赌博' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.content or '') + ' ' + (args.violation or '') + ' ' + (args.consequence or '') + ' ' + (args.lesson or ''))"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+        inputs:
+          title: $inputs.title
+          summary: $inputs.summary
+          content: $inputs.content
+          violation: $inputs.violation
+          consequence: $inputs.consequence
+          lesson: $inputs.lesson
+      - id: normalize
+        operator: calc.compliance.normalize_publish
+        inputs:
+          kind: $inputs.kind
+          id: $inputs.id
+          code: $inputs.code
+          name: $inputs.name
+          title: $inputs.title
+          summary: $inputs.summary
+          content: $inputs.content
+          level: $inputs.level
+          issuer: $inputs.issuer
+          published_at: $inputs.published_at
+          penalties: $inputs.penalties
+          law_ref: $inputs.law_ref
+          icon_name: $inputs.icon_name
+          hot_score: $inputs.hot_score
+          badge: $inputs.badge
+          industry: $inputs.industry
+          violation: $inputs.violation
+          consequence: $inputs.consequence
+          lesson: $inputs.lesson
+          badge_color: $inputs.badge_color
+      - id: create
+        operator: entity.create
+        params: {entity: compliance.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: compliance.published}
+      - id: published
+        operator: assemble.compliance.published
+        inputs:
+          entity: $nodes.create.entity
+      - id: response
+        operator: response.build
+        params: {source: created_entry}
+        inputs:
+          created_entry: $nodes.published.created_entry
+    edges:
+      - [auth, fields]
+      - [fields, sensitive]
+      - [sensitive, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, published]
+      - [published, response]
+
+  # ---------------------------------------------------------------------------
+  # 法条列表（同时承载 compliance.dimensions 兼容别名）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_COMPLIANCE_LAW_LIST_PIPELINE
+    version: v1.0.0
+    domain: compliance
+    description: 分页检索法条知识库（按效力级别过滤 / 关键词搜索）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.compliance.query
+        params: {kind: law}
+        inputs:
+          level: $inputs.level
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: compliance.item
+          query: {order: "-hot_score"}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+      - id: page
+        operator: calc.compliance.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.page.items
+    edges:
+      - [query, list]
+      - [list, page]
+      - [page, response]
+
+  # ---------------------------------------------------------------------------
+  # 避坑案例列表
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_COMPLIANCE_CASE_LIST_PIPELINE
+    version: v1.0.0
+    domain: compliance
+    description: 分页检索监管处罚与踩坑案例库（按行业过滤）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.compliance.query
+        params: {kind: case}
+        inputs:
+          industry: $inputs.industry
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: compliance.item
+          query: {order: "-hot_score"}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+      - id: page
+        operator: calc.compliance.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.page.items
+    edges:
+      - [query, list]
+      - [list, page]
+      - [page, response]
+
+  # ---------------------------------------------------------------------------
+  # 上线自检清单
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_COMPLIANCE_CHECKPOINT_LIST_PIPELINE
+    version: v1.0.0
+    domain: compliance
+    description: 获取上线前合规自检清单与门禁条目（可按六维防线过滤）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.compliance.query
+        params: {kind: checkpoint, default_page_size: 100}
+        inputs:
+          dimension_id: $inputs.dimension_id
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: compliance.item
+          query: {order: "dimension_id"}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+      - id: page
+        operator: calc.compliance.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.page.items
+    edges:
+      - [query, list]
+      - [list, page]
+      - [page, response]
+
+  # ---------------------------------------------------------------------------
+  # 六维合规防线自检评估
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_COMPLIANCE_AUDIT_PIPELINE
+    version: v1.0.0
+    domain: compliance
+    description: 按检查项权重计算六维合规评分、等级、风险排序与整改建议
+    saga: true
+    nodes:
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            passed_item_ids: {type: list, required: false, message: "passed_item_ids must be a list of checkpoint IDs"}
+            strict_mode: {type: boolean, required: false}
+        inputs:
+          passed_item_ids: $inputs.passed_item_ids
+          strict_mode: $inputs.strict_mode
+      - id: list
+        operator: entity.list
+        params:
+          entity: compliance.item
+          query: {order: "dimension_id"}
+        inputs:
+          filters: {kind: checkpoint}
+      - id: require_items
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "len(args.items or []) > 0"
+              message: 合规自检清单为空，无法评估：请先配置上线检查项
+        inputs:
+          items: $nodes.list.items
+      - id: score
+        operator: calc.compliance.score
+        inputs:
+          items: $nodes.list.items
+          passed_item_ids: $inputs.passed_item_ids
+      - id: dimensions
+        operator: calc.compliance.dimension_scores
+        inputs:
+          items: $nodes.list.items
+          passed_item_ids: $inputs.passed_item_ids
+      - id: rank
+        operator: calc.compliance.rank
+        inputs:
+          items: $nodes.score.failed_items
+      - id: assemble
+        operator: assemble.compliance.audit_report
+        inputs:
+          scored: $nodes.score
+          dimensions: $nodes.dimensions
+          ranked: $nodes.rank
+      - id: strict
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not (args.grade == 'CRITICAL' and args.strict_mode)"
+              message: "Compliance strict guard blocked: score is CRITICAL"
+        inputs:
+          grade: $nodes.score.grade
+          strict_mode: $inputs.strict_mode
+      - id: metric
+        operator: metric.incr
+        params: {metric: compliance.audit.evaluated}
+      - id: response
+        operator: response.build
+        params: {source: audit_report}
+        inputs:
+          audit_report: $nodes.assemble.audit_report
+    edges:
+      - [fields, list]
+      - [list, require_items]
+      - [require_items, score]
+      - [score, dimensions]
+      - [dimensions, rank]
+      - [rank, assemble]
+      - [assemble, strict]
+      - [strict, metric]
+      - [metric, response]

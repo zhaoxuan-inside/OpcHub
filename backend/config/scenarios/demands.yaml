@@ -1,0 +1,424 @@
+# 需求集市（企业委托寻源 / 创客竞标）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+
+scenarios:
+  - scenario: OPC_DEMAND_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 发布企业外包委托与法律求助（发起人身份由网关 context 绑定，管理员发布自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: coerce
+        operator: transform.coerce
+        params:
+          types: {budget_cny: float, deadline_days: int}
+        inputs:
+          budget_cny: $inputs.budget_cny
+          deadline_days: $inputs.deadline_days
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            title: {type: string, required: true, min_length: 2, max_length: 255}
+            description: {type: string, required: true, min_length: 5}
+            budget_cny: {type: number, required: true, min: 0}
+            category: {type: string, required: false}
+            deadline_days: {type: integer, required: false, min: 1, max: 365}
+        inputs:
+          title: $inputs.title
+          description: $inputs.description
+          budget_cny: $nodes.coerce.budget_cny
+          category: $inputs.category
+          deadline_days: $nodes.coerce.deadline_days
+      # 平台两级内容安全门禁的声明式预筛（强违规词直接拦截，其余交由审核域/网关外呼）。
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - {expr: "'洗钱' not in ((args.title or '') + ' ' + (args.description or ''))", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'地下钱庄' not in ((args.title or '') + ' ' + (args.description or ''))", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'假发票' not in ((args.title or '') + ' ' + (args.description or ''))", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'内嵌自设资金池' not in ((args.title or '') + ' ' + (args.description or ''))", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'非法集资' not in ((args.title or '') + ' ' + (args.description or ''))", message: "内容合规校验未通过：命中平台敏感词规则"}
+        inputs:
+          title: $inputs.title
+          description: $inputs.description
+      - id: deadline
+        operator: calc.demand.deadline
+        inputs:
+          deadline_days: $nodes.coerce.deadline_days
+      - id: normalize
+        operator: calc.demand.normalize_publish
+        inputs:
+          title: $inputs.title
+          description: $inputs.description
+          budget_cny: $nodes.coerce.budget_cny
+          category: $inputs.category
+          creator_name: $inputs.creator_name
+          deadline_at: $nodes.deadline.deadline_at
+      - id: create
+        operator: entity.create
+        params: {entity: demands.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: demand.published}
+      - id: published
+        operator: assemble.demand.publish_result
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, coerce]
+      - [coerce, fields]
+      - [fields, moderation]
+      - [moderation, deadline]
+      - [deadline, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, published]
+
+  - scenario: OPC_DEMAND_BID_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 提交创客竞标方案并累计需求的竞标人数
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: coerce
+        operator: transform.coerce
+        params:
+          types: {bid_amount_cny: float, delivery_days: int}
+        inputs:
+          bid_amount_cny: $inputs.bid_amount_cny
+          delivery_days: $inputs.delivery_days
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            demand_id: {type: string, required: true, min_length: 1}
+            bid_amount_cny: {type: number, required: true, min: 0}
+            delivery_days: {type: integer, required: true, min: 1, max: 365}
+            proposal_text: {type: string, required: true, min_length: 5}
+        inputs:
+          demand_id: $inputs.demand_id
+          bid_amount_cny: $nodes.coerce.bid_amount_cny
+          delivery_days: $nodes.coerce.delivery_days
+          proposal_text: $inputs.proposal_text
+      - id: load
+        operator: entity.get
+        params:
+          entity: demands.item
+          message: 需求不存在或已被删除，无法竞标
+        inputs:
+          key: $inputs.demand_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [OPEN, BIDDING]
+          message: 该需求已截止或已关闭，无法继续竞标
+        inputs:
+          current: $nodes.load.entity.status
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - {expr: "'洗钱' not in (args.proposal_text or '')", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'地下钱庄' not in (args.proposal_text or '')", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'假发票' not in (args.proposal_text or '')", message: "内容合规校验未通过：命中平台敏感词规则"}
+            - {expr: "'非法集资' not in (args.proposal_text or '')", message: "内容合规校验未通过：命中平台敏感词规则"}
+        inputs:
+          proposal_text: $inputs.proposal_text
+      - id: normalize
+        operator: calc.demand.normalize_bid
+        inputs:
+          demand_id: $nodes.load.id
+          bid_amount_cny: $nodes.coerce.bid_amount_cny
+          delivery_days: $nodes.coerce.delivery_days
+          proposal_text: $inputs.proposal_text
+      - id: create
+        operator: entity.create
+        params: {entity: demands.bid}
+        inputs:
+          data: $nodes.normalize
+      - id: counter
+        operator: calc.demand.bid_counter
+        inputs:
+          demand_id: $nodes.load.id
+          bidders_count: $nodes.load.entity.bidders_count
+      - id: refresh
+        operator: entity.patch
+        params: {entity: demands.item}
+        inputs:
+          data: $nodes.counter
+      - id: metric
+        operator: metric.incr
+        params: {metric: demand.bid_submitted}
+      - id: message
+        operator: transform.template
+        params:
+          template: "《{title}》收到新的竞标方案，报价 ¥{amount}，交付周期 {days} 天。"
+          output_key: text
+        inputs:
+          title: $nodes.load.entity.title
+          amount: $nodes.create.entity.bid_amount_cny
+          days: $nodes.create.entity.delivery_days
+      - id: notify
+        operator: notify.emit
+        params:
+          kind: DEMAND_BID
+          title: 收到新的竞标方案
+        inputs:
+          recipient_id: $nodes.load.entity.creator_id
+          body: $nodes.message.text
+          link: $nodes.load.id
+      - id: result
+        operator: assemble.demand.bid_result
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, coerce]
+      - [coerce, fields]
+      - [fields, load]
+      - [load, state]
+      - [state, moderation]
+      - [moderation, normalize]
+      - [normalize, create]
+      - [create, counter]
+      - [counter, refresh]
+      - [refresh, metric]
+      - [metric, message]
+      - [message, notify]
+      - [notify, result]
+
+  - scenario: OPC_DEMAND_LIST_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 检索企业委托寻源商机（未传 page 返回扁平列表，传 page 返回分页信封）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.demand.query
+        inputs:
+          category: $inputs.category
+          status: $inputs.status
+          search: $inputs.search
+          sort: $inputs.sort
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params: {entity: demands.item}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+          order: $nodes.query.order
+          offset: $nodes.query.offset
+          limit: $nodes.query.limit
+      - id: page
+        operator: assemble.demand.list
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+          paged: $nodes.query.paged
+    edges:
+      - [query, list]
+      - [list, page]
+
+  - scenario: OPC_DEMAND_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 按 ID 读取单条委托及其竞标方案
+    saga: false
+    nodes:
+      - id: load
+        operator: entity.get
+        params:
+          entity: demands.item
+          message: 该委托不存在或已关闭
+        inputs:
+          key: $inputs.demand_id
+      - id: bids
+        operator: entity.list
+        params:
+          entity: demands.bid
+          query:
+            order: "-created_at"
+            filters: {demand_id: "$nodes.load.id"}
+      - id: detail
+        operator: assemble.demand.detail
+        inputs:
+          demand: $nodes.load.entity
+          bids: $nodes.bids.items
+      - id: result
+        operator: response.build
+        inputs:
+          entity: $nodes.detail
+    edges:
+      - [load, bids]
+      - [bids, detail]
+      - [detail, result]
+
+  - scenario: OPC_DEMAND_CLOSE_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 委托发起人关闭（截止）自己的需求
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: demands.item
+          message: 该委托不存在或已关闭
+        inputs:
+          key: $inputs.demand_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.creator_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [OPEN, BIDDING]
+          message: 该需求已截止或已关闭，无需重复操作
+        inputs:
+          current: $nodes.load.entity.status
+      - id: patch_data
+        operator: transform.merge
+        params:
+          items:
+            - {id: "$nodes.load.id", status: "CLOSED"}
+      - id: patch
+        operator: entity.patch
+        params: {entity: demands.item}
+        inputs:
+          data: $nodes.patch_data
+      - id: metric
+        operator: metric.incr
+        params: {metric: demand.closed}
+      - id: result
+        operator: response.build
+        inputs:
+          entity: $nodes.patch.entity
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, state]
+      - [state, patch_data]
+      - [patch_data, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  - scenario: OPC_DEMAND_DELETE_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 删除委托（仅发起人或管理员）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: demands.item
+          message: 该委托不存在或已被删除
+        inputs:
+          key: $inputs.demand_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.creator_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: demands.item}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: demand.deleted}
+      - id: audit
+        operator: audit.write
+        params:
+          action: demand.delete
+          resource_type: DEMAND
+        inputs:
+          resource_id: $nodes.load.id
+      - id: result
+        operator: transform.derive
+        params: {output_key: response, expr: "args.deleted"}
+        inputs:
+          deleted: $nodes.delete.deleted
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, metric]
+      - [metric, audit]
+      - [audit, result]
+
+  - scenario: OPC_DEMAND_BID_WITHDRAW_PIPELINE
+    version: v1.0.0
+    domain: demands
+    description: 竞标人撤回自己的竞标方案并回退需求的竞标人数
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: demands.bid
+          message: 该竞标记录不存在或已被撤回
+        inputs:
+          key: $inputs.bid_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.bidder_id
+      - id: demand
+        operator: entity.get
+        params:
+          entity: demands.item
+          message: 关联的委托不存在或已被删除
+        inputs:
+          key: $nodes.load.entity.demand_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: demands.bid}
+        inputs:
+          key: $nodes.load.id
+      - id: counter
+        operator: calc.demand.bid_counter
+        inputs:
+          demand_id: $nodes.demand.id
+          bidders_count: $nodes.demand.entity.bidders_count
+          delta: -1
+      - id: refresh
+        operator: entity.patch
+        params: {entity: demands.item}
+        inputs:
+          data: $nodes.counter
+      - id: metric
+        operator: metric.incr
+        params: {metric: demand.bid_withdrawn}
+      - id: result
+        operator: transform.derive
+        params: {output_key: response, expr: "args.deleted"}
+        inputs:
+          deleted: $nodes.delete.deleted
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, demand]
+      - [demand, delete]
+      - [delete, counter]
+      - [counter, refresh]
+      - [refresh, metric]
+      - [metric, result]

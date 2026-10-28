@@ -1,165 +1,202 @@
-"""Content moderation service managing violation reports and take-down enforcement."""
-import uuid
+"""Thin compatibility layer for the content-moderation domain.
+
+Reporting, take-down, restore, queue listing and the NLP pre-screen are *business
+flows* and now live entirely in ``config/scenarios/moderation.yaml`` (operators +
+the generic entity store). This module only keeps the historical import surface
+alive:
+
+* read/query shims (``list_items`` / ``get_item``) backed by the entity store,
+* a data-level ``report`` repository shim for legacy callers and test fixtures,
+* the legacy ``_items`` mapping, which mirrors writes into the entity store so
+  fixtures seeded the old way stay visible to the operator scenarios,
+* a persistence hydrator so existing write-behind bookkeeping keeps working.
+
+It must never re-implement a flow. ``moderation_service`` remains importable by
+other modules exactly as before.
+"""
 from datetime import datetime, timezone
-from typing import Dict, List, Optional
-from fastapi import HTTPException
-from .models import (
+from typing import Any, Dict, List, Optional
+
+from src.core.entity import entity_store
+from src.domains.moderation.entities import ENTITY_MODERATION_ITEM
+from src.domains.moderation.models import (
+    ContentReportRequest,
     ModerationItemResponse,
-    TakedownRequest,
-    RestoreRequest,
-    ModerationActionResponse,
+    REPORTABLE_TARGET_TYPES,
 )
 from src.infrastructure.database.persistence import domain_persistence
-from .models import ContentReportRequest, REPORTABLE_TARGET_TYPES
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _entity_items() -> Dict[str, ModerationItemResponse]:
+    """Read every moderation document currently held by the entity store."""
+    try:
+        rows, _total = entity_store.list(ENTITY_MODERATION_ITEM, {"limit": 0})
+    except KeyError:  # pragma: no cover - entity specs not booted
+        return {}
+    docs: Dict[str, ModerationItemResponse] = {}
+    for row in rows:
+        try:
+            docs[str(row.get("id"))] = ModerationItemResponse(**row)
+        except Exception:  # pragma: no cover - defensive against legacy rows
+            continue
+    return docs
+
+
+class _ModerationIndex(dict):
+    """Legacy ``_items`` mapping that mirrors writes into the entity store.
+
+    Historical fixtures seed ``moderation_service._items["mod-101"] = ...``
+    directly. Mirrored writes keep those seeds visible to the operator scenarios,
+    while reads merge both sources so operator-written items are visible to
+    legacy callers too.
+    """
+
+    def merged(self) -> Dict[str, ModerationItemResponse]:
+        docs = _entity_items()
+        # ``dict.items(self)`` reads the legacy cache without re-entering the
+        # overridden ``keys()`` / ``__iter__`` hooks (which would recurse).
+        docs.update(dict.items(self))
+        return docs
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        dict.__setitem__(self, key, value)
+        try:
+            payload = value.model_dump(mode="json") if hasattr(value, "model_dump") else dict(value)
+            payload["id"] = payload.get("id") or key
+            if entity_store.get(ENTITY_MODERATION_ITEM, {"key": payload["id"]}) is None:
+                entity_store.create(ENTITY_MODERATION_ITEM, payload)
+            else:
+                entity_store.update(ENTITY_MODERATION_ITEM, payload, partial=True)
+        except Exception:  # pragma: no cover - entity layer is best-effort here
+            pass
+
+    def __delitem__(self, key: str) -> None:
+        dict.pop(self, key, None)
+        try:
+            entity_store.delete(ENTITY_MODERATION_ITEM, {"key": key})
+        except Exception:  # pragma: no cover
+            pass
+
+    def pop(self, key: str, default: Any = None) -> Any:
+        value = self.merged().get(key, default)
+        dict.pop(self, key, None)
+        try:
+            entity_store.delete(ENTITY_MODERATION_ITEM, {"key": key})
+        except Exception:  # pragma: no cover
+            pass
+        return value
+
+    def clear(self) -> None:
+        keys = list(_entity_items().keys())
+        dict.clear(self)
+        for key in keys:
+            try:
+                entity_store.delete(ENTITY_MODERATION_ITEM, {"key": key})
+            except Exception:  # pragma: no cover
+                pass
+
+    def get(self, key: str, default: Any = None) -> Any:
+        return self.merged().get(key, default)
+
+    def values(self):
+        return self.merged().values()
+
+    def items(self):
+        return self.merged().items()
+
+    def keys(self):
+        return self.merged().keys()
+
+    def __len__(self) -> int:
+        return len(self.merged())
+
+    def __iter__(self):
+        return iter(self.merged())
+
+    def __contains__(self, key: object) -> bool:
+        return key in self.merged()
+
+
 class ModerationService:
-    """Manages content moderation, illegal speech inspection and take-down actions."""
+    """Data / query shim for content-moderation items."""
 
-    def __init__(self):
-        self._items: Dict[str, ModerationItemResponse] = {}
+    def __init__(self) -> None:
+        # Legacy id -> item index; the entity store remains authoritative.
+        self._items: _ModerationIndex = _ModerationIndex()
 
+    # ------------------------------------------------------------------
+    # Query shims (read path)
+    # ------------------------------------------------------------------
     def list_items(self, status: Optional[str] = None) -> List[ModerationItemResponse]:
         items = list(self._items.values())
         if status:
-            items = [it for it in items if it.status.upper() == status.upper()]
-        return items
+            wanted = str(status).upper()
+            items = [item for item in items if item.status.upper() == wanted]
+        return sorted(items, key=lambda item: item.reported_at or "", reverse=True)
 
     def get_item(self, item_id: str) -> Optional[ModerationItemResponse]:
         return self._items.get(item_id)
 
+    # ------------------------------------------------------------------
+    # Data-level repository shim (no take-down / restore flow)
+    # ------------------------------------------------------------------
     def report(self, req: ContentReportRequest) -> ModerationItemResponse:
-        """Record a user report (举报) against a piece of published content.
+        """Legacy data-level report writer.
 
-        Community reports are the user-interaction signal that keeps published
-        information honest: the platform does not verify authenticity itself —
-        reported content lands in the FLAGGED queue for operator disposition
-        (takedown / restore). Reports on the same target are merged into one
-        item whose report_count accumulates.
+        The business flow lives in ``OPC_MODERATION_REPORT_PIPELINE``; this shim
+        only reuses the same pure normalisation/merge functions so old callers
+        still persist through the entity store. New code must call the scenario.
         """
-        from .models import ModerationItemResponse as _Item
+        from src.domains.moderation.functions import normalize_report, report_merge
 
-        tt = str(req.target_type or "").strip().upper()
-        tid = str(req.target_id or "").strip()
-        if tt not in REPORTABLE_TARGET_TYPES:
-            raise ValueError(f"Unsupported report target_type: {req.target_type}")
-        if not tid:
-            raise ValueError("target_id is required for a report")
-
-        now = utc_now_iso()
-        existing = next(
-            (it for it in self._items.values()
-             if it.target_type == tt and it.target_id == tid and it.status == "FLAGGED"),
-            None,
+        report_input = normalize_report(
+            {},
+            req.model_dump(mode="json"),
+            {"user_id": req.reporter_id},
         )
-        if existing:
-            existing.report_count += 1
-            existing.reported_at = now
-            if req.reason and not existing.reason:
-                existing.reason = req.reason
-            domain_persistence.write("moderation.items", existing.id, existing)
-            return existing
-
-        item_id = f"mod_{uuid.uuid4().hex[:10]}"
-        snippet = (req.snippet_content or req.target_title or "").strip()[:160]
-        item = _Item(
-            id=item_id,
-            target_type=tt,
-            target_id=tid,
-            author_id=req.author_id or "",
-            author_name=req.author_name or "",
-            snippet_content=snippet,
-            violation_type="USER_REPORT",
-            status="FLAGGED",
-            report_count=1,
-            reported_at=now,
-            reason=req.reason or "用户举报：内容疑似违规或失实",
+        rows, _total = entity_store.list(
+            ENTITY_MODERATION_ITEM,
+            {
+                "filters": {
+                    "target_type": report_input["target_type"],
+                    "target_id": report_input["target_id"],
+                    "status": "FLAGGED",
+                },
+                "limit": 1,
+            },
         )
-        self._items[item_id] = item
-        domain_persistence.write("moderation.items", item_id, item)
+        merged = report_merge({}, {"existing": rows, "report": report_input}, {})
+        document = merged["document"]
+        if merged["merged"]:
+            stored = entity_store.update(ENTITY_MODERATION_ITEM, document, partial=True)
+        else:
+            stored = entity_store.create(ENTITY_MODERATION_ITEM, document)
+        item = ModerationItemResponse(**stored)
+        dict.__setitem__(self._items, item.id, item)
         return item
 
-    def revert_takedown(self, item_id: str, prev_status: str = "FLAGGED") -> bool:
-        item = self._items.get(item_id)
-        if item:
-            item.status = prev_status
-            item.moderated_at = None
-            domain_persistence.write("moderation.items", item_id, item)
-            return True
-        return False
-
-    def revert_restore(self, item_id: str) -> bool:
-        item = self._items.get(item_id)
-        if item:
-            item.status = "TAKEN_DOWN"
-            domain_persistence.write("moderation.items", item_id, item)
-            return True
-        return False
-
-    def revert_report(self, item_id: str, previous_count: int = 0) -> bool:
-        """Roll back a recorded report (Saga compensation).
-
-        A newly-created report is removed; an incremental report on an existing
-        item is restored to its previous ``report_count``.
-        """
-        item = self._items.get(item_id)
-        if not item:
-            return False
-        if previous_count <= 0:
-            del self._items[item_id]
-            domain_persistence.delete("moderation.items", item_id)
-            return True
-        item.report_count = previous_count
-        domain_persistence.write("moderation.items", item.id, item)
-        return True
-
-    def takedown(self, req: TakedownRequest) -> ModerationActionResponse:
-        item = self._items.get(req.item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail=f"Moderation item {req.item_id} not found")
-        
-        now = utc_now_iso()
-        item.status = "TAKEN_DOWN"
-        item.reason = req.reason
-        item.moderator_id = req.moderator_id
-        item.moderated_at = now
-        domain_persistence.write("moderation.items", item.id, item)
-
-        return ModerationActionResponse(
-            item_id=item.id,
-            status="TAKEN_DOWN",
-            moderated_at=now,
-            note=f"言论已全站下架: {req.reason}" + (" (作者已封禁)" if req.ban_author else "")
-        )
-
-    def restore(self, req: RestoreRequest) -> ModerationActionResponse:
-        item = self._items.get(req.item_id)
-        if not item:
-            raise HTTPException(status_code=404, detail=f"Moderation item {req.item_id} not found")
-        
-        now = utc_now_iso()
-        item.status = "NORMAL"
-        item.moderator_id = req.moderator_id
-        item.moderated_at = now
-        domain_persistence.write("moderation.items", item.id, item)
-
-        return ModerationActionResponse(
-            item_id=item.id,
-            status="NORMAL",
-            moderated_at=now,
-            note="处罚已撤销，言论恢复正常展示"
-        )
-
+    # ------------------------------------------------------------------
+    # Persistence hydration (entity store owns the runtime truth)
+    # ------------------------------------------------------------------
     def hydrate_items(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._items[r["id"]] = ModerationItemResponse(**r)
+        for row in rows:
+            item = ModerationItemResponse(**row)
+            dict.__setitem__(self._items, item.id, item)
         return len(rows)
 
 
 moderation_service = ModerationService()
 
 domain_persistence.register("moderation.items", moderation_service.hydrate_items)
+
+# Kept for callers that imported the enum from the service historically.
+__all__ = [
+    "ModerationService",
+    "moderation_service",
+    "utc_now_iso",
+    "REPORTABLE_TARGET_TYPES",
+]

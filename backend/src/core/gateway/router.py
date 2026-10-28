@@ -29,12 +29,13 @@ class RouteRule:
     def __init__(
         self,
         scenario: str,
-        handler: Callable[..., Any],
+        handler: Optional[Callable[..., Any]] = None,
         version: str = "v1.0.0",
         domain: str = "general",
         description: str = "",
         required_permission: str = "",
         owner_check: Optional[Dict[str, Any]] = None,
+        pipeline: Optional[str] = None,
     ):
         self.scenario = scenario
         self.handler = handler
@@ -43,20 +44,42 @@ class RouteRule:
         self.description = description
         self.required_permission = required_permission or ""
         self.owner_check = owner_check or None
-        self.is_async = inspect.iscoroutinefunction(handler)
-        self.sig = inspect.signature(handler)
+        self.pipeline = pipeline or None
+        self.is_async = True
+        self.sig = inspect.signature(handler) if handler else None
 
     async def execute(self, payload: dict[str, Any], context: dict[str, Any]) -> Any:
-        """Dynamically invoke handler matching its signature parameters."""
-        params = list(self.sig.parameters.values())
+        """Dynamically invoke the configured execution path."""
+        if self.pipeline:
+            from src.domains.orchestration.models import ScenarioExecuteRequest
+            from src.domains.orchestration.service import orchestration_service
 
+            result = await orchestration_service.execute_scenario(
+                ScenarioExecuteRequest(
+                    scenario_code=self.pipeline,
+                    inputs=dict(payload or {}),
+                    context=dict(context or {}),
+                )
+            )
+            if result.status != "SUCCESS":
+                message = (result.error_message or "场景执行失败").replace("Node ", "节点 ").replace(
+                    " execution error: ", " 执行失败："
+                )
+                if "权限" in message or "登录" in message:
+                    raise PermissionError(message)
+                raise ValueError(message)
+            output = dict(result.final_output or {})
+            return output.get("response", output)
+
+        if not self.handler:
+            raise KeyError(f"Route '{self.scenario}' has no pipeline or handler")
+        params = list(self.sig.parameters.values())
         if len(params) == 0:
             result = self.handler()
         elif len(params) == 1:
             result = self.handler(payload)
         else:
             result = self.handler(payload, context)
-
         if inspect.iscoroutine(result):
             return await result
         return result
@@ -103,13 +126,14 @@ class ScenarioRouter:
     def register(
         self,
         scenario: str,
-        handler: Callable[..., Any],
+        handler: Optional[Callable[..., Any]] = None,
         version: str = "v1.0.0",
         domain: str = "general",
         description: str = "",
         is_default: bool = True,
         required_permission: str = "",
         owner_check: Optional[Dict[str, Any]] = None,
+        pipeline: Optional[str] = None,
     ) -> None:
         """Register a new scenario routing rule under a specific code version."""
         rule = RouteRule(
@@ -120,12 +144,12 @@ class ScenarioRouter:
             description=description,
             required_permission=required_permission,
             owner_check=owner_check,
+            pipeline=pipeline,
         )
         self._routes[(scenario, version)] = rule
         if is_default or scenario not in self._default_versions:
             self._default_versions[scenario] = version
         logger.info(f"Registered scenario route: '{scenario}' [ver: {version}] -> {domain} ({description})")
-
     def unregister(self, scenario: str, version: Optional[str] = None) -> bool:
         """Remove a route rule by scenario code and optional version."""
         if version:

@@ -195,6 +195,22 @@ class GatewayConfigLoader:
             upgrade_adapter_str = entry.get("upgrade_adapter")
             required_permission = entry.get("required_permission", "")
             owner_check = entry.get("owner_check")
+            pipeline = entry.get("pipeline") or entry.get("scenario_code")
+
+            if pipeline:
+                router.register(
+                    scenario=scenario,
+                    handler=None,
+                    version=version,
+                    domain=domain,
+                    description=description,
+                    is_default=is_default,
+                    required_permission=required_permission,
+                    owner_check=owner_check,
+                    pipeline=pipeline,
+                )
+                count += 1
+                continue
 
             raw_handler = _import_symbol(handler_str) if handler_str else None
             model_cls = _import_symbol(model_str) if model_str else None

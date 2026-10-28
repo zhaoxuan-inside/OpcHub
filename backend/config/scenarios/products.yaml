@@ -1,0 +1,147 @@
+# 产品橱窗（商品展示）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+
+scenarios:
+  - scenario: OPC_PRODUCT_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: products
+    description: 发布独立创客作品到产品橱窗
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            title: {type: string, required: true, min_length: 2, max_length: 255}
+            tagline: {type: string, required: false, max_length: 255}
+            description: {type: string, required: false}
+            price_cny: {type: number, required: false, min: 0}
+        inputs:
+          title: $inputs.title
+          tagline: $inputs.tagline
+          description: $inputs.description
+          price_cny: $inputs.price_cny
+      - id: rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "len(args.tagline or '') >= 5 or len(args.description or '') >= 5"
+              message: 产品一句话卖点或详细介绍至少需要 5 个字符
+        inputs:
+          tagline: $inputs.tagline
+          description: $inputs.description
+      - id: normalize
+        operator: calc.product.normalize_publish
+        inputs:
+          title: $inputs.title
+          tagline: $inputs.tagline
+          description: $inputs.description
+          category: $inputs.category
+          pricing_model: $inputs.pricing_model
+          price_cny: $inputs.price_cny
+          demo_url: $inputs.demo_url
+          icon_url: $inputs.icon_url
+          version: $inputs.version
+          official_url: $inputs.official_url
+          download_url: $inputs.download_url
+          author_name: $inputs.author_name
+          screenshots: $inputs.screenshots
+      - id: create
+        operator: entity.create
+        params: {entity: product.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: product.published}
+      - id: response
+        operator: response.build
+        inputs:
+          entity: $nodes.create.entity
+          id: $nodes.create.id
+    edges:
+      - [auth, fields]
+      - [fields, rule]
+      - [rule, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, response]
+
+  - scenario: OPC_PRODUCT_LIST_PIPELINE
+    version: v1.0.0
+    domain: products
+    description: 分页检索产品橱窗
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.product.query
+        inputs:
+          category: $inputs.category
+          search: $inputs.search
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params:
+          entity: product.item
+          query: {order: "-upvote_count"}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+      - id: page
+        operator: calc.product.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+    edges:
+      - [query, list]
+      - [list, page]
+
+  - scenario: OPC_PRODUCT_DELETE_PIPELINE
+    version: v1.0.0
+    domain: products
+    description: 删除本人产品（管理员可删除任意产品）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params: {entity: product.item}
+        inputs:
+          key: $inputs.product_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: product.item}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: product.deleted}
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, metric]
+
+  - scenario: OPC_PRODUCT_SEMANTIC_SEARCH_PIPELINE
+    version: v1.0.0
+    domain: products
+    description: 基于向量相似度的产品语义检索
+    saga: false
+    nodes:
+      - id: search
+        operator: external.rag.product_search
+        inputs:
+          query: $inputs.query
+          top_k: $inputs.top_k
+          category: $inputs.category
+    edges: []

@@ -1,0 +1,292 @@
+# 消息箱（用户通知收件箱）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 数据模型：
+#   notification.item   每条投递回执（notify.emit 默认写入的实体）
+#   notification.inbox  每个用户的已读游标（read_map: 消息 ID -> read_at）
+# 读态单独存放，才能用一次声明式写入完成「批量已读 / 全部已读」，
+# 同时让 notification.item 保持为不可变的投递回执。
+
+scenarios:
+  - scenario: OPC_NOTIFICATION_LIST_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 分页查看当前登录用户的消息箱（同时返回 items / total / unread）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: query
+        operator: calc.notification.query
+        inputs:
+          status: $inputs.status
+          limit: $inputs.limit
+          offset: $inputs.offset
+      - id: list
+        operator: entity.list
+        params:
+          entity: notification.item
+          query: {order: "-created_at", limit: 0}
+        inputs:
+          filters: {user_id: $context.user_id}
+      - id: inbox
+        operator: entity.get
+        params: {entity: notification.inbox, required: false}
+        inputs:
+          key: $context.user_id
+      - id: assemble
+        operator: assemble.notification.list
+        inputs:
+          items: $nodes.list.items
+          read_map: $nodes.inbox.entity.read_map
+          status: $nodes.query.status
+          limit: $nodes.query.limit
+          offset: $nodes.query.offset
+    edges:
+      - [auth, query]
+      - [query, list]
+      - [list, inbox]
+      - [inbox, assemble]
+
+  - scenario: OPC_NOTIFICATION_UNREAD_COUNT_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 获取当前登录用户消息箱未读数（导航角标）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: list
+        operator: entity.list
+        params:
+          entity: notification.item
+          query: {limit: 0}
+        inputs:
+          filters: {user_id: $context.user_id}
+      - id: inbox
+        operator: entity.get
+        params: {entity: notification.inbox, required: false}
+        inputs:
+          key: $context.user_id
+      - id: unread
+        operator: calc.notification.unread
+        inputs:
+          items: $nodes.list.items
+          read_map: $nodes.inbox.entity.read_map
+    edges:
+      - [auth, list]
+      - [list, inbox]
+      - [inbox, unread]
+
+  - scenario: OPC_NOTIFICATION_MARK_READ_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 将指定消息标记为已读（仅作用于本人消息，重复标记幂等）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: list
+        operator: entity.list
+        params:
+          entity: notification.item
+          query: {limit: 0}
+        inputs:
+          filters: {user_id: $context.user_id}
+      - id: inbox
+        operator: entity.get
+        params: {entity: notification.inbox, required: false}
+        inputs:
+          key: $context.user_id
+      - id: plan
+        operator: calc.notification.read_plan
+        params: {scope: ids}
+        inputs:
+          items: $nodes.list.items
+          read_map: $nodes.inbox.entity.read_map
+          ids: $inputs.ids
+          id: $inputs.id
+      - id: save
+        operator: entity.upsert
+        params: {entity: notification.inbox}
+        inputs:
+          data: $nodes.plan.record
+      - id: metric
+        operator: metric.incr
+        params: {metric: notification.read_marked}
+      - id: result
+        operator: assemble.notification.action
+        inputs:
+          updated: $nodes.plan.updated
+          unread: $nodes.plan.unread
+          message: $nodes.plan.message
+    edges:
+      - [auth, list]
+      - [list, inbox]
+      - [inbox, plan]
+      - [plan, save]
+      - [save, metric]
+      - [metric, result]
+
+  - scenario: OPC_NOTIFICATION_MARK_ALL_READ_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 将当前登录用户全部未读消息标记为已读
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: list
+        operator: entity.list
+        params:
+          entity: notification.item
+          query: {limit: 0}
+        inputs:
+          filters: {user_id: $context.user_id}
+      - id: inbox
+        operator: entity.get
+        params: {entity: notification.inbox, required: false}
+        inputs:
+          key: $context.user_id
+      - id: plan
+        operator: calc.notification.read_plan
+        params: {scope: all}
+        inputs:
+          items: $nodes.list.items
+          read_map: $nodes.inbox.entity.read_map
+      - id: save
+        operator: entity.upsert
+        params: {entity: notification.inbox}
+        inputs:
+          data: $nodes.plan.record
+      - id: metric
+        operator: metric.incr
+        params: {metric: notification.read_all_marked}
+      - id: result
+        operator: assemble.notification.action
+        inputs:
+          updated: $nodes.plan.updated
+          unread: $nodes.plan.unread
+          message: $nodes.plan.message
+    edges:
+      - [auth, list]
+      - [list, inbox]
+      - [inbox, plan]
+      - [plan, save]
+      - [save, metric]
+      - [metric, result]
+
+  - scenario: OPC_NOTIFICATION_DELETE_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 删除本人一条消息（他人消息由 guard.owner 拒绝）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params: {entity: notification.item, message: 消息不存在}
+        inputs:
+          key: $inputs.id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.user_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: notification.item}
+        inputs:
+          key: $nodes.load.id
+      - id: list
+        operator: entity.list
+        params:
+          entity: notification.item
+          query: {limit: 0}
+        inputs:
+          filters: {user_id: $context.user_id}
+      - id: inbox
+        operator: entity.get
+        params: {entity: notification.inbox, required: false}
+        inputs:
+          key: $context.user_id
+      - id: unread
+        operator: calc.notification.unread
+        inputs:
+          items: $nodes.list.items
+          read_map: $nodes.inbox.entity.read_map
+      - id: metric
+        operator: metric.incr
+        params: {metric: notification.deleted}
+      - id: result
+        operator: assemble.notification.action
+        inputs:
+          updated: $nodes.delete.deleted
+          unread: $nodes.unread.unread
+          message: 消息已删除
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, list]
+      - [list, inbox]
+      - [inbox, unread]
+      - [unread, metric]
+      - [metric, result]
+
+  # 内部投递入口：供平台/审核域落库使用（可选，服务端调用，不是用户 API）。
+  - scenario: OPC_NOTIFICATION_CREATE_PIPELINE
+    version: v1.0.0
+    domain: notifications
+    description: 为指定用户写入一条消息（内部投递，不对外暴露）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+        output_key: auth_identity
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            user_id: {type: string, required: true, min_length: 1, message: 消息接收人不能为空}
+            title: {type: string, required: true, min_length: 1, max_length: 160}
+            content: {type: string, required: false, max_length: 2000}
+        inputs:
+          user_id: $inputs.user_id
+          title: $inputs.title
+          content: $inputs.content
+      - id: normalize
+        operator: calc.notification.normalize
+        inputs:
+          user_id: $inputs.user_id
+          kind: $inputs.kind
+          level: $inputs.level
+          title: $inputs.title
+          content: $inputs.content
+          body: $inputs.body
+          scene: $inputs.scene
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          verdict: $inputs.verdict
+          hit_words: $inputs.hit_words
+          link: $inputs.link
+          meta: $inputs.meta
+      - id: create
+        operator: entity.create
+        params: {entity: notification.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: notification.created}
+      - id: response
+        operator: response.build
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, fields]
+      - [fields, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, response]

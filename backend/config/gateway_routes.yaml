@@ -44,15 +44,14 @@ gateway:
       domain: "products"
       description: "检索独立创客商业作品列表"
       is_default: true
-      handler: "src.domains.products.service.product_service:list_products"
-      args_type: "kwargs"
+      pipeline: "OPC_PRODUCT_LIST_PIPELINE"
 
     - scenario: "products.publish"
       version: "v1.0.0"
       domain: "products"
       description: "发布新独立创客作品至橱窗（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:product_publish_adapter"
+      pipeline: "OPC_PRODUCT_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "products.search.semantic"
@@ -60,7 +59,7 @@ gateway:
       domain: "products"
       description: "基于轻量向量引擎与余弦相似度检索独立商业作品库 (NLP 语义搜索)"
       is_default: true
-      handler: "src.core.gateway.adapters:product_semantic_search_adapter"
+      pipeline: "OPC_PRODUCT_SEMANTIC_SEARCH_PIPELINE"
 
     # --------------------------------------------------------------------------
     # 2. Policy Center (政策中心)

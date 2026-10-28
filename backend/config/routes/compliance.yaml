@@ -1,0 +1,48 @@
+# Compliance (合规法条 / 避坑案例 / 上线自检) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "compliance.laws"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "获取合规法条知识库（法律、行政法规、部门规章白话提炼）"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_LAW_LIST_PIPELINE"
+
+  - gateway: "compliance.cases"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "获取典型踩坑与行政处罚案例库"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_CASE_LIST_PIPELINE"
+
+  - gateway: "compliance.publish"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "登录创客发布法条或避坑案例（kind: law | case，统一敏感词预筛门禁）"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_PUBLISH_PIPELINE"
+    required_permission: "content:publish"
+
+  # 向后兼容别名：旧调用方仍可用 compliance.dimensions 读取法条库
+  - gateway: "compliance.dimensions"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "获取合规法条知识库（兼容旧场景名）"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_LAW_LIST_PIPELINE"
+
+  - gateway: "compliance.checkpoints"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "获取上线前自检清单与合规门禁条目"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_CHECKPOINT_LIST_PIPELINE"
+
+  - gateway: "compliance.audit"
+    version: "v1.0.0"
+    domain: "compliance"
+    description: "评估创客产品自检并出具六维评分报告"
+    is_default: true
+    pipeline: "OPC_COMPLIANCE_AUDIT_PIPELINE"

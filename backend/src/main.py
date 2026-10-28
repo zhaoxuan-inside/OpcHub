@@ -64,6 +64,13 @@ async def lifespan(app: FastAPI):
         # Rebuild the in-memory domain indexes from persisted state (restart durability)
         await user_service.hydrate_from_db()
         await domain_persistence.initialize()
+        # Hydrate the generic entity store and compile the scenario assets that
+        # define every business flow (business = operator orchestration).
+        from src.core.entity import entity_store
+        from src.core.scenario import ensure_scenarios_loaded
+
+        await entity_store.initialize()
+        ensure_scenarios_loaded(force=True)
         # Seed the loyalty (points / membership / redemption) DAG pipelines.
         from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
 

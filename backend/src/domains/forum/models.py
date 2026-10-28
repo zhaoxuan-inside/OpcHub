@@ -161,3 +161,46 @@ class AnswerAcceptResponse(BaseModel):
     answer_id: str
     is_accepted: bool
     status: str
+
+
+# ---------------------------------------------------------------------------
+# Persistence records (relational join rows / soft-delete markers).
+#
+# These are *storage documents* only: they are never returned to the gateway as
+# business payloads. They exist so the generic entity store can key, validate and
+# mirror them with the same contracts as the content models above.
+# ---------------------------------------------------------------------------
+class ForumVoteRecord(BaseModel):
+    """One mutually-exclusive vote held by one user on one target."""
+
+    user_id: str
+    target_type: Literal["THREAD", "ANSWER", "COMMENT"]
+    target_id: str
+    vote_type: Literal["UPVOTE", "DOWNVOTE"]
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ForumFollowRecord(BaseModel):
+    """One follow edge between a user and a thread/question."""
+
+    user_id: str
+    thread_id: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class ForumTombstoneRecord(BaseModel):
+    """Soft-delete marker for content that other documents still reference.
+
+    ``type`` is the deleted content kind, ``path`` carries the materialized path
+    of a deleted comment so its whole subtree can be filtered at read time, and
+    ``thread_id`` keeps the parent thread for cleanup jobs.
+    """
+
+    id: str
+    type: Literal["THREAD", "ANSWER", "COMMENT"]
+    path: Optional[str] = None
+    thread_id: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None

@@ -1,0 +1,21 @@
+# 内容治理（moderation）网关场景 -> 算子编排 pipeline 映射
+# 供主控汇总；gateway_routes.yaml 保持 RBAC/ABAC 与入参契约不变。
+
+routes:
+  - gateway: "moderation.items.list"
+    pipeline: "OPC_MODERATION_LIST_PIPELINE"
+
+  - gateway: "moderation.items.detail"
+    pipeline: "OPC_MODERATION_DETAIL_PIPELINE"
+
+  - gateway: "moderation.report"
+    pipeline: "OPC_MODERATION_REPORT_PIPELINE"
+
+  - gateway: "moderation.takedown"
+    pipeline: "OPC_MODERATION_TAKEDOWN_PIPELINE"
+
+  - gateway: "moderation.restore"
+    pipeline: "OPC_MODERATION_RESTORE_PIPELINE"
+
+  - gateway: "moderation.prescreen"
+    pipeline: "OPC_MODERATION_PRESCREEN_PIPELINE"

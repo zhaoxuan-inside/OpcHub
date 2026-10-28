@@ -5,7 +5,7 @@ results. Today it carries content-moderation receipts (敏感词校验结果) fo
 published UGC; the model is intentionally generic so review/claim notices can
 reuse it later.
 """
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -29,7 +29,7 @@ class Notification(BaseModel):
     kind: str = KIND_PUBLISH_MODERATION
     level: str = Field(default="INFO", description="SUCCESS / WARNING / ERROR / INFO")
     title: str
-    content: str
+    content: str = ""
     scene: str = ""
     target_type: str = ""
     target_id: str = ""
@@ -38,6 +38,12 @@ class Notification(BaseModel):
     status: str = STATUS_UNREAD
     created_at: str
     read_at: Optional[str] = None
+    # Fields written by the generic ``notify.emit`` operator. Kept optional so a
+    # moderation receipt (content only) and a system notification (body + link)
+    # can share the very same entity document.
+    body: str = ""
+    link: Optional[str] = None
+    meta: Dict[str, Any] = Field(default_factory=dict)
 
 
 class NotificationListResponse(BaseModel):

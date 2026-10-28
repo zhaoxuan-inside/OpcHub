@@ -1,0 +1,9 @@
+routes:
+  - gateway: "policies.list"
+    pipeline: "OPC_POLICY_LIST_PIPELINE"
+
+  - gateway: "policies.publish"
+    pipeline: "OPC_POLICY_PUBLISH_PIPELINE"
+
+  - gateway: "policies.match"
+    pipeline: "OPC_POLICY_MATCH_PIPELINE"

@@ -2,6 +2,7 @@
 from src.domains.compliance.models import (
     ComplianceLaw,
     ComplianceCase,
+    ComplianceItem,
     CompliancePublishRequest,
     AuditCheckItem,
     AuditEvaluateRequest,
@@ -12,6 +13,7 @@ from src.domains.compliance.service import compliance_service, ComplianceService
 __all__ = [
     "ComplianceLaw",
     "ComplianceCase",
+    "ComplianceItem",
     "CompliancePublishRequest",
     "AuditCheckItem",
     "AuditEvaluateRequest",

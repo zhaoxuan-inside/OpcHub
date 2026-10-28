@@ -1,11 +1,41 @@
-"""Tests for P05 Demand & Bidding Market microkernel DAG pipelines and Saga compensation."""
+"""Gateway-level regression tests for the demand marketplace (需求集市).
+
+Business flows are declared in ``config/scenarios/demands.yaml`` and executed by
+the operator kernel; the gateway route still funnels through the legacy
+scenario adapter, so these tests assert the end-to-end ``/api/welcom/opc_world``
+contract (identity binding, response shape, content gate). Kernel-level flow
+coverage lives in ``tests/test_demands_operator_flows.py``.
+"""
 import pytest
 from fastapi.testclient import TestClient
 
-from src.main import app
+from src.core.security import create_session_token
 from src.domains.demands.service import demand_service
-from src.domains.orchestration.service import orchestration_service
-from src.domains.orchestration.models import ScenarioExecuteRequest
+from src.main import app
+from conftest import dispatch, gw_data
+
+MAKER_TOKEN = create_session_token({
+    "uid": "usr_dem_gw_maker",
+    "email": "dem_gw_maker@opchub.cn",
+    "nickname": "网关测试委托方",
+    "role": "MAKER",
+    "must_change_password": False,
+})
+
+DEMAND_PAYLOAD = {
+    "title": "海外独立站 Shopify 支付插件定制开发",
+    "description": "需要资深独立开发者对接 Stripe 与 PayPal 订阅计费网关，要求通过 PCI-DSS 基础合规检查。",
+    "budget_cny": 15000.0,
+    "category": "DEV",
+    "deadline_days": 10,
+}
+
+
+@pytest.fixture(autouse=True)
+def clean_demand_state():
+    demand_service.clear()
+    yield
+    demand_service.clear()
 
 
 @pytest.fixture
@@ -13,192 +43,65 @@ def client():
     return TestClient(app)
 
 
-def test_demand_publish_dag_success(client):
-    """Test standard execution of OPC_DEMAND_PUBLISH_PIPELINE via unified gateway."""
-    req = {
-        "scenario": "demands.publish",
-        "code_version": "v1.0.0",
-        "payload": {
-            "title": "海外独立站 Shopify 支付插件定制开发",
-            "description": "需要资深独立开发者对接 Stripe 与 PayPal 订阅计费网关，要求通过 PCI-DSS 基础合规检查。",
-            "budget_cny": 15000.0,
-            "category": "DEV",
-            "deadline_days": 10,
-            "creator_id": "usr_maker_client_2026",
-        },
-        "context": {},
-    }
-    resp = client.post("/api/welcom/opc_world", json=req)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["code"] == 200
-    assert data["data"]["title"] == "海外独立站 Shopify 支付插件定制开发"
-    demand_id = data["data"]["id"]
-    assert demand_id is not None
+def _publish(client, payload=None):
+    return dispatch(client, "demands.publish", payload or DEMAND_PAYLOAD, token=MAKER_TOKEN)
 
-    # Verify queryable in demand service
-    stored = demand_service.get_demand(demand_id)
+
+def test_demand_publish_via_gateway_binds_gateway_identity(client):
+    body = _publish(client).json()
+    assert body["code"] == 200, body
+    demand = body["data"]
+    assert demand["title"] == DEMAND_PAYLOAD["title"]
+    assert demand["budget_cny"] == 15000.0
+    assert demand["creator_id"] == "usr_dem_gw_maker"
+    assert demand["is_official"] is False
+    assert demand["status"] == "OPEN"
+
+    stored = demand_service.get_demand(demand["id"])
     assert stored is not None
-    assert stored.budget_cny == 15000.0
+    assert stored.creator_id == "usr_dem_gw_maker"
 
 
-def test_demand_publish_moderation_guard_blocked(client):
-    """Test that demand publish guard blocks sensitive or illegal content."""
-    req = {
-        "scenario": "demands.publish",
-        "code_version": "v1.0.0",
-        "payload": {
-            "title": "急求内嵌自设资金池搭建方案",
-            "description": "希望能绕过第三方持牌支付机构监管，私自沉淀用户预付款。",
-            "budget_cny": 50000.0,
-            "category": "DEV",
-            "deadline_days": 10,
-            "creator_id": "usr_bad_client",
-        },
-        "context": {},
-    }
-    resp = client.post("/api/welcom/opc_world", json=req)
-    assert resp.status_code in [200, 400, 422]
-    data = resp.json()
-    assert data["code"] != 200 or "violation" in str(data).lower() or "prohibited" in str(data).lower()
-
-
-
-@pytest.mark.asyncio
-async def test_demand_publish_saga_rollback_on_downstream_failure():
-    """Test that downstream failure triggers Saga reverse compensation to remove persisted demand."""
-    inputs = {
-        "title": "回滚测试外包委托需求",
-        "description": "本需求将在下游度量节点发生故障时自动触发 Saga 补偿物理撤回。",
-        "budget_cny": 8000.0,
-        "category": "DEV",
-        "deadline_days": 7,
-        "creator_id": "usr_test_rollback",
-        "simulate_downstream_failure": True,
-    }
-    res = await orchestration_service.execute_scenario(
-        ScenarioExecuteRequest(
-            scenario_code="OPC_DEMAND_PUBLISH_PIPELINE",
-            version="v1.0.0",
-            inputs=inputs,
-        )
+def test_demand_publish_blocks_sensitive_content_via_gateway(client):
+    payload = dict(
+        DEMAND_PAYLOAD,
+        description="需要能够提供洗钱与地下钱庄资金通道的合作方。",
     )
-    # The pipeline should converge to ROLLED_BACK
-    assert res.status == "ROLLED_BACK"
-    assert len(res.compensation_traces) > 0
-    # Confirm trace for demand.publish.persist
-    persist_trace = next(
-        (t for t in res.compensation_traces if t.get("node_id") == "step_persist"), None
-    )
-    assert persist_trace is not None
-    assert persist_trace.get("status") == "SUCCESS"
-
-    # Verify demand is physically eliminated from memory
-    did = persist_trace["output"].get("demand_id")
-    if did:
-        assert demand_service.get_demand(did) is None
+    body = _publish(client, payload).json()
+    assert body["code"] == 400
+    assert "敏感" in str(body)
 
 
-def test_demand_bid_dag_success(client):
-    """Test standard execution of OPC_DEMAND_BID_PIPELINE via unified gateway."""
-    # Find an open demand
-    demands = demand_service.list_demands()
-    assert len(demands) > 0
-    target_demand = demands[0]
-    initial_count = target_demand.bidders_count
+def test_demand_bid_via_gateway_binds_bidder_and_counts(client):
+    demand = gw_data(client, "demands.publish", DEMAND_PAYLOAD)
 
-    req = {
-        "scenario": "demands.bid",
-        "code_version": "v1.0.0",
-        "payload": {
-            "demand_id": target_demand.id,
-            "bidder_id": "usr_maker_expert_007",
+    bid = dispatch(
+        client,
+        "demands.bid",
+        {
+            "demand_id": demand["id"],
             "bid_amount_cny": 14000.0,
             "delivery_days": 6,
-            "proposal_text": "已交付过同类独立站系统，拥有成熟方案与生产级代码，6天内高质量交付并协助上线。",
+            "proposal_text": "已交付过同类独立站系统，拥有成熟方案与生产级代码，6 天内高质量交付并协助上线。",
         },
-        "context": {},
-    }
-    resp = client.post("/api/welcom/opc_world", json=req)
-    assert resp.status_code == 200
-    data = resp.json()
-    assert data["code"] == 200
-    assert data["data"]["bidder_id"] == "usr_maker_expert_007"
-    assert data["data"]["bid_amount_cny"] == 14000.0
+        token=MAKER_TOKEN,
+    ).json()["data"]
 
-    # Verify bidders_count incremented
-    updated = demand_service.get_demand(target_demand.id)
-    assert updated.bidders_count == initial_count + 1
+    assert bid["demand_id"] == demand["id"]
+    assert bid["bidder_id"] == "usr_dem_gw_maker"
+    assert bid["bid_amount_cny"] == 14000.0
+    assert demand_service.get_demand(demand["id"]).bidders_count == 1
 
 
-def test_demand_bid_guard_blocked_on_invalid_demand_or_sensitive(client):
-    """Test bidding guard blocks invalid demand IDs or moderation violations."""
-    # 1. Non-existent demand
-    req_bad_id = {
-        "scenario": "demands.bid",
-        "code_version": "v1.0.0",
-        "payload": {
-            "demand_id": "non_existent_demand_id_xyz",
-            "bidder_id": "usr_maker_001",
-            "bid_amount_cny": 1000.0,
-            "delivery_days": 3,
-            "proposal_text": "正常提案文本内容详情测试。",
-        },
-        "context": {},
-    }
-    resp = client.post("/api/welcom/opc_world", json=req_bad_id)
-    assert resp.status_code in [200, 400, 422]
-    data_bad = resp.json()
-    assert data_bad["code"] != 200 or "not found" in str(data_bad).lower()
+def test_demand_list_supports_flat_feed_and_paged_envelope(client):
+    gw_data(client, "demands.publish", DEMAND_PAYLOAD)
 
-    # 2. Sensitive keywords in bid proposal
-    demands = demand_service.list_demands()
-    req_sensitive = {
-        "scenario": "demands.bid",
-        "code_version": "v1.0.0",
-        "payload": {
-            "demand_id": demands[0].id,
-            "bidder_id": "usr_maker_001",
-            "bid_amount_cny": 1000.0,
-            "delivery_days": 3,
-            "proposal_text": "我们可以配合代开假发票来冲抵外包开发成本。",
-        },
-        "context": {},
-    }
-    resp_sens = client.post("/api/welcom/opc_world", json=req_sensitive)
-    assert resp_sens.status_code in [200, 400, 422]
-    data_sens = resp_sens.json()
-    assert data_sens["code"] != 200 or "violation" in str(data_sens).lower() or "prohibited" in str(data_sens).lower()
+    flat = gw_data(client, "demands.list", {})
+    assert isinstance(flat, list)
+    assert any(item["title"] == DEMAND_PAYLOAD["title"] for item in flat)
 
-
-
-@pytest.mark.asyncio
-async def test_demand_bid_saga_rollback_on_downstream_failure():
-    """Test that downstream failure triggers Saga reverse compensation to remove bid and restore count."""
-    demands = demand_service.list_demands()
-    assert len(demands) > 0
-    target_demand = demands[0]
-    initial_count = target_demand.bidders_count
-
-    inputs = {
-        "demand_id": target_demand.id,
-        "bidder_id": "usr_maker_rollback_bid",
-        "bid_amount_cny": 12000.0,
-        "delivery_days": 5,
-        "proposal_text": "本竞标方案将触发下游度量异常并自动逆向补偿回滚。",
-        "simulate_downstream_failure": True,
-    }
-    res = await orchestration_service.execute_scenario(
-        ScenarioExecuteRequest(
-            scenario_code="OPC_DEMAND_BID_PIPELINE",
-            version="v1.0.0",
-            inputs=inputs,
-        )
-    )
-    # The pipeline should converge to ROLLED_BACK
-    assert res.status == "ROLLED_BACK"
-    assert len(res.compensation_traces) > 0
-
-    # Verify bidders_count was rolled back to initial_count
-    updated = demand_service.get_demand(target_demand.id)
-    assert updated.bidders_count == initial_count
+    paged = gw_data(client, "demands.list", {"page": 1, "page_size": 5})
+    assert paged["page"] == 1
+    assert paged["page_size"] == 5
+    assert paged["total"] >= 1
+    assert len(paged["items"]) >= 1

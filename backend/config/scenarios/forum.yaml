@@ -1,0 +1,1268 @@
+# 头脑风暴（知乎式问答社区）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 迁移说明（算子内核 v2）：
+# * 计数（answer_count / comment_count / upvote_count / view_count / follow_count）
+#   一律由纯函数增量计算 + entity.patch 落库，不在 service 中隐式修改。
+# * 内容审核：`calc.moderation.prescreen` 是审核域发布的通用预筛算子（纯函数，
+#   无 I/O）；论坛场景跨域“调用算子”而非 import 模块。外部审核服务在本轮基线中
+#   不接入，判定不足时按声明式策略降级（仅拦截 CONFIRMED_VIOLATION）。
+# * feed 缓存已移除：游标/热度排序全部在 calc.forum.page 中计算。
+#   为兼容旧响应形状，feed 仍输出 cache_hit/cache_written/prewarmed_next=false。
+
+scenarios:
+  # -------------------------------------------------------------------------
+  # 发帖 / 编辑 / 删除
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_THREAD_PUBLISH
+    version: v1.0.0
+    domain: forum
+    description: 发布头脑风暴讨论帖/知乎式问题（作者身份取自 context，管理员自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            title:
+              type: string
+              required: true
+              min_length: 5
+              max_length: 255
+              message: 讨论帖标题至少需要 5 个字符，且不能超过 255 个字符
+            content: {type: string, required: true, min_length: 10, message: 讨论帖正文至少需要 10 个字符}
+            category_code: {type: string, required: false, max_length: 32}
+        inputs:
+          title: $inputs.title
+          content: $inputs.content
+          category_code: $inputs.category_code
+      - id: normalize
+        operator: calc.forum.thread_publish
+        inputs:
+          category_code: $inputs.category_code
+          author_id: $inputs.author_id
+          title: $inputs.title
+          content: $inputs.content
+          author_name: $inputs.author_name
+          author_title: $inputs.author_title
+      - id: text
+        operator: transform.template
+        params:
+          template: "{title}\n{content}"
+          output_key: text
+        inputs:
+          title: $nodes.normalize.title
+          content: $nodes.normalize.content
+      # 声明式内容预筛：审核域通用 NLP 预筛算子（无网络调用），高置信违规直接拦截。
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $nodes.text.text
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
+              message: 内容合规校验未通过：命中平台内容安全预筛规则
+        inputs:
+          verdict: $nodes.prescreen.verdict
+      - id: create
+        operator: entity.create
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.normalize
+      - id: hot
+        operator: calc.forum.hot_score
+        inputs:
+          thread: $nodes.create.entity
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data:
+            id: $nodes.create.id
+            hot_score: $nodes.hot.hot_score
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.thread.published}
+      - id: result
+        operator: transform.derive
+        params: {expr: "args.entity", output_key: created_thread}
+        inputs:
+          entity: $nodes.patch.entity
+    edges:
+      - [auth, fields]
+      - [fields, normalize]
+      - [normalize, text]
+      - [text, prescreen]
+      - [prescreen, moderation]
+      - [moderation, create]
+      - [create, hot]
+      - [hot, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  - scenario: OPC_FORUM_THREAD_UPDATE_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 编辑讨论帖标题/正文/分区（限作者或管理员）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            title: {type: string, required: true, min_length: 5, max_length: 255, message: 讨论帖标题至少需要 5 个字符}
+            content: {type: string, required: true, min_length: 10, message: 讨论帖正文至少需要 10 个字符}
+            category_code: {type: string, required: false, max_length: 32}
+        inputs:
+          title: $inputs.title
+          content: $inputs.content
+          category_code: $inputs.category_code
+      - id: normalize
+        operator: calc.forum.thread_update
+        inputs:
+          thread_id: $nodes.load.id
+          title: $inputs.title
+          content: $inputs.content
+          category_code: $inputs.category_code
+      - id: text
+        operator: transform.template
+        params:
+          template: "{title}\n{content}"
+          output_key: text
+        inputs:
+          title: $nodes.normalize.title
+          content: $nodes.normalize.content
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $nodes.text.text
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
+              message: 内容合规校验未通过：命中平台内容安全预筛规则
+        inputs:
+          verdict: $nodes.prescreen.verdict
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.normalize.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.thread.updated}
+      - id: result
+        operator: transform.derive
+        params: {expr: "args.entity", output_key: updated_thread}
+        inputs:
+          entity: $nodes.patch.entity
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, fields]
+      - [fields, normalize]
+      - [normalize, text]
+      - [text, prescreen]
+      - [prescreen, moderation]
+      - [moderation, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  - scenario: OPC_FORUM_THREAD_DELETE_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 删除讨论帖（限作者或管理员；写墓碑标记，关联观点/评论由详情装配按墓碑过滤）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: tombstone
+        operator: entity.create
+        params: {entity: forum.tombstone}
+        inputs:
+          data:
+            id: $nodes.load.id
+            type: THREAD
+      - id: delete
+        operator: entity.delete
+        params: {entity: forum.thread}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.thread.deleted}
+      - id: audit
+        operator: audit.write
+        params:
+          action: forum.thread.delete
+          resource_type: FORUM_THREAD
+        inputs:
+          resource_id: $nodes.load.id
+      - id: result
+        operator: assemble.forum.delete_result
+        params: {flag: deleted}
+        inputs:
+          id: $nodes.load.id
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, tombstone]
+      - [tombstone, delete]
+      - [delete, metric]
+      - [metric, audit]
+      - [audit, result]
+
+  # -------------------------------------------------------------------------
+  # 观点回答（知乎式 answer）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_ANSWER_PUBLISH
+    version: v1.0.0
+    domain: forum
+    description: 撰写并发布针对议题的知乎式深度观点回答
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            thread_id: {type: string, required: true, min_length: 1}
+            content: {type: string, required: true, min_length: 5, message: 观点回答至少需要 5 个字符}
+        inputs:
+          thread_id: $inputs.thread_id
+          content: $inputs.content
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: words
+        operator: calc.forum.word_stats
+        inputs:
+          content: $inputs.content
+      - id: normalize
+        operator: calc.forum.answer_publish
+        inputs:
+          thread_id: $nodes.thread.id
+          content: $nodes.words.content
+          word_count: $nodes.words.word_count
+          read_minutes: $nodes.words.read_minutes
+          author_id: $inputs.author_id
+          author_name: $inputs.author_name
+          author_title: $inputs.author_title
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $nodes.normalize.content
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
+              message: 内容合规校验未通过：命中平台内容安全预筛规则
+        inputs:
+          verdict: $nodes.prescreen.verdict
+      - id: create
+        operator: entity.create
+        params: {entity: forum.answer}
+        inputs:
+          data: $nodes.normalize
+      - id: activity
+        operator: calc.forum.thread_activity
+        inputs:
+          thread: $nodes.thread.entity
+          answer_delta: 1
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.activity.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.answer.published}
+      - id: result
+        operator: transform.derive
+        params: {expr: "args.entity", output_key: created_answer}
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, fields]
+      - [fields, thread]
+      - [thread, words]
+      - [words, normalize]
+      - [normalize, prescreen]
+      - [prescreen, moderation]
+      - [moderation, create]
+      - [create, activity]
+      - [activity, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  - scenario: OPC_FORUM_ANSWER_ACCEPT_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 提问者采纳/取消采纳最佳观点（再次采纳同一回答即取消）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: answer
+        operator: entity.get
+        params:
+          entity: forum.answer
+          message: Answer not found / 观点回答不存在或已被删除
+        inputs:
+          key: $inputs.answer_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.thread.entity.author_id
+      - id: relation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.answer.thread_id == args.thread_id"
+              message: 该观点回答不属于当前讨论帖，无法采纳
+        inputs:
+          answer: $nodes.answer.entity
+          thread_id: $nodes.thread.id
+      - id: decision
+        operator: calc.forum.accept_transition
+        inputs:
+          accepted_answer_id: $nodes.thread.entity.accepted_answer_id
+          answer_id: $nodes.answer.id
+      - id: clear_previous
+        operator: entity.patch
+        params: {entity: forum.answer}
+        when: nodes.decision.previous_answer_id
+        inputs:
+          data: {id: $nodes.decision.previous_answer_id, is_accepted: false}
+      - id: mark
+        operator: entity.patch
+        params: {entity: forum.answer}
+        inputs:
+          data: {id: $nodes.answer.id, is_accepted: $nodes.decision.is_accepted}
+      - id: bind
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: {id: $nodes.thread.id, accepted_answer_id: $nodes.decision.accepted_answer_id}
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.answer.accepted}
+      - id: result
+        operator: transform.wrap
+        params: {output_key: accept_result}
+        inputs:
+          thread_id: $nodes.thread.id
+          answer_id: $nodes.decision.answer_id
+          is_accepted: $nodes.decision.is_accepted
+          action: $nodes.decision.action
+          status: PUBLISHED
+    edges:
+      - [auth, thread]
+      - [thread, answer]
+      - [answer, owner]
+      - [owner, relation]
+      - [relation, decision]
+      - [decision, clear_previous]
+      - [decision, mark]
+      - [clear_previous, mark]
+      - [mark, bind]
+      - [bind, metric]
+      - [metric, result]
+
+  - scenario: OPC_FORUM_ANSWER_DELETE_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 删除观点回答及其评论、投票（限回答作者或管理员）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: forum.answer
+          message: Answer not found / 观点回答不存在或已被删除
+        inputs:
+          key: $inputs.answer_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $nodes.load.entity.thread_id
+      - id: comments
+        operator: entity.list
+        params:
+          entity: forum.comment
+        inputs:
+          filters: {thread_id: "$nodes.thread.id"}
+      - id: plan
+        operator: calc.forum.answer_delete_plan
+        inputs:
+          answer: $nodes.load.entity
+          comments: $nodes.comments.items
+      - id: tombstone
+        operator: entity.create
+        params: {entity: forum.tombstone}
+        inputs:
+          data:
+            id: $nodes.load.id
+            type: ANSWER
+            thread_id: $nodes.thread.id
+      - id: delete
+        operator: entity.delete
+        params: {entity: forum.answer}
+        inputs:
+          key: $nodes.load.id
+      - id: delta
+        operator: transform.derive
+        params: {expr: "args.removed * -1", output_key: comment_delta}
+        inputs:
+          removed: $nodes.plan.removed_comments
+      - id: activity
+        operator: calc.forum.thread_activity
+        inputs:
+          thread: $nodes.thread.entity
+          answer_delta: -1
+          comment_delta: $nodes.delta.comment_delta
+          clear_accepted_answer_id: $nodes.load.id
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.activity.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.answer.deleted}
+      - id: result
+        operator: assemble.forum.delete_result
+        params: {flag: answer_deleted}
+        inputs:
+          id: $nodes.load.id
+          thread_id: $nodes.thread.id
+          removed_count: $nodes.plan.removed_comments
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, thread]
+      - [thread, comments]
+      - [comments, plan]
+      - [plan, tombstone]
+      - [tombstone, delete]
+      - [delete, delta]
+      - [delta, activity]
+      - [activity, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 嵌套评论（物化路径）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_COMMENT_PUBLISH
+    version: v1.0.0
+    domain: forum
+    description: 发表一级评论或物化路径嵌套子回复（父评论路径 + 深度自动推导）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            thread_id: {type: string, required: true, min_length: 1}
+            content: {type: string, required: true, min_length: 1, message: 评论内容不能为空}
+            target_type: {type: string, required: false}
+            target_id: {type: string, required: false}
+            parent_id: {type: string, required: false}
+        inputs:
+          thread_id: $inputs.thread_id
+          content: $inputs.content
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          parent_id: $inputs.parent_id
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: parent
+        operator: entity.get
+        params:
+          entity: forum.comment
+          required: false
+        inputs:
+          key: $inputs.parent_id
+      - id: parent_check
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not args.parent_id or args.parent"
+              message: 父评论不存在，无法挂载子回复
+            - expr: "not args.parent or args.parent.thread_id == args.thread_id"
+              message: 父评论不属于当前讨论帖，无法挂载子回复
+        inputs:
+          parent: $nodes.parent.entity
+          parent_id: $inputs.parent_id
+          thread_id: $nodes.thread.id
+      - id: normalize
+        operator: calc.forum.comment_publish
+        inputs:
+          thread_id: $nodes.thread.id
+          author_id: $inputs.author_id
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          parent_id: $inputs.parent_id
+          reply_to_user_id: $inputs.reply_to_user_id
+          content: $inputs.content
+          author_name: $inputs.author_name
+          author_title: $inputs.author_title
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $nodes.normalize.content
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
+              message: 内容合规校验未通过：命中平台内容安全预筛规则
+        inputs:
+          verdict: $nodes.prescreen.verdict
+      - id: answer
+        operator: entity.get
+        params:
+          entity: forum.answer
+          required: false
+        when: "nodes.normalize.target_type == 'ANSWER'"
+        inputs:
+          key: $nodes.normalize.target_id
+      - id: create
+        operator: entity.create
+        params: {entity: forum.comment}
+        inputs:
+          data: $nodes.normalize
+      - id: path
+        operator: calc.forum.comment_path
+        inputs:
+          comment_id: $nodes.create.id
+          thread_id: $nodes.thread.id
+          parent: $nodes.parent.entity
+          parent_id: $inputs.parent_id
+          reply_to_user_id: $inputs.reply_to_user_id
+      - id: patch_comment
+        operator: entity.patch
+        params: {entity: forum.comment}
+        inputs:
+          data: $nodes.path
+      - id: activity
+        operator: calc.forum.thread_activity
+        inputs:
+          thread: $nodes.thread.entity
+          comment_delta: 1
+      - id: patch_thread
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.activity.patch
+      - id: answer_counter
+        operator: calc.forum.counter
+        params: {field: comment_count}
+        when: "nodes.normalize.target_type == 'ANSWER' and nodes.answer.entity"
+        inputs:
+          id: $nodes.answer.id
+          current: $nodes.answer.entity.comment_count
+          delta: 1
+      - id: patch_answer
+        operator: entity.patch
+        params: {entity: forum.answer}
+        when: "nodes.normalize.target_type == 'ANSWER' and nodes.answer.entity"
+        inputs:
+          data: $nodes.answer_counter.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.comment.published}
+      - id: result
+        operator: transform.derive
+        params: {expr: "args.entity", output_key: created_comment}
+        inputs:
+          entity: $nodes.patch_comment.entity
+    edges:
+      - [auth, fields]
+      - [fields, thread]
+      - [thread, parent]
+      - [parent, parent_check]
+      - [parent_check, normalize]
+      - [normalize, prescreen]
+      - [prescreen, moderation]
+      - [moderation, answer]
+      - [moderation, create]
+      - [create, path]
+      - [path, patch_comment]
+      - [patch_comment, activity]
+      - [activity, patch_thread]
+      - [patch_thread, answer_counter]
+      - [answer_counter, patch_answer]
+      - [answer, answer_counter]
+      - [patch_thread, metric]
+      - [patch_answer, metric]
+      - [metric, result]
+
+  - scenario: OPC_FORUM_COMMENT_DELETE_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 删除评论及其整棵物化路径子树（限评论作者或管理员）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: forum.comment
+          message: Comment not found / 评论不存在或已被删除
+        inputs:
+          key: $inputs.comment_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $nodes.load.entity.thread_id
+      - id: comments
+        operator: entity.list
+        params:
+          entity: forum.comment
+        inputs:
+          filters: {thread_id: "$nodes.thread.id"}
+      - id: plan
+        operator: calc.forum.comment_delete_plan
+        inputs:
+          comment: $nodes.load.entity
+          comments: $nodes.comments.items
+      - id: tombstone
+        operator: entity.create
+        params: {entity: forum.tombstone}
+        inputs:
+          data:
+            id: $nodes.load.id
+            type: COMMENT
+            path: $nodes.plan.path
+            thread_id: $nodes.thread.id
+      - id: delete
+        operator: entity.delete
+        params: {entity: forum.comment}
+        inputs:
+          key: $nodes.load.id
+      - id: delta
+        operator: transform.derive
+        params: {expr: "args.removed * -1", output_key: comment_delta}
+        inputs:
+          removed: $nodes.plan.removed_count
+      - id: activity
+        operator: calc.forum.thread_activity
+        inputs:
+          thread: $nodes.thread.entity
+          comment_delta: $nodes.delta.comment_delta
+      - id: patch_thread
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.activity.patch
+      - id: answer_check
+        operator: entity.get
+        params:
+          entity: forum.answer
+          required: false
+        when: nodes.plan.answer_id
+        inputs:
+          key: $nodes.plan.answer_id
+      - id: patch_answer
+        operator: entity.patch
+        params: {entity: forum.answer}
+        when: "nodes.plan.answer_id and nodes.answer_check.found"
+        inputs:
+          data: $nodes.plan.answer_patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.comment.deleted}
+      - id: result
+        operator: assemble.forum.delete_result
+        params: {flag: comment_deleted}
+        inputs:
+          id: $nodes.load.id
+          thread_id: $nodes.thread.id
+          removed_count: $nodes.plan.removed_count
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, thread]
+      - [thread, comments]
+      - [comments, plan]
+      - [plan, tombstone]
+      - [tombstone, delete]
+      - [delete, delta]
+      - [delta, activity]
+      - [activity, patch_thread]
+      - [patch_thread, answer_check]
+      - [answer_check, patch_answer]
+      - [patch_thread, metric]
+      - [patch_answer, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 知乎式互斥赞同 / 反对 / 取消
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_VOTE_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 知乎式互斥赞同 / 反对 / 取消投票（THREAD / ANSWER / COMMENT 三分支，计数由纯函数增量维护）
+    saga: false
+    nodes:
+      # 请求归一化先于身份守卫：guard.authn 会回写 inputs.user_id，
+      # 先固化调用方 user_id 才能保留旧网关“payload 指定投票人”的语义。
+      - id: request
+        operator: calc.forum.vote_request
+        inputs:
+          user_id: $inputs.user_id
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          vote_type: $inputs.vote_type
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            user_id: {type: string, required: true, min_length: 1}
+            target_id: {type: string, required: true, min_length: 1}
+            target_type: {type: string, required: true, enum: [THREAD, ANSWER, COMMENT]}
+            vote_type: {type: string, required: true, enum: [UPVOTE, DOWNVOTE, CANCEL]}
+        inputs:
+          user_id: $nodes.request.user_id
+          target_id: $nodes.request.target_id
+          target_type: $nodes.request.target_type
+          vote_type: $nodes.request.vote_type
+      - id: ledger
+        operator: entity.get
+        params:
+          entity: forum.vote
+          required: false
+        inputs:
+          user_id: $nodes.request.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: decision
+        operator: calc.forum.vote_transition
+        inputs:
+          current_vote: $nodes.ledger.entity.vote_type
+          vote_type: $nodes.request.vote_type
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      # --- THREAD branch ---
+      - id: thread_load
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Vote target not found / 投票目标不存在或已被删除
+        when: "nodes.request.target_type == 'THREAD'"
+        inputs:
+          key: $nodes.request.target_id
+      - id: thread_vote
+        operator: calc.forum.vote_transition
+        inputs:
+          current_vote: $nodes.ledger.entity.vote_type
+          vote_type: $nodes.request.vote_type
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          upvote_count: $nodes.thread_load.entity.upvote_count
+          downvote_count: $nodes.thread_load.entity.downvote_count
+      - id: thread_patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data:
+            id: $nodes.thread_load.id
+            upvote_count: $nodes.thread_vote.upvote_count
+            downvote_count: $nodes.thread_vote.downvote_count
+      # --- ANSWER branch ---
+      - id: answer_load
+        operator: entity.get
+        params:
+          entity: forum.answer
+          message: Vote target not found / 投票目标不存在或已被删除
+        when: "nodes.request.target_type == 'ANSWER'"
+        inputs:
+          key: $nodes.request.target_id
+      - id: answer_vote
+        operator: calc.forum.vote_transition
+        inputs:
+          current_vote: $nodes.ledger.entity.vote_type
+          vote_type: $nodes.request.vote_type
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          upvote_count: $nodes.answer_load.entity.upvote_count
+          downvote_count: $nodes.answer_load.entity.downvote_count
+      - id: answer_patch
+        operator: entity.patch
+        params: {entity: forum.answer}
+        inputs:
+          data:
+            id: $nodes.answer_load.id
+            upvote_count: $nodes.answer_vote.upvote_count
+            downvote_count: $nodes.answer_vote.downvote_count
+      # --- COMMENT branch ---
+      - id: comment_load
+        operator: entity.get
+        params:
+          entity: forum.comment
+          message: Vote target not found / 投票目标不存在或已被删除
+        when: "nodes.request.target_type == 'COMMENT'"
+        inputs:
+          key: $nodes.request.target_id
+      - id: comment_vote
+        operator: calc.forum.vote_transition
+        inputs:
+          current_vote: $nodes.ledger.entity.vote_type
+          vote_type: $nodes.request.vote_type
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          upvote_count: $nodes.comment_load.entity.upvote_count
+          downvote_count: $nodes.comment_load.entity.downvote_count
+      - id: comment_patch
+        operator: entity.patch
+        params: {entity: forum.comment}
+        inputs:
+          data:
+            id: $nodes.comment_load.id
+            upvote_count: $nodes.comment_vote.upvote_count
+            downvote_count: $nodes.comment_vote.downvote_count
+      - id: merged
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.thread_vote
+            - $nodes.answer_vote
+            - $nodes.comment_vote
+      - id: save_vote
+        operator: entity.upsert
+        params: {entity: forum.vote}
+        when: nodes.decision.new_vote
+        inputs:
+          data:
+            user_id: $nodes.request.user_id
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+            vote_type: $nodes.decision.new_vote
+      - id: remove_vote
+        operator: entity.delete
+        params: {entity: forum.vote}
+        when: "not nodes.decision.new_vote"
+        inputs:
+          user_id: $nodes.request.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.vote.cast}
+      - id: result
+        operator: transform.wrap
+        params: {output_key: vote_result}
+        inputs:
+          user_vote: $nodes.merged.user_vote
+          upvote_count: $nodes.merged.upvote_count
+          downvote_count: $nodes.merged.downvote_count
+          target_type: $nodes.merged.target_type
+          target_id: $nodes.merged.target_id
+          action: $nodes.merged.action
+    edges:
+      - [request, auth]
+      - [auth, fields]
+      - [fields, ledger]
+      - [ledger, decision]
+      - [decision, thread_load]
+      - [decision, answer_load]
+      - [decision, comment_load]
+      - [thread_load, thread_vote]
+      - [thread_vote, thread_patch]
+      - [answer_load, answer_vote]
+      - [answer_vote, answer_patch]
+      - [comment_load, comment_vote]
+      - [comment_vote, comment_patch]
+      - [thread_patch, merged]
+      - [answer_patch, merged]
+      - [comment_patch, merged]
+      - [merged, save_vote]
+      - [merged, remove_vote]
+      - [save_vote, metric]
+      - [remove_vote, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 关注议题
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_FOLLOW_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 关注 / 取消关注议题并维护 follow_count
+    saga: false
+    nodes:
+      # 先固化调用方身份，避免 guard.authn 回写 inputs.user_id 覆盖 payload。
+      - id: request
+        operator: transform.derive
+        params: {expr: "args.user_id or context.user_id", output_key: viewer_id}
+        inputs:
+          user_id: $inputs.user_id
+      - id: auth
+        operator: guard.authn
+      - id: thread
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: existing
+        operator: entity.get
+        params:
+          entity: forum.follow
+          required: false
+        inputs:
+          user_id: $nodes.request.viewer_id
+          thread_id: $nodes.thread.id
+      - id: transition
+        operator: calc.forum.follow_transition
+        inputs:
+          existing: $nodes.existing.entity
+          thread_id: $nodes.thread.id
+          user_id: $nodes.request.viewer_id
+          follow_count: $nodes.thread.entity.follow_count
+      - id: follow
+        operator: entity.create
+        params: {entity: forum.follow}
+        when: nodes.transition.active
+        inputs:
+          data:
+            user_id: $nodes.request.viewer_id
+            thread_id: $nodes.thread.id
+      - id: unfollow
+        operator: entity.delete
+        params: {entity: forum.follow}
+        when: "not nodes.transition.active"
+        inputs:
+          user_id: $nodes.request.viewer_id
+          thread_id: $nodes.thread.id
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: {id: $nodes.thread.id, follow_count: $nodes.transition.follow_count}
+      - id: metric
+        operator: metric.incr
+        params: {metric: forum.follow.toggled}
+      - id: result
+        operator: transform.wrap
+        params: {output_key: follow_result}
+        inputs:
+          thread_id: $nodes.transition.thread_id
+          is_following: $nodes.transition.is_following
+          follow_count: $nodes.transition.follow_count
+    edges:
+      - [request, auth]
+      - [auth, thread]
+      - [thread, existing]
+      - [existing, transition]
+      - [transition, follow]
+      - [transition, unfollow]
+      - [follow, patch]
+      - [unfollow, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 详情 / 列表 / 无限流 feed
+  # -------------------------------------------------------------------------
+  - scenario: OPC_FORUM_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 获取议题详情、观点回答与物化路径评论树（公开读，阅读计数经纯函数 + entity.patch 维护）
+    saga: false
+    nodes:
+      - id: viewer
+        operator: transform.derive
+        params: {expr: "args.user_id or context.user_id", output_key: viewer_id}
+        inputs:
+          user_id: $inputs.user_id
+      - id: load
+        operator: entity.get
+        params:
+          entity: forum.thread
+          message: Thread not found / 讨论帖不存在或已被删除
+        inputs:
+          key: $inputs.thread_id
+      - id: activity
+        operator: calc.forum.thread_activity
+        inputs:
+          thread: $nodes.load.entity
+          view_delta: 1
+      - id: patch
+        operator: entity.patch
+        params: {entity: forum.thread}
+        inputs:
+          data: $nodes.activity.patch
+      - id: answers
+        operator: entity.list
+        params: {entity: forum.answer}
+        inputs:
+          filters: {thread_id: "$nodes.load.id"}
+      - id: comments
+        operator: entity.list
+        params: {entity: forum.comment}
+        inputs:
+          filters: {thread_id: "$nodes.load.id"}
+      - id: votes
+        operator: entity.list
+        params: {entity: forum.vote}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: follows
+        operator: entity.list
+        params: {entity: forum.follow}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: tombstones
+        operator: entity.list
+        params: {entity: forum.tombstone}
+      - id: assemble
+        operator: assemble.forum.thread_detail
+        inputs:
+          thread: $nodes.patch.entity
+          answers: $nodes.answers.items
+          comments: $nodes.comments.items
+          votes: $nodes.votes.items
+          follows: $nodes.follows.items
+          tombstones: $nodes.tombstones.items
+          viewer_id: $nodes.viewer.viewer_id
+    edges:
+      - [viewer, load]
+      - [load, activity]
+      - [activity, patch]
+      - [patch, answers]
+      - [patch, comments]
+      - [patch, votes]
+      - [patch, follows]
+      - [patch, tombstones]
+      - [answers, assemble]
+      - [comments, assemble]
+      - [votes, assemble]
+      - [follows, assemble]
+      - [tombstones, assemble]
+
+  - scenario: OPC_FORUM_LIST_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 分页检索头脑风暴讨论帖（id 既可为分区码也可为帖子 id）
+    saga: false
+    nodes:
+      - id: viewer
+        operator: transform.derive
+        params: {expr: "args.user_id or context.user_id", output_key: viewer_id}
+        inputs:
+          user_id: $inputs.user_id
+      - id: query
+        operator: calc.forum.query
+        inputs:
+          category_code: $inputs.category_code
+          id: $inputs.id
+          thread_id: $inputs.thread_id
+          search: $inputs.search
+          status: $inputs.status
+          sort_by: $inputs.sort_by
+          page: $inputs.page
+          page_size: $inputs.page_size
+          page_length: $inputs.page_length
+      - id: list
+        operator: entity.list
+        params: {entity: forum.thread}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+          order: $nodes.query.order
+      - id: page
+        operator: calc.forum.page
+        inputs:
+          items: $nodes.list.items
+          mode: $nodes.query.mode
+          category_code: $nodes.query.category_code
+          sort_by: $nodes.query.sort_by
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+          cursor: $nodes.query.cursor
+          limit: $nodes.query.limit
+      - id: answers
+        operator: entity.list
+        params: {entity: forum.answer}
+      - id: votes
+        operator: entity.list
+        params: {entity: forum.vote}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: follows
+        operator: entity.list
+        params: {entity: forum.follow}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: assemble
+        operator: assemble.forum.feed
+        params: {output_key: feed}
+        inputs:
+          envelope: $nodes.page.envelope
+          answers: $nodes.answers.items
+          votes: $nodes.votes.items
+          follows: $nodes.follows.items
+          viewer_id: $nodes.viewer.viewer_id
+    edges:
+      - [viewer, query]
+      - [query, list]
+      - [list, page]
+      - [page, answers]
+      - [page, votes]
+      - [page, follows]
+      - [answers, assemble]
+      - [votes, assemble]
+      - [follows, assemble]
+
+  - scenario: OPC_FORUM_FEED_STREAM_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 无限流 feed（游标分页 + 热度/回答数/精选排序，缓存已移除，热度读时计算）
+    saga: false
+    nodes:
+      - id: viewer
+        operator: transform.derive
+        params: {expr: "args.user_id or context.user_id", output_key: viewer_id}
+        inputs:
+          user_id: $inputs.user_id
+      - id: query
+        operator: calc.forum.query
+        inputs:
+          category_code: $inputs.category_code
+          search: $inputs.search
+          sort_by: $inputs.sort_by
+          cursor: $inputs.cursor
+          limit: $inputs.limit
+      - id: list
+        operator: entity.list
+        params: {entity: forum.thread}
+        inputs:
+          filters: $nodes.query.filters
+          search: $nodes.query.search
+          order: $nodes.query.order
+      - id: page
+        operator: calc.forum.page
+        inputs:
+          items: $nodes.list.items
+          mode: $nodes.query.mode
+          category_code: $nodes.query.category_code
+          sort_by: $nodes.query.sort_by
+          cursor: $nodes.query.cursor
+          limit: $nodes.query.limit
+      - id: answers
+        operator: entity.list
+        params: {entity: forum.answer}
+      - id: votes
+        operator: entity.list
+        params: {entity: forum.vote}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: follows
+        operator: entity.list
+        params: {entity: forum.follow}
+        inputs:
+          filters: {user_id: "$nodes.viewer.viewer_id"}
+      - id: assemble
+        operator: assemble.forum.feed
+        params: {output_key: feed}
+        inputs:
+          envelope: $nodes.page.envelope
+          answers: $nodes.answers.items
+          votes: $nodes.votes.items
+          follows: $nodes.follows.items
+          viewer_id: $nodes.viewer.viewer_id
+      - id: envelope
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.assemble.feed
+            - {cache_hit: false, cache_written: false, prewarmed_next: false, cache_removed: true}
+      - id: result
+        operator: transform.derive
+        params: {expr: "args.envelope", output_key: feed_result}
+        inputs:
+          envelope: $nodes.envelope
+    edges:
+      - [viewer, query]
+      - [query, list]
+      - [list, page]
+      - [page, answers]
+      - [page, votes]
+      - [page, follows]
+      - [answers, assemble]
+      - [votes, assemble]
+      - [follows, assemble]
+      - [assemble, envelope]
+      - [envelope, result]

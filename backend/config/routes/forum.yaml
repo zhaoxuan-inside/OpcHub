@@ -1,0 +1,126 @@
+# Forum (头脑风暴 / 知乎式问答) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "forum.feed.stream"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "流式无限滚动检索头脑风暴社区讨论帖（游标分页 + 热度/回答数/精选排序）"
+    is_default: true
+    pipeline: "OPC_FORUM_FEED_STREAM_PIPELINE"
+
+  - gateway: "forum.threads.list"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "检索头脑风暴社区讨论帖列表（分页约束: id, page, page_size/page_length）"
+    is_default: true
+    pipeline: "OPC_FORUM_LIST_PIPELINE"
+
+  - gateway: "forum.threads.publish"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "发布新创客讨论帖与踩坑复盘（所有注册用户可发布，管理员发布自动打官方标签）"
+    is_default: true
+    pipeline: "OPC_FORUM_THREAD_PUBLISH"
+    required_permission: "content:publish"
+
+  - gateway: "forum.threads.get"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "获取议题详情、知乎式观点回答与物化路径评论树"
+    is_default: true
+    pipeline: "OPC_FORUM_DETAIL_PIPELINE"
+
+  - gateway: "forum.threads.update"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "编辑头脑风暴讨论帖标题/正文/分区（限作者或管理员）"
+    is_default: true
+    pipeline: "OPC_FORUM_THREAD_UPDATE_PIPELINE"
+    required_permission: "content:publish"
+    owner_check:
+      resource_type: "thread"
+      id_field: "thread_id"
+
+  - gateway: "forum.threads.delete"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "删除头脑风暴社区讨论帖（限超级管理员或帖子发帖人）"
+    is_default: true
+    pipeline: "OPC_FORUM_THREAD_DELETE_PIPELINE"
+    required_permission: "forum:post_comment"
+    owner_check:
+      resource_type: "thread"
+      id_field: "thread_id"
+
+  - gateway: "forum.threads.follow"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "关注/取消关注议题"
+    is_default: true
+    pipeline: "OPC_FORUM_FOLLOW_PIPELINE"
+    required_permission: "forum:post_comment"
+
+  - gateway: "forum.answers.publish"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "撰写并发布针对议题的知乎式深度观点回答"
+    is_default: true
+    pipeline: "OPC_FORUM_ANSWER_PUBLISH"
+    required_permission: "content:publish"
+
+  - gateway: "forum.answers.accept"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "提问者采纳最佳观点或取消采纳"
+    is_default: true
+    pipeline: "OPC_FORUM_ANSWER_ACCEPT_PIPELINE"
+    required_permission: "forum:post_comment"
+
+  - gateway: "forum.answers.delete"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "删除观点回答及其评论与投票（限回答作者或管理员）"
+    is_default: true
+    pipeline: "OPC_FORUM_ANSWER_DELETE_PIPELINE"
+    required_permission: "forum:post_comment"
+    owner_check:
+      resource_type: "answer"
+      id_field: "answer_id"
+
+  - gateway: "forum.comments.create"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "发表一级回答或物化路径嵌套子回复"
+    is_default: true
+    pipeline: "OPC_FORUM_COMMENT_PUBLISH"
+    required_permission: "forum:post_comment"
+
+  - gateway: "forum.comments.delete"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "删除评论及其子评论树与投票（限评论作者或管理员）"
+    is_default: true
+    pipeline: "OPC_FORUM_COMMENT_DELETE_PIPELINE"
+    required_permission: "forum:post_comment"
+    owner_check:
+      resource_type: "comment"
+      id_field: "comment_id"
+
+  - gateway: "forum.vote"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "知乎式互斥赞同 / 反对 / 取消投票"
+    is_default: true
+    pipeline: "OPC_FORUM_VOTE_PIPELINE"
+    required_permission: "forum:post_comment"
+
+  # 语义检索：向量召回仍由 RAG 适配器提供（算子内核尚无通用 external.rag.*
+  # 语义检索算子），因此该路由暂映射到列表场景的关键字检索，作为声明式降级。
+  - gateway: "forum.search.semantic"
+    version: "v1.0.0"
+    domain: "forum"
+    description: "检索头脑风暴社区讨论帖（关键字降级；向量语义检索待通用 RAG 检索算子发布后切换）"
+    is_default: true
+    pipeline: "OPC_FORUM_LIST_PIPELINE"

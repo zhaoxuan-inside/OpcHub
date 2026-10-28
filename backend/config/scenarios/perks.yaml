@@ -1,0 +1,370 @@
+# 生态特权（优惠公告 / 领取）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+
+scenarios:
+  - scenario: OPC_PERK_LIST_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 公开优惠公告板：按分类过滤、剔除过期、优先级排序
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.perk.query
+        inputs:
+          category: $inputs.category
+      - id: list
+        operator: entity.list
+        params:
+          entity: perk.item
+          query: {order: "-priority"}
+        inputs:
+          filters: $nodes.query.filters
+      - id: board
+        operator: assemble.perk.board
+        inputs:
+          items: $nodes.list.items
+          category: $nodes.query.category
+      - id: result
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.board.items
+    edges:
+      - [query, list]
+      - [list, board]
+      - [board, result]
+
+  - scenario: OPC_PERK_LIST_ALL_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 管理端查看全部优惠公告（含已下线，按优先级排序）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: role
+        operator: guard.role
+        params:
+          roles: [ADMIN]
+          message: 权限不足：仅平台管理员可查看全部优惠公告
+      - id: list
+        operator: entity.list
+        params:
+          entity: perk.item
+          query: {order: "-priority"}
+      - id: result
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.list.items
+    edges:
+      - [auth, role]
+      - [role, list]
+      - [list, result]
+
+  - scenario: OPC_PERK_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 按 ID 读取单条优惠公告
+    saga: false
+    nodes:
+      - id: load
+        operator: entity.get
+        params:
+          entity: perk.item
+          message: 优惠公告不存在或已下线
+        inputs:
+          key: $inputs.perk_id
+      - id: result
+        operator: response.build
+        inputs:
+          entity: $nodes.load.entity
+    edges:
+      - [load, result]
+
+  - scenario: OPC_PERK_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 提报并上线生态优惠公告（作者由网关身份绑定，管理员自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            name: {type: string, required: true, min_length: 2, max_length: 255}
+            provider: {type: string, required: true, min_length: 2, max_length: 255}
+            summary: {type: string, required: true, min_length: 5}
+            value_cny: {type: number, required: true, min: 0}
+            quota_remaining: {type: integer, required: false, min: 1}
+            priority: {type: integer, required: false, min: 0, max: 100}
+            category: {type: string, required: false, enum: [TOKEN, SERVER, SAAS, AI, FINANCE, INFRA, OTHER]}
+            status: {type: string, required: false, enum: [PUBLISHED, OFFLINE]}
+            effective_start: {type: string, required: false, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}
+            effective_end: {type: string, required: false, pattern: "^\\d{4}-\\d{2}-\\d{2}$"}
+        inputs:
+          name: $inputs.name
+          provider: $inputs.provider
+          summary: $inputs.summary
+          value_cny: $inputs.value_cny
+          quota_remaining: $inputs.quota_remaining
+          priority: $inputs.priority
+          category: $inputs.category
+          status: $inputs.status
+          effective_start: $inputs.effective_start
+          effective_end: $inputs.effective_end
+      - id: window
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not (args.effective_start and args.effective_end and args.effective_end < args.effective_start)"
+              message: 优惠截止日期不能早于生效日期
+        inputs:
+          effective_start: $inputs.effective_start
+          effective_end: $inputs.effective_end
+      - id: normalize
+        operator: calc.perk.publish_payload
+        inputs:
+          name: $inputs.name
+          provider: $inputs.provider
+          summary: $inputs.summary
+          value_cny: $inputs.value_cny
+          category: $inputs.category
+          quota_remaining: $inputs.quota_remaining
+          effective_start: $inputs.effective_start
+          effective_end: $inputs.effective_end
+          redeem_url: $inputs.redeem_url
+          priority: $inputs.priority
+          status: $inputs.status
+          highlights: $inputs.highlights
+          author_name: $inputs.author_name
+      - id: create
+        operator: entity.create
+        params: {entity: perk.item}
+        inputs:
+          data: $nodes.normalize
+      - id: metric
+        operator: metric.incr
+        params: {metric: perk.published}
+      - id: result
+        operator: assemble.perk.publish_result
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, fields]
+      - [fields, window]
+      - [window, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, result]
+
+  - scenario: OPC_PERK_CLAIM_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 领取优惠：防重复领取、校验有效期与库存、扣减额度并生成兑换凭据
+    saga: true
+    nodes:
+      # 网关已执行 RBAC；此处仍保留 authn 节点用于补齐上下文身份。
+      # required=false 兼容旧调用方（payload 携带 user_id），但上下文身份优先。
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+        output_key: auth
+      - id: identity
+        operator: calc.perk.claim_identity
+        inputs:
+          user_id: $inputs.user_id
+      - id: load
+        operator: entity.get
+        params:
+          entity: perk.item
+          message: 优惠公告不存在或已下线
+        inputs:
+          key: $inputs.perk_id
+      - id: unique
+        operator: guard.unique
+        params:
+          entity: perk.claim
+          message: 您已领取过该优惠，请勿重复领取
+        inputs:
+          user_id: $nodes.identity.user_id
+          perk_id: $nodes.load.entity.id
+      - id: eligible
+        operator: calc.perk.claim_eligibility
+        inputs:
+          perk: $nodes.load.entity
+      - id: counters
+        operator: calc.perk.claim_counters
+        inputs:
+          perk: $nodes.load.entity
+      - id: patch
+        operator: entity.patch
+        params: {entity: perk.item}
+        inputs:
+          data:
+            id: $nodes.load.id
+            quota_remaining: $nodes.counters.quota_remaining
+            claim_count: $nodes.counters.claim_count
+      - id: voucher
+        operator: calc.perk.voucher
+      - id: assemble
+        operator: assemble.perk.claim
+        inputs:
+          perk: $nodes.load.entity
+          user_id: $nodes.identity.user_id
+          voucher_code: $nodes.voucher.voucher_code
+      - id: create
+        operator: entity.create
+        params: {entity: perk.claim}
+        inputs:
+          data: $nodes.assemble
+      - id: metric
+        operator: metric.incr
+        params: {metric: perk.claimed}
+      - id: result
+        operator: assemble.perk.claim_result
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, identity]
+      - [identity, load]
+      - [load, unique]
+      - [unique, eligible]
+      - [eligible, counters]
+      - [counters, patch]
+      - [patch, voucher]
+      - [voucher, assemble]
+      - [assemble, create]
+      - [create, metric]
+      - [metric, result]
+
+  - scenario: OPC_PERK_CLAIMS_MINE_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 查看当前创客已领取的优惠凭据
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: list
+        operator: entity.list
+        params:
+          entity: perk.claim
+          query: {order: "-created_at"}
+        inputs:
+          filters:
+            user_id: $context.user_id
+      - id: result
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.list.items
+    edges:
+      - [auth, list]
+      - [list, result]
+
+  - scenario: OPC_PERK_REVOKE_CLAIM_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 撤销一条领取记录并回补优惠额度（本人或管理员）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load_claim
+        operator: entity.get
+        params:
+          entity: perk.claim
+          message: 领取记录不存在
+        inputs:
+          user_id: $context.user_id
+          perk_id: $inputs.perk_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load_claim.entity.user_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: perk.claim}
+        inputs:
+          user_id: $nodes.load_claim.entity.user_id
+          perk_id: $nodes.load_claim.entity.perk_id
+      - id: load_perk
+        operator: entity.get
+        params:
+          entity: perk.item
+          message: 优惠公告不存在
+        inputs:
+          key: $nodes.load_claim.entity.perk_id
+      - id: counters
+        operator: calc.perk.release_counters
+        inputs:
+          perk: $nodes.load_perk.entity
+      - id: patch
+        operator: entity.patch
+        params: {entity: perk.item}
+        inputs:
+          data:
+            id: $nodes.load_perk.id
+            quota_remaining: $nodes.counters.quota_remaining
+            claim_count: $nodes.counters.claim_count
+      - id: metric
+        operator: metric.incr
+        params: {metric: perk.claim.revoked}
+      - id: result
+        operator: transform.wrap
+        params: {output_key: response}
+        inputs:
+          revoked: true
+          perk_id: $nodes.load_claim.entity.perk_id
+    edges:
+      - [auth, load_claim]
+      - [load_claim, owner]
+      - [owner, delete]
+      - [delete, load_perk]
+      - [load_perk, counters]
+      - [counters, patch]
+      - [patch, metric]
+      - [metric, result]
+
+  - scenario: OPC_PERK_DELETE_PIPELINE
+    version: v1.0.0
+    domain: perks
+    description: 删除优惠公告（仅发布者或管理员）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: perk.item
+          message: 优惠公告不存在
+        inputs:
+          key: $inputs.perk_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: perk.item}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: perk.deleted}
+      - id: result
+        operator: transform.wrap
+        params: {output_key: response}
+        inputs:
+          deleted: $nodes.delete.deleted
+          perk_id: $nodes.load.id
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, metric]
+      - [metric, result]

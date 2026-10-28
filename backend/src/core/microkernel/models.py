@@ -13,24 +13,41 @@ class NodeType(str, Enum):
 
 
 class NodeDef(BaseModel):
-    """Definition of an atomic node in the DAG graph."""
+    """Definition of an atomic node in the DAG graph.
+
+    A node is a declarative invocation of exactly one operator:
+
+    * ``params``     – static operator configuration (entity name, rules, metric…)
+    * ``inputs_map`` – per-node argument mapping, values may use ``$inputs.x``,
+                       ``$context.user_id``, ``$nodes.create.id`` or ``$params.x``
+    * ``when``       – safe boolean expression; false means SKIPPED
+    * ``output_key`` – optional key under which the node output is published
+    """
+
     id: str
     action_handler: str
     type: NodeType = NodeType.BIZ
     retry: int = Field(default=1, ge=0, le=5)
     timeout_ms: int = Field(default=5000, ge=100)
+    params: dict[str, Any] = Field(default_factory=dict)
+    inputs_map: dict[str, Any] = Field(default_factory=dict)
+    when: str | None = None
+    output_key: str | None = None
 
 
 class EdgeDef(BaseModel):
     """Directional edge from one node to another."""
+
     from_node: str = Field(alias="from")
     to_node: str = Field(alias="to")
+    when: str | None = None
 
     model_config = {"populate_by_name": True}
 
 
 class ExecutionGraph(BaseModel):
     """Execution graph topology with mandatory single-entry and single-exit nodes."""
+
     topology: str = "DAG"
     entry_node: str = "dnode-1"
     exit_node: str | None = None
@@ -40,6 +57,7 @@ class ExecutionGraph(BaseModel):
 
 class DAGConfig(BaseModel):
     """Top-level configuration payload compiled by the visual orchestrator."""
+
     version: str = "v1.0.4-draft"
     scenario_code: str = "tax.calculate_vat_exemption"
     timestamp: str | None = None
@@ -54,6 +72,7 @@ class ExecutionStatus(str, Enum):
     GUARD_REJECTED = "GUARD_REJECTED"
     ROLLED_BACK = "ROLLED_BACK"
     COMPENSATION_FAILED = "COMPENSATION_FAILED"
+    SKIPPED = "SKIPPED"
 
 
 class NodeExecutionTrace(BaseModel):
@@ -90,4 +109,3 @@ class ExecutionResult(BaseModel):
     final_output: dict[str, Any]
     error_message: str | None = None
     compensation_traces: list[CompensationTrace] = Field(default_factory=list)
-
