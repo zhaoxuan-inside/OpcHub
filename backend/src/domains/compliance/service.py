@@ -1,15 +1,9 @@
 """Compliance Service managing legal provisions (法条) and pitfall cases (避坑案例).
 
-数据、配置、代码三分离：
-- 数据（Data）: backend/data/seeds/compliance.json —— 法条 / 案例 全部持久化至 PostgreSQL
-  (domain_snapshots JSONB)，运行时通过 hydrate 从数据库重建索引。
-- 配置（Config）: backend/config/application.yaml `compliance` 段 —— 评分阈值等参数化。
-- 代码（Code）: 本服务仅承担加载、索引、发布与查询逻辑，零业务数据硬编码。
+合规知识全部持久化至 PostgreSQL (domain_snapshots JSONB)，运行时通过 hydrate
+从数据库重建索引；服务本身不加载文件种子，也不再接受纯内存写入。
 """
-import json
-import logging
 import uuid
-from pathlib import Path
 from typing import List
 
 from src.core.config import settings
@@ -23,28 +17,6 @@ from src.domains.compliance.models import (
 )
 from src.infrastructure.database.persistence import domain_persistence
 
-logger = logging.getLogger("opchub.compliance")
-
-
-def _load_compliance_seeds() -> dict:
-    """Load compliance knowledge base (laws / cases / checkpoints) from external data file."""
-    search_paths = [
-        Path("backend/data/seeds/compliance.json"),
-        Path("data/seeds/compliance.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "compliance.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load compliance seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_COMPLIANCE_SEEDS: dict = _load_compliance_seeds()
-
 
 class ComplianceService:
     """Provides compliance legal knowledge, pitfall cases and (legacy) self-audit checklists."""
@@ -53,32 +25,10 @@ class ComplianceService:
         self._laws: List[ComplianceLaw] = []
         self._cases: List[ComplianceCase] = []
         self._checkpoints: List[AuditCheckItem] = []
-        self._init_seeds()
 
-    def _init_seeds(self) -> None:
-        """Initialize in-memory catalog from external data seeds and queue DB persistence."""
-        for data in DEFAULT_COMPLIANCE_SEEDS.get("laws", []):
-            data = dict(data)
-            # Seed laws/cases are platform-curated legal knowledge → official.
-            data.setdefault("is_official", True)
-            data.setdefault("author_name", "官方发布")
-            law = ComplianceLaw(**data)
-            if not any(l.id == law.id for l in self._laws):
-                self._laws.append(law)
-                self._persist("law", law)
-        for data in DEFAULT_COMPLIANCE_SEEDS.get("cases", []):
-            data = dict(data)
-            data.setdefault("is_official", True)
-            data.setdefault("author_name", "官方发布")
-            case = ComplianceCase(**data)
-            if not any(c.id == case.id for c in self._cases):
-                self._cases.append(case)
-                self._persist("case", case)
-        for data in DEFAULT_COMPLIANCE_SEEDS.get("checkpoints", []):
-            chk = AuditCheckItem(**data)
-            if not any(c.id == chk.id for c in self._checkpoints):
-                self._checkpoints.append(chk)
-                self._persist("checkpoint", chk)
+    def _require_db(self) -> None:
+        """Compliance content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("compliance")
 
     @staticmethod
     def _persist(kind: str, entity: object) -> None:
@@ -107,6 +57,7 @@ class ComplianceService:
 
         登录用户即可发布：写入内存索引并持久化至 PostgreSQL。
         """
+        self._require_db()
         req = payload if isinstance(payload, CompliancePublishRequest) else CompliancePublishRequest(**payload)
         if req.kind == "law":
             entity_id = req.id or f"law_{uuid.uuid4().hex[:8]}"
@@ -158,6 +109,7 @@ class ComplianceService:
 
     def delete_entry(self, kind: str, entity_id: str) -> bool:
         """Physically remove a published law/case (Saga compensation)."""
+        self._require_db()
         kind = str(kind or "").strip().lower()
         eid = str(entity_id or "")
         if not eid:
@@ -214,25 +166,21 @@ class ComplianceService:
     # ---------------------------------------------------------------- hydration
     def hydrate_items(self, rows: List[dict]) -> int:
         """Rebuild in-memory indexes from persisted PostgreSQL snapshots (restart durability)."""
-        if rows:
-            for r in rows:
-                kind = r.get("_kind") or _infer_entity_kind(r)
-                if kind == "law":
-                    law = ComplianceLaw(**r)
-                    if not any(l.id == law.id for l in self._laws):
-                        self._laws.append(law)
-                elif kind == "case":
-                    case = ComplianceCase(**r)
-                    if not any(c.id == case.id for c in self._cases):
-                        self._cases.append(case)
-                elif kind == "checkpoint":
-                    chk = AuditCheckItem(**r)
-                    if not any(c.id == chk.id for c in self._checkpoints):
-                        self._checkpoints.append(chk)
-            return len(rows)
-        # If DB is empty, persist baseline seeds to PostgreSQL snapshots
-        self._init_seeds()
-        return len(self._laws) + len(self._cases) + len(self._checkpoints)
+        for r in rows:
+            kind = r.get("_kind") or _infer_entity_kind(r)
+            if kind == "law":
+                law = ComplianceLaw(**r)
+                if not any(l.id == law.id for l in self._laws):
+                    self._laws.append(law)
+            elif kind == "case":
+                case = ComplianceCase(**r)
+                if not any(c.id == case.id for c in self._cases):
+                    self._cases.append(case)
+            elif kind == "checkpoint":
+                chk = AuditCheckItem(**r)
+                if not any(c.id == chk.id for c in self._checkpoints):
+                    self._checkpoints.append(chk)
+        return len(rows)
 
     def clear(self) -> None:
         """Reset compliance catalog for isolated testing."""

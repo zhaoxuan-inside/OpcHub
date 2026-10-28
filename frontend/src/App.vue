@@ -20,97 +20,25 @@
       @open-login="showLoginModal = true"
       @open-profile="handleSwitchTab('profile')"
       @open-inbox="openInbox"
+      @open-command="openCommandPalette"
     />
 
-    <!-- Main View Container -->
+    <!-- Routed workspace. Every list/detail has a real URL now. -->
     <main>
-      <!-- 1. Home View: Accessible to all; STRICTLY the ONLY view for unauthenticated visitors -->
-      <HomeView
-        v-if="!userSession || activeTab === 'home'"
-        :user-session="userSession"
-        @open-login="showLoginModal = true"
-        @open-register="showRegisterModal = true"
-        @switch-tab="handleSwitchTab"
-        @toast="showToast"
-      />
-
-      <!-- 2. Authenticated Maker / User Views -->
-      <template v-else-if="userSession && currentRole !== 'ADMIN'">
-        <ForumView
-          v-if="activeTab === 'forum'"
-          :user-session="userSession"
+      <RouterView v-slot="{ Component }">
+        <component
+          :is="Component"
+          v-bind="viewProps"
+          @toast="showToast"
+          @open-login="showLoginModal = true"
           @open-register="showRegisterModal = true"
-          @toast="showToast"
-        />
-        <ShowcaseView
-          v-else-if="activeTab === 'product'"
-          :user-session="userSession"
-          @open-register="showRegisterModal = true"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <PolicyView
-          v-else-if="activeTab === 'policy'"
-          :user-session="userSession"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <DemandsView
-          v-else-if="activeTab === 'demand'"
-          :user-session="userSession"
-          @open-register="showRegisterModal = true"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <SopView
-          v-else-if="activeTab === 'sop'"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <PerksView
-          v-else-if="activeTab === 'perks'"
-          :user-session="userSession"
-          @open-register="showRegisterModal = true"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <ComplianceView
-          v-else-if="activeTab === 'compliance'"
-          @open-login="showLoginModal = true"
-          @toast="showToast"
-        />
-        <ProfileView
-          v-else-if="activeTab === 'profile'"
+          @switch-tab="handleSwitchTab"
+          @navigate="handleNavigate"
           @logout="handleLogout"
-          @navigate="handleSwitchTab"
-          @toast="showToast"
-          @session-updated="userSession = $event"
+          @session-updated="onSessionUpdated"
+          @require-login="showLoginModal = true"
         />
-      </template>
-
-      <!-- 3. Authenticated Admin / Governance Views -->
-      <template v-else-if="userSession && currentRole === 'ADMIN'">
-        <ConsoleView
-          v-if="activeTab === 'backend-orch' || activeTab === 'console'"
-          :user-session="userSession"
-          @toast="showToast"
-        />
-
-        <FrontendOrchView
-          v-else-if="activeTab === 'frontend-orch'"
-          @toast="showToast"
-        />
-        <OpsView
-          v-else-if="activeTab === 'ops' || activeTab === 'moderation'"
-        />
-        <ProfileView
-          v-else-if="activeTab === 'profile'"
-          @logout="handleLogout"
-          @navigate="handleSwitchTab"
-          @toast="showToast"
-          @session-updated="userSession = $event"
-        />
-      </template>
+      </RouterView>
     </main>
 
     <!-- Modals -->
@@ -136,13 +64,22 @@
       @agree="onLegalAgreed"
     />
 
-    <!-- 消息箱：发布敏感词校验结果通知 -->
+    <!-- 消息箱：发布审核结果通知 -->
     <NotificationInbox
       :visible="showInbox"
       :user-session="userSession"
       @close="showInbox = false"
       @unread-change="unreadCount = $event"
       @toast="showToast"
+    />
+
+    <!-- Global command palette (⌘K / Ctrl+K) -->
+    <CommandPalette
+      :visible="showCommandPalette"
+      :user-session="userSession"
+      :current-role="currentRole"
+      @close="showCommandPalette = false"
+      @navigate="handleCommandNavigate"
     />
 
     <!-- Liquid Specular Notice Capsule -->
@@ -195,83 +132,54 @@
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import Navbar from '@/components/Navbar.vue';
 import RegisterModal from '@/components/RegisterModal.vue';
 import LoginModal from '@/components/LoginModal.vue';
 import LegalModal from '@/components/LegalModal.vue';
 import NotificationInbox from '@/components/NotificationInbox.vue';
-import HomeView from '@/views/HomeView.vue';
-import ForumView from '@/views/ForumView.vue';
-import ShowcaseView from '@/views/ShowcaseView.vue';
-import PolicyView from '@/views/PolicyView.vue';
-import DemandsView from '@/views/DemandsView.vue';
-import SopView from '@/views/SopView.vue';
-import PerksView from '@/views/PerksView.vue';
-import ComplianceView from '@/views/ComplianceView.vue';
-import ConsoleView from '@/views/ConsoleView.vue';
-import FrontendOrchView from '@/views/FrontendOrchView.vue';
-import OpsView from '@/views/OpsView.vue';
-import ProfileView from '@/views/ProfileView.vue';
+import CommandPalette from '@/components/CommandPalette.vue';
 import { dispatchGateway } from '@/api/gateway';
 import { activeNotice, notify, dismissNotice } from '@/api/notification';
+import {
+  authState,
+  clearSession,
+  ensureSession,
+  isAuthenticated,
+  isPlatformAdmin,
+  rememberTab,
+  setSession,
+  toggleRole,
+  updateSessionUser,
+} from '@/stores/auth';
+import { pathForTab, tabForRoute } from '@/router';
 
-const MAKER_TABS = ['home', 'forum', 'product', 'policy', 'demand', 'sop', 'perks', 'compliance', 'profile'];
-const ADMIN_TABS = ['home', 'backend-orch', 'console', 'frontend-orch', 'ops', 'moderation', 'profile'];
+const route = useRoute();
+const router = useRouter();
 
-function getInitialRole() {
-  const saved = localStorage.getItem('opchub_current_role');
-  if (saved === 'ADMIN' || saved === 'MAKER') return saved;
-  return 'MAKER';
-}
+const userSession = computed(() => authState.user);
+const currentRole = computed(() => authState.role);
+const activeTab = computed(() => tabForRoute(route));
 
-function getInitialTab() {
-  const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
-  const hash = rawHash.split('?')[0];
-  if (hash && (MAKER_TABS.includes(hash) || ADMIN_TABS.includes(hash))) {
-    return hash;
-  }
-  const saved = localStorage.getItem('opchub_active_tab');
-  if (saved && (MAKER_TABS.includes(saved) || ADMIN_TABS.includes(saved))) {
-    return saved;
-  }
-  return 'home';
-}
-
-function getInitialUserSession() {
-  try {
-    const token = localStorage.getItem('opchub_session_token');
-    if (!token) return null;
-    const raw = localStorage.getItem('opchub_user_session');
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
-}
-
-const activeTab = ref('home');
-const initialTab = getInitialTab();
-if (initialTab && initialTab !== 'home') {
-  activeTab.value = initialTab;
-}
-const currentRole = ref(getInitialRole());
 const isDark = ref(false);
-const userSession = ref(getInitialUserSession());
-
 const showRegisterModal = ref(false);
 const showLoginModal = ref(false);
 const showLegalModal = ref(false);
 const legalTab = ref('terms');
+const showCommandPalette = ref(false);
 
-// 消息箱：发布敏感词校验结果的持久通知
+// 消息箱：审核结果的持久通知
 const showInbox = ref(false);
 const unreadCount = ref(0);
 let unreadTimer = null;
 
 const notice = activeNotice;
 
+const viewProps = computed(() => (route.meta?.passSession ? { userSession: authState.user } : {}));
+
 async function refreshUnread(announceNew = false) {
-  if (!userSession.value) {
+  if (!authState.user) {
     unreadCount.value = 0;
     return;
   }
@@ -281,7 +189,7 @@ async function refreshUnread(announceNew = false) {
   if (announceNew && next > unreadCount.value) {
     showToast({
       title: '消息箱',
-      message: `收到 ${next - unreadCount.value} 条新的敏感词校验结果`,
+      message: `收到 ${next - unreadCount.value} 条新的平台审核结果`,
       type: 'INFO',
     });
   }
@@ -293,21 +201,65 @@ function openInbox() {
   refreshUnread(false);
 }
 
-watch(userSession, (session) => {
-  if (session) {
-    refreshUnread(false);
-  } else {
-    unreadCount.value = 0;
-    showInbox.value = false;
-  }
-});
+function openCommandPalette() {
+  showCommandPalette.value = true;
+}
 
-watch(activeTab, () => {
-  if (userSession.value) refreshUnread(true);
-});
+function onGlobalPointerDown(event) {
+  document.querySelectorAll('details.ci-more[open]').forEach((details) => {
+    if (!details.contains(event.target)) details.open = false;
+  });
+}
+
+function onGlobalKeydown(event) {
+  const key = String(event.key || '').toLowerCase();
+  if (key === 'escape') {
+    document.querySelectorAll('details.ci-more[open]').forEach((details) => {
+      details.open = false;
+    });
+  }
+  if ((event.metaKey || event.ctrlKey) && key === 'k') {
+    event.preventDefault();
+    if (!isAuthenticated.value) {
+      showLoginModal.value = true;
+      return;
+    }
+    showCommandPalette.value = !showCommandPalette.value;
+    return;
+  }
+  if (key === 'escape' && showCommandPalette.value) {
+    showCommandPalette.value = false;
+  }
+}
+
+watch(
+  () => authState.user,
+  (session) => {
+    if (session) refreshUnread(false);
+    else {
+      unreadCount.value = 0;
+      showInbox.value = false;
+    }
+  }
+);
+
+watch(
+  () => route.fullPath,
+  () => {
+    if (authState.user) refreshUnread(true);
+  }
+);
+
+watch(
+  () => route.query.login,
+  (value) => {
+    if (value === '1' && !isAuthenticated.value) showLoginModal.value = true;
+  },
+  { immediate: true }
+);
 
 function handleSwitchTab(tab) {
-  if (!userSession.value && tab !== 'home') {
+  if (!isAuthenticated.value && tab !== 'home') {
     showToast({
       title: '需登录创客账号',
       message: '未登录用户仅限浏览平台宣传首页。请登录或入驻后进入创客工作台。',
@@ -316,16 +268,36 @@ function handleSwitchTab(tab) {
     showLoginModal.value = true;
     return;
   }
-  activeTab.value = tab;
-  localStorage.setItem('opchub_active_tab', tab);
-  if (window.location.hash.replace(/^#\/?/, '') !== tab) {
-    window.location.hash = tab;
+  const path = pathForTab(tab);
+  rememberTab(tab);
+  if (route.path === path) {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
   }
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  router.push(path);
+}
+
+function handleNavigate(target) {
+  if (!target) return;
+  if (String(target).startsWith('/')) {
+    router.push(String(target));
+    return;
+  }
+  handleSwitchTab(target);
+}
+
+function handleCommandNavigate(target) {
+  showCommandPalette.value = false;
+  if (!target) return;
+  if (target.tab) {
+    handleSwitchTab(target.tab);
+    return;
+  }
+  if (target.path) router.push(target.path);
 }
 
 function handleToggleRole() {
-  if (!userSession.value) {
+  if (!authState.user) {
     showToast({
       title: '需管理员登录',
       message: '管理治理视角仅限授权管理员登录后进入。',
@@ -334,7 +306,7 @@ function handleToggleRole() {
     showLoginModal.value = true;
     return;
   }
-  if (userSession.value.role !== 'ADMIN' && currentRole.value === 'MAKER') {
+  if (!isPlatformAdmin.value) {
     showToast({
       title: '权限不足',
       message: '管理治理视角仅限授权管理员登录后进入。',
@@ -342,43 +314,36 @@ function handleToggleRole() {
     });
     return;
   }
-  if (currentRole.value === 'MAKER') {
-    currentRole.value = 'ADMIN';
-    localStorage.setItem('opchub_current_role', 'ADMIN');
-    handleSwitchTab('ops');
+  const next = toggleRole();
+  if (next === 'ADMIN') {
+    router.push('/admin/ops');
     showToast({
       title: '视角已切换',
-      message: '当前已切换至【管理治理视角 (Admin Governance)】，展示后端微内核编排与全域运营大盘。',
+      message: '当前已切换至【管理治理视角】，可查看后端编排与全域运营大盘。',
       type: 'INFO',
     });
   } else {
-    currentRole.value = 'MAKER';
-    localStorage.setItem('opchub_current_role', 'MAKER');
-    handleSwitchTab('home');
+    router.push('/');
     showToast({
       title: '视角已切换',
-      message: '当前已切换回【创客工作台视角 (Maker OS)】。',
+      message: '当前已切换回【创客工作台视角】。',
       type: 'INFO',
     });
   }
 }
 
 function handleLogout() {
-  localStorage.removeItem('opchub_session_token');
-  localStorage.removeItem('opchub_user_session');
-  localStorage.removeItem('opchub_active_tab');
-  localStorage.removeItem('opchub_current_role');
-  userSession.value = null;
-  activeTab.value = 'home';
-  currentRole.value = 'MAKER';
-  if (window.location.hash) {
-    history.replaceState(null, '', window.location.pathname);
-  }
+  clearSession();
+  router.replace('/');
   showToast({
     title: '已退出登录',
     message: '您已安全退出创客登录，已返回平台宣传首页。',
     type: 'INFO',
   });
+}
+
+function onSessionUpdated(updated) {
+  updateSessionUser(updated);
 }
 
 function handleToggleTheme() {
@@ -417,11 +382,8 @@ function onLegalAgreed() {
 
 function onRegisterSuccess(data) {
   showRegisterModal.value = false;
-  userSession.value = data;
-  localStorage.setItem('opchub_user_session', JSON.stringify(data));
-  currentRole.value = 'MAKER';
-  localStorage.setItem('opchub_current_role', 'MAKER');
-  handleSwitchTab('profile');
+  setSession(data, { preferAdmin: false });
+  router.replace('/profile');
   showToast({
     title: '商用入驻成功',
     message: data.message || `恭喜创客 ${data.email}，已完成商用认证，欢迎入驻！`,
@@ -431,24 +393,17 @@ function onRegisterSuccess(data) {
 
 function onLoginSuccess(data) {
   showLoginModal.value = false;
-  userSession.value = data;
-  localStorage.setItem('opchub_user_session', JSON.stringify(data));
-  const role = data.role || (data.user && data.user.role) || 'MAKER';
-  if (role === 'ADMIN') {
-    const savedRole = localStorage.getItem('opchub_current_role');
-    currentRole.value = (savedRole === 'MAKER' || savedRole === 'ADMIN') ? savedRole : 'ADMIN';
-  } else {
-    currentRole.value = 'MAKER';
-  }
-  localStorage.setItem('opchub_current_role', currentRole.value);
+  setSession(data, { preferAdmin: true });
 
-  // 登录后若在 home 默认推荐主入口，若已经在其他页面则保持当前页面
-  if (activeTab.value === 'home') {
-    const defaultTab = currentRole.value === 'ADMIN' ? 'ops' : 'forum';
-    handleSwitchTab(defaultTab);
-  } else {
-    handleSwitchTab(activeTab.value);
+  const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '';
+  if (redirect) {
+    router.replace(redirect);
+  } else if (isPlatformAdmin.value && authState.role === 'ADMIN') {
+    router.replace('/admin/ops');
+  } else if (route.path === '/') {
+    router.replace('/forum');
   }
+
   showToast({
     title: '登录成功',
     message: `欢迎回来，${data.nickname || data.email}！`,
@@ -460,114 +415,26 @@ function showToast({ title, message, type = 'INFO', duration = 4500 }) {
   notify({ title, message, type, duration });
 }
 
-async function checkSession() {
-  const token = localStorage.getItem('opchub_session_token');
-  if (token) {
-    try {
-      const res = await dispatchGateway('auth.session', {}, { silent: true });
-      if (res.ok && res.data && (res.data.authenticated || res.data.valid)) {
-        const u = res.data.user || res.data;
-        userSession.value = u;
-        localStorage.setItem('opchub_user_session', JSON.stringify(u));
-
-        // 维持当前页面模式，禁止刷新自动改切视角模式
-        const savedRole = localStorage.getItem('opchub_current_role');
-        if (u.role === 'ADMIN') {
-          if (savedRole === 'MAKER' || savedRole === 'ADMIN') {
-            currentRole.value = savedRole;
-          } else {
-            currentRole.value = 'ADMIN';
-            localStorage.setItem('opchub_current_role', 'ADMIN');
-          }
-        } else {
-          currentRole.value = 'MAKER';
-          localStorage.setItem('opchub_current_role', 'MAKER');
-        }
-
-        // 保持当前页面：检查当前 tab 是否与模式兼容，保持所在页面
-        const currentTab = activeTab.value;
-        if (currentRole.value === 'ADMIN' && !ADMIN_TABS.includes(currentTab)) {
-          if (MAKER_TABS.includes(currentTab) && currentTab !== 'home') {
-            currentRole.value = 'MAKER';
-            localStorage.setItem('opchub_current_role', 'MAKER');
-          }
-        } else if (currentRole.value !== 'ADMIN' && !MAKER_TABS.includes(currentTab)) {
-          if (ADMIN_TABS.includes(currentTab)) {
-            if (u.role === 'ADMIN') {
-              currentRole.value = 'ADMIN';
-              localStorage.setItem('opchub_current_role', 'ADMIN');
-            } else {
-              activeTab.value = 'home';
-              localStorage.setItem('opchub_active_tab', 'home');
-              if (window.location.hash) {
-                history.replaceState(null, '', window.location.pathname);
-              }
-            }
-          }
-        }
-      } else if (res.statusCode === 401 || (res.data && res.data.valid === false)) {
-        localStorage.removeItem('opchub_session_token');
-        localStorage.removeItem('opchub_user_session');
-        localStorage.removeItem('opchub_active_tab');
-        localStorage.removeItem('opchub_current_role');
-        userSession.value = null;
-        activeTab.value = 'home';
-        currentRole.value = 'MAKER';
-        if (window.location.hash) {
-          history.replaceState(null, '', window.location.pathname);
-        }
-      }
-    } catch (e) {
-      console.warn('Session check fallback', e);
-    }
-  } else {
-    userSession.value = null;
-    activeTab.value = 'home';
-    currentRole.value = 'MAKER';
-    if (window.location.hash) {
-      history.replaceState(null, '', window.location.pathname);
-    }
-  }
-}
-
-function onHashChange() {
-  const rawHash = window.location.hash.replace(/^#\/?/, '').trim();
-  const hash = rawHash.split('?')[0];
-  if (hash && (MAKER_TABS.includes(hash) || ADMIN_TABS.includes(hash))) {
-    if (activeTab.value !== hash) {
-      if (!userSession.value && hash !== 'home') {
-        activeTab.value = 'home';
-        if (window.location.hash) {
-          history.replaceState(null, '', window.location.pathname);
-        }
-        showLoginModal.value = true;
-      } else {
-        activeTab.value = hash;
-        localStorage.setItem('opchub_active_tab', hash);
-      }
-    }
-  }
-}
-
-onMounted(() => {
+onMounted(async () => {
   const savedTheme = localStorage.getItem('opchub_theme');
   if (savedTheme === 'dark') {
     isDark.value = true;
     document.documentElement.setAttribute('data-theme', 'dark');
   }
-  window.addEventListener('hashchange', onHashChange);
-  if (activeTab.value && activeTab.value !== 'home' && !window.location.hash) {
-    window.location.hash = activeTab.value;
-  }
-  checkSession();
+
+  await ensureSession(true);
   refreshUnread(false);
+
+  window.addEventListener('keydown', onGlobalKeydown);
+  window.addEventListener('pointerdown', onGlobalPointerDown);
   unreadTimer = setInterval(() => {
-    if (userSession.value) refreshUnread(true);
+    if (authState.user) refreshUnread(true);
   }, 60000);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('hashchange', onHashChange);
+  window.removeEventListener('keydown', onGlobalKeydown);
+  window.removeEventListener('pointerdown', onGlobalPointerDown);
   if (unreadTimer) {
     clearInterval(unreadTimer);
     unreadTimer = null;
@@ -597,7 +464,7 @@ onUnmounted(() => {
 
 /*
  * Message blocks carry no left accent bar. The circular icon badge already
- * conveys the severity (success / error / warn / info) through its own colour,
- * so a second coloured stripe on the edge is redundant.
+ * conveys the severity through its own colour, so a second coloured stripe
+ * on the edge is redundant.
  */
 </style>

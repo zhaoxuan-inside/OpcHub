@@ -1,35 +1,31 @@
-"""Test policy data separation, seed loading, database persistence, and gateway dispatch."""
+"""Policy catalog behaviour: DB-only source of truth, gateway dispatch, RAG and hydration."""
 import pytest
 from httpx import AsyncClient, ASGITransport
 
 from src.main import app
-from src.domains.policies.service import (
-    policy_service,
-    _load_policy_seeds,
-    DEFAULT_POLICY_SEEDS,
-)
+from src.domains.policies.service import policy_service
 from src.domains.policies.models import PolicyCreate, PolicyMatchRequest
-from src.infrastructure.database.persistence import domain_persistence
+from src.infrastructure.database.persistence import (
+    PersistenceUnavailableError,
+    domain_persistence,
+)
 from src.core.rag.service import policy_rag_service
+from tests.catalog_fixtures import load_catalog, seed_policies
 
 
 @pytest.fixture(autouse=True)
-def ensure_policy_seeds():
-    """Ensure baseline seeds are loaded for each test."""
-    policy_service._policies.clear()
-    policy_service._init_seeds()
+def ensure_policy_fixtures():
+    """Populate representative, test-owned policy rows (production ships no seeds)."""
+    policy_service.clear()
+    seed_policies(policy_service)
     yield
+    policy_service.clear()
 
 
-def test_policy_seeds_file_separation():
-    """Verify code, config, and data separation: policies.json exists and is valid."""
-    seeds = _load_policy_seeds()
+def test_policy_catalog_fixture_is_valid():
+    """Test fixture contains the policy shapes used by the UI and matching engine."""
+    seeds = load_catalog("policies.json")
     assert len(seeds) >= 4
-    assert "pol_vat_exemption_2026" in seeds
-    assert "pol_ai_compute_voucher_hz" in seeds
-    assert "pol_rnd_deduction_100" in seeds
-    assert "pol_offshore_trade_2026" in seeds
-
     for pid, p in seeds.items():
         assert "title" in p
         assert "summary" in p
@@ -38,8 +34,33 @@ def test_policy_seeds_file_separation():
         assert "legal_basis" in p
 
 
-def test_policy_service_seed_initialization():
-    """Verify PolicyService populates from external data seeds on startup."""
+def test_policy_service_starts_empty_without_database():
+    """No runtime seed loading: an empty DB means an empty catalog."""
+    policy_service.clear()
+    assert policy_service.list_policies() == []
+
+
+def test_policy_mutation_requires_database():
+    """In strict mode, publishing without PostgreSQL is rejected instead of kept in memory."""
+    policy_service.clear()
+    previous = domain_persistence.strict
+    domain_persistence.strict = True
+    try:
+        with pytest.raises(PersistenceUnavailableError):
+            policy_service.create_policy(PolicyCreate(
+                title="不应落内存的政策",
+                policy_level="NATIONAL",
+                category="TAX",
+                subsidy_amount_max=1000.0,
+                summary="无数据库时发布应被拒绝",
+                eligible_conditions=[],
+                legal_basis="测试依据",
+            ))
+    finally:
+        domain_persistence.strict = previous
+
+
+def test_policy_service_hydrates_from_fixture_rows():
     policies = policy_service.list_policies()
     assert len(policies) >= 4
     vat_policy = next((p for p in policies if p.id == "pol_vat_exemption_2026"), None)
@@ -53,7 +74,6 @@ async def test_policy_gateway_list_and_match():
     """Verify unified gateway dispatch scenario policies.list and policies.match."""
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        # 1. Dispatch policies.list
         resp = await ac.post("/api/welcom/opc_world", json={
             "scenario": "policies.list",
             "payload": {},
@@ -66,7 +86,6 @@ async def test_policy_gateway_list_and_match():
         assert len(items) >= 4
         assert any(p["code"] == "POL-2026-081" for p in items)
 
-        # 2. Dispatch policies.match
         match_resp = await ac.post("/api/welcom/opc_world", json={
             "scenario": "policies.match",
             "payload": {
@@ -85,7 +104,7 @@ async def test_policy_gateway_list_and_match():
 
 @pytest.mark.asyncio
 async def test_policy_rag_semantic_search():
-    """Verify RAG semantic vector search over external policy data."""
+    """Verify RAG semantic vector search over the hydrated policy catalog."""
     results = await policy_rag_service.search_policies(
         query="小规模免税与增值税",
         top_k=3,

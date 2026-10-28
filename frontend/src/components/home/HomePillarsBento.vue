@@ -1,6 +1,7 @@
 <template>
   <section id="showcaseBento" class="section-container">
     <div class="section-header">
+      <div class="section-eyebrow"><span class="mono-tag">02 / CAPABILITIES</span><span>四大核心支柱</span></div>
       <h2 class="section-title">四大核心支柱 · 解构超级个体的商业全景</h2>
       <p class="section-desc">
         我们为一人公司定制了从找政策、备文书，到拓市场、求合作的完整能力链路。
@@ -12,6 +13,7 @@
       <div class="bento-card bento-span-2" @mousemove="trackCardSpotlight" @click="$emit('card-click', 'policy')">
         <div class="bento-content">
           <div class="card-top-meta">
+            <span class="bento-index">01</span>
             <span class="mono-tag accent-tag">POL-RADAR // 实时聚合</span>
             <span class="card-status-badge">全域覆盖</span>
           </div>
@@ -46,6 +48,7 @@
       <div class="bento-card" @mousemove="trackCardSpotlight" @click="$emit('card-click', 'product')">
         <div class="bento-content">
           <div class="card-top-meta">
+            <span class="bento-index">02</span>
             <span class="mono-tag">SHOWCASE // 独立作品秀场</span>
             <span class="card-status-badge hot">HOT 榜单</span>
           </div>
@@ -84,6 +87,7 @@
       <div class="bento-card" @mousemove="trackCardSpotlight" @click="$emit('card-click', 'sop')">
         <div class="bento-content">
           <div class="card-top-meta">
+            <span class="bento-index">03</span>
             <span class="mono-tag">SOP-DOC // 智能公函与文书</span>
             <span class="card-status-badge ai">AI 增强</span>
           </div>
@@ -114,6 +118,7 @@
       <div class="bento-card bento-span-2" @mousemove="trackCardSpotlight" @click="$emit('card-click', 'demand')">
         <div class="bento-content">
           <div class="card-top-meta">
+            <span class="bento-index">04</span>
             <span class="mono-tag">MARKET // 技能交易撮合</span>
             <span class="card-status-badge">即时对接</span>
           </div>
@@ -557,4 +562,112 @@ function getInitials(name) {
     grid-column: span 1;
   }
 }
+
+/* ---- v2 editorial overrides ---- */
+.section-container {
+  margin-bottom: 80px;
+}
+
+.section-header {
+  text-align: left;
+  max-width: none;
+  margin: 0 0 28px;
+}
+
+.section-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+}
+
+.section-title {
+  font-size: 32px;
+  font-weight: 680;
+  letter-spacing: -0.045em;
+  margin-bottom: 8px;
+}
+
+.section-desc {
+  max-width: 660px;
+  font-size: 13.5px;
+}
+
+.bento-grid {
+  gap: 14px;
+}
+
+.bento-card {
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--glass-surface);
+  box-shadow: var(--glass-shadow);
+  border-color: var(--glass-border);
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.bento-card:hover {
+  transform: none;
+  background: var(--glass-surface);
+  border-color: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+.card-top-meta {
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.bento-index {
+  margin-right: auto;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+}
+
+.bento-title {
+  font-size: 19px;
+  letter-spacing: -0.03em;
+  line-height: 1.28;
+}
+
+.bento-text {
+  font-size: 12.5px;
+  line-height: 1.65;
+  margin-bottom: 20px;
+}
+
+.bento-action-row {
+  color: var(--text-primary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 12px;
+}
+
+.policy-chip,
+.mini-product-item,
+.stepper-node,
+.demand-pill {
+  border-radius: 8px;
+  background: var(--glass-surface-subtle);
+  border-color: var(--glass-border-subtle);
+}
+
+.card-status-badge {
+  font-size: 9px;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 1024px) {
+  .bento-grid { grid-template-columns: 1fr; }
+  .bento-span-2 { grid-column: span 1; }
+}
+
 </style>

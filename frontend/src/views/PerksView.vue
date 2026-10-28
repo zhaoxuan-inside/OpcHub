@@ -27,6 +27,18 @@
       <div class="perks-feed-layout">
         <!-- Main Perks Stream (左侧优惠公告流) -->
         <section class="perks-feed-stream">
+          <WorkspaceHeader
+            eyebrow="ECOSYSTEM / PERKS"
+            meta="CLOUD / AI / SAAS / PAYMENT"
+            title="生态特权"
+            description="把云资源、AI 算力、SaaS 与支付通道的生态优惠集中到一处，按有效期与剩余名额领取。"
+            :stats="[
+              { value: totalCount || sortedDisplayPerks.length, label: '在架公告' },
+              { value: coveredCategoryCount, label: '覆盖分类' },
+              { value: maxValueText, label: '最高价值' },
+            ]"
+          />
+
           <!-- Category Filter Bar (公告分区选项卡 + 搜索 + 排序选择 + 刷新) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -47,7 +59,7 @@
 
             <div class="feed-filter-right">
               <!-- Search Box -->
-              <div class="semantic-search-box">
+              <div class="semantic-search-box" :class="{ searching: isSearching }">
                 <div class="search-input-wrap">
                   <input
                     v-model="searchQuery"
@@ -58,18 +70,6 @@
                   />
                   <button v-if="searchQuery" type="button" class="clear-search-btn" @click="resetSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  :disabled="isSearching"
-                  @click="handleSearch"
-                  title="检索优惠公告"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <span>{{ isSearching ? '检索中...' : '搜索' }}</span>
-                </button>
               </div>
 
               <!-- Sort Segmented -->
@@ -79,7 +79,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -494,7 +494,8 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
@@ -504,6 +505,7 @@ import PublishForm from '@/components/PublishForm.vue';
 import { PERK_FIELDS } from '@/config/publishForms';
 import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { trackContentRead } from '@/utils/loyalty';
 import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 import {
   PERK_CATEGORIES,
@@ -533,6 +535,9 @@ const emit = defineEmits(['toast', 'open-login']);
 const props = defineProps({
   userSession: { type: Object, default: null },
 });
+
+const route = useRoute();
+const router = useRouter();
 
 const currentUserSession = computed(() => {
   if (props.userSession) return props.userSession;
@@ -574,10 +579,17 @@ const quickLinkCategories = computed(() =>
 const sortOptions = PERK_SORT_OPTIONS;
 
 // Lifecycle: lock body scroll to feed like PolicyView & ShowcaseView
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
-  loadPerks();
+  await applyRouteState({ initial: true });
 });
+
+watch(
+  () => [route.params.id, route.query.category, route.query.sort, route.query.q, route.query.compose],
+  () => {
+    applyRouteState();
+  }
+);
 
 onUnmounted(() => {
   document.body.classList.remove('fixed-screen-feed');
@@ -612,9 +624,101 @@ async function loadPerks() {
   }
 }
 
+function syncPerksQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'relevance') delete query[key];
+  }
+  router.replace({
+    name: 'perks',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+function normalizePerkList(data) {
+  if (!data) return [];
+  return Array.isArray(data) ? data : (data.items || []);
+}
+
+let applyingRoute = false;
+
+async function applyRouteState({ initial = false } = {}) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = categoryList.value.some((item) => item.key === route.query.category)
+      ? String(route.query.category)
+      : 'ALL';
+    const sort = (sortOptions || []).some((item) => item.key === route.query.sort)
+      ? String(route.query.sort)
+      : 'relevance';
+    const q = String(route.query.q || '').trim();
+    const compose = route.query.compose === '1';
+    const id = route.params.id ? String(route.params.id) : '';
+
+    currentCategory.value = category;
+    currentSort.value = sort;
+
+    if (compose) {
+      selectedPerk.value = null;
+      return;
+    }
+
+    if (id) {
+      let found = perks.value.find((item) => String(item.id) === id);
+      if (!found) {
+        const res = await dispatchGateway('perks.list', {}, { silent: true });
+        if (res.ok) {
+          perks.value = normalizePerkList(res.data);
+          await enrichInteractions(perks.value, 'PERK');
+          found = perks.value.find((item) => String(item.id) === id);
+        }
+      }
+      if (found) {
+        selectedPerk.value = found;
+        trackContentRead('PERK', found.id);
+      } else {
+        selectedPerk.value = null;
+        emit('toast', { title: '特权不存在', message: '该公告可能已下架，或链接地址有误。', type: 'WARN' });
+        router.replace({ name: 'perks', query: route.query });
+      }
+      return;
+    }
+
+    selectedPerk.value = null;
+
+    if (q) {
+      if (!perks.value.length) await loadPerks();
+      searchQuery.value = q;
+      isSearchActive.value = true;
+      activeSearchQuery.value = q;
+      return;
+    }
+
+    if (isSearchActive.value) {
+      searchQuery.value = '';
+      isSearchActive.value = false;
+      activeSearchQuery.value = '';
+    }
+
+    if (initial) await loadPerks();
+  } finally {
+    applyingRoute = false;
+  }
+}
+
 // Category filter
 function selectCategory(catKey) {
   currentCategory.value = catKey;
+  syncPerksQuery({ category: catKey === 'ALL' ? undefined : catKey });
+}
+
+function selectSort(sortKey) {
+  currentSort.value = sortKey;
+  syncPerksQuery({ sort: sortKey === 'relevance' ? undefined : sortKey });
 }
 
 const totalCount = computed(() => perks.value.length);
@@ -681,24 +785,26 @@ const sortedDisplayPerks = computed(() => {
 });
 
 // Search handling (local keyword filter over the announcement corpus)
-function handleSearch() {
+function handleSearch(options = {}) {
   const q = searchQuery.value.trim();
   if (!q) {
-    resetSearch();
+    resetSearch(options);
     return;
   }
   isSearchActive.value = true;
   activeSearchQuery.value = q;
+  if (options.updateUrl !== false) syncPerksQuery({ q });
 }
 
-function handleClearSearch() {
-  resetSearch();
+function handleClearSearch(options = {}) {
+  resetSearch(options);
 }
 
-async function resetSearch() {
+async function resetSearch(options = {}) {
   searchQuery.value = '';
   isSearchActive.value = false;
   activeSearchQuery.value = '';
+  if (options.updateUrl !== false) syncPerksQuery({ q: undefined });
   if (perks.value.length === 0) {
     await loadPerks();
   }
@@ -756,11 +862,18 @@ async function openPerkUrl(perk) {
 
 // Inline Detail
 function openPerkDetail(p) {
+  if (!p) return;
   selectedPerk.value = p;
+  trackContentRead('PERK', p.id);
+  const id = String(p.id || '');
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'perks', params: { id }, query: route.query });
+  }
 }
 
 function closePerkDetail() {
   selectedPerk.value = null;
+  router.push({ name: 'perks', query: route.query });
 }
 
 // Publish Modal
@@ -774,7 +887,7 @@ const renderedPerkSummary = computed(() =>
 function summaryExcerpt(item) {
   return stripMarkdown(item?.summary || '');
 }
-const showPublishPage = ref(false);
+const showPublishPage = computed(() => route.query.compose === '1');
 const isPublishing = ref(false);
 
 const publishForm = ref({
@@ -803,12 +916,22 @@ function openPublishPage() {
     summary: '',
     highlightsText: '',
   };
-  showPublishPage.value = true;
+  router.push({
+    name: 'perks',
+    params: route.params.id ? { id: route.params.id } : {},
+    query: { ...route.query, compose: '1' },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closePublishPage() {
-  showPublishPage.value = false;
+  const query = { ...route.query };
+  delete query.compose;
+  router.push({
+    name: 'perks',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
 }
 
 async function submitPublishPerk() {
@@ -850,7 +973,7 @@ async function submitPublishPerk() {
         message: `《${publishForm.value.name}》已通过平台审核并上架生态优惠公告板。`,
         type: 'SUCCESS',
       });
-      showPublishPage.value = false;
+      closePublishPage();
       await loadPerks();
     } else {
       emit('toast', {

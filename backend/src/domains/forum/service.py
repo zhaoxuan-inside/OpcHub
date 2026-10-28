@@ -8,8 +8,6 @@ from datetime import datetime, timezone
 import time
 import math
 from typing import Optional, List, Dict, Set, Tuple, Any
-from pathlib import Path
-import json
 
 from src.domains.forum.models import (
     ForumThreadCreate,
@@ -27,26 +25,6 @@ from src.infrastructure.database.persistence import domain_persistence
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _load_forum_seeds() -> Dict[str, Dict[str, Any]]:
-    """Load baseline discussion thread seeds from external data file."""
-    search_paths = [
-        Path("backend/data/seeds/forum_threads.json"),
-        Path("data/seeds/forum_threads.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "forum_threads.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
-    return {}
-
-
-DEFAULT_SEEDS_DICT: Dict[str, Dict[str, Any]] = _load_forum_seeds()
 
 
 class ForumService:
@@ -68,7 +46,10 @@ class ForumService:
         self._deleted_answer_ids: Set[str] = set()
         # Key: cache_key -> (timestamp, data_dict)
         self._feed_cache: Dict[str, Tuple[float, Dict[str, Any]]] = {}
-        self._init_seeds()
+
+    def _require_db(self) -> None:
+        """Forum content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("forum")
 
     def invalidate_feed_cache(self, category_code: Optional[str] = None) -> int:
         """Invalidate feed cache entries for a specific category or globally."""
@@ -96,58 +77,6 @@ class ForumService:
         """Store feed batch into cache with current timestamp."""
         self._feed_cache[cache_key] = (time.time(), data)
 
-    def _init_seeds(self) -> None:
-        for tid, seed in DEFAULT_SEEDS_DICT.items():
-            if tid not in self._deleted_thread_ids and tid not in self._threads:
-                item = dict(seed)
-                # Seed baseline Zhihu-style answers if none exist
-                thread_obj = ForumThreadResponse(**item)
-                self._threads[tid] = thread_obj
-
-                # Add a high-quality initial seed answer for each discussion question
-                answer_id = f"ans_seed_{tid}"
-                if answer_id not in self._answers:
-                    seed_author = "创客实战专家" if tid == "1" else ("跨境出海先锋" if tid == "3" else "AI架构师")
-                    seed_title = "已验证一人公司实操解答"
-                    seed_content = (
-                        f"针对议题《{thread_obj.title}》的核心建议：\n\n"
-                        f"1. **合规第一优先**：务必保留完整的资金与业务凭证，避免个人与企业资产混同；\n"
-                        f"2. **自动化申报**：善用平台提供的自动化模板和政策计算器，降低人工犯错成本；\n"
-                        f"3. **风险隔离**：一人公司虽小，但需严格建立防火墙机制，确保业务长期可持续。"
-                    )
-                    ans = ForumAnswerResponse(
-                        id=answer_id,
-                        thread_id=tid,
-                        author_id="usr_expert_seed",
-                        author_name=seed_author,
-                        author_title=seed_title,
-                        content=seed_content,
-                        upvote_count=max(thread_obj.upvote_count // 2, 12),
-                        downvote_count=1,
-                        comment_count=max(thread_obj.comment_count // 3, 4),
-                        is_accepted=(tid in ("1", "2")),
-                        word_count=len(seed_content),
-                        read_minutes=1,
-                        status="PUBLISHED",
-                        created_at=thread_obj.created_at,
-                        updated_at=thread_obj.updated_at,
-                    )
-                    self._answers[answer_id] = ans
-                    thread_obj.answer_count = 1
-                    if ans.is_accepted:
-                        thread_obj.accepted_answer_id = answer_id
-                
-                self.recalculate_hot_score("THREAD", tid)
-
-    def _ensure_seed_thread(self, thread_id: str) -> None:
-        tid = str(thread_id)
-        if tid in self._deleted_thread_ids or tid in self._threads:
-            return
-        if tid in DEFAULT_SEEDS_DICT:
-            seed = DEFAULT_SEEDS_DICT[tid]
-            self._threads[tid] = ForumThreadResponse(**seed)
-            self._init_seeds()
-
     def clear(self) -> None:
         """Reset service state for isolated testing."""
         self._threads.clear()
@@ -165,6 +94,7 @@ class ForumService:
 
     def create_thread(self, payload: ForumThreadCreate) -> ForumThreadResponse:
         """Publish a new forum discussion thread or question."""
+        self._require_db()
         thread_id = str(uuid.uuid4())
         now = utc_now_iso()
         thread = ForumThreadResponse(
@@ -197,7 +127,6 @@ class ForumService:
     def get_thread(self, thread_id: str, record_view: bool = True) -> ForumThreadResponse:
         """Get thread by ID, optionally incrementing view count."""
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads or tid in self._deleted_thread_ids:
             raise KeyError(f"Forum thread with ID {thread_id} not found")
         thread = self._threads[tid]
@@ -209,7 +138,6 @@ class ForumService:
     def get_thread_detail(self, thread_id: str, user_id: Optional[str] = None) -> Optional[ThreadDetailResponse]:
         """Retrieve thread detail including Zhihu-style answers and nested comments."""
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads or tid in self._deleted_thread_ids:
             return None
         
@@ -311,8 +239,8 @@ class ForumService:
 
     def create_answer(self, payload: ForumAnswerCreate) -> ForumAnswerResponse:
         """Post an in-depth answer or perspective to an existing question/thread."""
+        self._require_db()
         tid = str(payload.thread_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads or tid in self._deleted_thread_ids:
             raise KeyError(f"Forum thread with ID {tid} not found")
 
@@ -363,9 +291,9 @@ class ForumService:
 
     def accept_answer(self, thread_id: str, answer_id: str, operator_user_id: str) -> Tuple[bool, str]:
         """Accept an answer as the best perspective for the question."""
+        self._require_db()
         tid = str(thread_id)
         aid = str(answer_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads or tid in self._deleted_thread_ids:
             raise KeyError(f"Thread with ID {tid} not found")
         if aid not in self._answers or aid in self._deleted_answer_ids:
@@ -410,6 +338,7 @@ class ForumService:
 
     def delete_answer(self, answer_id: str) -> bool:
         """Delete an answer, its attached comments and all related votes."""
+        self._require_db()
         aid = str(answer_id)
         answer = self._answers.get(aid)
         if answer is None:
@@ -446,6 +375,7 @@ class ForumService:
 
     def execute_vote(self, user_id: str, target_type: str, target_id: str, vote_type: str) -> VoteResponse:
         """Execute a Zhihu-style vote: UPVOTE, DOWNVOTE, or CANCEL with mutual exclusivity."""
+        self._require_db()
         uid = str(user_id)
         ttype = str(target_type).upper()
         tid = str(target_id)
@@ -459,7 +389,6 @@ class ForumService:
         # Resolve target object
         target_obj = None
         if ttype == "THREAD":
-            self._ensure_seed_thread(tid)
             if tid in self._threads and tid not in self._deleted_thread_ids:
                 target_obj = self._threads[tid]
         elif ttype == "ANSWER":
@@ -534,9 +463,9 @@ class ForumService:
 
     def toggle_follow(self, user_id: str, thread_id: str) -> Dict[str, Any]:
         """Toggle question/topic follow state."""
+        self._require_db()
         uid = str(user_id)
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads or tid in self._deleted_thread_ids:
             raise KeyError(f"Forum thread with ID {thread_id} not found")
         
@@ -684,7 +613,6 @@ class ForumService:
         if not content:
             raise ValueError("Forum comment content cannot be empty")
 
-        self._ensure_seed_thread(thread_id)
         if thread_id not in self._threads:
             raise KeyError(f"Forum thread with ID {thread_id} not found")
         if parent_id and parent_id not in self._comments:
@@ -705,8 +633,8 @@ class ForumService:
 
     def create_comment(self, thread_id: str, payload: ForumCommentCreate) -> ForumCommentResponse:
         """Post a comment under an answer or question with materialized path computation."""
+        self._require_db()
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         if tid not in self._threads:
             raise KeyError(f"Forum thread with ID {thread_id} not found")
 
@@ -825,8 +753,8 @@ class ForumService:
         is_admin: bool = False,
     ) -> ForumThreadResponse:
         """Edit title/content/category of a thread (author or ADMIN only)."""
+        self._require_db()
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         thread = self._threads.get(tid)
         if not thread or tid in self._deleted_thread_ids:
             raise KeyError(f"Forum thread with ID {thread_id} not found")
@@ -871,8 +799,8 @@ class ForumService:
                     answer["user_vote"] = self._votes.get((uid, "ANSWER", aid))
 
     def delete_thread(self, thread_id: str) -> bool:
+        self._require_db()
         tid = str(thread_id)
-        self._ensure_seed_thread(tid)
         if tid in self._threads:
             self._threads.pop(tid, None)
             self._deleted_thread_ids.add(tid)
@@ -905,6 +833,7 @@ class ForumService:
 
     def delete_comment(self, comment_id: str) -> bool:
         """Delete a comment together with its whole materialized-path subtree."""
+        self._require_db()
         cid = str(comment_id)
         comment = self._comments.get(cid)
         if comment is None:

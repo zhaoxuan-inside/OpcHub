@@ -46,9 +46,11 @@
       </div>
 
       <!-- 面板 -->
-      <OperatorPanel v-show="activeTab === 'operators'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
-      <SubgraphPanel v-show="activeTab === 'subgraphs'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
-      <ScenarioPanel v-show="activeTab === 'scenarios'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
+      <!-- Panels are mounted only when active: Vue Flow needs a measurable
+           viewport at mount time, otherwise nodes stay visibility:hidden. -->
+      <OperatorPanel v-if="activeTab === 'operators'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
+      <SubgraphPanel v-if="activeTab === 'subgraphs'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
+      <ScenarioPanel v-if="activeTab === 'scenarios'" :user-session="userSession" @toast="(t) => emit('toast', t)" @count="onCount" />
     </div>
   </div>
 </template>

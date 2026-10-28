@@ -1,7 +1,7 @@
 """Tests for the 生态特权 优惠公告 (discount announcement board) feature.
 
 Verifies:
-1. Baseline announcement seeds load from ``backend/data/seeds/perks.json`` across categories.
+1. Test-only announcement fixtures cover every category (production ships no seeds).
 2. ``perks.list`` returns PUBLISHED announcements sorted by display priority (featured first).
 3. Category filtering (TOKEN / SERVER / SAAS / FINANCE / AI / INFRA) works.
 4. The board is an announcement feed, NOT a membership/pricing tier system
@@ -15,6 +15,7 @@ from fastapi.testclient import TestClient
 from src.main import app
 from src.domains.perks.service import perk_service
 from src.domains.perks.models import PerkCreate
+from tests.catalog_fixtures import seed_perks
 from tests.conftest import gw_data
 
 EXPECTED_CATEGORIES = {"TOKEN", "SERVER", "SAAS", "AI", "FINANCE", "INFRA"}
@@ -24,7 +25,7 @@ EXPECTED_CATEGORIES = {"TOKEN", "SERVER", "SAAS", "AI", "FINANCE", "INFRA"}
 def ensure_announcement_seeds():
     """Guard against other test modules clearing the shared perk singleton."""
     if not perk_service._perks:
-        perk_service._init_seeds()
+        seed_perks(perk_service)
     yield
 
 

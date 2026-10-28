@@ -122,6 +122,22 @@
 
       <!-- 3. Right Action Island -->
       <div class="nav-right-actions">
+        <!-- Global command palette trigger -->
+        <button
+          v-if="userSession"
+          class="nav-command-btn"
+          @click="$emit('open-command')"
+          title="全局搜索与快捷跳转 (⌘K / Ctrl+K)"
+          aria-label="打开全局搜索"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round">
+            <circle cx="11" cy="11" r="7"></circle>
+            <line x1="16.5" y1="16.5" x2="21" y2="21"></line>
+          </svg>
+          <span class="nav-command-label">搜索</span>
+          <kbd class="nav-command-kbd">⌘K</kbd>
+        </button>
+
         <!-- Quick Login / Register pill for unauthenticated visitors -->
         <button
           v-if="!userSession"
@@ -251,6 +267,7 @@ const emit = defineEmits([
   'open-login',
   'open-profile',
   'open-inbox',
+  'open-command',
 ]);
 
 function toggleRole() {
@@ -275,6 +292,62 @@ function handleUserClick() {
 </script>
 
 <style scoped>
+.nav-command-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 10px;
+  margin-right: 2px;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border-subtle);
+  background: var(--glass-surface);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+.nav-command-btn:hover {
+  color: var(--accent);
+  border-color: rgba(0, 113, 227, 0.28);
+  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
+}
+
+.nav-command-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.nav-command-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.nav-command-kbd {
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  border: 1px solid var(--glass-border-subtle);
+  color: var(--text-tertiary);
+  background: var(--glass-surface-solid, rgba(255, 255, 255, 0.9));
+}
+
+@media (max-width: 720px) {
+  .nav-command-label,
+  .nav-command-kbd {
+    display: none;
+  }
+
+  .nav-command-btn {
+    width: 32px;
+    justify-content: center;
+    padding: 0;
+  }
+}
+
 .nav-login-pill {
   padding: 5px 14px;
   font-size: 12px;

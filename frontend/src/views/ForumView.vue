@@ -4,7 +4,7 @@
     <ForumCreateView
       v-if="currentViewMode === 'create'"
       :user-session="currentUserSession"
-      @back="currentViewMode = 'list'"
+      @back="handleBackToList"
       @success="handleNewPostSuccess"
       @toast="$emit('toast', $event)"
     />
@@ -29,6 +29,18 @@
       <div class="zhihu-feed-layout">
         <!-- Main Article Stream (左侧知乎文章流) -->
         <section class="zhihu-feed-stream">
+          <WorkspaceHeader
+            eyebrow="COMMUNITY / FIELD NOTES"
+            meta="ASK / ANSWER / REVIEW"
+            title="头脑风暴"
+            description="把真实踩坑、财务申报与出海经验写成可检索的实战帖。提问、回答、复盘，而不是碎片化刷屏。"
+            :stats="[
+              { value: totalCount || postsList.length, label: '实战议题' },
+              { value: hotRankPosts.length, label: '今日热榜' },
+              { value: categories.length - 1, label: '讨论分区' },
+            ]"
+          />
+
           <!-- Category Filter Bar (风暴分区选项卡 + 排序选择) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -66,7 +78,7 @@
               </div>
 
               <!-- Search Box -->
-              <div class="semantic-search-box">
+              <div class="semantic-search-box" :class="{ searching: isSearching }">
                 <div class="search-input-wrap">
                   <input
                     v-model="searchKeyword"
@@ -77,18 +89,6 @@
                   />
                   <button v-if="searchKeyword" type="button" class="clear-search-btn" @click="handleClearSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  :disabled="isSearching"
-                  @click="handleSemanticSearch"
-                  title="搜索"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <span>{{ isSearching ? '搜索中...' : '搜索' }}</span>
-                </button>
               </div>
 
               <div class="sort-segmented">
@@ -97,7 +97,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -337,6 +337,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import ForumIcon from '@/components/ForumIcon.vue';
 import ForumCard from '@/components/ForumCard.vue';
 import ForumDetailView from '@/components/ForumDetailView.vue';
@@ -344,6 +345,7 @@ import ForumCreateView from '@/components/ForumCreateView.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import { dispatchGateway } from '@/api/gateway';
 import { enrichForumInteractions } from '@/utils/contentInteractions';
+import { trackContentRead } from '@/utils/loyalty';
 
 const props = defineProps({
   userSession: {
@@ -353,6 +355,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['open-register', 'toast']);
+
+const route = useRoute();
+const router = useRouter();
 
 // User Session Resolution
 const currentUserSession = computed(() => {
@@ -405,6 +410,7 @@ function setDensity(mode) {
   try {
     localStorage.setItem('opchub_forum_density', mode);
   } catch (e) {}
+  syncForumQuery({ density: mode === 'comfortable' ? undefined : mode });
 }
 
 // Relative time formatting helper
@@ -685,10 +691,10 @@ function computeTextSemanticScore(query, text) {
   return Math.min(0.999, Math.max(0.15, score));
 }
 
-async function handleSemanticSearch() {
+async function handleSemanticSearch(options = {}) {
   const query = searchKeyword.value.trim();
   if (!query) {
-    handleClearSearch();
+    handleClearSearch(options);
     return;
   }
 
@@ -708,11 +714,13 @@ async function handleSemanticSearch() {
       isSemanticSearchActive.value = true;
       activeSearchQuery.value = query;
       hasMore.value = false;
-      emit('toast', {
-        title: '搜索完成',
-        message: `已为您找到 ${transformed.length} 篇相关讨论。`,
-        type: 'SUCCESS',
-      });
+      if (!options.quiet) {
+        emit('toast', {
+          title: '搜索完成',
+          message: `已为您找到 ${transformed.length} 篇相关讨论。`,
+          type: 'SUCCESS',
+        });
+      }
     } else {
       // In-browser fallback scoring over current posts
       const scored = postsList.value.map((p) => {
@@ -730,11 +738,13 @@ async function handleSemanticSearch() {
       isSemanticSearchActive.value = true;
       activeSearchQuery.value = query;
       hasMore.value = false;
-      emit('toast', {
-        title: '搜索完成',
-        message: `已为您匹配相关讨论内容。`,
-        type: 'SUCCESS',
-      });
+      if (!options.quiet) {
+        emit('toast', {
+          title: '搜索完成',
+          message: `已为您匹配相关讨论内容。`,
+          type: 'SUCCESS',
+        });
+      }
     }
   } catch (e) {
     const scored = postsList.value.map((p) => {
@@ -754,14 +764,18 @@ async function handleSemanticSearch() {
     hasMore.value = false;
   } finally {
     isSearching.value = false;
+    if (options.updateUrl !== false && activeSearchQuery.value === query) {
+      syncForumQuery({ q: query });
+    }
   }
 }
 
-function handleClearSearch() {
+function handleClearSearch(options = {}) {
   searchKeyword.value = '';
   activeSearchQuery.value = '';
   isSemanticSearchActive.value = false;
   clientFeedCache.clear();
+  if (options.updateUrl !== false) syncForumQuery({ q: undefined });
   fetchFeedStream(true);
 }
 
@@ -778,6 +792,7 @@ function handlePostsScroll(e) {
 function handleSelectCategory(catCode) {
   if (selectedCategoryCode.value === catCode) return;
   selectedCategoryCode.value = catCode;
+  syncForumQuery({ category: catCode === 'ALL' ? undefined : catCode });
   if (postsScrollContainerRef.value) {
     postsScrollContainerRef.value.scrollTop = 0;
   }
@@ -884,30 +899,156 @@ const hotRankPosts = computed(() => {
     .slice(0, 5);
 });
 
-// Card Select Action (全页面打开文章详情与交流)
+function syncForumQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'hot') delete query[key];
+    if (key === 'density' && value === 'comfortable') delete query[key];
+  }
+  router.replace({
+    name: 'forum',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+function baseListQuery() {
+  const query = { ...route.query };
+  delete query.compose;
+  return query;
+}
+
+// Card Select Action → real detail route /forum/:id
 function handleSelectPost(post) {
+  if (!post) return;
   lastScrollY.value = window.scrollY;
   activePost.value = post;
   currentViewMode.value = 'detail';
-  if (!window.location.hash.includes(`post_id=${post.id}`)) {
-    try {
-      window.history.replaceState(null, '', `${window.location.pathname}#forum?post_id=${encodeURIComponent(post.id)}`);
-    } catch (e) {}
+  trackContentRead('FORUM_THREAD', post.id);
+  const id = String(post.id || '');
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'forum', params: { id }, query: baseListQuery() });
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function handleBackToList() {
   currentViewMode.value = 'list';
-  if (window.location.hash.includes('post_id=')) {
-    try {
-      window.history.replaceState(null, '', `${window.location.pathname}#forum`);
-    } catch (e) {}
-  }
+  router.push({ name: 'forum', query: baseListQuery() });
   nextTick(() => {
     window.scrollTo({ top: lastScrollY.value, behavior: 'auto' });
     initScrollObserver();
   });
+}
+
+async function openPostById(id) {
+  const key = String(id);
+  const cached = postsList.value.find((post) => String(post.id) === key) || detailCache.get(key);
+  if (cached) {
+    activePost.value = cached;
+    currentViewMode.value = 'detail';
+    return;
+  }
+
+  const res = await dispatchGateway(
+    'forum.threads.get',
+    { thread_id: key, user_id: currentUserSession.value?.uid || '' },
+    { silent: true }
+  );
+  if (res.ok && res.data?.thread) {
+    const post = transformThread(res.data.thread);
+    await enrichForumInteractions([post]);
+    detailCache.set(key, post);
+    activePost.value = post;
+    currentViewMode.value = 'detail';
+    trackContentRead('FORUM_THREAD', post.id);
+  } else {
+    emit('toast', {
+      title: '帖子不存在',
+      message: res.error || '该讨论可能已删除，或链接地址有误。',
+      type: 'WARN',
+    });
+    router.replace({ name: 'forum', query: route.query });
+  }
+}
+
+let applyingRoute = false;
+
+async function applyRouteState({ initial = false } = {}) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = categories.some((item) => item.code === route.query.category)
+      ? String(route.query.category)
+      : 'ALL';
+    const sort = sortOptions.some((item) => item.key === route.query.sort)
+      ? String(route.query.sort)
+      : 'hot';
+    const density = route.query.density === 'compact' ? 'compact' : 'comfortable';
+    const q = String(route.query.q || '').trim();
+    const compose = route.query.compose === '1';
+    const id = route.params.id ? String(route.params.id) : '';
+
+    const categoryChanged = selectedCategoryCode.value !== category;
+    const sortChanged = currentSort.value !== sort;
+    selectedCategoryCode.value = category;
+    currentSort.value = sort;
+
+    if (viewDensity.value !== density) {
+      viewDensity.value = density;
+      try {
+        localStorage.setItem('opchub_forum_density', density);
+      } catch (error) {
+        // ignore private-mode storage errors
+      }
+    }
+
+    if (compose) {
+      currentViewMode.value = 'create';
+      return;
+    }
+
+    if (id) {
+      await openPostById(id);
+      return;
+    }
+
+    currentViewMode.value = 'list';
+    activePost.value = null;
+
+    if (q) {
+      searchKeyword.value = q;
+      if (q !== activeSearchQuery.value) {
+        await handleSemanticSearch({ updateUrl: false, quiet: true });
+      }
+      return;
+    }
+
+    if (isSemanticSearchActive.value) {
+      await handleClearSearch({ updateUrl: false, quiet: true });
+      return;
+    }
+
+    if (initial || categoryChanged || sortChanged || postsList.value.length === 0) {
+      await fetchFeedStream(true);
+    }
+  } finally {
+    applyingRoute = false;
+  }
+}
+
+function selectSort(sortKey) {
+  if (currentSort.value === sortKey) return;
+  currentSort.value = sortKey;
+  syncForumQuery({ sort: sortKey === 'hot' ? undefined : sortKey });
+  if (isSemanticSearchActive.value && searchKeyword.value.trim()) {
+    handleSemanticSearch();
+  } else {
+    isSemanticSearchActive.value = false;
+    fetchFeedStream(true);
+  }
 }
 
 // Thread vote sync (赞同/反对来自卡片或详情页，post 对象为共享引用，这里保持列表与缓存一致)
@@ -1023,6 +1164,7 @@ function handleOpenCreatePage() {
     return;
   }
   currentViewMode.value = 'create';
+  router.push({ name: 'forum', query: { ...route.query, compose: '1' } });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1037,35 +1179,13 @@ async function handleNewPostSuccess(newThread) {
   postsList.value.unshift(transformed);
   activePost.value = transformed;
   currentViewMode.value = 'detail';
+  router.push({
+    name: 'forum',
+    params: { id: String(transformed.id) },
+    query: baseListQuery(),
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
-
-function checkUrlForPost() {
-  const hash = window.location.hash || '';
-  const match = hash.match(/post_id=([^&]+)/);
-  if (match && match[1]) {
-    const postId = decodeURIComponent(match[1]);
-    const found = postsList.value.find((p) => String(p.id) === String(postId));
-    if (found) {
-      activePost.value = found;
-      currentViewMode.value = 'detail';
-    }
-  }
-}
-
-function onWindowHashChange() {
-  checkUrlForPost();
-}
-
-watch(currentSort, () => {
-  if (isSemanticSearchActive.value && searchKeyword.value.trim()) {
-    // 搜索态下切换排序：重跑语义搜索（结果按相关度排序）
-    handleSemanticSearch();
-  } else {
-    isSemanticSearchActive.value = false;
-    fetchFeedStream(true);
-  }
-});
 
 watch(currentViewMode, (mode) => {
   if (mode === 'list') {
@@ -1075,22 +1195,26 @@ watch(currentViewMode, (mode) => {
   }
 }, { immediate: true });
 
-// Lifecycle: Infinite Scroll Feed stream initialization & intersection observer mounting
+watch(
+  () => [route.params.id, route.query.category, route.query.sort, route.query.q, route.query.density, route.query.compose],
+  () => {
+    applyRouteState();
+  }
+);
+
+// Lifecycle: route-driven feed/detail initialization
 onMounted(async () => {
   if (currentViewMode.value === 'list') {
     document.body.classList.add('fixed-screen-feed');
   }
-  window.addEventListener('hashchange', onWindowHashChange);
-  await fetchFeedStream(true);
+  await applyRouteState({ initial: true });
   nextTick(() => {
     initScrollObserver();
   });
-  checkUrlForPost();
 });
 
 onUnmounted(() => {
   document.body.classList.remove('fixed-screen-feed');
-  window.removeEventListener('hashchange', onWindowHashChange);
   if (scrollObserver) {
     scrollObserver.disconnect();
     scrollObserver = null;

@@ -30,9 +30,9 @@ def test_catalog_exposes_provenance_fields():
     published at runtime (e.g. by an admin) are admin-authored and are not
     required to ship curated provenance; the UI falls back to platform defaults.
     """
-    from src.domains.sop.service import DEFAULT_SOP_SEEDS
+    from tests.catalog_fixtures import load_catalog
 
-    seeded_ids = {raw["id"] for raw in (DEFAULT_SOP_SEEDS.get("nodes") or [])}
+    seeded_ids = {raw["id"] for raw in (load_catalog("sop.json").get("nodes") or [])}
     catalog = sop_service.list_document_cards(user_id="usr_catalog_test")
     seeded_items = [i for i in catalog.items if i.id in seeded_ids]
     assert seeded_items, "expected seeded documents in the catalog"

@@ -60,6 +60,18 @@
     />
 
     <div v-else class="sop-main-content">
+      <WorkspaceHeader
+        eyebrow="SOP / DOCUMENT WORKBENCH"
+        meta="TEMPLATE / GUIDE / DRAFT"
+        title="流程文书"
+        description="把工商、财税、法律与出海流程拆成可执行的步骤。选择标准文书，按引导填写，再生成可提交的材料。"
+        :stats="[
+          { value: documentCatalog.length, label: '标准文书' },
+          { value: flowCatalog.length, label: '流程模板' },
+          { value: myDocuments.length, label: '我的文书' },
+        ]"
+      />
+
       <!-- View mode switcher: 节点工作台 / 流程向导 / 目标反查 -->
       <div class="glass-box sop-mode-bar">
         <div class="sop-mode-tabs">
@@ -68,7 +80,7 @@
             :key="mode.key"
             type="button"
             :class="['sop-mode-tab', { active: viewMode === mode.key }]"
-            @click="viewMode = mode.key"
+            @click="selectViewMode(mode.key)"
           >
             <span class="sop-mode-tab-label">{{ mode.label }}</span>
             <span class="sop-mode-tab-desc">{{ mode.desc }}</span>
@@ -742,6 +754,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import { enrichInteractions } from '@/utils/contentInteractions';
 import SopDocumentCard from '@/components/sop/SopDocumentCard.vue';
@@ -756,6 +769,9 @@ import SopMyDocCard from '@/components/sop/SopMyDocCard.vue';
 import SopMyFlowCard from '@/components/sop/SopMyFlowCard.vue';
 
 const emit = defineEmits(['toast', 'open-login']);
+
+const route = useRoute();
+const router = useRouter();
 
 const currentUserSession = computed(() => safeSession());
 
@@ -801,6 +817,7 @@ const flowSort = ref('hot');
 // The flow currently opened on the full-page reader (same idiom as the doc page).
 const flowPageDetail = ref(null);
 const flowReturnMode = ref('guide');
+const loadedFlowId = ref('');
 // 我的流程详情与平台流程详情共用整页；owner 模式显示编辑/删除。
 const flowOwnerMode = ref(false);
 
@@ -835,13 +852,116 @@ const currentViewMode = ref('workspace');
 const docPageNode = ref(null);
 const docPageChildren = ref([]);
 // Where the full-page document writer should return to on back.
-const docReturnMode = ref('workspace');
+const docReturnMode = ref('workbench');
 // Creation entry (创建文书 / 发布新文档): keep the writing area open and show
 // templates as a right-side panel instead of a full-page picker takeover.
 const docCreationMode = ref(false);
 // Existing private draft reopened in the editor (null = brand new document).
 const docDraftDoc = ref(null);
 
+function resetDetailState() {
+  currentViewMode.value = 'workspace';
+  docPageNode.value = null;
+  docPageChildren.value = [];
+  docDraftDoc.value = null;
+  docCreationMode.value = false;
+  flowPageDetail.value = null;
+  flowOwnerMode.value = false;
+  loadedFlowId.value = '';
+  myDocPageDoc.value = null;
+  flowBuilderInitial.value = null;
+  editingFlowId.value = '';
+}
+
+function syncSopListQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '' || value === 'workbench') delete query[key];
+  }
+  router.replace({ name: 'sop', query });
+}
+
+function selectViewMode(mode) {
+  viewMode.value = mode;
+  syncSopListQuery({ view: mode === 'workbench' ? undefined : mode });
+}
+
+let applyingRoute = false;
+
+async function applyRouteState() {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    if (['workbench', 'guide', 'mydocs', 'flows'].includes(route.query.view)) {
+      viewMode.value = String(route.query.view);
+    }
+
+    if (route.name === 'sop-docs') {
+      const id = String(route.params.id || '');
+      if (!nodes.value.length) await loadGraph();
+      const node = nodes.value.find((item) => String(item.id) === id);
+      if (node) {
+        openDocPage(node, { updateUrl: false });
+      } else {
+        emit('toast', { title: '文书不存在', message: '该文书可能已下架，或链接地址有误。', type: 'WARN' });
+        router.replace({ name: 'sop' });
+      }
+      return;
+    }
+
+    if (route.name === 'sop-flows') {
+      const id = String(route.params.id || '');
+      await handleOpenFlow({ id }, { updateUrl: false });
+      return;
+    }
+
+    if (route.name === 'sop-my-docs') {
+      const id = String(route.params.id || '');
+      viewMode.value = 'mydocs';
+      if (!myDocuments.value.length) await loadMyDocuments();
+      const doc = myDocuments.value.find((item) => String(item.id) === id);
+      if (doc) openMyDocPage(doc, { updateUrl: false });
+      else {
+        emit('toast', { title: '文书不存在', message: '该私有文书可能已删除。', type: 'WARN' });
+        router.replace({ name: 'sop', query: { view: 'mydocs' } });
+      }
+      return;
+    }
+
+    if (route.name === 'sop-my-flows') {
+      const id = String(route.params.id || '');
+      viewMode.value = 'flows';
+      if (!myFlows.value.length) await loadMyFlows();
+      const flow = myFlows.value.find((item) => String(item.id) === id);
+      if (flow) openMyFlowPage(flow, { updateUrl: false });
+      else {
+        emit('toast', { title: '流程不存在', message: '该私有流程可能已删除。', type: 'WARN' });
+        router.replace({ name: 'sop', query: { view: 'flows' } });
+      }
+      return;
+    }
+
+    if (route.name === 'sop-flow-builder') {
+      const editId = String(route.query.edit || '');
+      if (currentViewMode.value === 'flowbuilder' && String(editingFlowId.value || '') === editId) return;
+      let flow = null;
+      if (editId) {
+        if (!myFlows.value.length) await loadMyFlows();
+        flow = myFlows.value.find((item) => String(item.id) === editId) || null;
+      }
+      openFlowBuilder(flow, null, { updateUrl: false });
+      return;
+    }
+
+    const view = ['workbench', 'guide', 'mydocs', 'flows'].includes(route.query.view)
+      ? String(route.query.view)
+      : 'workbench';
+    viewMode.value = view;
+    resetDetailState();
+  } finally {
+    applyingRoute = false;
+  }
+}
 
 const CATEGORY_LABELS = {
   ENTITY: '主体登记',
@@ -1141,32 +1261,48 @@ async function loadFlowCatalog() {
 
 /** Open a flow on the full-page reader — same interaction as opening a standard
  * document: the page replaces the workspace, never a modal. */
-function handleOpenFlow(flow) {
+async function handleOpenFlow(flow, options = {}) {
+  if (!flow?.id) return;
+  const id = String(flow.id);
   flowReturnMode.value = viewMode.value || 'guide';
   flowOwnerMode.value = false;
+
+  if (options.updateUrl !== false && String(route.params.id || '') !== id) {
+    router.push({
+      name: 'sop-flows',
+      params: { id },
+      query: viewMode.value && viewMode.value !== 'workbench' ? { view: viewMode.value } : {},
+    });
+  }
+
+  if (loadedFlowId.value === id && flowPageDetail.value) {
+    currentViewMode.value = 'flow';
+    return;
+  }
+
   flowPageDetail.value = null;
   currentViewMode.value = 'flow';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  dispatchGateway('sop.flow.template.detail', { flow_id: flow.id }, { silent: true })
-    .then((res) => {
-      if (res.ok && res.data) {
-        flowPageDetail.value = res.data;
-      } else {
-        emit('toast', { title: '流程加载受阻', message: res.error || '未能加载该流程的步骤明细。', type: 'ERROR' });
-        handleBackFromFlow();
-      }
-    })
-    .catch(() => {
-      emit('toast', { title: '加载异常', message: '流程服务暂时不可用，请稍后重试。', type: 'ERROR' });
-      handleBackFromFlow();
-    });
+
+  const res = await dispatchGateway('sop.flow.template.detail', { flow_id: id }, { silent: true });
+  if (res.ok && res.data) {
+    flowPageDetail.value = res.data;
+    loadedFlowId.value = id;
+  } else {
+    emit('toast', { title: '流程加载受阻', message: res.error || '未能加载该流程的步骤明细。', type: 'ERROR' });
+    handleBackFromFlow();
+  }
 }
 
 /** Leave the full-page flow reader and return to the originating workspace. */
 function handleBackFromFlow() {
-  currentViewMode.value = flowReturnMode.value || 'guide';
+  const targetMode = flowReturnMode.value || 'guide';
+  currentViewMode.value = 'workspace';
+  viewMode.value = targetMode;
   flowPageDetail.value = null;
   flowOwnerMode.value = false;
+  loadedFlowId.value = '';
+  router.push({ name: 'sop', query: targetMode === 'workbench' ? {} : { view: targetMode } });
 }
 
 function handleFlowSearch() {
@@ -1226,17 +1362,27 @@ async function loadMyDocuments() {
  * Open a private document on the full-page reader — same interaction as the
  * standard document page: the page replaces the workspace, never a modal.
  */
-function openMyDocPage(doc) {
+function openMyDocPage(doc, options = {}) {
   if (!doc) return;
   myDocReturnMode.value = viewMode.value || 'mydocs';
   myDocPageDoc.value = doc;
   currentViewMode.value = 'mydoc';
+  if (options.updateUrl !== false && String(route.params.id || '') !== String(doc.id)) {
+    router.push({
+      name: 'sop-my-doc',
+      params: { id: String(doc.id) },
+      query: { view: myDocReturnMode.value },
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function handleBackFromMyDoc() {
-  currentViewMode.value = myDocReturnMode.value || 'mydocs';
+  const targetMode = myDocReturnMode.value || 'mydocs';
+  currentViewMode.value = 'workspace';
+  viewMode.value = targetMode;
   myDocPageDoc.value = null;
+  router.push({ name: 'sop', query: targetMode === 'workbench' ? {} : { view: targetMode } });
 }
 
 async function handleDeleteMyDocument(doc) {
@@ -1312,41 +1458,52 @@ async function loadMyFlows() {
  * Open one of the maker's own flows on the full-page reader — same interaction
  * as opening a platform flow, but in owner mode (edit / delete available).
  */
-function openMyFlowPage(flow) {
+async function openMyFlowPage(flow, options = {}) {
   if (!flow) return;
+  const id = String(flow.id);
   flowReturnMode.value = viewMode.value || 'flows';
   flowOwnerMode.value = true;
+
+  if (options.updateUrl !== false && String(route.params.id || '') !== id) {
+    router.push({
+      name: 'sop-my-flow',
+      params: { id },
+      query: { view: flowReturnMode.value },
+    });
+  }
+
+  if (loadedFlowId.value === `my-${id}` && flowPageDetail.value) {
+    currentViewMode.value = 'flow';
+    return;
+  }
+
   flowPageDetail.value = null;
   currentViewMode.value = 'flow';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-  dispatchGateway('sop.flow.get', { flow_id: flow.id }, { silent: true })
-    .then((res) => {
-      if (res.ok && res.data) {
-        const stages = [...new Set((res.data.items || []).map((i) => i.stage))].sort((a, b) => a - b);
-        flowPageDetail.value = {
-          template: {
-            ...res.data.flow,
-            category: 'MY',
-            stages,
-            outcome: '',
-            unlocks: [],
-            is_official: false,
-            publisher_org: '私有流程',
-            author_name: '我',
-            author_title: '流程编排人',
-          },
-          steps: res.data.items || [],
-          missing_nodes: res.data.missing_nodes || [],
-        };
-      } else {
-        emit('toast', { title: '流程加载受阻', message: res.error || '未能加载该流程。', type: 'ERROR' });
-        handleBackFromFlow();
-      }
-    })
-    .catch(() => {
-      emit('toast', { title: '加载异常', message: '流程服务暂时不可用，请稍后重试。', type: 'ERROR' });
-      handleBackFromFlow();
-    });
+
+  const res = await dispatchGateway('sop.flow.get', { flow_id: id }, { silent: true });
+  if (res.ok && res.data) {
+    const stages = [...new Set((res.data.items || []).map((i) => i.stage))].sort((a, b) => a - b);
+    flowPageDetail.value = {
+      template: {
+        ...res.data.flow,
+        category: 'MY',
+        stages,
+        outcome: '',
+        unlocks: [],
+        is_official: false,
+        publisher_org: '私有流程',
+        author_name: '我',
+        author_title: '流程编排人',
+      },
+      steps: res.data.items || [],
+      missing_nodes: res.data.missing_nodes || [],
+    };
+    loadedFlowId.value = `my-${id}`;
+  } else {
+    emit('toast', { title: '流程加载受阻', message: res.error || '未能加载该流程。', type: 'ERROR' });
+    handleBackFromFlow();
+  }
 }
 
 /** Edit one of the maker's own flows from the full-page reader. */
@@ -1373,7 +1530,7 @@ async function handleDeleteMyFlowFromPage(flow) {
  * to that flow page, anything else returns to the active mode tab. The builder
  * never navigates to another mode tab — it replaces the workspace in place.
  */
-function openFlowBuilder(flow = null, returnMode = null) {
+function openFlowBuilder(flow = null, returnMode = null, options = {}) {
   // Guard against a DOM event being passed in as the flow argument.
   const target = flow && typeof flow === 'object' && !flow.type ? flow : null;
   if (target) {
@@ -1397,6 +1554,12 @@ function openFlowBuilder(flow = null, returnMode = null) {
   flowBuilderReturnMode.value =
     returnMode || (currentViewMode.value === 'flow' ? 'flow' : (viewMode.value || 'flows'));
   currentViewMode.value = 'flowbuilder';
+  if (options.updateUrl !== false) {
+    router.push({
+      name: 'sop-flow-builder',
+      query: target?.id ? { edit: String(target.id), view: flowBuilderReturnMode.value } : { view: flowBuilderReturnMode.value },
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1413,7 +1576,9 @@ function closeFlowBuilder() {
     if (flow) openMyFlowPage(flow);
     else currentViewMode.value = 'flows';
   } else {
-    currentViewMode.value = returnMode;
+    currentViewMode.value = 'workspace';
+    viewMode.value = returnMode;
+    router.push({ name: 'sop', query: returnMode === 'workbench' ? {} : { view: returnMode } });
   }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -1502,7 +1667,7 @@ function groupName(parentId) {
  * Open the full-page document reader/writer for a node.
  * The document page owns its own form state, so the workspace keeps no copy.
  */
-function openDocPage(node) {
+function openDocPage(node, options = {}) {
   if (!node) return;
   const nodeId = node.node_id || node.id;
   const target = nodes.value.find((n) => n.id === nodeId);
@@ -1512,12 +1677,19 @@ function openDocPage(node) {
   }
   // Remember where the writer was opened from so back returns to the same
   // page — a flow step keeps the flow page, everything else keeps the tab.
-  docReturnMode.value = currentViewMode.value === 'flow' ? 'flow' : 'workspace';
+  docReturnMode.value = currentViewMode.value === 'flow' ? 'flow' : (viewMode.value || 'workbench');
   docCreationMode.value = false;
   docDraftDoc.value = null;
   docPageNode.value = target;
   docPageChildren.value = target.kind === 'subgraph' ? subgraphChildren(target) : [];
   currentViewMode.value = 'doc';
+  if (options.updateUrl !== false && String(route.params.id || '') !== String(target.id)) {
+    router.push({
+      name: 'sop-docs',
+      params: { id: String(target.id) },
+      query: viewMode.value && viewMode.value !== 'workbench' ? { view: viewMode.value } : {},
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1543,6 +1715,13 @@ function handlePickDocument(doc) {
   if (!target) return;
   docPageNode.value = target;
   docPageChildren.value = target.kind === 'subgraph' ? subgraphChildren(target) : [];
+  if (String(route.params.id || '') !== String(target.id)) {
+    router.push({
+      name: 'sop-docs',
+      params: { id: String(target.id) },
+      query: viewMode.value && viewMode.value !== 'workbench' ? { view: viewMode.value } : {},
+    });
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1565,19 +1744,31 @@ async function handleDocumentSaved(savedDoc) {
     docReturnMode.value = 'mydocs';
     docPageNode.value = null;
     docPageChildren.value = [];
-    currentViewMode.value = 'mydocs';
+    currentViewMode.value = 'workspace';
     viewMode.value = 'mydocs';
+    router.push({ name: 'sop', query: { view: 'mydocs' } });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 }
 
 function handleBackFromDoc() {
-  currentViewMode.value = docReturnMode.value || 'workspace';
-  docReturnMode.value = 'workspace';
+  const targetMode = docReturnMode.value || 'workbench';
+  docReturnMode.value = 'workbench';
   docCreationMode.value = false;
   docDraftDoc.value = null;
   docPageNode.value = null;
   docPageChildren.value = [];
+  currentViewMode.value = 'workspace';
+  if (targetMode === 'flow') {
+    resetDetailState();
+    router.back();
+    return;
+  }
+  viewMode.value = ['workbench', 'guide', 'mydocs', 'flows'].includes(targetMode) ? targetMode : 'workbench';
+  router.push({
+    name: 'sop',
+    query: viewMode.value === 'workbench' ? {} : { view: viewMode.value },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -1675,14 +1866,22 @@ watch(viewMode, (mode) => {
   }
 });
 
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
   loadGraph();
   loadDocumentCatalog();
   loadFlowCatalog();
   loadMyDocuments();
   loadMyFlows();
+  await applyRouteState();
 });
+
+watch(
+  () => [route.name, route.params.id, route.query.view, route.query.edit],
+  () => {
+    applyRouteState();
+  }
+);
 
 onUnmounted(() => {
   document.body.classList.remove('fixed-screen-feed');

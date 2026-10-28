@@ -1,10 +1,8 @@
 """SOP Service managing workflow stages, document templates, the workflow graph, and generated document instances."""
 import asyncio
-import json
 import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 from src.domains.sop.models import (
@@ -65,53 +63,6 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _load_sop_seeds() -> Dict[str, Any]:
-    """Load the workflow graph seeds (stages / nodes / edges / goals) from an external data file.
-
-    Maintains strict code, config, and data separation: zero workflow records hardcoded in source.
-    """
-    search_paths = [
-        Path("backend/data/seeds/sop.json"),
-        Path("data/seeds/sop.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "sop.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load SOP seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_SOP_SEEDS: Dict[str, Any] = _load_sop_seeds()
-
-
-def _load_sop_flow_seeds() -> Dict[str, Any]:
-    """Load the platform flow-template seeds from an external data file.
-
-    Kept apart from ``sop.json`` so the authoring data for flows and for the
-    document graph can evolve independently.
-    """
-    search_paths = [
-        Path("backend/data/seeds/sop_flows.json"),
-        Path("data/seeds/sop_flows.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "sop_flows.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load SOP flow seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_SOP_FLOW_SEEDS: Dict[str, Any] = _load_sop_flow_seeds()
-
-
 class SOPService:
     """Manages business registration and compliance document templates and generated instances."""
 
@@ -130,42 +81,10 @@ class SOPService:
         # Background consumer that audits and promotes approved submissions.
         self._review_consumer_task = None
         self._review_consumer_running = False
-        self._init_seeds()
 
-    # ------------------------------------------------------------------
-    # Seed loading
-    # ------------------------------------------------------------------
-    def _init_seeds(self) -> None:
-        """Populate the workflow graph and the template catalog from external seed data."""
-        stages = DEFAULT_SOP_SEEDS.get("stages") or []
-        for raw in stages:
-            stage = SOPStage(**raw)
-            self._stages.append(stage)
-
-        for raw in DEFAULT_SOP_SEEDS.get("nodes") or []:
-            node = SOPNode(**raw)
-            self._nodes[node.id] = node
-            if node.kind == SOP_NODE_DOCUMENT:
-                self._register_template_from_node(node)
-
-        for raw in DEFAULT_SOP_SEEDS.get("edges") or []:
-            self._edges.append(SOPEdge(**raw))
-
-        for raw in DEFAULT_SOP_SEEDS.get("goals") or []:
-            goal = SOPGoal(**raw)
-            self._goals[goal.id] = goal
-
-        # Platform flow templates: an ordered set of nodes completing one outcome.
-        for raw in DEFAULT_SOP_FLOW_SEEDS.values():
-            flow = SOPFlowTemplate(**raw)
-            self._flow_templates[flow.id] = flow
-
-        # Persist seeded graph documents so they survive a restart.
-        for node in self._nodes.values():
-            if node.kind == SOP_NODE_DOCUMENT:
-                template = self._templates.get(node.id)
-                if template is not None:
-                    domain_persistence.write("sop.templates", node.id, template)
+    def _require_db(self) -> None:
+        """SOP content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("sop")
 
     def _register_template_from_node(self, node: SOPNode) -> None:
         """Project a document-kind graph node into the legacy template catalog."""
@@ -221,6 +140,7 @@ class SOPService:
         return self._templates[template_id]
 
     def create_template(self, req: SOPTemplateCreate) -> SOPTemplate:
+        self._require_db()
         """Create and register a new SOP compliance document template."""
         tid = f"tpl_{uuid.uuid4().hex[:8]}"
         template = SOPTemplate(
@@ -567,6 +487,7 @@ class SOPService:
     # User-authored flows
     # ------------------------------------------------------------------
     def create_flow(self, req: SOPFlowCreate) -> SOPFlow:
+        self._require_db()
         """Create a user-owned flow from an ordered list of node references."""
         fid = f"flow_{uuid.uuid4().hex[:10]}"
         now = utc_now_iso()
@@ -636,6 +557,7 @@ class SOPService:
         return self._flows[flow_id]
 
     def update_flow(self, flow_id: str, req: SOPFlowCreate) -> SOPFlow:
+        self._require_db()
         """Replace the content of an existing flow."""
         flow = self.get_flow(flow_id)
         flow.name = req.name.strip()
@@ -653,6 +575,7 @@ class SOPService:
         return flow
 
     def delete_flow(self, flow_id: str) -> bool:
+        self._require_db()
         """Delete a stored flow."""
         if flow_id in self._flows:
             del self._flows[flow_id]
@@ -786,6 +709,7 @@ class SOPService:
         }
 
     def render_and_save_document(self, payload: SOPDocumentCreate) -> SOPDocumentResponse:
+        self._require_db()
         """Render document template with maker input data and persist instance to backend."""
         template = self.get_template(payload.template_id)
 
@@ -831,6 +755,7 @@ class SOPService:
         return document
 
     def save_draft_document(self, payload: SOPDocumentDraftCreate) -> SOPDocumentResponse:
+        self._require_db()
         """Persist a freely-edited document draft from the text editor.
 
         This is the write path behind 「起草新文书」: the maker may start from a
@@ -914,6 +839,7 @@ class SOPService:
         }
 
     def restore_draft_snapshot(self, doc_id: str, snapshot: dict) -> bool:
+        self._require_db()
         """Restore a draft from a snapshot taken before an atomic save."""
         doc = self._documents.get(str(doc_id))
         if doc is None or not snapshot:
@@ -940,6 +866,7 @@ class SOPService:
         return docs
 
     def delete_document(self, doc_id: str) -> bool:
+        self._require_db()
         """Physically delete persisted document by ID for Saga rollback."""
         if doc_id in self._documents:
             del self._documents[doc_id]
@@ -1001,6 +928,7 @@ class SOPService:
         return item
 
     def submit_document_for_review(self, doc_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
+        self._require_db()
         """Submit one of the maker's own documents for publish review.
 
         The document moves to PENDING_REVIEW (待审核) and a review item is
@@ -1036,6 +964,7 @@ class SOPService:
         )
 
     def submit_flow_for_review(self, flow_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
+        self._require_db()
         """Submit one of the maker's own flows for publish review.
 
         The flow moves to PENDING_REVIEW (待审核) and a review item is
@@ -1077,6 +1006,7 @@ class SOPService:
         )
 
     def withdraw_review_submission(self, item_id: str) -> bool:
+        self._require_db()
         """Withdraw a queued review submission (Saga compensation).
 
         Removes the queue item and returns the owning document/flow to its
@@ -1204,6 +1134,7 @@ class SOPService:
         return None
 
     def _approve_review_item(self, item: SOPReviewItem) -> None:
+        self._require_db()
         """Promote an audited submission into the platform catalogs."""
         now = utc_now_iso()
         if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
@@ -1226,6 +1157,7 @@ class SOPService:
         domain_persistence.write("sop.review_queue", item.id, item)
 
     def _reject_review_item(self, item: SOPReviewItem, reason: str) -> None:
+        self._require_db()
         """Mark an audited submission as rejected and roll the source back."""
         now = utc_now_iso()
         if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
@@ -1245,6 +1177,7 @@ class SOPService:
         domain_persistence.write("sop.review_queue", item.id, item)
 
     def publish_document_to_catalog(self, doc: SOPDocumentResponse, is_official: bool = False) -> str:
+        self._require_db()
         """Promote a maker's document into the standard document catalog (标准文书库).
 
         The rendered document becomes a fillable document node in the graph, so it
@@ -1287,6 +1220,7 @@ class SOPService:
         return node_id
 
     def publish_flow_to_catalog(self, flow: SOPFlow, is_official: bool = False) -> str:
+        self._require_db()
         """Promote a maker's flow into the platform flow guide (流程向导)."""
         steps, _missing = self._build_plan_items(
             [(ref.node_id, ref.required) for ref in flow.node_refs]
@@ -1413,31 +1347,6 @@ class SOPService:
             goal = SOPGoal(**r)
             self._goals[goal.id] = goal
         return len(rows)
-
-    def persist_graph_seeds(self) -> int:
-        """Write the workflow graph into PostgreSQL.
-
-        The seed file is the authoring source, but the runtime catalog must live
-        in the database so the workbench reads real persisted records. This runs
-        after the persistence layer is enabled, because writes are no-ops before
-        the database probe succeeds.
-        """
-        written = 0
-        for node in self._nodes.values():
-            domain_persistence.write("sop.nodes", node.id, node)
-            written += 1
-        for idx, edge in enumerate(self._edges):
-            key = f"{edge.from_node}->{edge.to_node}"
-            domain_persistence.write("sop.edges", key, edge)
-            written += 1
-        for goal in self._goals.values():
-            domain_persistence.write("sop.goals", goal.id, goal)
-            written += 1
-        for flow in self._flow_templates.values():
-            domain_persistence.write("sop.flow_templates", flow.id, flow)
-            written += 1
-        return written
-
 
 sop_service = SOPService()
 

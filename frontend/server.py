@@ -146,6 +146,31 @@ async def proxy_api_to_backend(path: str, request: Request):
         )
 
 
+@app.get("/{full_path:path}", include_in_schema=False)
+async def spa_history_fallback(full_path: str):
+    """Serve the Vue SPA for any non-API, non-asset path.
+
+    The frontend uses HTML5 history routing (/policies/:id, /forum/:id, …).
+    A hard refresh on a detail URL must return index.html, not a 404.
+    """
+    if full_path.startswith("api/") or full_path.startswith("assets/"):
+        return Response(status_code=404)
+    if "." in Path(full_path).name:
+        return Response(status_code=404)
+    index_file = DIST_DIR / "index.html"
+    if index_file.is_file():
+        return FileResponse(
+            index_file,
+            media_type="text/html; charset=utf-8",
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
+    return HTMLResponse("<h2>OpcHub Frontend Dist Not Found</h2>", status_code=404)
+
+
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("FRONTEND_PORT", "3000"))

@@ -209,7 +209,12 @@
         <section class="sop-doc-main-col">
           <div class="sop-doc-writer-grid">
             <section class="sop-doc-form-pane">
-              <div class="sop-doc-pane-label">待填要素</div>
+              <div class="sop-doc-pane-label">
+                待填要素
+                <span v-if="fieldSteps.length > 1" class="sop-wizard-progress-label">
+                  {{ isReviewStep ? '检查答案' : `第 ${currentStep + 1} / ${fieldSteps.length} 步` }}
+                </span>
+              </div>
 
               <div v-if="node.description" class="sop-doc-intro">{{ node.description }}</div>
 
@@ -223,15 +228,92 @@
                 @toast="$emit('toast', $event)"
               />
 
-              <div class="sop-doc-fields">
+              <!-- Guided interview: one small group of fields at a time. -->
+              <div v-if="fieldSteps.length > 1" class="sop-wizard">
+                <div class="sop-wizard-track">
+                  <span class="sop-wizard-track-fill" :style="{ width: `${wizardProgress}%` }"></span>
+                </div>
+                <div class="sop-wizard-steps">
+                  <button
+                    v-for="(step, idx) in fieldSteps"
+                    :key="`step-${idx}`"
+                    type="button"
+                    class="sop-wizard-step"
+                    :class="{ active: currentStep === idx, done: currentStep > idx }"
+                    @click="goToStep(idx)"
+                  >
+                    <span class="sop-wizard-step-index">{{ idx + 1 }}</span>
+                    <span class="sop-wizard-step-label">{{ step.title }}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="sop-wizard-step sop-wizard-review-step"
+                    :class="{ active: isReviewStep }"
+                    @click="goToStep(fieldSteps.length)"
+                  >
+                    <span class="sop-wizard-step-index">✓</span>
+                    <span class="sop-wizard-step-label">检查答案</span>
+                  </button>
+                </div>
+              </div>
+
+              <div v-if="!isReviewStep" class="sop-doc-fields">
                 <SopFieldForm
-                  v-for="field in (node.required_fields || [])"
+                  v-for="field in currentFields"
                   :key="field.key"
                   :field="field"
                   :model-value="formData[field.key] ?? ''"
                   :show-error="submitted && isFieldMissing(field)"
                   @update:model-value="(v) => onFieldInput(field.key, v)"
                 />
+              </div>
+
+              <!-- Review screen: final answers before generating the document. -->
+              <div v-else class="sop-review">
+                <div class="sop-review-head">
+                  <span class="sop-review-title">检查答案</span>
+                  <span class="sop-review-sub">确认无误后，点击「确认并保存」生成正式文书。</span>
+                </div>
+                <div class="sop-review-list">
+                  <div v-for="field in (node.required_fields || [])" :key="`review-${field.key}`" class="sop-review-row">
+                    <span class="sop-review-label">{{ field.label }}</span>
+                    <span class="sop-review-value" :class="{ empty: isFieldMissing(field) }">
+                      {{ formData[field.key] || (field.required ? '未填写' : '—') }}
+                    </span>
+                    <button type="button" class="sop-review-edit" @click="jumpToField(field.key)">修改</button>
+                  </div>
+                </div>
+              </div>
+
+              <div v-if="fieldSteps.length > 1" class="sop-wizard-actions">
+                <button
+                  type="button"
+                  class="btn-liquid-outline sop-wizard-btn"
+                  :disabled="currentStep === 0"
+                  @click="prevStep"
+                >
+                  上一步
+                </button>
+                <span class="sop-wizard-actions-hint">
+                  {{ wizardSavedHint }}
+                </span>
+                <button
+                  v-if="!isReviewStep"
+                  type="button"
+                  class="btn-liquid sop-wizard-btn"
+                  @click="nextStep"
+                >
+                  下一步
+                </button>
+                <button
+                  v-else
+                  type="button"
+                  class="btn-liquid sop-wizard-btn"
+                  :disabled="saving"
+                  @click="saveDocument"
+                >
+                  {{ saving ? '保存中…' : '确认并保存' }}
+                </button>
               </div>
             </section>
 
@@ -509,6 +591,112 @@ watch(
  * ------------------------------------------------------------------------ */
 const formData = reactive({});
 const submitted = ref(false);
+const currentStep = ref(0);
+const draftRestoring = ref(false);
+const wizardSavedHint = ref('');
+
+function draftKey() {
+  return `opchub_sop_draft_${props.node?.id || 'blank'}`;
+}
+
+const fieldSteps = computed(() => {
+  const fields = props.node?.required_fields || [];
+  if (!fields.length) return [];
+  const groups = [];
+  let current = { title: '基本信息', fields: [] };
+  for (const field of fields) {
+    const section = field.section || field.group || '';
+    if (section && section !== current.title && current.fields.length) {
+      groups.push(current);
+      current = { title: section, fields: [] };
+    } else if (!section && current.fields.length >= 3) {
+      groups.push(current);
+      current = { title: `第 ${groups.length + 2} 组`, fields: [] };
+    }
+    current.fields.push(field);
+  }
+  if (current.fields.length) groups.push(current);
+  return groups;
+});
+
+const currentFields = computed(() => {
+  if (isReviewStep.value) return props.node?.required_fields || [];
+  return fieldSteps.value[currentStep.value]?.fields || (props.node?.required_fields || []);
+});
+
+const isReviewStep = computed(
+  () => fieldSteps.value.length > 1 && currentStep.value >= fieldSteps.value.length
+);
+
+const wizardProgress = computed(() => {
+  if (!fieldSteps.value.length) return 0;
+  if (isReviewStep.value) return 100;
+  return Math.round(((currentStep.value + 1) / (fieldSteps.value.length + 1)) * 100);
+});
+
+function stepMissing(fields) {
+  return fields.filter((field) => field.required && isFieldMissing(field));
+}
+
+function goToStep(index) {
+  const max = fieldSteps.value.length;
+  currentStep.value = Math.max(0, Math.min(index, max));
+}
+
+function jumpToField(key) {
+  const index = fieldSteps.value.findIndex((step) => step.fields.some((field) => field.key === key));
+  if (index >= 0) currentStep.value = index;
+}
+
+function nextStep() {
+  const missing = stepMissing(currentFields.value);
+  if (missing.length) {
+    submitted.value = true;
+    emit('toast', {
+      title: '这一步还没填完',
+      message: `还需补充：${missing.map((field) => field.label).join('、')}。`,
+      type: 'WARN',
+    });
+    return;
+  }
+  goToStep(currentStep.value + 1);
+}
+
+function prevStep() {
+  goToStep(currentStep.value - 1);
+}
+
+function persistLocalDraft() {
+  if (draftRestoring.value || isEditorMode.value || !props.node?.id) return;
+  try {
+    const payload = { data: { ...formData }, step: currentStep.value, at: Date.now() };
+    localStorage.setItem(draftKey(), JSON.stringify(payload));
+    wizardSavedHint.value = '已自动保存草稿';
+  } catch (error) {
+    // Private mode / quota errors are non-fatal.
+  }
+}
+
+function restoreLocalDraft() {
+  wizardSavedHint.value = '';
+  if (!props.node?.id) return;
+  try {
+    const raw = localStorage.getItem(draftKey());
+    if (!raw) return;
+    const payload = JSON.parse(raw);
+    if (!payload?.data) return;
+    draftRestoring.value = true;
+    for (const field of props.node?.required_fields || []) {
+      if (payload.data[field.key] !== undefined) formData[field.key] = payload.data[field.key];
+    }
+    currentStep.value = Math.max(0, Math.min(Number(payload.step) || 0, fieldSteps.value.length));
+    wizardSavedHint.value = '已恢复上次填写';
+  } catch (error) {
+    // Corrupted draft: start clean.
+  } finally {
+    draftRestoring.value = false;
+  }
+}
 
 // Reset the form whenever a different document is opened.
 watch(
@@ -521,10 +709,22 @@ watch(
       formData[field.key] = field.default ?? '';
     }
     submitted.value = false;
+    currentStep.value = 0;
+    wizardSavedHint.value = '';
     // The previous document's PDF no longer applies.
     revokeFallbackUrl();
+    // Restore an unfinished interview for this document.
+    restoreLocalDraft();
   },
   { immediate: true }
+);
+
+watch(
+  formData,
+  () => {
+    persistLocalDraft();
+  },
+  { deep: true }
 );
 
 function categoryLabel(category) {
@@ -704,6 +904,12 @@ async function saveDocument() {
     });
     if (res.ok && res.data) {
       emit('saved', res.data);
+      try {
+        localStorage.removeItem(draftKey());
+      } catch (error) {
+        // ignore storage errors
+      }
+      wizardSavedHint.value = '';
       emit('toast', {
         title: '文书已保存',
         message: `《${res.data.document_title || node.name}》已保存到「我的文书」。`,
@@ -1224,6 +1430,211 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+
+/* ===== Guided interview (wizard) ===== */
+.sop-wizard-progress-label {
+  font-size: 10px;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+
+.sop-wizard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.sop-wizard-track {
+  height: 3px;
+  border-radius: 999px;
+  background: var(--glass-border-subtle);
+  overflow: hidden;
+}
+
+.sop-wizard-track-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sop-wizard-steps {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.sop-wizard-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 5px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-tertiary);
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sop-wizard-step:hover {
+  color: var(--text-secondary);
+  background: var(--glass-surface);
+}
+
+.sop-wizard-step.active {
+  color: var(--accent);
+  border-color: rgba(0, 113, 227, 0.24);
+  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
+}
+
+.sop-wizard-step.done {
+  color: var(--status-success);
+}
+
+.sop-wizard-step-index {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, monospace);
+  font-size: 9px;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.sop-wizard-step.active .sop-wizard-step-index {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.sop-wizard-step.done .sop-wizard-step-index {
+  color: #fff;
+  background: var(--status-success);
+  border-color: var(--status-success);
+}
+
+.sop-wizard-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.sop-wizard-btn {
+  min-width: 96px;
+  justify-content: center;
+  padding: 9px 16px;
+  font-size: 12.5px;
+}
+
+.sop-wizard-actions-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ===== Review answers ===== */
+.sop-review {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sop-review-head {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sop-review-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sop-review-sub {
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--text-secondary);
+}
+
+.sop-review-list {
+  display: flex;
+  flex-direction: column;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border-subtle);
+  overflow: hidden;
+}
+
+.sop-review-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 13px;
+  background: var(--glass-surface-subtle);
+  border-bottom: 1px solid var(--glass-border-subtle);
+}
+
+.sop-review-row:last-child {
+  border-bottom: none;
+}
+
+.sop-review-label {
+  width: 38%;
+  flex-shrink: 0;
+  font-size: 11.5px;
+  color: var(--text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sop-review-value {
+  flex: 1;
+  min-width: 0;
+  font-size: 12.5px;
+  color: var(--text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sop-review-value.empty {
+  color: var(--status-danger);
+}
+
+.sop-review-edit {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 3px 4px;
+}
+
+.sop-review-edit:hover {
+  text-decoration: underline;
 }
 
 .sop-doc-paper {

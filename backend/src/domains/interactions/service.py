@@ -110,7 +110,6 @@ def _lookup_target(target_type: str, target_id: str) -> Any:
     if target_type == "FORUM_THREAD":
         from src.domains.forum.service import forum_service
 
-        forum_service._ensure_seed_thread(tid)
         return forum_service._threads.get(tid)
     if target_type == "SOP_DOCUMENT":
         from src.domains.sop.service import sop_service
@@ -310,6 +309,28 @@ class ContentInteractionService:
             if value:
                 return str(value)
         return ""
+
+    def resolve_target_author(self, target_type: str, target_id: str) -> str:
+        """Public helper for the loyalty ledger: who owns this content?"""
+        tt = str(target_type or "").upper()
+        tid = str(target_id or "")
+        if tt == "FORUM_THREAD":
+            from src.domains.forum.service import forum_service
+
+            obj = forum_service._threads.get(tid)
+        else:
+            obj = _lookup_target(tt, tid)
+        if obj is None:
+            return ""
+        for attr in ("author_id", "creator_id", "owner_id", "user_id"):
+            value = getattr(obj, attr, None)
+            if value:
+                return str(value)
+        return ""
+
+    def resolve_target_title(self, target_type: str, target_id: str) -> str:
+        """Public helper for ledger notes: human-readable content title."""
+        return self._target_title(str(target_type or "").upper(), str(target_id or ""))
 
     def _viewer(self, user_id: str, target_type: str, target_id: str) -> Dict[str, bool]:
         if not user_id:

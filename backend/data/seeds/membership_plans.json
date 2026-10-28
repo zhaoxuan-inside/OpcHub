@@ -1,0 +1,102 @@
+[
+  {
+    "code": "pro_monthly",
+    "tier": "PRO",
+    "tier_name": "PRO 创客",
+    "period_months": 1,
+    "price_cny": 19.9,
+    "points_price": 2400,
+    "recommended": false,
+    "benefits": [
+      "政策资格匹配无限次",
+      "AI 文书生成 100 篇 / 月",
+      "全量模板库",
+      "PDF / Word 导出",
+      "需求投标 20 个 / 月",
+      "积分获取 1.2x",
+      "积分兑换 95 折",
+      "优先工单 24h"
+    ],
+    "quotas": {
+      "policy_match": -1,
+      "ai_document": 100,
+      "demand_bid": 20
+    }
+  },
+  {
+    "code": "pro_yearly",
+    "tier": "PRO",
+    "tier_name": "PRO 创客",
+    "period_months": 12,
+    "price_cny": 199.0,
+    "points_price": 24000,
+    "recommended": true,
+    "benefits": [
+      "政策资格匹配无限次",
+      "AI 文书生成 100 篇 / 月",
+      "全量模板库",
+      "PDF / Word 导出",
+      "需求投标 20 个 / 月",
+      "积分获取 1.2x",
+      "积分兑换 95 折",
+      "优先工单 24h",
+      "年付相当于 10 个月"
+    ],
+    "quotas": {
+      "policy_match": -1,
+      "ai_document": 100,
+      "demand_bid": 20
+    }
+  },
+  {
+    "code": "black_monthly",
+    "tier": "BLACK_DIAMOND",
+    "tier_name": "黑钻创客 VIP",
+    "period_months": 1,
+    "price_cny": 89.0,
+    "points_price": 10800,
+    "recommended": false,
+    "benefits": [
+      "PRO 全部权益",
+      "AI 文书生成 300 篇 / 月 + 优先队列",
+      "模板库全量 + 1 次定制",
+      "PDF / Word / Excel 批量导出",
+      "需求投标无限 + 顶格优先派单",
+      "内容分发权重 1.5x",
+      "积分获取 1.5x",
+      "积分兑换 9 折",
+      "1v1 客服 4h"
+    ],
+    "quotas": {
+      "policy_match": -1,
+      "ai_document": 300,
+      "demand_bid": -1
+    }
+  },
+  {
+    "code": "black_yearly",
+    "tier": "BLACK_DIAMOND",
+    "tier_name": "黑钻创客 VIP",
+    "period_months": 12,
+    "price_cny": 899.0,
+    "points_price": 108000,
+    "recommended": false,
+    "benefits": [
+      "PRO 全部权益",
+      "AI 文书生成 300 篇 / 月 + 优先队列",
+      "模板库全量 + 1 次定制",
+      "PDF / Word / Excel 批量导出",
+      "需求投标无限 + 顶格优先派单",
+      "内容分发权重 1.5x",
+      "积分获取 1.5x",
+      "积分兑换 9 折",
+      "1v1 客服 4h",
+      "年度实体礼"
+    ],
+    "quotas": {
+      "policy_match": -1,
+      "ai_document": 300,
+      "demand_bid": -1
+    }
+  }
+]

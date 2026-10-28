@@ -5,19 +5,35 @@ from httpx import AsyncClient, ASGITransport
 
 from src.main import app
 from src.domains.forum.service import forum_service
-from src.domains.forum.models import ForumThreadCreate
 from src.domains.orchestration.service import orchestration_service
 from src.domains.orchestration.models import ScenarioExecuteRequest
+
+
+def _populate_feed_threads(count: int = 6) -> None:
+    """Create deterministic, test-owned threads (no production seed data)."""
+    from src.domains.forum.models import ForumThreadResponse
+
+    for i in range(count):
+        tid = f"th_feed_{i + 1}"
+        created = f"2026-01-{i + 1:02d}T00:00:00+00:00"
+        forum_service._threads[tid] = ForumThreadResponse(
+            id=tid,
+            category_code="DEV" if i % 2 == 0 else "BIZ",
+            author_id=f"usr_feed_{i + 1}",
+            title=f"Feed 测试帖子 {i + 1}",
+            content=f"用于分页与游标测试的帖子正文 {i + 1}。",
+            created_at=created,
+            updated_at=created,
+        )
 
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_forum_feed():
     forum_service.clear()
-    forum_service._init_seeds()
+    _populate_feed_threads()
     forum_service.invalidate_feed_cache()
     yield
     forum_service.clear()
-    forum_service._init_seeds()
     forum_service.invalidate_feed_cache()
 
 

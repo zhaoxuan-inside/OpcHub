@@ -45,37 +45,36 @@
       </div>
     </div>
 
-    <div class="grid-3 exhibition-grid">
-      <div
-        v-for="item in filteredContentList"
+    <div class="exhibition-list">
+      <button
+        v-for="(item, idx) in filteredContentList"
         :key="item.id"
-        class="glass-card exhibition-card"
-        @mousemove="trackCardSpotlight"
+        type="button"
+        class="exhibit-row"
         @click="$emit('exhibit-click', item)"
       >
-        <div>
-          <div class="exhibit-header">
-            <span class="mono-tag" :style="{ color: item.badgeColor || 'var(--text-secondary)' }">
-              {{ item.categoryTag }}
-            </span>
+        <span class="exhibit-index">{{ String(idx + 1).padStart(2, '0') }}</span>
+
+        <span class="exhibit-main">
+          <span class="exhibit-meta">
+            <span class="exhibit-category" :style="{ color: item.badgeColor || 'var(--text-secondary)' }">{{ item.categoryTag }}</span>
             <span class="exhibit-metric">{{ item.metricLabel }}</span>
-          </div>
+          </span>
+          <span class="exhibit-title">{{ item.title }}</span>
+          <span class="exhibit-summary">{{ item.summary }}</span>
+        </span>
 
-          <h3 class="exhibit-title">{{ item.title }}</h3>
-          <p class="exhibit-summary">{{ item.summary }}</p>
-        </div>
-
-        <div class="exhibit-footer">
-          <div class="exhibit-author">
-            <div class="author-dot"></div>
-            <span>{{ item.authorOrSource }}</span>
-          </div>
-          <div class="exhibit-cta">
-            <span>{{ item.actionLabel }}</span>
-            <span class="cta-arrow">›</span>
-          </div>
-        </div>
-      </div>
+        <span class="exhibit-side">
+          <span class="exhibit-author">
+            <span class="author-dot"></span>
+            {{ item.authorOrSource }}
+          </span>
+          <span class="exhibit-cta">
+            {{ item.actionLabel }}
+            <span class="cta-arrow">↗</span>
+          </span>
+        </span>
+      </button>
     </div>
     <div v-if="filteredContentList.length === 0" class="exhibition-empty">
       该分类内容正在收录中，切换其他筛选查看更多精选。
@@ -85,7 +84,6 @@
 
 <script setup>
 import { ref, computed } from 'vue';
-import { trackCardSpotlight } from './spotlight';
 
 const props = defineProps({
   items: {
@@ -109,118 +107,166 @@ const filteredContentList = computed(() => {
 
 <style scoped>
 .section-container {
-  margin-bottom: 72px;
+  margin-bottom: 80px;
 }
 
 .section-header {
-  text-align: center;
-  max-width: 720px;
-  margin: 0 auto 36px;
+  text-align: left;
+  max-width: none;
+  margin: 0 0 24px;
 }
 
 .section-title {
   font-family: var(--font-display);
-  font-size: 28px;
-  font-weight: 600;
-  letter-spacing: -0.03em;
+  font-size: 32px;
+  font-weight: 680;
+  letter-spacing: -0.045em;
   color: var(--text-primary);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .section-desc {
-  font-size: 14.5px;
+  max-width: 680px;
+  font-size: 13.5px;
   color: var(--text-secondary);
   line-height: 1.6;
 }
 
-/* Filter Tabs Bar */
 .filter-tabs-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
+  justify-content: flex-start;
+  gap: 4px;
   flex-wrap: wrap;
-  margin-top: 24px;
+  margin-top: 18px;
 }
 
 .filter-tab-pill {
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  background: var(--glass-surface);
-  border: 1px solid var(--glass-border);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
   color: var(--text-secondary);
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
-  transition: var(--transition-liquid);
+  transition: background 0.18s ease, color 0.18s ease;
   user-select: none;
 }
 
 .filter-tab-pill:hover {
   color: var(--text-primary);
-  background: var(--glass-surface-hover);
+  background: var(--glass-surface-subtle);
 }
 
 .filter-tab-pill.active {
-  color: #fff;
-  background: var(--accent);
-  border-color: var(--accent);
-  box-shadow: 0 2px 10px rgba(0, 113, 227, 0.35);
+  color: var(--bg-canvas);
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  box-shadow: none;
 }
 
-/* Exhibition Cards */
-.exhibition-grid {
-  margin-top: 20px;
+[data-theme="dark"] .filter-tab-pill.active {
+  color: #0A0B0D;
 }
 
-.exhibition-card {
-  min-height: 220px;
+.exhibition-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--glass-border);
 }
 
-.exhibit-header {
+.exhibit-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 220px;
+  gap: 22px;
+  align-items: start;
+  width: 100%;
+  padding: 22px 6px;
+  border: none;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  background: transparent;
+  color: var(--text-primary);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.18s ease;
+}
+
+.exhibit-row:hover {
+  background: var(--glass-surface-subtle);
+}
+
+.exhibit-index {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  padding-top: 4px;
+}
+
+.exhibit-main {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.exhibit-meta {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 12px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.exhibit-category {
+  color: var(--text-tertiary);
 }
 
 .exhibit-metric {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 600;
   color: var(--accent);
 }
 
 .exhibit-title {
   font-family: var(--font-display);
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 8px;
+  font-size: 19px;
+  font-weight: 640;
   line-height: 1.35;
+  letter-spacing: -0.025em;
+  color: var(--text-primary);
 }
 
 .exhibit-summary {
-  font-size: 13px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12.5px;
+  line-height: 1.6;
   color: var(--text-secondary);
-  line-height: 1.55;
-  margin-bottom: 18px;
 }
 
-.exhibit-footer {
-  border-top: 1px solid var(--glass-border-subtle);
-  padding-top: 14px;
+.exhibit-side {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-size: 12px;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+  text-align: right;
 }
 
 .exhibit-author {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 10.5px;
   color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 .author-dot {
@@ -228,29 +274,49 @@ const filteredContentList = computed(() => {
   height: 5px;
   border-radius: 50%;
   background: var(--accent);
+  flex-shrink: 0;
 }
 
 .exhibit-cta {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: var(--accent);
-  font-weight: 600;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.04em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 .cta-arrow {
-  font-size: 14px;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.exhibition-card:hover .cta-arrow {
-  transform: translateX(3px);
+.exhibit-row:hover .cta-arrow {
+  color: var(--accent);
+  transform: translate(2px, -2px);
 }
 
 .exhibition-empty {
-  text-align: center;
   padding: 36px 0;
   color: var(--text-tertiary);
-  font-size: 13px;
+  font-size: 12.5px;
+}
+
+@media (max-width: 760px) {
+  .exhibit-row {
+    grid-template-columns: 30px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .exhibit-side {
+    grid-column: 2;
+    align-items: flex-start;
+    text-align: left;
+  }
+
+  .exhibit-title {
+    font-size: 17px;
+  }
 }
 </style>

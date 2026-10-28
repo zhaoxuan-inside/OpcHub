@@ -29,6 +29,10 @@ logger = logging.getLogger("opchub.persistence")
 Hydrator = Callable[[List[Dict[str, Any]]], int]
 
 
+class PersistenceUnavailableError(RuntimeError):
+    """Raised when a domain mutation requires a live database but none is available."""
+
+
 def snapshot(entity: Any) -> Dict[str, Any]:
     """Serialize a pydantic domain entity into a JSON-safe document."""
     if hasattr(entity, "model_dump"):
@@ -43,9 +47,19 @@ class DomainPersistence:
 
     def __init__(self) -> None:
         self.enabled: bool = False
+        # Strict mode refuses domain mutations when PostgreSQL is unavailable instead
+        # of silently accepting memory-only state. Tests opt out via ``strict = False``.
+        self.strict: bool = True
         self._hydrators: Dict[str, Hydrator] = {}
         self._tasks: Set["asyncio.Task[Any]"] = set()
         self._tail: "asyncio.Task[Any] | None" = None
+
+    def require(self, domain: str) -> None:
+        """Fail fast when a DB-backed domain receives a mutation without a database."""
+        if self.strict and not self.enabled:
+            raise PersistenceUnavailableError(
+                f"Database persistence is unavailable; refusing to mutate domain '{domain}' in memory only."
+            )
 
     # -- registration ------------------------------------------------------
     def register(self, domain: str, hydrator: Hydrator) -> None:

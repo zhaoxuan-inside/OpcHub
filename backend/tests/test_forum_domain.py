@@ -362,20 +362,6 @@ async def test_forum_thread_deletion_author_and_admin():
         assert tid not in active_ids
         assert tid2 not in active_ids
 
-        # 5. Super Admin deletes a default seed post (id: '1')
-        ac.headers["Authorization"] = f"Bearer {admin_token}"
-        del_seed = await _gw(ac, "forum.threads.delete", {"thread_id": "1"})
-        assert del_seed.json()["code"] == 200
-        assert del_seed.json()["data"]["deleted"] is True
-
-        # Verify seed 1 is not in list_threads or get
-        list_after_seed = await _gw(ac, "forum.threads.list", {"id": "ALL", "page": 1, "page_size": 20})
-        after_data = list_after_seed.json()["data"]
-        after_items = after_data["items"] if isinstance(after_data, dict) else after_data
-        assert "1" not in {t["id"] for t in after_items}
-        get_seed = await _gw(ac, "forum.threads.get", {"thread_id": "1"})
-        assert get_seed.json()["code"] == 404
-
 
 @pytest.mark.asyncio
 async def test_forum_threads_mandatory_pagination():

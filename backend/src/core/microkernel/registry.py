@@ -17,6 +17,7 @@ class AtomicRegistry:
         self._compensators: dict[str, ActionHandler] = {}
         self._register_default_handlers()
         self._register_domain_handlers()
+        self._register_loyalty_handlers()
         self._register_external_gateway_handlers()
 
     def register(
@@ -2428,6 +2429,12 @@ class AtomicRegistry:
             description="统一评论持久化算子",
             compensator=content_comment_compensate,
         )
+
+    def _register_loyalty_handlers(self):
+        """Register the loyalty (积分 / 会员 / 兑换) atomic operators."""
+        from src.domains.loyalty.operators import register_loyalty_operators
+
+        register_loyalty_operators(self)
 
 
 registry = AtomicRegistry()

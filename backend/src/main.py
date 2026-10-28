@@ -64,17 +64,15 @@ async def lifespan(app: FastAPI):
         # Rebuild the in-memory domain indexes from persisted state (restart durability)
         await user_service.hydrate_from_db()
         await domain_persistence.initialize()
-        # Persist the SOP workflow graph seeds so the standard-document catalog
-        # is read from PostgreSQL rather than only from the authoring seed file.
-        # This must run after initialize(), because persistence writes are no-ops
-        # until the database probe has succeeded.
-        from src.domains.sop.service import sop_service
-        await domain_persistence.flush()
-        sop_service.persist_graph_seeds()
-        await domain_persistence.flush()
+        # Seed the loyalty (points / membership / redemption) DAG pipelines.
+        from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
+
+        ensure_loyalty_pipelines()
         # Start the publish review-queue consumer: it keeps auditing pending
         # document / flow submissions and promotes approved ones into the
         # standard document catalog and flow guide.
+        from src.domains.sop.service import sop_service
+
         sop_service.start_review_consumer(interval=5.0)
         # Start file sensing watcher for versioned hot-reloading
         hot_reload_engine.start_background_watcher()

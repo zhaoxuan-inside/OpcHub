@@ -1,5 +1,7 @@
 """Generic adapters for domain services referenced by gateway routes configuration."""
+import logging
 import time
+from datetime import datetime, timezone
 from typing import Any, Dict
 from src.domains.user.service import user_service
 from src.domains.orchestration.service import orchestration_service
@@ -15,8 +17,11 @@ from src.infrastructure.external_gateway import (
 from src.core.rag import policy_rag_service, forum_rag_service
 
 # Imported eagerly so its domain-persistence hydrators are registered before
-# startup hydration (restart durability for interactions / comments).
+# startup hydration (restart durability for interactions / comments / loyalty).
 from src.domains.interactions.service import content_interaction_service  # noqa: E402,F401
+from src.domains.loyalty.service import loyalty_service  # noqa: E402,F401
+
+logger = logging.getLogger("opchub.gateway.adapters")
 
 
 def _publish_identity_fields(
@@ -34,6 +39,139 @@ def _publish_identity_fields(
     """
     inputs["_author_key"] = author_key
     inputs["_author_name_key"] = name_key
+
+
+# ---------------------------------------------------------------------------
+# Loyalty bridge helpers
+#
+# Publishing / interacting / reading are business domains; points are a separate
+# loyalty domain. These helpers execute the loyalty DAG pipelines and never let
+# a points failure break the business action (best-effort, logged).
+# ---------------------------------------------------------------------------
+
+
+async def _run_loyalty_pipeline(scenario_code: str, inputs: Dict[str, Any], context: Dict[str, Any] = None) -> Dict[str, Any]:
+    from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
+
+    ensure_loyalty_pipelines()
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code=scenario_code,
+            version="v1.0.0",
+            inputs=dict(inputs or {}),
+            context=dict(context or {}),
+        )
+    )
+    return res.final_output if res.status == "SUCCESS" else {"loyalty_error": res.error_message}
+
+
+async def _award_loyalty(
+    event_code: str,
+    user_id: str,
+    actor_id: str,
+    target_type: str,
+    target_id: str,
+    context: Dict[str, Any] = None,
+    idempotency_key: str = "",
+    note: str = "",
+) -> Dict[str, Any]:
+    from src.domains.loyalty.pipelines import AWARD_PIPELINE
+
+    try:
+        return await _run_loyalty_pipeline(
+            AWARD_PIPELINE,
+            {
+                "event_code": event_code,
+                "user_id": user_id,
+                "actor_id": actor_id,
+                "target_type": target_type,
+                "target_id": target_id,
+                "idempotency_key": idempotency_key or None,
+                "note": note,
+            },
+            context,
+        )
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning("Loyalty award failed for %s/%s: %s", event_code, target_id, exc)
+        return {"loyalty_error": str(exc)}
+
+
+async def _revoke_loyalty(
+    event_code: str,
+    target_type: str,
+    target_id: str,
+    context: Dict[str, Any] = None,
+    idempotency_key: str = "",
+    actor_id: str = "",
+) -> Dict[str, Any]:
+    from src.domains.loyalty.pipelines import REVOKE_PIPELINE
+
+    try:
+        return await _run_loyalty_pipeline(
+            REVOKE_PIPELINE,
+            {
+                "event_code": event_code,
+                "actor_id": actor_id,
+                "target_type": target_type,
+                "target_id": target_id,
+                "idempotency_key": idempotency_key or None,
+            },
+            context,
+        )
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning("Loyalty revoke failed for %s/%s: %s", event_code, target_id, exc)
+        return {"loyalty_error": str(exc)}
+
+
+async def _award_publish_points(
+    event_code: str,
+    target_type: str,
+    entity: Any,
+    context: Dict[str, Any] = None,
+) -> None:
+    """Award publish points after a publish pipeline has actually persisted content."""
+    if not isinstance(entity, dict):
+        return
+    target_id = (
+        entity.get("id")
+        or entity.get("thread_id")
+        or entity.get("product_id")
+        or entity.get("demand_id")
+        or entity.get("doc_id")
+        or entity.get("flow_id")
+        or entity.get("perk_id")
+        or entity.get("compliance_id")
+        or ""
+    )
+    author_id = (
+        entity.get("author_id")
+        or entity.get("creator_id")
+        or entity.get("owner_id")
+        or entity.get("user_id")
+        or (context or {}).get("user_id", "")
+    )
+    if not target_id or not author_id:
+        return
+    first_publish = not loyalty_service.has_award(str(author_id), "PUBLISH_")
+    await _award_loyalty(
+        event_code=event_code,
+        user_id=str(author_id),
+        actor_id=str((context or {}).get("user_id") or author_id),
+        target_type=target_type,
+        target_id=str(target_id),
+        context=context,
+        idempotency_key=f"publish:{target_type}:{target_id}",
+    )
+    if first_publish:
+        await _award_loyalty(
+            event_code="FIRST_PUBLISH",
+            user_id=str(author_id),
+            actor_id=str(author_id),
+            target_type=target_type,
+            target_id=str(target_id),
+            context=context,
+            idempotency_key=f"once:FIRST_PUBLISH:{author_id}",
+        )
 
 
 async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -54,7 +192,9 @@ async def demand_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) ->
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Demand publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_demand") or res.final_output
+    created = res.final_output.get("created_demand") or res.final_output
+    await _award_publish_points("PUBLISH_DEMAND", "DEMAND", created, c)
+    return created
 
 
 async def demand_bid_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -282,7 +422,23 @@ async def sop_review_process_adapter(p: Dict[str, Any], c: Dict[str, Any] = None
     from src.domains.sop.service import sop_service
     payload = p or {}
     limit = payload.get("limit")
+    pending = sop_service.list_review_queue(status="PENDING").items
     res = await sop_service.process_review_queue(limit=limit)
+    approved = set(res.published_documents) | set(res.published_flows)
+    for item in pending:
+        if item.target_id not in approved:
+            continue
+        target_type = "SOP_DOCUMENT" if item.target_type == "DOCUMENT" else "SOP_FLOW"
+        await _award_loyalty(
+            "PUBLISH_SOP",
+            item.author_id,
+            item.author_id,
+            target_type,
+            item.target_id,
+            c,
+            f"publish:{target_type}:{item.target_id}",
+            note=item.title,
+        )
     return res.model_dump()
 
 
@@ -323,7 +479,9 @@ async def perk_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> A
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Perk publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_perk") or res.final_output
+    created = res.final_output.get("created_perk") or res.final_output
+    await _award_publish_points("PUBLISH_PERK", "PERK", created, c)
+    return created
 
 
 async def compliance_audit_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -504,7 +662,9 @@ async def forum_thread_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Forum thread publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_thread") or res.final_output
+    created = res.final_output.get("created_thread") or res.final_output
+    await _award_publish_points("PUBLISH_FORUM", "FORUM_THREAD", created, c)
+    return created
 
 
 async def forum_feed_stream_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -562,7 +722,9 @@ async def forum_answer_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = No
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Forum answer publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_answer") or res.final_output
+    created = res.final_output.get("created_answer") or res.final_output
+    await _award_publish_points("PUBLISH_ANSWER", "FORUM_ANSWER", created, c)
+    return created
 
 
 async def forum_answer_accept_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -607,7 +769,20 @@ async def forum_vote_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any
         if "not found" in error_msg.lower():
             raise KeyError(error_msg)
         raise ValueError(error_msg)
-    return res.final_output.get("vote_result") or res.final_output
+    vote = res.final_output.get("vote_result") or res.final_output
+    if isinstance(vote, dict) and str(vote.get("target_type") or "").upper() == "THREAD":
+        actor = str(inputs.get("user_id") or "")
+        thread_id = str(vote.get("target_id") or inputs.get("target_id") or "")
+        like_key = f"forum-vote-like:{actor}:THREAD:{thread_id}"
+        dislike_key = f"forum-vote-dislike:{actor}:THREAD:{thread_id}"
+        # Switching votes must first reverse the previous ledger entry.
+        await _revoke_loyalty("RECEIVE_LIKE", "FORUM_THREAD", thread_id, c, like_key, actor_id=actor)
+        await _revoke_loyalty("RECEIVE_DISLIKE", "FORUM_THREAD", thread_id, c, dislike_key, actor_id=actor)
+        if vote.get("user_vote") == "UPVOTE":
+            await _award_loyalty("RECEIVE_LIKE", "", actor, "FORUM_THREAD", thread_id, c, like_key)
+        elif vote.get("user_vote") == "DOWNVOTE":
+            await _award_loyalty("RECEIVE_DISLIKE", "", actor, "FORUM_THREAD", thread_id, c, dislike_key)
+    return vote
 
 
 async def forum_thread_get_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -706,7 +881,9 @@ async def product_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Product showcase publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_product") or res.final_output
+    created = res.final_output.get("created_product") or res.final_output
+    await _award_publish_points("PUBLISH_PRODUCT", "PRODUCT", created, c)
+    return created
 
 
 async def policy_match_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -746,7 +923,9 @@ async def policy_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) ->
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Policy publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_policy") or res.final_output
+    created = res.final_output.get("created_policy") or res.final_output
+    await _award_publish_points("PUBLISH_POLICY", "POLICY", created, c)
+    return created
 
 
 async def compliance_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -770,7 +949,9 @@ async def compliance_publish_adapter(p: Dict[str, Any], c: Dict[str, Any] = None
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Compliance publish pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_entry") or res.final_output
+    created = res.final_output.get("created_entry") or res.final_output
+    await _award_publish_points("PUBLISH_COMPLIANCE", "COMPLIANCE", created, c)
+    return created
 
 
 async def home_overview_adapter(p: Dict[str, Any], c: Dict[str, Any]) -> Any:
@@ -836,6 +1017,17 @@ async def user_profile_update_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
         avatar_id=p.get("avatar_id"),
     )
     profile = await user_service.update_profile(req=req, token=token)
+    profile_ctx = {**(c or {}), "user_id": profile.uid, "user_role": profile.role or "MAKER"}
+    if profile.avatar_id and profile.industry_track and (profile.company_name or profile.credit_code):
+        await _award_loyalty(
+            "PROFILE_COMPLETE",
+            profile.uid,
+            profile.uid,
+            "",
+            "",
+            profile_ctx,
+            f"once:PROFILE_COMPLETE:{profile.uid}",
+        )
     return profile.model_dump()
 
 
@@ -1016,6 +1208,16 @@ async def auth_register_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> 
         params["client_ip"] = c.get("client_ip")
     req = UserRegisterRequest(**params)
     res = await user_service.register_by_email(req)
+    if params.get("verification_code"):
+        await _award_loyalty(
+            "VERIFY_EMAIL",
+            res.uid,
+            res.uid,
+            "",
+            "",
+            {**(c or {}), "user_id": res.uid, "user_role": "MAKER"},
+            f"once:VERIFY_EMAIL:{res.uid}",
+        )
     return res.model_dump()
 
 
@@ -1389,6 +1591,28 @@ async def content_interaction_toggle_adapter(p: Dict[str, Any], c: Dict[str, Any
         kind=payload.get("kind", ""),
         target_title=payload.get("target_title"),
     )
+    # 积分联动：点赞/收藏/喜欢/踩都走同一条幂等键；取消互动反向冲销。
+    event_code = f"RECEIVE_{result.kind}"
+    idem = f"interaction:{event_code}:{user_id}:{result.target_type}:{result.target_id}"
+    if result.active:
+        await _award_loyalty(
+            event_code=event_code,
+            user_id="",
+            actor_id=str(user_id),
+            target_type=result.target_type,
+            target_id=result.target_id,
+            context=c,
+            idempotency_key=idem,
+        )
+    else:
+        await _revoke_loyalty(
+            event_code=event_code,
+            target_type=result.target_type,
+            target_id=result.target_id,
+            context=c,
+            idempotency_key=idem,
+            actor_id=str(user_id),
+        )
     return result.model_dump()
 
 
@@ -1458,7 +1682,22 @@ async def content_comments_create_adapter(p: Dict[str, Any], c: Dict[str, Any] =
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Content comment pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("created_comment") or res.final_output
+    created = res.final_output.get("created_comment") or res.final_output
+    if isinstance(created, dict):
+        comment_id = created.get("id") or res.final_output.get("comment_id")
+        commenter = created.get("author_id") or (c or {}).get("user_id", "")
+        target_type = created.get("target_type") or inputs.get("target_type", "")
+        target_id = created.get("target_id") or inputs.get("target_id", "")
+        if comment_id and len(str(created.get("content") or "")) >= 15:
+            await _award_loyalty(
+                "RECEIVE_COMMENT", "", str(commenter), str(target_type), str(target_id), c,
+                f"comment:receive:{comment_id}",
+            )
+            await _award_loyalty(
+                "COMMENT_CREATED", str(commenter), str(commenter), str(target_type), str(target_id), c,
+                f"comment:create:{comment_id}",
+            )
+    return created
 
 
 async def content_comments_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
@@ -1478,6 +1717,9 @@ async def content_comments_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] =
         comment_id=str(comment_id),
         is_admin=str(ctx.get("user_role", "")).upper() == "ADMIN",
     )
+    if ok:
+        await _revoke_loyalty("RECEIVE_COMMENT", "", "", c, f"comment:receive:{comment_id}", actor_id=str(user_id))
+        await _revoke_loyalty("COMMENT_CREATED", "", "", c, f"comment:create:{comment_id}", actor_id=str(user_id))
     return {"deleted": bool(ok), "comment_id": str(comment_id)}
 
 
@@ -1501,3 +1743,188 @@ async def product_semantic_search_adapter(p: Dict[str, Any], c: Dict[str, Any] =
 
 
 
+
+
+# ---------------------------------------------------------------------------
+# Loyalty / membership / redemption adapters
+# ---------------------------------------------------------------------------
+
+_LOYALTY_REASON_TEXT = {
+    "missing_user": "请先登录创客账号",
+    "rule_disabled": "该积分规则暂未开放",
+    "rule_zero_points": "该行为不计积分",
+    "official_account": "官方账号不参与积分激励",
+    "self_interaction": "自己不能给自己的内容刷互动积分",
+    "duplicate": "该笔积分已入账，请勿重复提交",
+    "pair_daily_cap": "今日与该创客的互动计分已达上限",
+    "daily_cap_reached": "今日积分获取已达上限，明天再来",
+    "reputation_blocked": "当前信誉分不足以获得互动积分",
+    "plan_not_found": "会员套餐不存在",
+    "insufficient_points": "晨光积分不足",
+    "item_unavailable": "该兑换商品已下架",
+    "out_of_stock": "该商品库存不足",
+    "address_required": "实物兑换需要填写收货地址",
+    "per_user_limit": "已达到该商品的兑换上限",
+    "debt_pending": "存在待补扣积分，暂时无法兑换",
+    "higher_tier_active": "当前已有更高档会员权益，无需降级兑换",
+}
+
+
+def _loyalty_uid(c: Dict[str, Any] = None, payload: Dict[str, Any] = None) -> str:
+    ctx = c or {}
+    return str(ctx.get("user_id") or (payload or {}).get("user_id") or "")
+
+
+async def loyalty_account_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    return loyalty_service.get_account(uid).model_dump()
+
+
+async def loyalty_ledger_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    payload = p or {}
+    return loyalty_service.list_ledger(
+        uid=uid,
+        limit=int(payload.get("limit", 50) or 50),
+        offset=int(payload.get("offset", 0) or 0),
+        event_code=str(payload.get("event_code") or ""),
+    ).model_dump()
+
+
+async def loyalty_rules_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    return loyalty_service.list_rules().model_dump()
+
+
+async def loyalty_membership_plans_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    membership = loyalty_service.get_membership(uid) if uid else None
+    plans = loyalty_service.list_plans(membership.tier if membership else "STANDARD")
+    return {
+        "items": [plan.model_dump() for plan in plans],
+        "current_tier": membership.tier if membership else "STANDARD",
+        "current_tier_name": membership.tier_name if membership else "标准创客",
+    }
+
+
+async def loyalty_membership_me_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    return loyalty_service.get_membership(uid).model_dump()
+
+
+async def loyalty_membership_subscribe_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    from src.domains.loyalty.pipelines import SUBSCRIBE_PIPELINE
+
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    payload = p or {}
+    out = await _run_loyalty_pipeline(
+        SUBSCRIBE_PIPELINE,
+        {
+            "plan_code": payload.get("plan_code", ""),
+            "pay_method": payload.get("pay_method", "POINTS"),
+            "idempotency_key": payload.get("idempotency_key"),
+        },
+        c,
+    )
+    if not out.get("loyalty_subscribed"):
+        reason = str(out.get("loyalty_reason") or "")
+        raise ValueError(_LOYALTY_REASON_TEXT.get(reason) or reason or "会员开通失败")
+    return out
+
+
+async def loyalty_membership_auto_renew_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    return loyalty_service.set_auto_renew(uid, bool((p or {}).get("enabled", False))).model_dump()
+
+
+async def loyalty_rewards_items_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    account = loyalty_service.get_account(uid) if uid else None
+    return {
+        "items": [item.model_dump() for item in loyalty_service.list_items(uid)],
+        "balance": account.balance if account else 0,
+    }
+
+
+async def loyalty_rewards_redeem_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    from src.domains.loyalty.pipelines import REDEEM_PIPELINE
+
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    payload = p or {}
+    out = await _run_loyalty_pipeline(
+        REDEEM_PIPELINE,
+        {
+            "item_code": payload.get("item_code", ""),
+            "qty": int(payload.get("qty", 1) or 1),
+            "address": payload.get("address"),
+            "idempotency_key": payload.get("idempotency_key"),
+        },
+        c,
+    )
+    if not out.get("loyalty_redeemed"):
+        reason = str(out.get("loyalty_reason") or "")
+        raise ValueError(_LOYALTY_REASON_TEXT.get(reason) or reason or "兑换失败")
+    return out
+
+
+async def loyalty_rewards_orders_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    uid = _loyalty_uid(c, p)
+    if not uid:
+        raise PermissionError("请先登录创客账号")
+    return loyalty_service.list_orders(uid).model_dump()
+
+
+async def loyalty_content_read_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Track a content detail view and credit the author a tiny read reward.
+
+    Guests are silently ignored (reading must never require login). Dedup is
+    per viewer + content + day, so refreshing a detail page cannot farm points.
+    """
+    from src.domains.loyalty.pipelines import AWARD_PIPELINE
+
+    uid = _loyalty_uid(c, p)
+    payload = p or {}
+    target_type = str(payload.get("target_type") or "").upper()
+    target_id = str(payload.get("target_id") or "")
+    if not uid or not target_type or not target_id:
+        return {"read_tracked": False, "reason": "guest_or_missing_target"}
+    day = datetime.now(timezone.utc).date().isoformat()
+    out = await _run_loyalty_pipeline(
+        AWARD_PIPELINE,
+        {
+            "event_code": "RECEIVE_READ",
+            "actor_id": uid,
+            "target_type": target_type,
+            "target_id": target_id,
+            "idempotency_key": f"read:{uid}:{target_type}:{target_id}:{day}",
+        },
+        c,
+    )
+    return {
+        "read_tracked": True,
+        "awarded": bool(out.get("loyalty_awarded")),
+        "delta": int(out.get("delta", 0) or 0),
+        "reason": out.get("loyalty_reason", ""),
+    }
+
+
+async def loyalty_admin_grant_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Admin-only audited points adjustment (补发 / 扣回)."""
+    payload = p or {}
+    return loyalty_service.admin_adjust(
+        uid=str(payload.get("uid") or ""),
+        delta=int(payload.get("delta", 0) or 0),
+        reason=str(payload.get("reason") or ""),
+        operator_id=str((c or {}).get("user_id") or ""),
+    )

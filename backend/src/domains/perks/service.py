@@ -3,11 +3,8 @@
 生态特权页面的数据源：由生态伙伴提报、管理端审核发布的优惠公告（Token 优惠、服务器优惠、
 SaaS 服务优惠、结算支付、AI 算力、基础设施等），创客在前端浏览公告并前往服务商处领取。
 """
-import json
-import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from src.domains.perks.models import (
@@ -19,34 +16,9 @@ from src.domains.perks.models import (
 from src.core.config import settings
 from src.infrastructure.database.persistence import domain_persistence
 
-logger = logging.getLogger("opchub.perks")
-
 # 生态优惠公告分类与状态枚举统一从 backend/config/application.yaml 加载（代码/配置/数据三分离）
 PERK_CATEGORIES = set(settings.perk_categories)
 PERK_STATUSES = set(settings.perk_statuses)
-
-
-def _load_perk_seeds() -> Dict[str, Dict[str, Any]]:
-    """Load baseline ecosystem discount announcement seeds from external data file.
-
-    Maintains strict code, config, and data separation: zero announcements hardcoded in source.
-    """
-    search_paths = [
-        Path("backend/data/seeds/perks.json"),
-        Path("data/seeds/perks.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "perks.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load perk seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_PERK_SEEDS: Dict[str, Dict[str, Any]] = _load_perk_seeds()
 
 
 def utc_now_iso() -> str:
@@ -60,19 +32,10 @@ class PerkService:
         self._perks: Dict[str, PerkResponse] = {}
         # Key: (user_id, perk_id)
         self._claims: Dict[Tuple[str, str], PerkClaimResponse] = {}
-        self._init_seeds()
 
-    def _init_seeds(self) -> None:
-        """Initialize in-memory announcement catalog from external data seeds."""
-        for pid, data in DEFAULT_PERK_SEEDS.items():
-            if pid not in self._perks:
-                data = dict(data)
-                # Seed perks are platform-curated ecosystem announcements → official.
-                data.setdefault("is_official", True)
-                data.setdefault("author_name", "官方发布")
-                perk = PerkResponse(**data)
-                self._perks[pid] = perk
-                domain_persistence.write("perks.items", pid, perk)
+    def _require_db(self) -> None:
+        """Perk content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("perks")
 
     def list_perks(self, payload: Optional[Dict[str, Any]] = None) -> List[PerkResponse]:
         """List published discount announcements, optionally filtered by category.
@@ -108,6 +71,7 @@ class PerkService:
 
     def create_perk(self, req: PerkCreate) -> PerkResponse:
         """Create and publish a new ecosystem discount announcement."""
+        self._require_db()
         pid = f"perk_{uuid.uuid4().hex[:8]}"
         perk = PerkResponse(
             id=pid,
@@ -181,6 +145,7 @@ class PerkService:
         }
 
     def claim_perk(self, req: PerkClaimRequest) -> PerkClaimResponse:
+        self._require_db()
         if req.perk_id not in self._perks:
             raise KeyError(f"Perk {req.perk_id} not found")
         perk = self._perks[req.perk_id]
@@ -215,6 +180,7 @@ class PerkService:
         return self._perks.get(perk_id)
 
     def delete_perk(self, perk_id: str) -> bool:
+        self._require_db()
         if perk_id in self._perks:
             del self._perks[perk_id]
             domain_persistence.delete("perks.items", perk_id)
@@ -222,6 +188,7 @@ class PerkService:
         return False
 
     def revoke_claim(self, user_id: str, perk_id: str) -> bool:
+        self._require_db()
         key = (user_id, perk_id)
         if key in self._claims:
             del self._claims[key]
@@ -234,14 +201,9 @@ class PerkService:
         return False
 
     def hydrate_perks(self, rows: List[Dict]) -> int:
-        if rows:
-            for r in rows:
-                self._perks[r["id"]] = PerkResponse(**r)
-            return len(rows)
-        # If DB is empty, persist baseline announcement seeds to PostgreSQL snapshots
-        for pid, perk in self._perks.items():
-            domain_persistence.write("perks.items", pid, perk)
-        return len(self._perks)
+        for r in rows:
+            self._perks[r["id"]] = PerkResponse(**r)
+        return len(rows)
 
     def hydrate_claims(self, rows: List[Dict]) -> int:
         for r in rows:

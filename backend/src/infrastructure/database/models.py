@@ -14,6 +14,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -30,8 +31,10 @@ class User(Base):
     """Maker & Tenant Account entity (users)."""
     __tablename__ = "users"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    uid: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    # Human-readable account handle. Mapped to the `handle` column so no
+    # non-UUID identifier column is ever named `uid` / `id` in the DDL.
+    uid: Mapped[str] = mapped_column("handle", String(64), unique=True, nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True)
     nickname: Mapped[str] = mapped_column(String(100), nullable=False)
     role: Mapped[str] = mapped_column(String(32), default="MAKER", nullable=False)  # 'ADMIN', 'MAKER', 'GUEST'
@@ -58,7 +61,9 @@ class Entitlement(Base):
     """System Entitlement Catalog entity (entitlements)."""
     __tablename__ = "entitlements"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # e.g. 'ENT_VIP', 'ENT_POL_VIP'
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    # Stable business code, e.g. 'ENT_VIP'. Never used as a database identity.
+    code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     annual_price: Mapped[float] = mapped_column(Numeric(10, 2), default=0.00, nullable=False)
@@ -71,7 +76,7 @@ class UserEntitlement(Base):
     __tablename__ = "user_entitlements"
 
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
-    entitlement_id: Mapped[str] = mapped_column(String(64), ForeignKey("entitlements.id", ondelete="RESTRICT"), primary_key=True)
+    entitlement_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("entitlements.id", ondelete="RESTRICT"), primary_key=True)
     activated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(32), default="ACTIVE", nullable=False)
@@ -84,7 +89,7 @@ class Policy(Base):
     """Government Policy Incentive entity with pgvector semantic support (policies)."""
     __tablename__ = "policies"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     summary_plain: Mapped[str] = mapped_column(Text, nullable=False)
@@ -103,7 +108,7 @@ class Perk(Base):
     """Compute and Cloud Infrastructure Perk entity (perks)."""
     __tablename__ = "perks"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     partner_name: Mapped[str] = mapped_column(String(128), nullable=False)
     perk_type: Mapped[str] = mapped_column(String(64), nullable=False)  # 'CLOUD_VOUCHER', 'API_ROUTE'
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -111,7 +116,12 @@ class Perk(Base):
     nominal_value_usd: Mapped[float] = mapped_column(Numeric(10, 2), default=0.00, nullable=False)
     remaining_quota: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
     total_quota: Mapped[int] = mapped_column(Integer, default=50, nullable=False)
-    required_entitlement: Mapped[Optional[str]] = mapped_column(String(64), ForeignKey("entitlements.id"), nullable=True)
+    required_entitlement: Mapped[Optional[uuid.UUID]] = mapped_column(
+        "required_entitlement_id",
+        UUID(as_uuid=True),
+        ForeignKey("entitlements.id"),
+        nullable=True,
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
@@ -120,7 +130,7 @@ class Demand(Base):
     """Outsourcing Demand Marketplace entity (demands)."""
     __tablename__ = "demands"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     creator_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
@@ -140,7 +150,7 @@ class DemandBid(Base):
     __tablename__ = "demand_bids"
     __table_args__ = (UniqueConstraint("demand_id", "bidder_id", name="uq_demand_bid"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     demand_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("demands.id", ondelete="CASCADE"), nullable=False, index=True)
     bidder_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     bid_amount_cny: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False)
@@ -158,7 +168,7 @@ class DAGPipelineConfig(Base):
     __tablename__ = "dag_pipeline_configs"
     __table_args__ = (UniqueConstraint("scenario_code", "version", name="uq_scenario_version"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     scenario_code: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     version: Mapped[str] = mapped_column(String(32), nullable=False)
     status: Mapped[str] = mapped_column(String(32), default="DRAFT", nullable=False)
@@ -172,7 +182,7 @@ class ForumThread(Base):
     """Community Brainstorm & Experience Thread entity (forum_threads)."""
     __tablename__ = "forum_threads"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     category_code: Mapped[str] = mapped_column(String(64), default="DEV", nullable=False, index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -195,7 +205,7 @@ class ForumComment(Base):
     """Materialized-Path Nested Comment entity (forum_comments)."""
     __tablename__ = "forum_comments"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("forum_threads.id", ondelete="CASCADE"), nullable=False, index=True)
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -219,7 +229,7 @@ class ForumUpvote(Base):
     __tablename__ = "forum_upvotes"
     __table_args__ = (UniqueConstraint("user_id", "target_type", "target_id", name="uq_forum_upvote_target"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     target_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'THREAD' or 'COMMENT'
     target_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False, index=True)
@@ -231,7 +241,7 @@ class ForumBookmark(Base):
     __tablename__ = "forum_bookmarks"
     __table_args__ = (UniqueConstraint("user_id", "thread_id", name="uq_forum_bookmark"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     thread_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("forum_threads.id", ondelete="CASCADE"), nullable=False, index=True)
     folder_name: Mapped[str] = mapped_column(String(64), default="默认收藏夹", nullable=False)
@@ -242,7 +252,7 @@ class SOPTemplate(Base):
     """Business SOP Template entity (sop_templates)."""
     __tablename__ = "sop_templates"
 
-    id: Mapped[str] = mapped_column(String(64), primary_key=True)  # 'tpl_individual_biz_reg'
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     stage: Mapped[int] = mapped_column(Integer, default=1, nullable=False, index=True)
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -259,8 +269,8 @@ class SOPDocument(Base):
     """Maker Generated Legal / SOP Document entity (sop_documents)."""
     __tablename__ = "sop_documents"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    template_id: Mapped[str] = mapped_column(String(64), ForeignKey("sop_templates.id"), nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    template_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("sop_templates.id"), nullable=False, index=True)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     document_title: Mapped[str] = mapped_column(String(255), nullable=False)
     form_data: Mapped[Dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -278,7 +288,7 @@ class ProductShowcase(Base):
     """Independent Maker Product Showcase entity (product_showcases)."""
     __tablename__ = "product_showcases"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     author_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     tagline: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -306,7 +316,7 @@ class PerkClaim(Base):
     __tablename__ = "perk_claims"
     __table_args__ = (UniqueConstraint("perk_id", "user_id", name="uq_perk_user_claim"),)
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     perk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("perks.id", ondelete="CASCADE"), nullable=False)
     user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     voucher_code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
@@ -321,24 +331,29 @@ class ContentModerationLog(Base):
     """Governance & Moderation Takedown Record entity (content_moderation_logs)."""
     __tablename__ = "content_moderation_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
     target_type: Mapped[str] = mapped_column(String(32), nullable=False, index=True)  # 'FORUM_THREAD', 'COMMENT'
-    target_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
-    author_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Business references use `_key` / `_uid`, never `_id`, so every DDL identity
+    # column remains a real UUID.
+    target_id: Mapped[str] = mapped_column("target_key", String(64), nullable=False, index=True)
+    author_id: Mapped[str] = mapped_column("author_uid", String(64), nullable=False, index=True)
     violation_type: Mapped[str] = mapped_column(String(64), nullable=False)
     snippet_content: Mapped[str] = mapped_column(Text, nullable=False)
     action_type: Mapped[str] = mapped_column(String(32), nullable=False)  # 'TAKEN_DOWN', 'RESTORED'
     reason: Mapped[str] = mapped_column(String(255), nullable=False)
-    moderator_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    moderator_id: Mapped[str] = mapped_column("moderator_uid", String(64), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
 
 
 class RAGVector(Base):
     """Native pgvector RAG Index table for policy and document semantic matching (ADR-003)."""
     __tablename__ = "rag_vectors"
+    __table_args__ = (UniqueConstraint("collection", "doc_key", name="uq_rag_collection_doc"),)
 
-    collection: Mapped[str] = mapped_column(String(128), primary_key=True)
-    doc_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    collection: Mapped[str] = mapped_column(String(128), nullable=False)
+    # The caller-facing document key stays human-readable; the database identity is `id`.
+    doc_id: Mapped[str] = mapped_column("doc_key", String(128), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     metadata_payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
@@ -354,16 +369,16 @@ class AuditLog(Base):
     """
     __tablename__ = "audit_logs"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    actor_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    actor_id: Mapped[str] = mapped_column("actor_uid", String(64), default="", nullable=False, index=True)
     actor_role: Mapped[str] = mapped_column(String(32), default="GUEST", nullable=False)
     action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    resource_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    resource_id: Mapped[str] = mapped_column("resource_key", String(64), default="", nullable=False, index=True)
     permission: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     result: Mapped[str] = mapped_column(String(16), default="SUCCESS", nullable=False, index=True)
     ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    trace_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    trace_id: Mapped[str] = mapped_column("trace_code", String(64), default="", nullable=False)
     detail_encrypted: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False, index=True)
 
@@ -372,16 +387,16 @@ class AuditLogArchive(Base):
     """Cold-storage archive of audit_logs past the retention window (audit_logs_archive)."""
     __tablename__ = "audit_logs_archive"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True)
-    actor_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    actor_id: Mapped[str] = mapped_column("actor_uid", String(64), default="", nullable=False, index=True)
     actor_role: Mapped[str] = mapped_column(String(32), default="GUEST", nullable=False)
     action: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     resource_type: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    resource_id: Mapped[str] = mapped_column(String(64), default="", nullable=False, index=True)
+    resource_id: Mapped[str] = mapped_column("resource_key", String(64), default="", nullable=False, index=True)
     permission: Mapped[str] = mapped_column(String(64), default="", nullable=False)
     result: Mapped[str] = mapped_column(String(16), default="SUCCESS", nullable=False)
     ip_address: Mapped[str] = mapped_column(String(64), default="", nullable=False)
-    trace_id: Mapped[str] = mapped_column(String(64), default="", nullable=False)
+    trace_id: Mapped[str] = mapped_column("trace_code", String(64), default="", nullable=False)
     detail_encrypted: Mapped[str] = mapped_column(Text, default="", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
     archived_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
@@ -396,9 +411,12 @@ class DomainSnapshot(Base):
     relational tables which remain the schema-of-record for relational reporting.
     """
     __tablename__ = "domain_snapshots"
+    __table_args__ = (UniqueConstraint("domain", "entity_key", name="uq_domain_snapshot_entity"),)
 
-    domain: Mapped[str] = mapped_column(String(64), primary_key=True)
-    entity_id: Mapped[str] = mapped_column(String(160), primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, server_default=text("gen_random_uuid()"))
+    domain: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    # Domain entities may use human-readable keys; the database identity is `id`.
+    entity_id: Mapped[str] = mapped_column("entity_key", String(160), nullable=False)
     payload: Mapped[Dict[str, Any]] = mapped_column(JSONB, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False

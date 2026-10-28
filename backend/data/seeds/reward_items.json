@@ -1,0 +1,214 @@
+[
+  {
+    "code": "membership_pro_monthly",
+    "name": "PRO 创客月卡",
+    "type": "MEMBERSHIP",
+    "points_price": 2400,
+    "stock": -1,
+    "per_user_limit": 24,
+    "icon": "spark",
+    "description": "解锁 PRO 创客全部功能额度 1 个月，可叠加续期。",
+    "meta": {
+      "tier": "PRO",
+      "months": 1
+    }
+  },
+  {
+    "code": "membership_pro_yearly",
+    "name": "PRO 创客年卡",
+    "type": "MEMBERSHIP",
+    "points_price": 24000,
+    "stock": -1,
+    "per_user_limit": 12,
+    "icon": "spark",
+    "description": "解锁 PRO 创客全部功能额度 12 个月，可叠加续期。",
+    "meta": {
+      "tier": "PRO",
+      "months": 12
+    }
+  },
+  {
+    "code": "membership_black_monthly",
+    "name": "黑钻创客月卡",
+    "type": "MEMBERSHIP",
+    "points_price": 10800,
+    "stock": -1,
+    "per_user_limit": 24,
+    "icon": "gem",
+    "description": "解锁黑钻创客全部权益 1 个月，含顶格优先派单与 1v1 客服。",
+    "meta": {
+      "tier": "BLACK_DIAMOND",
+      "months": 1
+    }
+  },
+  {
+    "code": "membership_black_yearly",
+    "name": "黑钻创客年卡",
+    "type": "MEMBERSHIP",
+    "points_price": 108000,
+    "stock": -1,
+    "per_user_limit": 12,
+    "icon": "gem",
+    "description": "解锁黑钻创客全部权益 12 个月，含年度实体礼。",
+    "meta": {
+      "tier": "BLACK_DIAMOND",
+      "months": 12
+    }
+  },
+  {
+    "code": "physical_sticker_pack",
+    "name": "晨昏线外 贴纸包",
+    "type": "PHYSICAL",
+    "points_price": 1500,
+    "stock": 500,
+    "per_user_limit": 3,
+    "icon": "gift",
+    "description": "一套 12 枚哑光贴纸，适合贴在笔记本与电脑外壳。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_badge",
+    "name": "亚克力创客徽章",
+    "type": "PHYSICAL",
+    "points_price": 3000,
+    "stock": 300,
+    "per_user_limit": 3,
+    "icon": "gift",
+    "description": "磨砂亚克力材质，附磁吸背扣。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_lanyard",
+    "name": "创客工牌 + 挂绳",
+    "type": "PHYSICAL",
+    "points_price": 4500,
+    "stock": 200,
+    "per_user_limit": 2,
+    "icon": "gift",
+    "description": "可写名字的工牌卡套与织带挂绳，线下活动必备。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_tote",
+    "name": "晨昏线外 帆布袋",
+    "type": "PHYSICAL",
+    "points_price": 6000,
+    "stock": 150,
+    "per_user_limit": 2,
+    "icon": "gift",
+    "description": "12 盎司加厚帆布，单色丝印，通勤容量。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_yearbook",
+    "name": "年度创客年鉴",
+    "type": "PHYSICAL",
+    "points_price": 12000,
+    "stock": 80,
+    "per_user_limit": 1,
+    "icon": "book",
+    "description": "年度精选政策、文书与创客故事合集，限量编号。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_desk_toy",
+    "name": "桌面晨昏线摆件",
+    "type": "PHYSICAL",
+    "points_price": 15000,
+    "stock": 60,
+    "per_user_limit": 1,
+    "icon": "gift",
+    "description": "黄铜与胡桃木组合的桌面摆件，刻有创客编号。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "physical_collab",
+    "name": "联名限量款",
+    "type": "PHYSICAL",
+    "points_price": 30000,
+    "stock": 20,
+    "per_user_limit": 1,
+    "icon": "gem",
+    "description": "与生态伙伴联名的年度限量单品，兑完即止。",
+    "meta": {
+      "shipping": true
+    }
+  },
+  {
+    "code": "digital_exposure_24h",
+    "name": "内容置顶 24 小时",
+    "type": "DIGITAL",
+    "points_price": 3000,
+    "stock": -1,
+    "per_user_limit": 4,
+    "icon": "bolt",
+    "description": "为一条已发布内容增加 24 小时置顶曝光，每人每周限 1 次。",
+    "meta": {
+      "effect": "EXPOSURE_24H"
+    }
+  },
+  {
+    "code": "digital_quality_apply",
+    "name": "优质内容申请",
+    "type": "DIGITAL",
+    "points_price": 5000,
+    "stock": -1,
+    "per_user_limit": 4,
+    "icon": "star",
+    "description": "提交一条内容申请加精，审核不通过全额退还积分。",
+    "meta": {
+      "effect": "QUALITY_REVIEW"
+    }
+  },
+  {
+    "code": "digital_ai_pack",
+    "name": "AI 文书加量包 50 篇",
+    "type": "DIGITAL",
+    "points_price": 2000,
+    "stock": -1,
+    "per_user_limit": 12,
+    "icon": "spark",
+    "description": "在当前会员额度之外增加 50 篇 AI 文书生成次数。",
+    "meta": {
+      "effect": "AI_PACK_50"
+    }
+  },
+  {
+    "code": "digital_template_unlock",
+    "name": "单模板解锁券",
+    "type": "DIGITAL",
+    "points_price": 800,
+    "stock": -1,
+    "per_user_limit": 20,
+    "icon": "file",
+    "description": "解锁任意一个付费模板的永久使用权。",
+    "meta": {
+      "effect": "TEMPLATE_UNLOCK"
+    }
+  },
+  {
+    "code": "digital_rename_card",
+    "name": "改名卡",
+    "type": "DIGITAL",
+    "points_price": 1000,
+    "stock": -1,
+    "per_user_limit": 4,
+    "icon": "pen",
+    "description": "修改一次创客昵称，90 天内限用 1 次。",
+    "meta": {
+      "effect": "RENAME"
+    }
+  }
+]

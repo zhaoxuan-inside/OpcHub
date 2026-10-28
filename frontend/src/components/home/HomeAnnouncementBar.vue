@@ -16,34 +16,37 @@ defineEmits(['explore']);
 <style scoped>
 .announcement-wrapper {
   display: flex;
-  justify-content: center;
-  margin-bottom: 24px;
+  justify-content: flex-start;
+  margin-bottom: 30px;
+  padding: 0 4px;
 }
 
 .announcement-pill {
-  display: inline-flex;
+  display: flex;
+  width: 100%;
   align-items: center;
   gap: 10px;
-  padding: 6px 16px;
-  border-radius: var(--radius-full);
-  background: var(--glass-surface);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow), var(--glass-specular);
-  backdrop-filter: var(--blur-strength);
-  -webkit-backdrop-filter: var(--blur-strength);
-  font-size: 13px;
+  padding: 0 0 11px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--glass-border-subtle);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  font-size: 12px;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: var(--transition-liquid);
+  transition: color 0.18s ease, border-color 0.18s ease;
   user-select: none;
 }
 
 .announcement-pill:hover {
-  background: var(--glass-surface-hover);
-  border-color: var(--glass-border-hover);
-  box-shadow: var(--glass-glow-halo);
+  background: transparent;
+  border-color: var(--text-primary);
+  box-shadow: none;
   color: var(--text-primary);
-  transform: translateY(-1px);
+  transform: none;
 }
 
 .pulse-dot {
@@ -75,6 +78,7 @@ defineEmits(['explore']);
 }
 
 .announcement-arrow {
+  margin-left: auto;
   font-size: 14px;
   color: var(--text-tertiary);
   transition: transform 0.2s ease;

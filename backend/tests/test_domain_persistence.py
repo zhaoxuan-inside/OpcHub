@@ -178,3 +178,6 @@ async def test_hydrator_rebuilds_service_indexes(monkeypatch):
 
     product_service._products.clear()
     forum_service._votes.clear()
+    # Restore the hermetic default: later tests must see persistence disabled.
+    persistence_mod.domain_persistence.enabled = False
+    persistence_mod.domain_persistence._tail = None

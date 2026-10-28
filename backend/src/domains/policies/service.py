@@ -1,8 +1,5 @@
-import json
-import logging
 import uuid
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 from src.domains.policies.models import (
     PolicyCreate,
@@ -12,50 +9,16 @@ from src.domains.policies.models import (
 )
 from src.infrastructure.database.persistence import domain_persistence
 
-logger = logging.getLogger("opchub.policies")
-
-
-def _load_policy_seeds() -> Dict[str, Dict[str, Any]]:
-    """Load baseline government incentive policy seeds from external data file.
-
-    Maintains strict code, config, and data separation: zero policy records hardcoded in source.
-    """
-    search_paths = [
-        Path("backend/data/seeds/policies.json"),
-        Path("data/seeds/policies.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "policies.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load policy seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_POLICY_SEEDS: Dict[str, Dict[str, Any]] = _load_policy_seeds()
-
 
 class PolicyService:
     """Manages government incentive policies and matches maker eligibility."""
 
     def __init__(self):
-        self._policies: Dict[str, PolicyResponse] = {}
-        self._init_seeds()
+        self._policies: dict[str, PolicyResponse] = {}
 
-    def _init_seeds(self) -> None:
-        """Initialize in-memory catalog from external data seeds and queue DB persistence."""
-        for pid, data in DEFAULT_POLICY_SEEDS.items():
-            if pid not in self._policies:
-                data = dict(data)
-                # Seed policies are platform-curated government sources → official.
-                data.setdefault("is_official", True)
-                data.setdefault("author_name", "官方发布")
-                policy = PolicyResponse(**data)
-                self._policies[pid] = policy
-                domain_persistence.write("policies.items", pid, policy)
+    def _require_db(self) -> None:
+        """Policy content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("policies")
 
     def list_policies(self, category: Optional[str] = None) -> List[PolicyResponse]:
         policies = list(self._policies.values())
@@ -65,6 +28,7 @@ class PolicyService:
 
     def create_policy(self, req: PolicyCreate) -> PolicyResponse:
         """Create and publish a new government policy/subsidy rule."""
+        self._require_db()
         pid = f"pol_{uuid.uuid4().hex[:8]}"
         pcode = req.code or f"POL-2026-{uuid.uuid4().hex[:4].upper()}"
         policy = PolicyResponse(
@@ -162,21 +126,17 @@ class PolicyService:
 
     def delete_policy(self, policy_id: str) -> bool:
         """Physically delete policy for Saga reverse compensation."""
+        self._require_db()
         if policy_id in self._policies:
             del self._policies[policy_id]
             domain_persistence.delete("policies.items", policy_id)
             return True
         return False
 
-    def hydrate_items(self, rows: List[Dict]) -> int:
-        if rows:
-            for r in rows:
-                self._policies[r["id"]] = PolicyResponse(**r)
-            return len(rows)
-        # If DB is empty, persist baseline seeds to PostgreSQL snapshots
-        for pid, policy in self._policies.items():
-            domain_persistence.write("policies.items", pid, policy)
-        return len(self._policies)
+    def hydrate_items(self, rows: List[dict]) -> int:
+        for r in rows:
+            self._policies[r["id"]] = PolicyResponse(**r)
+        return len(rows)
 
     def clear(self) -> None:
         """Reset policies for isolated testing."""

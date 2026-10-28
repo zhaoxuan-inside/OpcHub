@@ -40,6 +40,17 @@ FOUNDING_VIP_ENTITLEMENT_ID = "ent_black_diamond_priority"
 FOUNDING_VIP_TIER_NAME = "黑钻创客 VIP"
 _ENTITLEMENT_EXPIRY_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# 会员档位 -> 现有权益目录映射（loyalty 域开通/续期时统一同步）
+MEMBERSHIP_ENTITLEMENT_MAP = {
+    "PRO": {"ent_ai_tax_assistant"},
+    "BLACK_DIAMOND": {"ent_ai_tax_assistant", "ent_black_diamond_priority"},
+}
+MEMBERSHIP_TIER_NAMES = {
+    "STANDARD": "标准创客",
+    "PRO": "PRO 创客",
+    "BLACK_DIAMOND": FOUNDING_VIP_TIER_NAME,
+}
+
 
 class UserService:
     """Manages maker profile, authentication, and entitlements."""
@@ -91,6 +102,8 @@ class UserService:
             "phone": meta.get("phone", ""),
             "credit_code": getattr(db_user, "unified_social_credit_code", None) or meta.get("credit_code", ""),
             "tier_name": meta.get("tier_name", "标准创客"),
+            "membership_tier": meta.get("membership_tier", "STANDARD"),
+            "membership_expires_at": meta.get("membership_expires_at", ""),
             "account_type": meta.get("account_type", "MAKER"),
             "industry_track": meta.get("industry_track", ""),
             "password_hash": db_user.password_hash or "",
@@ -129,6 +142,13 @@ class UserService:
             expiries.pop(ent_id, None)
         if FOUNDING_VIP_ENTITLEMENT_ID not in active and record.get("tier_name") == FOUNDING_VIP_TIER_NAME:
             record["tier_name"] = "标准创客"
+        membership_tier = str(record.get("membership_tier") or "").upper()
+        if membership_tier == "PRO" and "ent_ai_tax_assistant" not in active:
+            if record.get("tier_name") == MEMBERSHIP_TIER_NAMES["PRO"]:
+                record["tier_name"] = "标准创客"
+        elif membership_tier == "BLACK_DIAMOND" and FOUNDING_VIP_ENTITLEMENT_ID not in active:
+            if record.get("tier_name") == MEMBERSHIP_TIER_NAMES["BLACK_DIAMOND"]:
+                record["tier_name"] = "标准创客"
 
     async def _next_registration_ordinal(self) -> int:
         """1-based sequence number the next MAKER registration will occupy (built-in admin excluded)."""
@@ -719,6 +739,46 @@ class UserService:
             receipt_no=receipt,
             message="专属创客收费权益已激活并绑定，权限即刻生效！",
         )
+
+    async def sync_membership(self, uid: str, tier: str, expires_at: str) -> None:
+        """Project a loyalty membership grant onto the legacy profile fields.
+
+        The loyalty domain remains the single source of truth for the membership
+        window; this method only mirrors it into ``tier_name`` /
+        ``active_entitlements`` / ``entitlement_expiries`` so older clients and
+        the entitlement catalog keep working.
+        """
+        record = self._users_by_uid.get(str(uid))
+        if not record:
+            return
+        tier = str(tier or "STANDARD").upper()
+        if tier not in MEMBERSHIP_ENTITLEMENT_MAP:
+            tier = "STANDARD"
+        owned = {"ent_ai_tax_assistant", "ent_black_diamond_priority"}
+        active = record.setdefault("active_entitlements", set())
+        expiries = record.setdefault("entitlement_expiries", {})
+        for ent_id in owned:
+            active.discard(ent_id)
+            expiries.pop(ent_id, None)
+        for ent_id in MEMBERSHIP_ENTITLEMENT_MAP.get(tier, set()):
+            active.add(ent_id)
+            expiries[ent_id] = expires_at
+        record["tier_name"] = MEMBERSHIP_TIER_NAMES.get(tier, "标准创客")
+        record["membership_tier"] = tier
+        record["membership_expires_at"] = expires_at
+        try:
+            await db_repository.update_user_fields(
+                str(uid),
+                metadata_patch={
+                    "tier_name": record["tier_name"],
+                    "membership_tier": tier,
+                    "membership_expires_at": expires_at,
+                    "active_entitlements": sorted(active),
+                    "entitlement_expiries": expiries,
+                },
+            )
+        except Exception:
+            pass
 
     async def deactivate_entitlement(self, entitlement_id: str, user_id: Optional[str] = None) -> bool:
         ent_id = entitlement_id

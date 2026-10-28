@@ -24,7 +24,99 @@
       <span v-if="viewer.rating > 0" class="ci-rating-mine">我的 {{ viewer.rating }}<OpcIcon name="star-filled" :size="12" /></span>
     </div>
 
-    <div class="ci-bar" :class="{ 'ci-bar-compact': compact, 'ci-bar-band': variant === 'band' }">
+    <!-- Card mode: only 3 visible actions + an overflow menu.
+         This keeps cards at one primary action instead of an 8-icon toolbar. -->
+    <div v-if="isCollapsed" class="ci-bar ci-bar-collapsed" :class="{ 'ci-bar-band': variant === 'band' }">
+      <button
+        v-if="showKind('LIKE')"
+        type="button"
+        class="ci-btn ci-like"
+        :class="{ active: viewer.liked }"
+        @click.stop="toggle('LIKE')"
+        :title="viewer.liked ? '取消点赞' : '点赞'"
+        :aria-pressed="viewer.liked"
+      >
+        <InteractionIcon name="like" :filled="viewer.liked" :size="iconSize" />
+        <span class="ci-count">{{ counts.like }}</span>
+      </button>
+
+      <button
+        type="button"
+        class="ci-btn ci-comment"
+        :class="{ active: viewer.commented }"
+        @click.stop="handleCommentClick"
+        :title="commentMode === 'disabled' ? '暂不支持评论' : '查看评论'"
+        :disabled="commentMode === 'disabled'"
+      >
+        <InteractionIcon name="comment" :filled="viewer.commented" :size="iconSize" />
+        <span class="ci-count">{{ counts.comment }}</span>
+      </button>
+
+      <button
+        v-if="showKind('FAVORITE')"
+        type="button"
+        class="ci-btn ci-favorite"
+        :class="{ active: viewer.favorited }"
+        @click.stop="toggle('FAVORITE')"
+        :title="viewer.favorited ? '取消收藏' : '收藏'"
+        :aria-pressed="viewer.favorited"
+      >
+        <InteractionIcon name="favorite" :filled="viewer.favorited" :size="iconSize" />
+        <span class="ci-count">{{ counts.favorite }}</span>
+      </button>
+
+      <details class="ci-more" @click.stop>
+        <summary class="ci-more-trigger" title="更多互动" aria-label="更多互动">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <circle cx="5" cy="12" r="1.8"></circle>
+            <circle cx="12" cy="12" r="1.8"></circle>
+            <circle cx="19" cy="12" r="1.8"></circle>
+          </svg>
+        </summary>
+        <div class="ci-more-menu" role="menu">
+          <button
+            v-if="showKind('LOVE')"
+            type="button"
+            role="menuitem"
+            class="ci-more-item"
+            :class="{ active: viewer.loved }"
+            @click.stop="toggle('LOVE'); closeMoreMenu($event)"
+          >
+            <InteractionIcon name="love" :filled="viewer.loved" :size="14" />
+            <span>{{ viewer.loved ? '取消喜欢' : '喜欢' }}</span>
+            <span class="ci-more-count">{{ counts.love }}</span>
+          </button>
+          <button
+            v-if="showKind('DISLIKE')"
+            type="button"
+            role="menuitem"
+            class="ci-more-item"
+            :class="{ active: viewer.disliked }"
+            @click.stop="toggle('DISLIKE'); closeMoreMenu($event)"
+          >
+            <InteractionIcon name="dislike" :filled="viewer.disliked" :size="14" />
+            <span>{{ viewer.disliked ? '取消点踩' : '点踩' }}</span>
+            <span class="ci-more-count">{{ counts.dislike }}</span>
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            class="ci-more-item"
+            :disabled="reporting"
+            @click.stop="submitReport(); closeMoreMenu($event)"
+          >
+            <OpcIcon name="alert" :size="14" />
+            <span>举报</span>
+          </button>
+          <div v-if="ratingCount > 0" class="ci-more-rating">
+            <InteractionIcon name="star" :filled="true" :size="13" />
+            <span>评分 {{ ratingAvg }} · {{ ratingCount }} 人</span>
+          </div>
+        </div>
+      </details>
+    </div>
+
+    <div v-else class="ci-bar" :class="{ 'ci-bar-compact': compact, 'ci-bar-band': variant === 'band' }">
       <!-- 点赞 -->
       <button
         v-if="showKind('LIKE')"
@@ -124,19 +216,20 @@
         <span class="ci-count">{{ ratingCount > 0 ? ratingAvg : '暂无' }}</span>
       </div>
 
-      <ContentCommentDrawer
-        v-if="commentMode === 'drawer'"
-        :visible="drawerVisible"
-        :target-type="targetType"
-        :target-id="String(targetId)"
-        :title="targetTitle"
-        :authenticated="authenticated"
-        @close="drawerVisible = false"
-        @count-change="handleCommentCount"
-        @require-login="requireLogin"
-        @toast="(payload) => emit('toast', payload)"
-      />
     </div>
+
+    <ContentCommentDrawer
+      v-if="commentMode === 'drawer'"
+      :visible="drawerVisible"
+      :target-type="targetType"
+      :target-id="String(targetId)"
+      :title="targetTitle"
+      :authenticated="authenticated"
+      @close="drawerVisible = false"
+      @count-change="handleCommentCount"
+      @require-login="requireLogin"
+      @toast="(payload) => emit('toast', payload)"
+    />
   </div>
 </template>
 
@@ -210,6 +303,16 @@ const iconSize = computed(() => {
   if (props.variant === 'band') return 17;
   return props.compact ? 13 : 16;
 });
+
+// Cards use the collapsed action bar; details keep the full labelled bar.
+const isCollapsed = computed(
+  () => !props.showLabels && (props.variant === 'band' || props.compact)
+);
+
+function closeMoreMenu(event) {
+  const details = event?.currentTarget?.closest?.('details');
+  if (details) details.open = false;
+}
 
 function showKind(kind) {
   return !props.kinds || props.kinds.includes(kind);
@@ -734,8 +837,125 @@ watch(
   background: transparent;
 }
 
+/* ===== Collapsed card mode: 3 visible actions + overflow menu ===== */
+.ci-bar-collapsed {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 0;
+  background: transparent;
+  border: none;
+}
+
+.ci-bar-collapsed .ci-btn {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 4px 10px;
+  gap: 5px;
+  border: none;
+  background: transparent;
+}
+
+.ci-bar-collapsed .ci-count {
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.ci-more {
+  position: relative;
+  margin-left: auto;
+}
+
+.ci-more-trigger {
+  list-style: none;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.ci-more-trigger::-webkit-details-marker {
+  display: none;
+}
+
+.ci-more-trigger:hover {
+  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
+  color: var(--accent);
+}
+
+.ci-more[open] > .ci-more-trigger {
+  color: var(--accent);
+  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
+}
+
+.ci-more-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 40;
+  min-width: 168px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--glass-border);
+  background: var(--glass-surface-solid, rgba(255, 255, 255, 0.98));
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18), var(--glass-specular);
+  backdrop-filter: var(--blur-strength, blur(18px));
+  -webkit-backdrop-filter: var(--blur-strength, blur(18px));
+}
+
+.ci-more-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 9px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ci-more-item:hover {
+  background: var(--accent-glass, rgba(0, 113, 227, 0.08));
+  color: var(--text-primary);
+}
+
+.ci-more-item.active {
+  color: var(--accent);
+}
+
+.ci-more-count {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
+.ci-more-rating {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 8px 9px 4px;
+  border-top: 1px solid var(--glass-border-subtle);
+  font-size: 10.5px;
+  color: var(--text-tertiary);
+}
+
 @media (max-width: 640px) {
   .ci-btn {
+    padding: 4px 8px;
+  }
+
+  .ci-bar-collapsed .ci-btn {
     padding: 4px 8px;
   }
 }

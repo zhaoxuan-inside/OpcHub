@@ -60,10 +60,10 @@ def test_seeded_document_nodes_carry_fillable_fields_with_guidance():
     *seeded* catalog only. Runtime-published templates are admin-authored and are
     not required to ship maker-facing guidance.
     """
-    from src.domains.sop.service import DEFAULT_SOP_SEEDS
+    from tests.catalog_fixtures import load_catalog
 
-    seeded_ids = {raw["id"] for raw in (DEFAULT_SOP_SEEDS.get("nodes") or [])}
-    assert seeded_ids, "seed file must define nodes"
+    seeded_ids = {raw["id"] for raw in (load_catalog("sop.json").get("nodes") or [])}
+    assert seeded_ids, "test fixture must define nodes"
 
     graph = _seeded_graph()
     documents = [n for n in graph.nodes if n.kind == SOP_NODE_DOCUMENT and n.id in seeded_ids]

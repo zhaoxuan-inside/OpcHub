@@ -1,0 +1,237 @@
+[
+  {
+    "code": "PROFILE_COMPLETE",
+    "name": "完善创客资料",
+    "category": "TASK",
+    "points": 200,
+    "growth": 50,
+    "once": true,
+    "enabled": true,
+    "description": "头像、行业赛道与主体信息完善度达到 80%"
+  },
+  {
+    "code": "VERIFY_EMAIL",
+    "name": "完成邮箱验证",
+    "category": "TASK",
+    "points": 100,
+    "growth": 20,
+    "once": true,
+    "enabled": true,
+    "description": "注册流程内完成邮箱验证"
+  },
+  {
+    "code": "VERIFY_IDENTITY",
+    "name": "完成实名 / 企业认证",
+    "category": "TASK",
+    "points": 500,
+    "growth": 200,
+    "once": true,
+    "enabled": true,
+    "description": "实名或企业资质核验通过"
+  },
+  {
+    "code": "FIRST_PUBLISH",
+    "name": "首次发布内容",
+    "category": "TASK",
+    "points": 300,
+    "growth": 50,
+    "once": true,
+    "enabled": true,
+    "description": "首篇内容通过审核后一次性奖励"
+  },
+  {
+    "code": "PUBLISH_POLICY",
+    "name": "发布政策",
+    "category": "CONTENT",
+    "points": 100,
+    "growth": 20,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "政策内容通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_SOP",
+    "name": "发布文书 / 模板",
+    "category": "CONTENT",
+    "points": 120,
+    "growth": 25,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "文书、模板或流程通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_FORUM",
+    "name": "发布头脑风暴主题",
+    "category": "CONTENT",
+    "points": 50,
+    "growth": 10,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "论坛主题通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_ANSWER",
+    "name": "发表深度回答",
+    "category": "CONTENT",
+    "points": 40,
+    "growth": 8,
+    "daily_cap": 400,
+    "enabled": true,
+    "description": "论坛回答通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_PRODUCT",
+    "name": "发布产品橱窗",
+    "category": "CONTENT",
+    "points": 60,
+    "growth": 12,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "产品展示通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_DEMAND",
+    "name": "发布需求",
+    "category": "CONTENT",
+    "points": 60,
+    "growth": 12,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "需求委托通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_PERK",
+    "name": "发布生态优惠",
+    "category": "CONTENT",
+    "points": 60,
+    "growth": 12,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "生态优惠公告通过审核后入账"
+  },
+  {
+    "code": "PUBLISH_COMPLIANCE",
+    "name": "发布合规法条 / 案例",
+    "category": "CONTENT",
+    "points": 100,
+    "growth": 20,
+    "daily_cap": 500,
+    "enabled": true,
+    "description": "合规知识库内容通过审核后入账"
+  },
+  {
+    "code": "COMMENT_CREATED",
+    "name": "发表有效评论",
+    "category": "INTERACTION",
+    "points": 5,
+    "growth": 1,
+    "daily_cap": 50,
+    "per_target_cap": 15,
+    "enabled": true,
+    "description": "评论不少于 15 字，每篇内容最多 3 条计分"
+  },
+  {
+    "code": "RECEIVE_LIKE",
+    "name": "内容被点赞",
+    "category": "INTERACTION",
+    "points": 5,
+    "growth": 2,
+    "daily_cap": 300,
+    "per_target_cap": 300,
+    "enabled": true,
+    "description": "他人点赞你的内容"
+  },
+  {
+    "code": "RECEIVE_FAVORITE",
+    "name": "内容被收藏",
+    "category": "INTERACTION",
+    "points": 10,
+    "growth": 5,
+    "daily_cap": 400,
+    "per_target_cap": 500,
+    "enabled": true,
+    "description": "他人收藏你的内容"
+  },
+  {
+    "code": "RECEIVE_LOVE",
+    "name": "内容被喜欢",
+    "category": "INTERACTION",
+    "points": 3,
+    "growth": 1,
+    "daily_cap": 150,
+    "per_target_cap": 150,
+    "enabled": true,
+    "description": "他人喜欢你的内容"
+  },
+  {
+    "code": "RECEIVE_COMMENT",
+    "name": "内容被评论",
+    "category": "INTERACTION",
+    "points": 8,
+    "growth": 3,
+    "daily_cap": 300,
+    "per_target_cap": 400,
+    "enabled": true,
+    "description": "他人对你的内容发表有效评论"
+  },
+  {
+    "code": "RECEIVE_READ",
+    "name": "内容被阅读",
+    "category": "READ",
+    "points": 1,
+    "growth": 0,
+    "daily_cap": 50,
+    "per_target_cap": 200,
+    "enabled": true,
+    "description": "他人打开你的内容详情，同一读者同一内容每日计一次"
+  },
+  {
+    "code": "RECEIVE_DISLIKE",
+    "name": "内容被踩",
+    "category": "INTERACTION",
+    "points": 0,
+    "growth": 0,
+    "daily_cap": 0,
+    "per_target_cap": 0,
+    "enabled": true,
+    "description": "踩不直接扣积分，仅进入内容质量分与排序"
+  },
+  {
+    "code": "QUALITY_BONUS",
+    "name": "优质内容奖励",
+    "category": "BONUS",
+    "points": 500,
+    "growth": 300,
+    "daily_cap": 3000,
+    "enabled": true,
+    "description": "运营加精或评为优质内容"
+  },
+  {
+    "code": "DAILY_STREAK_7",
+    "name": "连续活跃 7 天",
+    "category": "BONUS",
+    "points": 100,
+    "growth": 20,
+    "enabled": true,
+    "description": "连续 7 天有发布或互动行为"
+  },
+  {
+    "code": "DAILY_STREAK_30",
+    "name": "连续活跃 30 天",
+    "category": "BONUS",
+    "points": 500,
+    "growth": 100,
+    "enabled": true,
+    "description": "连续 30 天有发布或互动行为"
+  },
+  {
+    "code": "INVITE_SUCCESS",
+    "name": "邀请好友",
+    "category": "BONUS",
+    "points": 1000,
+    "growth": 50,
+    "daily_cap": 5000,
+    "enabled": true,
+    "description": "被邀请人完成首篇内容并通过审核"
+  }
+]

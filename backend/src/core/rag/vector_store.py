@@ -362,7 +362,7 @@ class PGVectorStore(BaseVectorStore):
             embedding=doc.vector,
             created_at=datetime.now(timezone.utc),
         ).on_conflict_do_update(
-            index_elements=["collection", "doc_id"],
+            index_elements=["collection", "doc_key"],
             set_={
                 "title": doc.title,
                 "content": doc.content,

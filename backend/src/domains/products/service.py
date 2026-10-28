@@ -1,42 +1,14 @@
 """Product Showcase service managing maker products and upvotes."""
-import json
-import logging
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.domains.products.models import ProductCreate, ProductResponse
 from src.infrastructure.database.persistence import domain_persistence
 
-logger = logging.getLogger("opchub.products")
-
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _load_product_seeds() -> Dict[str, Dict[str, Any]]:
-    """Load baseline maker product seeds from external data file.
-
-    Maintains strict code, config, and data separation: zero product records hardcoded in source.
-    """
-    search_paths = [
-        Path("backend/data/seeds/products.json"),
-        Path("data/seeds/products.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "products.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load product seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_PRODUCT_SEEDS: Dict[str, Dict[str, Any]] = _load_product_seeds()
 
 
 class ProductService:
@@ -46,15 +18,10 @@ class ProductService:
         self._products: Dict[str, ProductResponse] = {}
         # Key: cache_key -> (timestamp, data_dict)
         self._cache: Dict[str, tuple[float, Any]] = {}
-        self._init_seeds()
 
-    def _init_seeds(self) -> None:
-        """Initialize in-memory catalog from external data seeds."""
-        for pid, data in DEFAULT_PRODUCT_SEEDS.items():
-            if pid not in self._products:
-                prod = ProductResponse(**data)
-                self._products[pid] = prod
-                domain_persistence.write("products.items", pid, prod)
+    def _require_db(self) -> None:
+        """Product content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("products")
 
     def invalidate_cache(self) -> int:
         """Evict all cached products list pages."""
@@ -80,6 +47,7 @@ class ProductService:
         self._cache[key] = (time.time(), data)
 
     def create_product(self, payload: ProductCreate) -> ProductResponse:
+        self._require_db()
         pid = str(uuid.uuid4())
         now = utc_now_iso()
         product = ProductResponse(
@@ -213,6 +181,7 @@ class ProductService:
 
     def delete_product(self, product_id: str) -> bool:
         """Physically delete product for Saga reverse compensation."""
+        self._require_db()
         if product_id in self._products:
             del self._products[product_id]
             domain_persistence.delete("products.items", product_id)

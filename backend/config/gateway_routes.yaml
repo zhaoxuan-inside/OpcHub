@@ -513,6 +513,97 @@ gateway:
       required_permission: "content:comment"
 
     # --------------------------------------------------------------------------
+    # 6.6 Loyalty: Points / Membership / Rewards (晨光积分与会员)
+    # --------------------------------------------------------------------------
+    - scenario: "loyalty.account"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取当前创客的晨光积分余额、成长等级与会员状态"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_account_adapter"
+
+    - scenario: "loyalty.ledger"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取当前创客的积分收支流水"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_ledger_adapter"
+
+    - scenario: "loyalty.rules"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取当前生效的积分获取规则与上限"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_rules_adapter"
+
+    - scenario: "loyalty.membership.plans"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取会员套餐与权益对比"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_membership_plans_adapter"
+
+    - scenario: "loyalty.membership.me"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取当前创客的会员档位、到期日与权益"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_membership_me_adapter"
+
+    - scenario: "loyalty.membership.subscribe"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "开通 / 续期会员（积分兑换或现金下单）"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_membership_subscribe_adapter"
+      required_permission: "content:interact"
+
+    - scenario: "loyalty.membership.auto-renew"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "开启 / 关闭会员自动续费"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_membership_auto_renew_adapter"
+      required_permission: "content:interact"
+
+    - scenario: "loyalty.rewards.items"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取积分兑换商城目录与库存"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_rewards_items_adapter"
+
+    - scenario: "loyalty.rewards.redeem"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "积分兑换会员时长、数字权益或产品周边"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_rewards_redeem_adapter"
+      required_permission: "content:interact"
+
+    - scenario: "loyalty.rewards.orders"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "读取当前创客的积分兑换订单"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_rewards_orders_adapter"
+
+    - scenario: "loyalty.content.read"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "记录内容阅读并为作者发放小额阅读积分（同一读者每日一次）"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_content_read_adapter"
+
+    - scenario: "loyalty.admin.grant"
+      version: "v1.0.0"
+      domain: "loyalty"
+      description: "管理端积分补发 / 扣回（全量审计，不受日常上限约束）"
+      is_default: true
+      handler: "src.core.gateway.adapters:loyalty_admin_grant_adapter"
+      required_permission: "review:audit_all"
+
+    # --------------------------------------------------------------------------
     # 7. Telemetry & Platform Overview (运营大盘与全景)
     # --------------------------------------------------------------------------
     - scenario: "telemetry.dashboard"

@@ -1,7 +1,7 @@
 """Data models for Product Compliance Guide (法条 / 案例 知识库).
 
-数据 / 配置 / 代码三分离：业务数据存于 backend/data/seeds/compliance.json 并
-持久化至 PostgreSQL；本文件仅定义领域模型与请求/响应契约。
+合规知识统一持久化至 PostgreSQL（domain_snapshots），本文件仅定义领域模型与
+请求/响应契约，不承载业务数据。
 """
 from typing import List, Optional
 from pydantic import BaseModel, Field

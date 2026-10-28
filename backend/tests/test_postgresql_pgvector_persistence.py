@@ -73,6 +73,27 @@ def test_postgresql_ddl_compilation_all_tables():
         assert len(ddl) > 30, f"DDL unexpectedly short for {table_name}"
 
 
+def test_every_id_column_is_uuid():
+    """Contract: every column named `id` or `*_id` must be a PostgreSQL UUID.
+
+    Human-readable identifiers are stored in `code` / `key` / `handle` / `uid`
+    columns, never in an identity column.
+    """
+    from sqlalchemy.dialects.postgresql import UUID as PGUUID
+
+    offenders = []
+    for table_name, table in Base.metadata.tables.items():
+        for column in table.columns:
+            if column.name == "id" or column.name.endswith("_id"):
+                if not isinstance(column.type, PGUUID):
+                    offenders.append(f"{table_name}.{column.name}:{column.type}")
+    assert not offenders, f"Non-UUID identity columns: {offenders}"
+
+    # The account handle is explicitly not an identity column.
+    assert "handle" in User.__table__.columns
+    assert "uid" not in User.__table__.columns
+
+
 def test_pgvector_column_and_operator_compilation():
     """Verify Vector(128) column and cosine distance (<=>) operator compilation (ADR-003)."""
     # 1. Verify Vector column exists on Policy and RAGVector

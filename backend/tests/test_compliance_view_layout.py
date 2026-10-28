@@ -4,7 +4,7 @@ Verifies:
 1. ComplianceView.vue mirrors the Policy Center (PolicyView.vue) dual-column feed layout:
    category filter bar, scrollable card grid, and right auxiliary sidebar.
 2. 数据 / 配置 / 代码 三分离:
-   - 数据: backend/data/seeds/compliance.json seeds 全量入 PostgreSQL (domain_snapshots)
+   - 数据: PostgreSQL domain_snapshots（测试用 fixtures 位于 tests/fixtures/catalog）
    - 配置: frontend/src/config/compliancePage.js 承载展示配置 (分类/图标/配色/排序)
    - 代码: 视图组件仅承担逻辑，不硬编码业务数据
 3. 合规页面展示法条(Law) 与 案例(Case)，提供发布入口、热门打榜与免责声明。
@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 COMPLIANCE_VIEW = ROOT / "frontend" / "src" / "views" / "ComplianceView.vue"
 POLICY_VIEW = ROOT / "frontend" / "src" / "views" / "PolicyView.vue"
 COMPLIANCE_CONFIG = ROOT / "frontend" / "src" / "config" / "compliancePage.js"
-COMPLIANCE_SEEDS = ROOT / "backend" / "data" / "seeds" / "compliance.json"
+COMPLIANCE_SEEDS = ROOT / "backend" / "tests" / "fixtures" / "catalog" / "compliance.json"
 
 
 def test_compliance_view_dual_column_feed_layout():
@@ -62,6 +62,9 @@ def test_compliance_view_categories_and_features():
     assert "openPublishModal" in source
     assert "submitPublish" in source
     assert "发布法条 / 案例" in source or "发布法条/案例" in source
+    # 与生态特权一致的侧栏「增加合规指南」入口
+    assert "增加合规指南" in source
+    assert "btn-creator-publish" in source
     assert "compliance.publish" in source
     assert "currentViewMode" in source
     assert "CreatePageLayout" in source

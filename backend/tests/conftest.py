@@ -8,8 +8,10 @@ Tests that specifically exercise unauthenticated / insufficient-privilege paths 
 clear the header explicitly via ``client.headers.pop("Authorization", None)``.
 """
 import fastapi.testclient as _tc
+import pytest
 
 from src.core.security import create_session_token
+from src.infrastructure.database.persistence import domain_persistence
 from src.infrastructure.database.repository import db_repository
 
 # ---------------------------------------------------------------------------
@@ -28,6 +30,54 @@ async def _database_unavailable() -> bool:
 
 
 db_repository.is_ready = _database_unavailable
+
+# The default suite has no PostgreSQL, so allow domain services to keep their
+# deterministic in-memory state. Production runs with ``strict = True`` and therefore
+# refuses to accept content that could not be persisted.
+domain_persistence.strict = False
+
+# Representative catalog data is now test-only (production ships no seed files).
+# Seed the shared domain singletons once, mirroring the previous import-time behaviour.
+from catalog_fixtures import (  # noqa: E402
+    seed_compliance,
+    seed_demands,
+    seed_perks,
+    seed_policies,
+    seed_products,
+    seed_sop,
+)
+from src.domains.compliance.service import compliance_service  # noqa: E402
+from src.domains.demands.service import demand_service  # noqa: E402
+from src.domains.perks.service import perk_service  # noqa: E402
+from src.domains.policies.service import policy_service  # noqa: E402
+from src.domains.products.service import product_service  # noqa: E402
+from src.domains.sop.service import sop_service  # noqa: E402
+
+seed_products(product_service)
+seed_policies(policy_service)
+seed_demands(demand_service)
+seed_perks(perk_service)
+seed_compliance(compliance_service)
+seed_sop(sop_service)
+
+
+@pytest.fixture(autouse=True)
+def _ensure_test_catalogs():
+    """Re-hydrate test-only catalogs if an earlier test cleared a shared singleton."""
+    if not product_service._products:
+        seed_products(product_service)
+    if not policy_service._policies:
+        seed_policies(policy_service)
+    if not demand_service._demands:
+        seed_demands(demand_service)
+    if not perk_service._perks:
+        seed_perks(perk_service)
+    if not compliance_service._laws:
+        seed_compliance(compliance_service)
+    if not sop_service._nodes:
+        seed_sop(sop_service)
+    yield
+
 
 DEFAULT_ADMIN_TOKEN = create_session_token({
     "uid": "usr_admin_builtin",

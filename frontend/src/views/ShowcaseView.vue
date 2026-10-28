@@ -27,6 +27,18 @@
       <div class="showcase-feed-layout">
         <!-- Main Product Stream (左侧产品流) -->
         <section class="showcase-feed-stream">
+          <WorkspaceHeader
+            eyebrow="SHOWCASE / INDEPENDENT WORK"
+            meta="BUILD / LAUNCH / TRACTION"
+            title="产品橱窗"
+            description="独立开发者与一人公司的作品展台。用一句话讲清楚你解决什么问题，再用真实产品承接注意力。"
+            :stats="[
+              { value: totalCount || sortedDisplayProducts.length, label: '在展作品' },
+              { value: hotRankProducts.length, label: '打榜候选' },
+              { value: categoryList.length - 1, label: '作品分类' },
+            ]"
+          />
+
           <!-- Category Filter Bar (产品分区选项卡 + 搜索 + 排序选择) -->
           <div class="glass-box feed-filter-bar showcase-top-bar">
             <div class="category-tabs-scroll">
@@ -44,7 +56,7 @@
 
             <div class="feed-filter-right">
               <!-- Search Box -->
-              <div class="semantic-search-box">
+              <div class="semantic-search-box" :class="{ searching: isSearching }">
                 <div class="search-input-wrap">
                   <input
                     v-model="searchQuery"
@@ -55,18 +67,6 @@
                   />
                   <button v-if="searchQuery" type="button" class="clear-search-btn" @click="handleClearSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  :disabled="isSearching"
-                  @click="handleSemanticSearch"
-                  title="搜索"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <span>{{ isSearching ? '搜索中...' : '搜索' }}</span>
-                </button>
               </div>
 
               <div class="sort-segmented">
@@ -75,7 +75,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -323,6 +323,14 @@
               </div>
 
               <div class="detail-body-scroll">
+                <div class="detail-overview-grid">
+                  <div v-for="stat in productStats" :key="stat.label" class="overview-stat-item">
+                    <span class="overview-stat-value">{{ stat.value }}</span>
+                    <span class="overview-stat-label">{{ stat.label }}</span>
+                    <span v-if="stat.sub" class="overview-stat-sub">{{ stat.sub }}</span>
+                  </div>
+                </div>
+
                 <div v-if="selectedProduct.screenshots && selectedProduct.screenshots.length > 0" class="detail-screenshots-section">
                   <h4 class="section-title">应用截图预览</h4>
                   <div class="screenshots-carousel">
@@ -339,7 +347,8 @@
                 <div class="detail-section">
                   <h4 class="section-title">应用介绍</h4>
                   <!-- 正文为统一富文本编辑器产出的 Markdown，渲染后展示 -->
-                  <div class="detail-full-description markdown-rendered-content" v-html="renderedProductDescription"></div>
+                  <div v-if="renderedProductDescription" class="detail-full-description markdown-rendered-content" v-html="renderedProductDescription"></div>
+                  <p v-else class="detail-empty-hint">作者暂未填写详细的应用介绍。</p>
                 </div>
 
                 <div class="detail-section">
@@ -350,20 +359,65 @@
                       <span class="spec-value">{{ selectedProduct.author_name || selectedProduct.author_id || '@创客' }}</span>
                     </div>
                     <div class="spec-item">
+                      <span class="spec-label">作者 ID</span>
+                      <span class="spec-value mono-val">{{ selectedProduct.author_id || '—' }}</span>
+                    </div>
+                    <div class="spec-item">
                       <span class="spec-label">当前版本</span>
-                      <span class="spec-value mono-val">{{ selectedProduct.version }}</span>
+                      <span class="spec-value mono-val">{{ selectedProduct.version || '未标注' }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">类别属性</span>
-                      <span class="spec-value">{{ selectedProduct.category }}</span>
+                      <span class="spec-value">{{ selectedProduct.category || '未分类' }}</span>
                     </div>
                     <div class="spec-item">
                       <span class="spec-label">定价方案</span>
                       <span class="spec-value">{{ formatPricing(selectedProduct.pricing_model, selectedProduct.price_cny) }}</span>
                     </div>
                     <div class="spec-item">
+                      <span class="spec-label">发布状态</span>
+                      <span class="spec-value spec-success">{{ selectedProduct.status === 'PUBLISHED' ? '已上架' : (selectedProduct.status || '已上架') }}</span>
+                    </div>
+                    <div class="spec-item">
                       <span class="spec-label">上架时间</span>
                       <span class="spec-value mono-val">{{ formatDate(selectedProduct.created_at) }}</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">最近更新</span>
+                      <span class="spec-value mono-val">{{ formatDate(selectedProduct.updated_at || selectedProduct.created_at) }}</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">产品编号</span>
+                      <span class="spec-value mono-val spec-break">{{ selectedProduct.id }}</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">截图数量</span>
+                      <span class="spec-value">{{ selectedProduct.screenshots?.length || 0 }} 张</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <h4 class="section-title">获取与交付</h4>
+                  <div class="spec-grid">
+                    <div class="spec-item">
+                      <span class="spec-label">官方网站</span>
+                      <a v-if="selectedProduct.official_url" :href="selectedProduct.official_url" target="_blank" rel="noopener noreferrer" class="spec-link">{{ selectedProduct.official_url }}</a>
+                      <span v-else class="spec-value spec-muted">暂未提供</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">下载地址</span>
+                      <a v-if="selectedProduct.download_url" :href="selectedProduct.download_url" target="_blank" rel="noopener noreferrer" class="spec-link">{{ selectedProduct.download_url }}</a>
+                      <span v-else class="spec-value spec-muted">暂未提供</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">在线体验</span>
+                      <a v-if="selectedProduct.demo_url" :href="selectedProduct.demo_url" target="_blank" rel="noopener noreferrer" class="spec-link">{{ selectedProduct.demo_url }}</a>
+                      <span v-else class="spec-value spec-muted">暂未提供</span>
+                    </div>
+                    <div class="spec-item">
+                      <span class="spec-label">交付方式</span>
+                      <span class="spec-value">{{ selectedProduct.download_url ? '安装包下载 / 官网直达' : (selectedProduct.official_url || selectedProduct.demo_url ? '官网 / 在线体验' : '联系作者获取') }}</span>
                     </div>
                     <div class="spec-item" style="grid-column: span 2;">
                       <span class="spec-label">商用交付保障</span>
@@ -494,6 +548,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
@@ -503,6 +558,7 @@ import PublishForm from '@/components/PublishForm.vue';
 import { PRODUCT_FIELDS } from '@/config/publishForms';
 import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { trackContentRead } from '@/utils/loyalty';
 import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 import { resolveProductIcon } from '@/utils/builtinIcons';
 
@@ -514,6 +570,9 @@ const props = defineProps({
 });
 
 const emit = defineEmits(['open-register', 'open-login', 'toast']);
+
+const route = useRoute();
+const router = useRouter();
 
 // Current User Session
 const currentUserSession = computed(() => {
@@ -547,7 +606,18 @@ const selectedProduct = ref(null);
 const renderedProductDescription = computed(() =>
   selectedProduct.value ? renderMarkdown(selectedProduct.value.description || '') : ''
 );
-const showPublishPage = ref(false);
+
+const productStats = computed(() => {
+  const p = selectedProduct.value || {};
+  const rating = Number(p.rating_avg || 0);
+  return [
+    { label: '点赞', value: Number(p.like_count ?? p.upvote_count ?? p.upvotes ?? 0) },
+    { label: '收藏', value: Number(p.favorite_count ?? 0) },
+    { label: '评论', value: Number(p.comment_count ?? 0) },
+    { label: '评分', value: rating > 0 ? rating.toFixed(1) : '暂无', sub: p.rating_count ? `${p.rating_count} 人评分` : '' },
+  ];
+});
+const showPublishPage = computed(() => route.query.compose === '1');
 const sentinelRef = ref(null);
 let observer = null;
 
@@ -623,6 +693,7 @@ function handleProductsScroll(e) {
 function selectCategory(catKey) {
   if (currentCategory.value === catKey) return;
   currentCategory.value = catKey;
+  syncShowcaseQuery({ category: catKey === 'ALL' ? undefined : catKey });
   if (productsScrollContainerRef.value) {
     productsScrollContainerRef.value.scrollTop = 0;
   }
@@ -630,6 +701,101 @@ function selectCategory(catKey) {
     handleSemanticSearch();
   } else {
     resetAndReload();
+  }
+}
+
+function selectSort(sortKey) {
+  if (currentSort.value === sortKey) return;
+  currentSort.value = sortKey;
+  syncShowcaseQuery({ sort: sortKey === 'hot' ? undefined : sortKey });
+}
+
+function syncShowcaseQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'hot') delete query[key];
+  }
+  router.replace({
+    name: 'products',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+function normalizeProductList(data) {
+  if (!data) return [];
+  return Array.isArray(data) ? data : (data.items || []);
+}
+
+let applyingRoute = false;
+
+async function applyRouteState({ initial = false } = {}) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = categoryList.some((item) => item.key === route.query.category)
+      ? String(route.query.category)
+      : 'ALL';
+    const sort = sortOptions.some((item) => item.key === route.query.sort)
+      ? String(route.query.sort)
+      : 'hot';
+    const q = String(route.query.q || '').trim();
+    const compose = route.query.compose === '1';
+    const id = route.params.id ? String(route.params.id) : '';
+    const categoryChanged = currentCategory.value !== category;
+
+    currentCategory.value = category;
+    currentSort.value = sort;
+
+    if (compose) {
+      selectedProduct.value = null;
+      return;
+    }
+
+    if (id) {
+      let found = displayProducts.value.find((item) => String(item.id) === id);
+      if (!found) {
+        const res = await dispatchGateway('products.list', {}, { silent: true });
+        if (res.ok) {
+          found = normalizeProductList(res.data).find((item) => String(item.id) === id);
+        }
+      }
+      if (found) {
+        selectedProduct.value = found;
+        trackContentRead('PRODUCT', found.id);
+      } else {
+        selectedProduct.value = null;
+        emit('toast', { title: '作品不存在', message: '该作品可能已下架，或链接地址有误。', type: 'WARN' });
+        router.replace({ name: 'products', query: route.query });
+      }
+      return;
+    }
+
+    selectedProduct.value = null;
+
+    if (q) {
+      searchQuery.value = q;
+      if (!displayProducts.value.length) {
+        await fetchProductsPage(1, false);
+      }
+      if (q !== activeSearchQuery.value) {
+        await handleSemanticSearch({ updateUrl: false, quiet: true });
+      }
+      return;
+    }
+
+    if (isSemanticSearchActive.value) {
+      await handleClearSearch({ updateUrl: false, quiet: true });
+      return;
+    }
+
+    if (initial || categoryChanged || displayProducts.value.length === 0) {
+      resetAndReload();
+    }
+  } finally {
+    applyingRoute = false;
   }
 }
 
@@ -662,10 +828,10 @@ function computeTextSemanticScore(query, text) {
   return Math.min(0.999, Math.max(0.15, score));
 }
 
-async function handleSemanticSearch() {
+async function handleSemanticSearch(options = {}) {
   const query = searchQuery.value.trim();
   if (!query) {
-    handleClearSearch();
+    handleClearSearch(options);
     return;
   }
 
@@ -684,11 +850,13 @@ async function handleSemanticSearch() {
       isSemanticSearchActive.value = true;
       activeSearchQuery.value = query;
       hasMore.value = false;
-      emit('toast', {
-        title: '搜索完成',
-        message: `已为您找到 ${res.data.items.length} 款相关作品。`,
-        type: 'SUCCESS',
-      });
+      if (!options.quiet) {
+        emit('toast', {
+          title: '搜索完成',
+          message: `已为您找到 ${res.data.items.length} 款相关作品。`,
+          type: 'SUCCESS',
+        });
+      }
     } else {
       // In-browser fallback scoring over current products
       const scored = displayProducts.value.map((item) => {
@@ -707,11 +875,13 @@ async function handleSemanticSearch() {
       isSemanticSearchActive.value = true;
       activeSearchQuery.value = query;
       hasMore.value = false;
-      emit('toast', {
-        title: '搜索完成',
-        message: `已为您匹配相关商业作品。`,
-        type: 'SUCCESS',
-      });
+      if (!options.quiet) {
+        emit('toast', {
+          title: '搜索完成',
+          message: `已为您匹配相关商业作品。`,
+          type: 'SUCCESS',
+        });
+      }
     }
   } catch (e) {
     const scored = displayProducts.value.map((item) => {
@@ -732,14 +902,18 @@ async function handleSemanticSearch() {
     hasMore.value = false;
   } finally {
     isSearching.value = false;
+    if (options.updateUrl !== false && activeSearchQuery.value === query) {
+      syncShowcaseQuery({ q: query });
+    }
   }
 }
 
-function handleClearSearch() {
+function handleClearSearch(options = {}) {
   searchQuery.value = '';
   activeSearchQuery.value = '';
   isSemanticSearchActive.value = false;
   invalidateClientCache();
+  if (options.updateUrl !== false) syncShowcaseQuery({ q: undefined });
   resetAndReload();
 }
 
@@ -829,12 +1003,13 @@ function handleManualRefresh() {
   emit('toast', { title: '缓存已刷新', message: '已同步最新数据库橱窗作品与打榜排行。', type: 'INFO' });
 }
 
-// Watch filters to trigger reload
-watch(currentCategory, () => {
-  if (!isSemanticSearchActive.value) {
-    resetAndReload();
+// Route-driven list state (/products?category=&sort=&q=&compose=1)
+watch(
+  () => [route.params.id, route.query.category, route.query.sort, route.query.q, route.query.compose],
+  () => {
+    applyRouteState();
   }
-});
+);
 
 // Sorted & Filtered Products Display
 const sortedDisplayProducts = computed(() => {
@@ -912,11 +1087,18 @@ function handleInteractionChanged(item, payload) {
 }
 
 function openProductDetail(item) {
+  if (!item) return;
   selectedProduct.value = item;
+  trackContentRead('PRODUCT', item.id);
+  const id = String(item.id || '');
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'products', params: { id }, query: route.query });
+  }
 }
 
 function closeProductDetail() {
   selectedProduct.value = null;
+  router.push({ name: 'products', query: route.query });
 }
 
 function handleOpenPublish() {
@@ -929,12 +1111,22 @@ function handleOpenPublish() {
     emit('open-login');
     return;
   }
-  showPublishPage.value = true;
+  router.push({
+    name: 'products',
+    params: route.params.id ? { id: route.params.id } : {},
+    query: { ...route.query, compose: '1' },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closePublishPage() {
-  showPublishPage.value = false;
+  const query = { ...route.query };
+  delete query.compose;
+  router.push({
+    name: 'products',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
 }
 
 // Submit publish form to backend microkernel DAG
@@ -1091,9 +1283,9 @@ function handleMouseMove(e) {
   card.style.setProperty('--mouse-y', `${y}px`);
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
-    fetchProductsPage(1, false);
+  await applyRouteState({ initial: true });
   nextTick(() => {
     setupIntersectionObserver();
   });
@@ -2158,11 +2350,91 @@ onUnmounted(() => {
   padding-right: 0;
 }
 
+.detail-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.overview-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 12px 8px;
+  border-radius: var(--radius-md);
+  background: var(--glass-surface-subtle);
+  border: 1px solid var(--glass-border-subtle);
+}
+
+.overview-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.overview-stat-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.overview-stat-sub {
+  font-size: 10px;
+  color: var(--text-tertiary);
+}
+
 .section-title {
   font-size: 14px;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0 0 10px 0;
+}
+
+.detail-empty-hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+}
+
+.spec-link {
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 62%;
+  text-align: right;
+}
+
+.spec-link:hover {
+  text-decoration: underline;
+}
+
+.spec-muted {
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+.spec-break {
+  overflow-wrap: anywhere;
+  word-break: break-all;
+  text-align: right;
+  max-width: 62%;
+}
+
+@media (max-width: 640px) {
+  .detail-overview-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .spec-grid {
+    grid-template-columns: 1fr;
+  }
+  .spec-item {
+    gap: 10px;
+  }
 }
 
 .detail-screenshots-section {

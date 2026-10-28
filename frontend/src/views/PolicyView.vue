@@ -31,6 +31,18 @@
       <div class="policy-feed-layout">
         <!-- Main Policy Stream (左侧政策流) -->
         <section class="policy-feed-stream">
+          <WorkspaceHeader
+            eyebrow="POLICY RADAR"
+            meta="NATIONAL / PROVINCIAL / PARK"
+            title="政策雷达"
+            description="把分散在部委、省市与园区的扶持政策收进一张可检索的清单，按主体、地区与营收判断可申报红利。"
+            :stats="[
+              { value: totalCount, label: '收录政策' },
+              { value: getCategoryCount('TAX'), label: '税费减免' },
+              { value: getCategoryCount('SUBSIDY'), label: '创业补贴' },
+            ]"
+          />
+
           <!-- Category Filter Bar (政策分区选项卡 + 搜索 + 排序选择 + 刷新) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -51,7 +63,7 @@
 
             <div class="feed-filter-right">
               <!-- Search Box -->
-              <div class="semantic-search-box">
+              <div class="semantic-search-box" :class="{ searching: isSearching }">
                 <div class="search-input-wrap">
                   <input
                     v-model="searchQuery"
@@ -62,18 +74,6 @@
                   />
                   <button v-if="searchQuery" type="button" class="clear-search-btn" @click="resetSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  :disabled="isSearching"
-                  @click="handleSearch"
-                  title="语义检索"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
-                  </svg>
-                  <span>{{ isSearching ? '检索中...' : '语义检索' }}</span>
-                </button>
               </div>
 
               <!-- Sort Segmented -->
@@ -83,7 +83,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -534,13 +534,23 @@
       </div>
     </div>
 
+    <PolicyEligibilityWizard
+      :visible="showEligibility"
+      :policy="eligibilityPolicy"
+      :initial-income="quarterlyIncome"
+      @close="showEligibility = false"
+      @open-policy="handleWizardPolicy"
+      @toast="$emit('toast', $event)"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
+import PolicyEligibilityWizard from '@/components/policy/PolicyEligibilityWizard.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
 import OfficialBadge from '@/components/OfficialBadge.vue';
@@ -548,6 +558,7 @@ import PublishForm from '@/components/PublishForm.vue';
 import { POLICY_FIELDS } from '@/config/publishForms';
 import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { trackContentRead } from '@/utils/loyalty';
 import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
 const emit = defineEmits(['toast', 'open-login']);
@@ -555,6 +566,9 @@ const emit = defineEmits(['toast', 'open-login']);
 const props = defineProps({
   userSession: { type: Object, default: null },
 });
+
+const route = useRoute();
+const router = useRouter();
 
 const currentUserSession = computed(() => {
   if (props.userSession) return props.userSession;
@@ -570,8 +584,11 @@ function handleInteractionChanged(item, payload) {
   applyBarChange(item, payload);
 }
 
-// Policies raw list from database
+// Policies raw list from database. `policies` is the currently visible result
+// set (search may narrow it); `allPolicies` keeps the unfiltered catalog so a
+// deep link can always resolve a detail without depending on the active query.
 const policies = ref([]);
+const allPolicies = ref([]);
 const isLoading = ref(false);
 const isSearching = ref(false);
 const isSearchActive = ref(false);
@@ -604,8 +621,11 @@ const taxResult = ref({
   vat_due: 0,
 });
 
-// Modal state
+// Detail state is derived from the route (/policies/:id), not a private ref.
 const selectedPolicy = ref(null);
+const policyScrollContainerRef = ref(null);
+const showEligibility = ref(false);
+const eligibilityPolicy = ref(null);
 
 // 详情正文渲染：发布侧为富文本（Markdown）；卡片/标签预览退回纯文本
 const renderedPolicySummary = computed(() =>
@@ -617,8 +637,10 @@ function summaryExcerpt(item) {
 }
 const aiSummaryResult = ref(null);
 const isAiSummarizing = ref(false);
-const showPublishPage = ref(false);
 const isPublishing = ref(false);
+
+// The publishing surface is a URL state too: /policies?compose=1
+const showPublishPage = computed(() => route.query.compose === '1');
 
 const publishForm = ref({
   title: '',
@@ -635,15 +657,23 @@ const publishForm = ref({
 });
 
 // Lifecycle: lock body scroll to feed like ShowcaseView & ForumView
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
-  loadPolicies();
+  await loadPolicies();
+  await applyRouteState();
   calculateTax();
 });
 
 onUnmounted(() => {
   document.body.classList.remove('fixed-screen-feed');
 });
+
+watch(
+  () => [route.params.id, route.query.q, route.query.category, route.query.sort, route.query.compose],
+  () => {
+    applyRouteState();
+  }
+);
 
 // Load policies from API
 async function loadPolicies() {
@@ -652,6 +682,7 @@ async function loadPolicies() {
     const res = await dispatchGateway('policies.list', {});
     if (res.ok && res.data) {
       policies.value = Array.isArray(res.data) ? res.data : (res.data.items || []);
+      allPolicies.value = [...policies.value];
       await enrichInteractions(policies.value, 'POLICY');
     } else {
       console.warn('policies.list responded with non-ok status:', res.status);
@@ -668,15 +699,95 @@ async function loadPolicies() {
   }
 }
 
+const VALID_CATEGORIES = new Set(categoryList.map((item) => item.key));
+const VALID_SORTS = new Set(sortOptions.map((item) => item.key));
+
+function syncListQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'relevance') delete query[key];
+  }
+  router.replace({
+    name: 'policies',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+let applyingRoute = false;
+
+/**
+ * URL is the source of truth for list filters + detail id.
+ * Deep links, browser back/forward and hard refresh all land here.
+ */
+async function applyRouteState() {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = String(route.query.category || '').toUpperCase();
+    currentCategory.value = VALID_CATEGORIES.has(category) ? category : 'ALL';
+    const sort = String(route.query.sort || '');
+    currentSort.value = VALID_SORTS.has(sort) ? sort : 'relevance';
+
+    const q = String(route.query.q || '').trim();
+    if (q && q !== activeSearchQuery.value) {
+      searchQuery.value = q;
+      await handleSearch({ updateUrl: false, quiet: true });
+    } else if (!q && isSearchActive.value) {
+      await resetSearch({ updateUrl: false, quiet: true });
+    }
+
+    if (route.query.compose === '1') {
+      selectedPolicy.value = null;
+      return;
+    }
+
+    const id = route.params.id ? String(route.params.id) : '';
+    if (!id) {
+      selectedPolicy.value = null;
+      return;
+    }
+
+    let found = allPolicies.value.find((item) => String(item.id || item.code) === id);
+    if (!found) {
+      await loadPolicies();
+      found = allPolicies.value.find((item) => String(item.id || item.code) === id);
+    }
+    if (found) {
+      selectedPolicy.value = found;
+      aiSummaryResult.value = null;
+      trackContentRead('POLICY', found.id);
+    } else {
+      selectedPolicy.value = null;
+      emit('toast', {
+        title: '政策不存在',
+        message: '该政策可能已下架，或链接地址有误。',
+        type: 'WARN',
+      });
+      router.replace({ name: 'policies', query: route.query });
+    }
+  } finally {
+    applyingRoute = false;
+  }
+}
+
 // Category filter
 function selectCategory(catKey) {
   currentCategory.value = catKey;
+  syncListQuery({ category: catKey === 'ALL' ? undefined : catKey });
 }
 
-const totalCount = computed(() => policies.value.length);
+function selectSort(sortKey) {
+  currentSort.value = sortKey;
+  syncListQuery({ sort: sortKey === 'relevance' ? undefined : sortKey });
+}
+
+const totalCount = computed(() => allPolicies.value.length);
 
 function getCategoryCount(catKey) {
-  return policies.value.filter((p) => (p.category || '').toUpperCase() === catKey.toUpperCase()).length;
+  return allPolicies.value.filter((p) => (p.category || '').toUpperCase() === catKey.toUpperCase()).length;
 }
 
 const currentCategoryLabel = computed(() => {
@@ -719,10 +830,10 @@ const sortedDisplayPolicies = computed(() => {
 });
 
 // Search handling
-async function handleSearch() {
+async function handleSearch(options = {}) {
   const q = searchQuery.value.trim();
   if (!q) {
-    resetSearch();
+    resetSearch(options);
     return;
   }
 
@@ -755,11 +866,15 @@ async function handleSearch() {
       isSearchActive.value = true;
       activeSearchQuery.value = q;
 
-      emit('toast', {
-        title: '向量语义检索',
-        message: `已基于特征词 “${q}” 智能召回 ${policies.value.length} 条最匹配政策！`,
-        type: 'SUCCESS',
-      });
+      if (options.updateUrl !== false) syncListQuery({ q });
+
+      if (!options.quiet) {
+        emit('toast', {
+          title: '向量语义检索',
+          message: `已基于特征词 “${q}” 智能召回 ${policies.value.length} 条最匹配政策！`,
+          type: 'SUCCESS',
+        });
+      }
     } else {
       // RAG 无召回时诚实回退：加载全量列表后按本地关键词过滤（不注入伪相关度）
       await loadPolicies();
@@ -772,13 +887,17 @@ async function handleSearch() {
       isSearchActive.value = true;
       activeSearchQuery.value = q;
 
-      emit('toast', {
-        title: '关键词筛选完成',
-        message: policies.value.length > 0
-          ? `按关键词 “${q}” 本地筛选出 ${policies.value.length} 条政策。`
-          : `未找到与 “${q}” 相关的政策。`,
-        type: 'INFO',
-      });
+      if (options.updateUrl !== false) syncListQuery({ q });
+
+      if (!options.quiet) {
+        emit('toast', {
+          title: '关键词筛选完成',
+          message: policies.value.length > 0
+            ? `按关键词 “${q}” 本地筛选出 ${policies.value.length} 条政策。`
+            : `未找到与 “${q}” 相关的政策。`,
+          type: 'INFO',
+        });
+      }
     }
   } catch (err) {
     isSearchActive.value = false;
@@ -792,11 +911,12 @@ async function handleSearch() {
   }
 }
 
-async function resetSearch() {
+async function resetSearch(options = {}) {
   searchQuery.value = '';
   isSearchActive.value = false;
   activeSearchQuery.value = '';
   await loadPolicies();
+  if (options.updateUrl !== false) syncListQuery({ q: undefined });
 }
 
 function quickSearchKeyword(keyword) {
@@ -846,36 +966,18 @@ async function calculateTax() {
   }
 }
 
-// Eligibility Match
-async function matchEligibility(p) {
-  try {
-    const res = await dispatchGateway('policies.match', {
-      quarterly_income: Number(quarterlyIncome.value) || 0,
-      maker_type: 'INDIVIDUAL',
-      region: p.region || '全国统一',
-      search_query: p.title,
-    });
+// Eligibility Match → guided 30-second wizard instead of a one-shot toast.
+function matchEligibility(p) {
+  eligibilityPolicy.value = p || null;
+  showEligibility.value = true;
+}
 
-    if (res.ok && res.data) {
-      emit('toast', {
-        title: `资格评估 · ${p.code || p.title}`,
-        message: res.data.explanation || (res.data.eligible ? '当前创客主体指标符合申报条件！' : '暂不符合该政策的申报条件，可查看其他政策。'),
-        type: res.data.eligible ? 'SUCCESS' : 'INFO',
-      });
-    } else {
-      emit('toast', {
-        title: '政策资格匹配失败',
-        message: res.error || `未能完成【${p.title}】的资格比对，请稍后重试。`,
-        type: 'ERROR',
-      });
-    }
-  } catch (e) {
-    emit('toast', {
-      title: '政策资格比对异常',
-      message: '匹配服务暂时不可用，请稍后重试。',
-      type: 'ERROR',
-    });
-  }
+function handleWizardPolicy(item) {
+  if (!item) return;
+  const found = allPolicies.value.find(
+    (policy) => String(policy.id || policy.code) === String(item.id || item.code)
+  );
+  openPolicyDetail(found || item);
 }
 
 // Quick AI Summarize
@@ -921,18 +1023,25 @@ async function summarizePolicyWithAI(p) {
   }
 }
 
-// Detail Modal
+// Detail route: /policies/:id
 function openPolicyDetail(p) {
+  if (!p) return;
+  const id = String(p.id || p.code || '');
   selectedPolicy.value = p;
   aiSummaryResult.value = null;
+  trackContentRead('POLICY', p.id);
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'policies', params: { id }, query: route.query });
+  }
 }
 
 function closePolicyDetail() {
   selectedPolicy.value = null;
   aiSummaryResult.value = null;
+  router.push({ name: 'policies', query: route.query });
 }
 
-// Publish Modal
+// Publish surface: /policies?compose=1
 function openPublishPage() {
   publishForm.value = {
     title: '',
@@ -947,12 +1056,22 @@ function openPublishPage() {
     legal_basis: '国家相关部委扶持指引公告',
     action_text: '匹配资格',
   };
-  showPublishPage.value = true;
+  router.push({
+    name: 'policies',
+    params: route.params.id ? { id: route.params.id } : {},
+    query: { ...route.query, compose: '1' },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closePublishPage() {
-  showPublishPage.value = false;
+  const query = { ...route.query };
+  delete query.compose;
+  router.push({
+    name: 'policies',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
 }
 
 async function submitPublishPolicy() {
@@ -993,7 +1112,7 @@ async function submitPublishPolicy() {
         message: `《${publishForm.value.title}》已通过平台审核并发布；官方账号发布的内容会自动打上官方标签。`,
         type: 'SUCCESS',
       });
-      showPublishPage.value = false;
+      closePublishPage();
       await loadPolicies();
     } else {
       emit('toast', {

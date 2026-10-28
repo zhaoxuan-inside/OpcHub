@@ -127,20 +127,20 @@ def test_client_supplied_official_tag_is_ignored(client):
     assert body["data"]["is_official"] is False
 
 
-def test_seeded_curated_content_is_official(client):
-    """平台内置的政策/法条种子数据属官方发布。
-
-    其它测试可能清空过域内单例，这里先幂等重建种子（_init_seeds 只补缺）。
-    """
+def test_curated_content_is_official(client):
+    """平台策展内容可标记为官方发布（测试夹具模拟策展数据）。"""
     from src.domains.policies.service import policy_service
     from src.domains.compliance.service import compliance_service
+    from tests.catalog_fixtures import seed_compliance, seed_policies
 
-    policy_service._init_seeds()
-    compliance_service._init_seeds()
+    if not policy_service._policies:
+        seed_policies(policy_service)
+    if not compliance_service._laws:
+        seed_compliance(compliance_service)
 
     policies = {p["id"]: p for p in gw_data(client, "policies.list", {})}
     seed = policies.get("pol_vat_exemption_2026")
-    assert seed, "policy seed pol_vat_exemption_2026 missing"
+    assert seed, "curated policy pol_vat_exemption_2026 missing"
     assert seed["is_official"] is True
 
     laws = {l["id"]: l for l in gw_data(client, "compliance.laws", {})}

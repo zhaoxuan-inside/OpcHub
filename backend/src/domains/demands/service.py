@@ -1,10 +1,7 @@
 """Demands service managing corporate outsourcing requirements and maker bids."""
-import json
-import logging
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from src.domains.demands.models import (
@@ -15,34 +12,9 @@ from src.domains.demands.models import (
 )
 from src.infrastructure.database.persistence import domain_persistence
 
-logger = logging.getLogger("opchub.demands")
-
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
-
-
-def _load_demand_seeds() -> Dict[str, Dict[str, Any]]:
-    """Load baseline corporate demand seeds from an external data file.
-
-    Maintains strict code, config, and data separation: zero demand records hardcoded in source.
-    """
-    search_paths = [
-        Path("backend/data/seeds/demands.json"),
-        Path("data/seeds/demands.json"),
-        Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "demands.json",
-    ]
-    for p in search_paths:
-        if p.is_file():
-            try:
-                with open(p, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception as e:
-                logger.warning("Failed to load demand seeds from %s: %s", p, e)
-    return {}
-
-
-DEFAULT_DEMAND_SEEDS: Dict[str, Dict[str, Any]] = _load_demand_seeds()
 
 
 class DemandService:
@@ -53,16 +25,10 @@ class DemandService:
         self._bids: Dict[str, List[BidResponse]] = {}
         # Key: cache_key -> (timestamp, data_dict)
         self._cache: Dict[str, tuple[float, Any]] = {}
-        self._init_seeds()
 
-    def _init_seeds(self) -> None:
-        """Initialize the in-memory marketplace catalog from external data seeds."""
-        for did, data in DEFAULT_DEMAND_SEEDS.items():
-            if did not in self._demands:
-                demand = DemandResponse(**data)
-                self._demands[did] = demand
-                self._bids.setdefault(did, [])
-                domain_persistence.write("demands.items", did, demand)
+    def _require_db(self) -> None:
+        """Demand content is database-backed; refuse memory-only mutations."""
+        domain_persistence.require("demands")
 
     def invalidate_cache(self) -> int:
         """Evict all cached demands list pages."""
@@ -85,6 +51,7 @@ class DemandService:
         self._cache[key] = (time.time(), data)
 
     def create_demand(self, payload: DemandCreate) -> DemandResponse:
+        self._require_db()
         did = str(uuid.uuid4())
         now = datetime.now(timezone.utc)
         deadline = (now + timedelta(days=payload.deadline_days)).isoformat()
@@ -178,6 +145,7 @@ class DemandService:
         return res
 
     def submit_bid(self, demand_id: str, payload: BidCreate) -> BidResponse:
+        self._require_db()
         if demand_id not in self._demands:
             raise KeyError(f"Demand {demand_id} not found")
         demand = self._demands[demand_id]
@@ -266,6 +234,7 @@ class DemandService:
         }
 
     def delete_demand(self, demand_id: str) -> bool:
+        self._require_db()
         if demand_id in self._demands:
             del self._demands[demand_id]
             domain_persistence.delete("demands.items", demand_id)
@@ -275,6 +244,7 @@ class DemandService:
         return False
 
     def delete_bid(self, demand_id: str, bid_id: str) -> bool:
+        self._require_db()
         if demand_id in self._demands and demand_id in self._bids:
             original_len = len(self._bids[demand_id])
             self._bids[demand_id] = [b for b in self._bids[demand_id] if b.id != bid_id]

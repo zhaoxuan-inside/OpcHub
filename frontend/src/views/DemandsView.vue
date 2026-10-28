@@ -27,6 +27,18 @@
       <div class="demands-feed-layout">
         <!-- Main Demand Stream (左侧商机流) -->
         <section class="demands-feed-stream">
+          <WorkspaceHeader
+            eyebrow="MARKET / DEMAND BOARD"
+            meta="POST / BID / DELIVER"
+            title="需求集市"
+            description="把能力短板变成可交易的委托。发布需求、提交方案、按里程碑交付，让一个人的公司也能调用外部专家。"
+            :stats="[
+              { value: totalCount || sortedDisplayDemands.length, label: '在招委托' },
+              { value: hotRankDemands.length, label: '今日热榜' },
+              { value: categoryList.length - 1, label: '需求分类' },
+            ]"
+          />
+
           <!-- Category Filter Bar (商机分区选项卡 + 搜索 + 排序选择) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -44,7 +56,7 @@
 
             <div class="feed-filter-right">
               <!-- Search Box -->
-              <div class="semantic-search-box">
+              <div class="semantic-search-box" :class="{ searching: isSearching }">
                 <div class="search-input-wrap">
                   <input
                     v-model="searchQuery"
@@ -55,18 +67,6 @@
                   />
                   <button v-if="searchQuery" type="button" class="clear-search-btn" @click="handleClearSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  :disabled="isSearching"
-                  @click="handleSearch"
-                  title="搜索"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                  </svg>
-                  <span>{{ isSearching ? '搜索中...' : '搜索' }}</span>
-                </button>
               </div>
 
               <div class="sort-segmented">
@@ -75,7 +75,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -524,6 +524,7 @@
 
 <script setup>
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
@@ -533,9 +534,13 @@ import PublishForm from '@/components/PublishForm.vue';
 import { DEMAND_FIELDS } from '@/config/publishForms';
 import CreatePageLayout from '@/components/CreatePageLayout.vue';
 import { enrichInteractions, applyBarChange } from '@/utils/contentInteractions';
+import { trackContentRead } from '@/utils/loyalty';
 import { renderMarkdown, stripMarkdown } from '@/utils/markdown';
 
 const emit = defineEmits(['open-login', 'toast']);
+
+const route = useRoute();
+const router = useRouter();
 
 function handleInteractionChanged(item, payload) {
   applyBarChange(item, payload);
@@ -575,7 +580,7 @@ const renderedDemandDescription = computed(() =>
 function descriptionExcerpt(item) {
   return stripMarkdown(item?.description || '');
 }
-const showPublishPage = ref(false);
+const showPublishPage = computed(() => route.query.compose === '1');
 const bidTarget = ref(null);
 const sentinelRef = ref(null);
 const demandsScrollContainerRef = ref(null);
@@ -767,19 +772,116 @@ function handleDemandsScroll(e) {
   }
 }
 
+function syncDemandsQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'new') delete query[key];
+  }
+  router.replace({
+    name: 'demands',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+function normalizeDemandList(data) {
+  if (!data) return [];
+  return Array.isArray(data) ? data : (data.items || []);
+}
+
+function findDemand(id) {
+  return displayDemands.value.find((item) => String(item.id) === id);
+}
+
+let applyingRoute = false;
+
+async function applyRouteState({ initial = false } = {}) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = categoryList.some((item) => item.key === route.query.category)
+      ? String(route.query.category)
+      : 'ALL';
+    const sort = sortOptions.some((item) => item.key === route.query.sort)
+      ? String(route.query.sort)
+      : 'new';
+    const q = String(route.query.q || '').trim();
+    const compose = route.query.compose === '1';
+    const id = route.params.id ? String(route.params.id) : '';
+    const categoryChanged = currentCategory.value !== category;
+
+    currentCategory.value = category;
+    currentSort.value = sort;
+
+    if (compose) {
+      selectedDemand.value = null;
+      return;
+    }
+
+    if (id) {
+      let found = findDemand(id);
+      if (!found) {
+        const res = await dispatchGateway('demands.list', {}, { silent: true });
+        if (res.ok) found = normalizeDemandList(res.data).find((item) => String(item.id) === id);
+      }
+      if (found) {
+        selectedDemand.value = found;
+        trackContentRead('DEMAND', found.id);
+      } else {
+        selectedDemand.value = null;
+        emit('toast', { title: '委托不存在', message: '该需求可能已关闭，或链接地址有误。', type: 'WARN' });
+        router.replace({ name: 'demands', query: route.query });
+      }
+      return;
+    }
+
+    selectedDemand.value = null;
+
+    if (q) {
+      searchQuery.value = q;
+      if (q !== activeSearchQuery.value) {
+        await handleSearch({ updateUrl: false, quiet: true });
+      }
+      return;
+    }
+
+    if (isSearchActive.value) {
+      await handleClearSearch({ updateUrl: false, quiet: true });
+      return;
+    }
+
+    if (initial || categoryChanged || displayDemands.value.length === 0) {
+      resetAndReload();
+    }
+  } finally {
+    applyingRoute = false;
+  }
+}
+
+function selectSort(sortKey) {
+  if (currentSort.value === sortKey) return;
+  currentSort.value = sortKey;
+  syncDemandsQuery({ sort: sortKey === 'new' ? undefined : sortKey });
+}
+
 function selectCategory(catKey) {
   if (currentCategory.value === catKey) return;
   currentCategory.value = catKey;
+  syncDemandsQuery({ category: catKey === 'ALL' ? undefined : catKey });
+  if (demandsScrollContainerRef.value) demandsScrollContainerRef.value.scrollTop = 0;
   if (isSearchActive.value && searchQuery.value.trim()) {
     handleSearch();
+  } else {
+    resetAndReload();
   }
-  // 列表重载统一由 watch(currentCategory) 驱动，避免同一动作双重拉取
 }
 
-async function handleSearch() {
+async function handleSearch(options = {}) {
   const query = searchQuery.value.trim();
   if (!query) {
-    handleClearSearch();
+    handleClearSearch(options);
     return;
   }
 
@@ -800,11 +902,13 @@ async function handleSearch() {
       isSearchActive.value = true;
       activeSearchQuery.value = query;
       hasMore.value = false;
-      emit('toast', {
-        title: '搜索完成',
-        message: `已为您找到 ${items.length} 条相关企业委托。`,
-        type: 'SUCCESS',
-      });
+      if (!options.quiet) {
+        emit('toast', {
+          title: '搜索完成',
+          message: `已为您找到 ${items.length} 条相关企业委托。`,
+          type: 'SUCCESS',
+        });
+      }
     } else {
       emit('toast', {
         title: '搜索未完成',
@@ -820,14 +924,18 @@ async function handleSearch() {
     });
   } finally {
     isSearching.value = false;
+    if (options.updateUrl !== false && activeSearchQuery.value === query) {
+      syncDemandsQuery({ q: query });
+    }
   }
 }
 
-function handleClearSearch() {
+function handleClearSearch(options = {}) {
   searchQuery.value = '';
   activeSearchQuery.value = '';
   isSearchActive.value = false;
   invalidateClientCache();
+  if (options.updateUrl !== false) syncDemandsQuery({ q: undefined });
   resetAndReload();
 }
 
@@ -914,15 +1022,13 @@ function handleManualRefresh() {
   emit('toast', { title: '缓存已刷新', message: '已同步最新数据库企业委托与竞标热榜。', type: 'INFO' });
 }
 
-// Watch filters to trigger reload
-watch(currentCategory, () => {
-  if (demandsScrollContainerRef.value) {
-    demandsScrollContainerRef.value.scrollTop = 0;
+// Route-driven list state (/demands?category=&sort=&q=&compose=1)
+watch(
+  () => [route.params.id, route.query.category, route.query.sort, route.query.q, route.query.compose],
+  () => {
+    applyRouteState();
   }
-  if (!isSearchActive.value) {
-    resetAndReload();
-  }
-});
+);
 
 // Sorted & Filtered Demands Display
 const sortedDisplayDemands = computed(() => {
@@ -979,11 +1085,18 @@ function setupIntersectionObserver() {
 
 // Modal controls
 function openDemandDetail(item) {
+  if (!item) return;
   selectedDemand.value = item;
+  trackContentRead('DEMAND', item.id);
+  const id = String(item.id || '');
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'demands', params: { id }, query: route.query });
+  }
 }
 
 function closeDemandDetail() {
   selectedDemand.value = null;
+  router.push({ name: 'demands', query: route.query });
 }
 
 function handleOpenPublish() {
@@ -996,12 +1109,22 @@ function handleOpenPublish() {
     emit('open-login');
     return;
   }
-  showPublishPage.value = true;
+  router.push({
+    name: 'demands',
+    params: route.params.id ? { id: route.params.id } : {},
+    query: { ...route.query, compose: '1' },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closePublishPage() {
-  showPublishPage.value = false;
+  const query = { ...route.query };
+  delete query.compose;
+  router.push({
+    name: 'demands',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
 }
 
 async function submitPublishDemand() {
@@ -1116,9 +1239,9 @@ async function submitBid() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
-  fetchDemandsPage(1, false);
+  await applyRouteState({ initial: true });
   nextTick(() => {
     setupIntersectionObserver();
   });

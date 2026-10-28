@@ -32,6 +32,18 @@
       <div class="compliance-feed-layout">
         <!-- Main Compliance Stream (左侧法条/案例流) -->
         <section class="compliance-feed-stream">
+          <WorkspaceHeader
+            eyebrow="COMPLIANCE / KNOWLEDGE BASE"
+            meta="LAW / CASE / CHECKLIST"
+            title="合规指南"
+            description="把法条、监管案例与实操清单放在同一个阅读面上。先看依据，再看后果，最后落到可执行的检查项。"
+            :stats="[
+              { value: laws.length, label: '收录法条' },
+              { value: cases.length, label: '避坑案例' },
+              { value: getCategoryCount('HOT'), label: '今日热门' },
+            ]"
+          />
+
           <!-- Category Filter Bar (分类选项卡 + 搜索 + 排序 + 发布) -->
           <div class="glass-box feed-filter-bar">
             <div class="category-tabs-scroll">
@@ -62,17 +74,6 @@
                   />
                   <button v-if="searchQuery" type="button" class="clear-search-btn" @click="resetSearch" title="清空搜索">×</button>
                 </div>
-                <button
-                  type="button"
-                  class="btn-liquid semantic-search-btn"
-                  @click="handleSearch"
-                  title="关键词本地筛选"
-                >
-                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-                  </svg>
-                  <span>筛选</span>
-                </button>
               </div>
 
               <!-- Sort Segmented (热门打榜默认) -->
@@ -82,7 +83,7 @@
                   :key="opt.key"
                   type="button"
                   :class="['sort-pill', { active: currentSort === opt.key }]"
-                  @click="currentSort = opt.key"
+                  @click="selectSort(opt.key)"
                 >
                   <OpcIcon :name="opt.icon" :size="13" /> {{ opt.label }}
                 </button>
@@ -322,6 +323,9 @@
                 <button v-if="!isSearchActive && currentCategory !== 'ALL'" class="btn-liquid-outline" @click="resetSearch">
                   重置筛选条件
                 </button>
+                <button class="btn-liquid" @click="openPublishModal">
+                  增加合规指南
+                </button>
               </div>
             </div>
           </div>
@@ -342,6 +346,14 @@
                 <p class="creator-desc">法条 · 案例 · 热门打榜</p>
               </div>
             </div>
+
+            <button class="btn-liquid btn-creator-publish" @click="openPublishModal">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              <span>增加合规指南</span>
+            </button>
 
             <div class="creator-quick-links">
               <span class="quick-pill" @click="selectCategory('LAW')">法条</span>
@@ -401,6 +413,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
 import OfficialBadge from '@/components/OfficialBadge.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
@@ -417,6 +430,9 @@ import {
 } from '@/config/compliancePage';
 
 const emit = defineEmits(['toast', 'open-login']);
+
+const route = useRoute();
+const router = useRouter();
 
 // 当前登录会话（页面未接收 userSession prop，与 SopView 同样从本地存储读取）
 function safeSession() {
@@ -481,10 +497,18 @@ const publishForm = ref({
 });
 
 // Lifecycle: lock body scroll to feed like PolicyView
-onMounted(() => {
+onMounted(async () => {
   document.body.classList.add('fixed-screen-feed');
-  loadAll();
+  await loadAll();
+  await applyRouteState({ initial: true });
 });
+
+watch(
+  () => [route.params.id, route.query.category, route.query.sort, route.query.q, route.query.compose],
+  () => {
+    applyRouteState();
+  }
+);
 
 watch(currentViewMode, (mode) => {
   if (mode === 'list') {
@@ -523,9 +547,89 @@ async function handleManualRefresh() {
   await loadAll();
 }
 
+function syncComplianceQuery(patch = {}) {
+  const query = { ...route.query, ...patch };
+  for (const [key, value] of Object.entries(query)) {
+    if (value === undefined || value === null || value === '') delete query[key];
+    if (key === 'category' && value === 'ALL') delete query[key];
+    if (key === 'sort' && value === 'hot') delete query[key];
+  }
+  router.replace({
+    name: 'compliance',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
+}
+
+let applyingRoute = false;
+
+async function applyRouteState({ initial = false } = {}) {
+  if (applyingRoute) return;
+  applyingRoute = true;
+  try {
+    const category = categoryList.some((item) => item.key === route.query.category)
+      ? String(route.query.category)
+      : 'ALL';
+    const sort = COMPLIANCE_SORT_OPTIONS.some((item) => item.key === route.query.sort)
+      ? String(route.query.sort)
+      : 'hot';
+    const q = String(route.query.q || '').trim();
+    const compose = route.query.compose === '1';
+    const id = route.params.id ? String(route.params.id) : '';
+
+    currentCategory.value = category;
+    currentSort.value = sort;
+
+    if (compose) {
+      currentViewMode.value = 'create';
+      selectedItem.value = null;
+      return;
+    }
+
+    currentViewMode.value = 'list';
+
+    if (id) {
+      let found = [...laws.value, ...cases.value].find((item) => String(item.id) === id);
+      if (!found) {
+        await loadAll();
+        found = [...laws.value, ...cases.value].find((item) => String(item.id) === id);
+      }
+      if (found) {
+        selectedItem.value = found;
+      } else {
+        selectedItem.value = null;
+        emit('toast', { title: '条目不存在', message: '该法条或案例可能已下架，或链接地址有误。', type: 'WARN' });
+        router.replace({ name: 'compliance', query: route.query });
+      }
+      return;
+    }
+
+    selectedItem.value = null;
+
+    if (q) {
+      searchQuery.value = q;
+      isSearchActive.value = true;
+      activeSearchQuery.value = q;
+      return;
+    }
+
+    searchQuery.value = '';
+    isSearchActive.value = false;
+    activeSearchQuery.value = '';
+  } finally {
+    applyingRoute = false;
+  }
+}
+
 function selectCategory(catKey) {
   currentCategory.value = catKey;
   selectedItem.value = null;
+  syncComplianceQuery({ category: catKey === 'ALL' ? undefined : catKey });
+}
+
+function selectSort(sortKey) {
+  currentSort.value = sortKey;
+  syncComplianceQuery({ sort: sortKey === 'hot' ? undefined : sortKey });
 }
 
 const currentCategoryLabel = computed(() => {
@@ -553,20 +657,22 @@ const displayItems = computed(() => {
 });
 
 // Search
-async function handleSearch() {
+async function handleSearch(options = {}) {
   const q = searchQuery.value.trim();
   if (!q) {
-    resetSearch();
+    resetSearch(options);
     return;
   }
   isSearchActive.value = true;
   activeSearchQuery.value = q;
+  if (options.updateUrl !== false) syncComplianceQuery({ q });
 }
 
-function resetSearch() {
+function resetSearch(options = {}) {
   searchQuery.value = '';
   isSearchActive.value = false;
   activeSearchQuery.value = '';
+  if (options.updateUrl !== false) syncComplianceQuery({ q: undefined });
 }
 
 function quickSearchKeyword(keyword) {
@@ -608,11 +714,17 @@ const hotRankItems = computed(() => {
 
 // ---- Detail ----
 function openDetail(item) {
+  if (!item) return;
   selectedItem.value = item;
+  const id = String(item.id || '');
+  if (id && String(route.params.id || '') !== id) {
+    router.push({ name: 'compliance', params: { id }, query: route.query });
+  }
 }
 
 function closeDetail() {
   selectedItem.value = null;
+  router.push({ name: 'compliance', query: route.query });
 }
 
 // ---- Publish (内联视图模式，同论坛"发起新风暴话题") ----
@@ -636,11 +748,23 @@ function openPublishModal() {
     badge: '',
   };
   currentViewMode.value = 'create';
+  router.push({
+    name: 'compliance',
+    params: route.params.id ? { id: route.params.id } : {},
+    query: { ...route.query, compose: '1' },
+  });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function closePublishModal() {
   currentViewMode.value = 'list';
+  const query = { ...route.query };
+  delete query.compose;
+  router.push({
+    name: 'compliance',
+    params: route.params.id ? { id: route.params.id } : {},
+    query,
+  });
 }
 
 async function submitPublish() {

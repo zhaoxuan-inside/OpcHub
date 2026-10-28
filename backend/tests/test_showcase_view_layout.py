@@ -46,6 +46,26 @@ def test_showcase_view_source_code_layout_and_cards():
     assert "超级个体橱窗规范" in content
 
 
+def test_showcase_product_detail_content_is_complete():
+    """Verify the inline product detail exposes the full DB-backed product metadata."""
+    source_file = Path(__file__).resolve().parent.parent.parent / "frontend" / "src" / "views" / "ShowcaseView.vue"
+    content = source_file.read_text(encoding="utf-8")
+
+    for token in (
+        "detail-overview-grid",
+        "productStats",
+        "应用信息与规格",
+        "获取与交付",
+        "产品编号",
+        "最近更新",
+        "发布状态",
+        "截图数量",
+        "作者 ID",
+        "spec-link",
+    ):
+        assert token in content, f"product detail missing {token}"
+
+
 def test_showcase_view_compiled_dist():
     """Verify that frontend dist bundle contains product showcase and card structure."""
     dist_dir = Path(__file__).resolve().parent.parent.parent / "frontend" / "dist" / "assets"

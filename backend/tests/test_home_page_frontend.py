@@ -63,23 +63,33 @@ def test_frontend_dist_contains_home_promotional_content():
 
 
 def test_unauthenticated_user_access_gated_in_source():
-    """Verify in App.vue and Navbar.vue that unauthenticated users are restricted strictly to HomeView."""
+    """Verify that unauthenticated users are restricted to the public home route.
+
+    The shell moved from a hash/activeTab switch to vue-router in the 2026-10
+    refactor, so the contract is now enforced by route meta + the navigation
+    guard instead of a v-if chain in App.vue.
+    """
     frontend_src = Path(__file__).resolve().parent.parent.parent / "frontend" / "src"
     app_vue = (frontend_src / "App.vue").read_text(encoding="utf-8")
+    router_js = (frontend_src / "router" / "index.js").read_text(encoding="utf-8")
+    auth_js = (frontend_src / "stores" / "auth.js").read_text(encoding="utf-8")
     navbar_vue = (frontend_src / "components" / "Navbar.vue").read_text(encoding="utf-8")
-    home_vue = (frontend_src / "views" / "HomeView.vue").read_text(encoding="utf-8")
 
-    # 1. HomeView is imported and default activeTab is 'home'
-    assert "import HomeView from '@/views/HomeView.vue'" in app_vue
-    assert "activeTab = ref('home')" in app_vue
+    # 1. App renders the routed workspace, and the home route is public.
+    assert "<RouterView" in app_vue
+    assert "component: HomeView" in router_js
+    assert "public: true" in router_js
 
-    # 2. Main rendering container strictly restricts unauthenticated users to HomeView
-    assert "v-if=\"!userSession || activeTab === 'home'\"" in app_vue
-    assert "v-else-if=\"userSession && currentRole !== 'ADMIN'\"" in app_vue
+    # 2. Every workspace route requires auth; the guard redirects to home + login.
+    assert "requiresAuth: true" in router_js
+    assert "ensureSession()" in router_js
+    assert "query: { login: '1', redirect: to.fullPath }" in router_js
+    assert "const requiresAuth = Boolean(to.meta.requiresAuth)" in router_js
 
-    # 3. handleSwitchTab intercepts unauthenticated requests
-    assert "!userSession.value && tab !== 'home'" in app_vue
-    assert "showLoginModal.value = true" in app_vue
+    # 3. Session is hydrated from localStorage before the guard decides.
+    assert "localStorage.getItem(TOKEN_KEY)" in auth_js
+    assert "readJSON(USER_KEY)" in auth_js
+    assert "export async function ensureSession" in auth_js
 
     # 4. Navbar displays navigation tabs ONLY after login (no locks), and provides login/register pill
     assert 'v-if="userSession" class="nav-tabs-wrapper"' in navbar_vue
@@ -106,24 +116,31 @@ def test_page_display_width_locked_consistently():
 
 
 def test_page_refresh_and_mode_persistence_in_source():
-    """Verify in App.vue that page refresh maintains current page and does not auto-switch page mode."""
+    """Verify page refresh preserves route + session without switching mode."""
     frontend_src = Path(__file__).resolve().parent.parent.parent / "frontend" / "src"
     app_vue = (frontend_src / "App.vue").read_text(encoding="utf-8")
+    router_js = (frontend_src / "router" / "index.js").read_text(encoding="utf-8")
+    auth_js = (frontend_src / "stores" / "auth.js").read_text(encoding="utf-8")
+    main_js = (frontend_src / "main.js").read_text(encoding="utf-8")
 
-    # 1. Page mode (role) and active tab are persisted to localStorage
-    assert "localStorage.setItem('opchub_current_role'" in app_vue
-    assert "localStorage.setItem('opchub_active_tab'" in app_vue
-    assert "localStorage.getItem('opchub_current_role')" in app_vue
-    assert "localStorage.getItem('opchub_active_tab')" in app_vue
+    # 1. Role + user session are persisted; the route itself is the URL now.
+    assert "localStorage.setItem(ROLE_KEY" in auth_js
+    assert "localStorage.setItem(USER_KEY" in auth_js
+    assert "localStorage.getItem(ROLE_KEY)" in auth_js
+    assert "readJSON(USER_KEY)" in auth_js
+    assert "localStorage.getItem(TOKEN_KEY)" in auth_js
 
-    # 2. URL hash is synchronized and monitored via hashchange
-    assert "window.location.hash" in app_vue
-    assert "hashchange" in app_vue
+    # 2. HTML5 history routing: a hard refresh on /policies/:id serves the SPA.
+    assert "createWebHistory()" in router_js
+    assert "path: '/policies/:id?'" in router_js
+    assert "path: '/forum/:id?'" in router_js
+    assert "spa_history_fallback" in (frontend_src.parent / "server.py").read_text(encoding="utf-8")
 
-    # 3. In checkSession, existing selected mode is preserved instead of unconditionally forcing ADMIN
-    assert "savedRole === 'MAKER' || savedRole === 'ADMIN'" in app_vue
-    assert "currentRole.value = savedRole" in app_vue
+    # 3. Existing selected mode is preserved by the auth store, not overwritten on refresh.
+    assert "saved === 'ADMIN' || saved === 'MAKER'" in auth_js
+    assert "persistRole(saved)" in auth_js
 
-    # 4. User session is hydrated on startup to avoid page flash
-    assert "localStorage.getItem('opchub_user_session')" in app_vue
+    # 4. Session is hydrated before mount to avoid a login flash.
+    assert "ensureSession(true)" in app_vue
+    assert "migrateLegacyHash()" in main_js
 

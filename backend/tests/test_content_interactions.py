@@ -144,8 +144,10 @@ PERK_ID = "perk_volc_ark_tokens"
 @pytest.fixture
 def seeded_perk():
     from src.domains.perks.service import perk_service
+    from tests.catalog_fixtures import seed_perks
 
-    perk_service._init_seeds()
+    if not perk_service._perks:
+        seed_perks(perk_service)
     assert perk_service._perks.get(PERK_ID) is not None
     yield perk_service._perks[PERK_ID]
 
