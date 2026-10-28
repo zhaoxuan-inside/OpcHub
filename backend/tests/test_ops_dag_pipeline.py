@@ -30,10 +30,8 @@ async def test_ops_dashboard_pipeline_success():
         data = res.json()
         assert data["code"] == 200
         res_data = data["data"]
-        assert res_data["orchestrated_by"] == "OPC_OPS_DASHBOARD_PIPELINE"
-        assert res_data["audit_status"] == "RECORDED"
-        assert "audit_id" in res_data
-
+        # v2 大盘是纯读场景（count/list + assemble），不再有旧 audit/orchestrated_by 字段。
+        assert res_data["is_live"] is True
         # Verify core KPIs report 0 until real instrumentation is wired in
         assert res_data["dau"]["value"] == "0"
         assert res_data["uv"]["value"] == "0"
@@ -72,6 +70,13 @@ async def test_telemetry_dashboard_alias_pipeline():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除；"
+        "大盘成功链路由 tests/test_ops_telemetry_api.py 覆盖，通用 Saga 逆序补偿由 "
+        "tests/test_microkernel_saga_compensation.py 覆盖。"
+    )
+)
 async def test_ops_dashboard_saga_rollback_on_downstream_failure():
     """Verify Saga reverse compensation executes when downstream telemetry step fails."""
     transport = ASGITransport(app=app)
@@ -94,6 +99,13 @@ async def test_ops_dashboard_saga_rollback_on_downstream_failure():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧 ops.dashboard 时间范围硬校验算子已移除；"
+        "当前场景将 time_range 原样透传给 assemble.telemetry.dashboard，"
+        "大盘契约（含 time_range 回显）由 tests/test_ops_telemetry_api.py 覆盖。"
+    )
+)
 async def test_ops_dashboard_guard_invalid_time_range():
     """Verify Guard blocks request with invalid time_range parameter."""
     transport = ASGITransport(app=app)

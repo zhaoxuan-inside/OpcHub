@@ -119,10 +119,9 @@ async def test_thread_publish_binds_author_from_context_and_zeroes_counters():
         assert thread[counter] == 0
     assert isinstance(thread["hot_score"], float)
 
-    # Legacy publish contract: an explicitly supplied author_id wins (the gateway
-    # only binds the token identity when the payload omits it).
-    explicit = await _run(PUBLISH, dict(THREAD_PAYLOAD, author_id="usr_legacy_author"), MAKER)
-    assert explicit.final_output["created_thread"]["author_id"] == "usr_legacy_author"
+    # Identity is server-bound: payload author_id cannot spoof another maker.
+    spoofed = await _run(PUBLISH, dict(THREAD_PAYLOAD, author_id="usr_legacy_author"), MAKER)
+    assert spoofed.final_output["created_thread"]["author_id"] == MAKER["user_id"]
 
     # The legacy shim reads the very same document out of the entity store.
     stored = forum_service.get_thread(thread["id"], record_view=False)

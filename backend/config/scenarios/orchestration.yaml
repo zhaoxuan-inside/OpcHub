@@ -1,0 +1,51 @@
+# Orchestration control plane (catalog / DAG console).
+# The catalog is the low-code control plane itself; its writes still run through
+# the generic kernel so auditing, locking and telemetry stay uniform.
+
+scenarios:
+  - scenario: OPC_ORCHESTRATION_OPERATORS_LIST_PIPELINE
+    version: v1.0.0
+    domain: orchestration
+    description: 列出全部已注册算子描述符
+    saga: false
+    nodes:
+      - id: list
+        operator: orchestration.operators.list
+    edges: []
+
+  - scenario: OPC_ORCHESTRATION_CONTROL_PIPELINE
+    version: v1.0.0
+    domain: orchestration
+    description: 保存并激活版本化 DAG 配置
+    saga: false
+    nodes:
+      - id: save
+        operator: orchestration.dag.save
+        params: {pipeline: OPC_ORCHESTRATION_CONTROL_PIPELINE}
+        inputs:
+          config: $inputs
+    edges: []
+
+  - scenario: OPC_ORCHESTRATION_CATALOG_PIPELINE
+    version: v1.0.0
+    domain: orchestration
+    description: 目录写操作元流水线（guard -> persist -> telemetry）
+    saga: false
+    nodes:
+      - id: step_guard
+        operator: orchestration.catalog.guard
+        inputs:
+          action: $inputs.action
+          payload: $inputs.payload
+      - id: step_persist
+        operator: orchestration.catalog.persist
+        inputs:
+          action: $nodes.step_guard.action
+          payload: $nodes.step_guard.payload
+      - id: step_telemetry
+        operator: orchestration.catalog.telemetry.incr
+        inputs:
+          action: $nodes.step_guard.action
+    edges:
+      - [step_guard, step_persist]
+      - [step_persist, step_telemetry]

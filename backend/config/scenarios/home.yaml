@@ -1,0 +1,67 @@
+# 首页全景（Home Overview）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 边界：
+# * 公开只读场景，不需要登录。
+# * 各域记录数由通用 `entity.count` / `entity.list` 节点收集，实体名以字符串配置；
+#   本场景不 import 任何领域 service。
+# * 汇总只做纯函数装配：`assemble.home.overview`
+#   （src/domains/home/functions.py）。
+# * 网关适配器保留旧兜底：场景失败时返回全零 overview（不在此文件表达）。
+
+scenarios:
+  - scenario: OPC_HOME_OVERVIEW_PIPELINE
+    version: v1.0.0
+    domain: home
+    description: 首页全域宏观指标聚合与功能空间地图
+    saga: false
+    nodes:
+      - id: count_products
+        operator: entity.count
+        params: {entity: product.item}
+      - id: count_forum
+        operator: entity.count
+        params: {entity: forum.thread}
+      - id: count_policies
+        operator: entity.count
+        params: {entity: policy.item}
+      - id: count_demands
+        operator: entity.count
+        params: {entity: demands.item}
+      - id: list_perks
+        operator: entity.list
+        params:
+          entity: perk.item
+          query:
+            limit: 0
+            filters: {status: PUBLISHED}
+      - id: list_interactions
+        operator: entity.list
+        params:
+          entity: interaction.record
+          query: {limit: 0}
+
+      - id: assemble
+        operator: assemble.home.overview
+        inputs:
+          region: $inputs.region
+          products_count: $nodes.count_products.total
+          forum_threads_count: $nodes.count_forum.total
+          matched_policies_count: $nodes.count_policies.total
+          demands_orders_count: $nodes.count_demands.total
+          perks: $nodes.list_perks.items
+          interaction_records: $nodes.list_interactions.items
+          active_dags_count: 0
+      - id: response
+        operator: response.build
+        params: {source: overview}
+        inputs:
+          overview: $nodes.assemble
+    edges:
+      - [count_products, count_forum]
+      - [count_forum, count_policies]
+      - [count_policies, count_demands]
+      - [count_demands, list_perks]
+      - [list_perks, list_interactions]
+      - [list_interactions, assemble]
+      - [assemble, response]

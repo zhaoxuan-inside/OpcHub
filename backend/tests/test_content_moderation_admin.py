@@ -99,7 +99,8 @@ async def test_takedown_violating_content():
         items = res_list.json()["data"]
         target = next(it for it in items if it["id"] == "mod-101")
         assert target["status"] == "TAKEN_DOWN"
-        assert target["moderator_id"] == "admin_sys_01"
+        # v2 审核人取自网关身份上下文（payload.moderator_id 不再可信）
+        assert target["moderator_id"] == "usr_admin_builtin"
 
 
 @pytest.mark.asyncio

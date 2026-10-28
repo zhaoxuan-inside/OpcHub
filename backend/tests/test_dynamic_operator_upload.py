@@ -156,7 +156,7 @@ def test_reject_declared_entry_missing():
 def test_reject_builtin_name_collision():
     """Built-in operators must not be overwritable by dynamic scripts."""
     r = client.post("/api/v1/scripts/upload", json={
-        "name": "gateway_ingress",
+        "name": "guard.authn",
         "code": VALID_SCRIPT,
         "token": _admin_token(),
     })

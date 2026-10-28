@@ -69,15 +69,14 @@ gateway:
       domain: "policies"
       description: "获取政府扶持与税收减免政策列表"
       is_default: true
-      handler: "src.domains.policies.service.policy_service:list_policies"
-      args_type: "kwargs"
+      pipeline: "OPC_POLICY_LIST_PIPELINE"
 
     - scenario: "policies.publish"
       version: "v1.0.0"
       domain: "policies"
       description: "发布政策公文（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:policy_publish_adapter"
+      pipeline: "OPC_POLICY_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "policies.match"
@@ -85,7 +84,7 @@ gateway:
       domain: "policies"
       description: "测算创客免税资格与预计减免额 (微内核 DAG 编排驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:policy_match_adapter"
+      pipeline: "OPC_POLICY_MATCH_PIPELINE"
 
     # --------------------------------------------------------------------------
     # 3. Demands & Bidding (需求集市与竞标)
@@ -95,15 +94,14 @@ gateway:
       domain: "demands"
       description: "检索企业委托寻源商机列表"
       is_default: true
-      handler: "src.domains.demands.service.demand_service:list_demands"
-      args_type: "kwargs"
+      pipeline: "OPC_DEMAND_LIST_PIPELINE"
 
     - scenario: "demands.publish"
       version: "v1.0.0"
       domain: "demands"
       description: "微内核DAG编排：发布企业外包委托与法律求助（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:demand_publish_adapter"
+      pipeline: "OPC_DEMAND_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "demands.bid"
@@ -111,7 +109,7 @@ gateway:
       domain: "demands"
       description: "微内核DAG编排：提交创客竞标方案与撮合"
       is_default: true
-      handler: "src.core.gateway.adapters:demand_bid_adapter"
+      pipeline: "OPC_DEMAND_BID_PIPELINE"
       required_permission: "market:vendor_apply"
 
 
@@ -123,30 +121,28 @@ gateway:
       domain: "sop"
       description: "获取合规流程阶段与文档模板列表"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:get_stages_and_templates"
+      pipeline: "OPC_SOP_TEMPLATE_LIST_PIPELINE"
 
     - scenario: "sop.documents"
       version: "v1.0.0"
       domain: "sop"
       description: "获取标准文书库列表（含作者、来源机构、喜欢/收藏/真实使用数）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_document_catalog_adapter"
+      pipeline: "OPC_SOP_DOCUMENT_CATALOG_PIPELINE"
 
     - scenario: "sop.flow.templates"
       version: "v1.0.0"
       domain: "sop"
       description: "获取平台流程模板库列表（含作者、来源机构、喜欢/收藏/使用数）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_template_catalog_adapter"
+      pipeline: "OPC_SOP_FLOW_TEMPLATE_LIST_PIPELINE"
 
     - scenario: "sop.flow.template.detail"
       version: "v1.0.0"
       domain: "sop"
       description: "获取单个平台流程模板及其展开后的文书步骤"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_template_detail_adapter"
-      args_type: "key"
-      key_name: "flow_id"
+      pipeline: "OPC_SOP_FLOW_TEMPLATE_DETAIL_PIPELINE"
 
 
 
@@ -157,48 +153,42 @@ gateway:
       domain: "sop"
       description: "获取完整合规流程图谱：阶段、节点(文书/子图)、依赖边与目标反查索引"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:get_graph"
+      pipeline: "OPC_SOP_GRAPH_PIPELINE"
 
     - scenario: "sop.node"
       version: "v1.0.0"
       domain: "sop"
       description: "获取单个流程节点上下文：子文档、前置依赖与本步产出说明"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_node_context_adapter"
-      args_type: "key"
-      key_name: "node_id"
+      pipeline: "OPC_SOP_NODE_CONTEXT_PIPELINE"
 
     - scenario: "sop.flow.list"
       version: "v1.0.0"
       domain: "sop"
       description: "获取创客自建的流程清单"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:list_flows"
-      args_type: "kwargs"
+      pipeline: "OPC_SOP_FLOW_LIST_PIPELINE"
 
     - scenario: "sop.myflow.cards"
       version: "v1.0.0"
       domain: "sop"
       description: "获取创客私有流程卡片列表（与平台流程卡片同构）"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:list_my_flow_cards"
-      args_type: "kwargs"
+      pipeline: "OPC_SOP_MY_FLOW_CARDS_PIPELINE"
 
     - scenario: "sop.flow.get"
       version: "v1.0.0"
       domain: "sop"
       description: "获取单个自建流程及其展开后的文书清单"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:resolve_flow"
-      args_type: "key"
-      key_name: "flow_id"
+      pipeline: "OPC_SOP_FLOW_DETAIL_PIPELINE"
 
     - scenario: "sop.flow.create"
       version: "v1.0.0"
       domain: "sop"
       description: "创建并持久化一条创客自建流程"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_create_adapter"
+      pipeline: "OPC_SOP_FLOW_CREATE_PIPELINE"
       required_permission: "sop:save_progress"
 
     - scenario: "sop.flow.update"
@@ -206,7 +196,7 @@ gateway:
       domain: "sop"
       description: "更新一条创客自建流程"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_update_adapter"
+      pipeline: "OPC_SOP_FLOW_UPDATE_PIPELINE"
       required_permission: "sop:save_progress"
 
     - scenario: "sop.flow.delete"
@@ -214,26 +204,23 @@ gateway:
       domain: "sop"
       description: "删除一条创客自建流程"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_delete_adapter"
+      pipeline: "OPC_SOP_FLOW_DELETE_PIPELINE"
       required_permission: "sop:save_progress"
-      args_type: "key"
-      key_name: "flow_id"
 
     - scenario: "sop.template.publish"
       version: "v1.0.0"
       domain: "sop"
       description: "发布并登记新合规文书模板"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:create_template"
+      pipeline: "OPC_SOP_TEMPLATE_PUBLISH_PIPELINE"
       required_permission: "data:schema_manage"
-      model: "src.domains.sop.models:SOPTemplateCreate"
 
     - scenario: "sop.document.render"
       version: "v1.0.0"
       domain: "sop"
       description: "微内核DAG编排：根据用户输入渲染并持久化合规文书"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_document_render_adapter"
+      pipeline: "OPC_SOP_DOCUMENT_RENDER_PIPELINE"
       required_permission: "sop:save_progress"
 
     - scenario: "sop.document.draft"
@@ -241,7 +228,7 @@ gateway:
       domain: "sop"
       description: "文本编辑器起草：保存自由编辑的私有文书草稿（可选基于标准模板，注册创客可用）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_document_draft_adapter"
+      pipeline: "OPC_SOP_DOCUMENT_DRAFT_PIPELINE"
       required_permission: "content:publish"
 
 
@@ -250,26 +237,21 @@ gateway:
       domain: "sop"
       description: "按 ID 获取已生成的文书实例"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:get_document"
-      args_type: "key"
-      key_name: "doc_id"
+      pipeline: "OPC_SOP_DOCUMENT_DETAIL_PIPELINE"
 
     - scenario: "sop.document.list"
       version: "v1.0.0"
       domain: "sop"
       description: "获取创客已保存的文书历史列表"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:list_documents"
-      args_type: "kwargs"
+      pipeline: "OPC_SOP_DOCUMENT_MINE_PIPELINE"
 
     - scenario: "sop.document.delete"
       version: "v1.0.0"
       domain: "sop"
       description: "删除一条创客已保存的文书实例"
       is_default: true
-      handler: "src.domains.sop.service.sop_service:delete_document"
-      args_type: "key"
-      key_name: "doc_id"
+      pipeline: "OPC_SOP_DOCUMENT_DELETE_PIPELINE"
       required_permission: "sop:save_progress"
 
     - scenario: "sop.document.publish"
@@ -277,7 +259,7 @@ gateway:
       domain: "sop"
       description: "发布「我的文书」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_document_publish_adapter"
+      pipeline: "OPC_SOP_DOCUMENT_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "sop.flow.publish"
@@ -285,7 +267,7 @@ gateway:
       domain: "sop"
       description: "发布「我的流程」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_flow_publish_adapter"
+      pipeline: "OPC_SOP_FLOW_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "sop.review.queue"
@@ -293,7 +275,7 @@ gateway:
       domain: "sop"
       description: "获取文书与流程发布审核队列（含合法性/合规性/敏感词审核状态）"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_review_queue_adapter"
+      pipeline: "OPC_SOP_REVIEW_QUEUE_PIPELINE"
       required_permission: "review:audit_all"
 
     - scenario: "sop.review.process"
@@ -301,7 +283,7 @@ gateway:
       domain: "sop"
       description: "消费审核队列：逐项检查合法性/合规性/敏感词，通过后发布至标准文书与流程向导"
       is_default: true
-      handler: "src.core.gateway.adapters:sop_review_process_adapter"
+      pipeline: "OPC_SOP_REVIEW_PROCESS_PIPELINE"
       required_permission: "review:audit_all"
 
     # --------------------------------------------------------------------------
@@ -312,14 +294,14 @@ gateway:
       domain: "perks"
       description: "获取生态优惠公告列表（Token 优惠 / 服务器优惠 / SaaS 服务优惠等，支持按分类过滤）"
       is_default: true
-      handler: "src.domains.perks.service.perk_service:list_perks"
+      pipeline: "OPC_PERK_LIST_PIPELINE"
 
     - scenario: "perks.publish"
       version: "v1.0.0"
       domain: "perks"
       description: "提报并上线生态优惠公告（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:perk_publish_adapter"
+      pipeline: "OPC_PERK_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     - scenario: "perks.claim"
@@ -327,7 +309,7 @@ gateway:
       domain: "perks"
       description: "微内核DAG编排：领取特权并生成专属兑换凭据"
       is_default: true
-      handler: "src.core.gateway.adapters:perk_claim_adapter"
+      pipeline: "OPC_PERK_CLAIM_PIPELINE"
       required_permission: "perk:claim_coupon"
 
 
@@ -339,22 +321,21 @@ gateway:
       domain: "forum"
       description: "流式无限滚动检索头脑风暴社区讨论帖 (微内核 DAG + 缓存 + 预加载驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_feed_stream_adapter"
+      pipeline: "OPC_FORUM_FEED_STREAM_PIPELINE"
 
     - scenario: "forum.threads.list"
       version: "v1.0.0"
       domain: "forum"
       description: "检索头脑风暴社区讨论帖列表 (分页约束: id, page, page_size/page_length)"
       is_default: true
-      handler: "src.domains.forum.service.forum_service:list_threads_paginated"
-      args_type: "kwargs"
+      pipeline: "OPC_FORUM_LIST_PIPELINE"
 
     - scenario: "forum.threads.publish"
       version: "v1.0.0"
       domain: "forum"
       description: "发布新创客讨论帖与踩坑复盘（所有注册用户可发布，管理员发布自动打官方标签）"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_thread_publish_adapter"
+      pipeline: "OPC_FORUM_THREAD_PUBLISH"
       required_permission: "content:publish"
 
     - scenario: "forum.threads.get"
@@ -362,14 +343,14 @@ gateway:
       domain: "forum"
       description: "获取议题详情、知乎式观点回答与物化路径评论树"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_thread_get_adapter"
+      pipeline: "OPC_FORUM_DETAIL_PIPELINE"
 
     - scenario: "forum.answers.publish"
       version: "v1.0.0"
       domain: "forum"
       description: "撰写并发布针对议题的知乎式深度观点回答 (微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_answer_publish_adapter"
+      pipeline: "OPC_FORUM_ANSWER_PUBLISH"
       required_permission: "content:publish"
 
     - scenario: "forum.answers.accept"
@@ -377,7 +358,7 @@ gateway:
       domain: "forum"
       description: "提问者采纳最佳观点或取消采纳 (微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_answer_accept_adapter"
+      pipeline: "OPC_FORUM_ANSWER_ACCEPT_PIPELINE"
       required_permission: "forum:post_comment"
 
     - scenario: "forum.vote"
@@ -385,7 +366,7 @@ gateway:
       domain: "forum"
       description: "知乎式互斥赞同 / 反对 / 取消投票 (微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_vote_adapter"
+      pipeline: "OPC_FORUM_VOTE_PIPELINE"
       required_permission: "forum:post_comment"
 
     - scenario: "forum.threads.follow"
@@ -393,7 +374,7 @@ gateway:
       domain: "forum"
       description: "关注/取消关注议题"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_follow_adapter"
+      pipeline: "OPC_FORUM_FOLLOW_PIPELINE"
       required_permission: "forum:post_comment"
 
     - scenario: "forum.comments.create"
@@ -401,7 +382,7 @@ gateway:
       domain: "forum"
       description: "发表一级回答或物化路径嵌套子回复"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_comment_adapter"
+      pipeline: "OPC_FORUM_COMMENT_PUBLISH"
       required_permission: "forum:post_comment"
 
     - scenario: "forum.threads.update"
@@ -409,7 +390,7 @@ gateway:
       domain: "forum"
       description: "编辑头脑风暴讨论帖标题/正文/分区 (限作者或管理员，微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_thread_update_adapter"
+      pipeline: "OPC_FORUM_THREAD_UPDATE_PIPELINE"
       required_permission: "content:publish"
       owner_check:
         resource_type: "thread"
@@ -420,7 +401,7 @@ gateway:
       domain: "forum"
       description: "删除观点回答及其评论与投票 (限回答作者或管理员，微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_answer_delete_adapter"
+      pipeline: "OPC_FORUM_ANSWER_DELETE_PIPELINE"
       required_permission: "forum:post_comment"
       owner_check:
         resource_type: "answer"
@@ -431,7 +412,7 @@ gateway:
       domain: "forum"
       description: "删除评论及其子评论树与投票 (限评论作者或管理员，微内核 DAG 编排)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_comment_delete_adapter"
+      pipeline: "OPC_FORUM_COMMENT_DELETE_PIPELINE"
       required_permission: "forum:post_comment"
       owner_check:
         resource_type: "comment"
@@ -442,7 +423,7 @@ gateway:
       domain: "forum"
       description: "删除头脑风暴社区讨论帖 (限超级管理员或帖子发帖人)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_thread_delete_adapter"
+      pipeline: "OPC_FORUM_THREAD_DELETE_PIPELINE"
       required_permission: "forum:post_comment"
       owner_check:
         resource_type: "thread"
@@ -453,7 +434,7 @@ gateway:
       domain: "forum"
       description: "基于轻量向量引擎与余弦相似度检索头脑风暴社区讨论帖 (NLP 语义搜索)"
       is_default: true
-      handler: "src.core.gateway.adapters:forum_semantic_search_adapter"
+      pipeline: "OPC_FORUM_SEMANTIC_SEARCH_PIPELINE"
 
     # --------------------------------------------------------------------------
     # 6.5 Unified Content Interactions (统一公开内容互动)
@@ -463,7 +444,7 @@ gateway:
       domain: "interactions"
       description: "统一切换公开内容互动：点赞 LIKE / 收藏 FAVORITE / 喜欢 LOVE / 踩 DISLIKE"
       is_default: true
-      handler: "src.core.gateway.adapters:content_interaction_toggle_adapter"
+      pipeline: "OPC_INTERACTION_TOGGLE_PIPELINE"
       required_permission: "content:interact"
 
     - scenario: "content.interaction.rate"
@@ -471,7 +452,7 @@ gateway:
       domain: "interactions"
       description: "对公开内容进行 1-5 星打分（可重复打分覆盖）"
       is_default: true
-      handler: "src.core.gateway.adapters:content_interaction_rate_adapter"
+      pipeline: "OPC_INTERACTION_RATE_PIPELINE"
       required_permission: "content:interact"
 
     - scenario: "content.interactions.state"
@@ -479,28 +460,28 @@ gateway:
       domain: "interactions"
       description: "批量读取公开内容的互动计数与当前登录用户的互动状态"
       is_default: true
-      handler: "src.core.gateway.adapters:content_interactions_state_adapter"
+      pipeline: "OPC_INTERACTION_STATE_PIPELINE"
 
     - scenario: "content.interactions.mine"
       version: "v1.0.0"
       domain: "interactions"
       description: "读取当前创客的点赞、收藏、喜欢与评论记录"
       is_default: true
-      handler: "src.core.gateway.adapters:content_interactions_mine_adapter"
+      pipeline: "OPC_INTERACTION_MINE_PIPELINE"
 
     - scenario: "content.comments.list"
       version: "v1.0.0"
       domain: "interactions"
       description: "读取公开内容的评论列表"
       is_default: true
-      handler: "src.core.gateway.adapters:content_comments_list_adapter"
+      pipeline: "OPC_INTERACTION_COMMENTS_LIST_PIPELINE"
 
     - scenario: "content.comments.create"
       version: "v1.0.0"
       domain: "interactions"
       description: "对公开内容发表评论"
       is_default: true
-      handler: "src.core.gateway.adapters:content_comments_create_adapter"
+      pipeline: "OPC_CONTENT_COMMENT_PUBLISH_PIPELINE"
       required_permission: "content:comment"
 
     - scenario: "content.comments.delete"
@@ -508,7 +489,7 @@ gateway:
       domain: "interactions"
       description: "删除自己发表的公开内容评论"
       is_default: true
-      handler: "src.core.gateway.adapters:content_comments_delete_adapter"
+      pipeline: "OPC_INTERACTION_COMMENT_DELETE_PIPELINE"
       required_permission: "content:comment"
 
     # --------------------------------------------------------------------------
@@ -519,42 +500,42 @@ gateway:
       domain: "loyalty"
       description: "读取当前创客的晨光积分余额、成长等级与会员状态"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_account_adapter"
+      pipeline: "OPC_LOYALTY_ACCOUNT_PIPELINE"
 
     - scenario: "loyalty.ledger"
       version: "v1.0.0"
       domain: "loyalty"
       description: "读取当前创客的积分收支流水"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_ledger_adapter"
+      pipeline: "OPC_LOYALTY_LEDGER_PIPELINE"
 
     - scenario: "loyalty.rules"
       version: "v1.0.0"
       domain: "loyalty"
       description: "读取当前生效的积分获取规则与上限"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_rules_adapter"
+      pipeline: "OPC_LOYALTY_RULES_PIPELINE"
 
     - scenario: "loyalty.membership.plans"
       version: "v1.0.0"
       domain: "loyalty"
       description: "读取会员套餐与权益对比"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_membership_plans_adapter"
+      pipeline: "OPC_LOYALTY_MEMBERSHIP_PLANS_PIPELINE"
 
     - scenario: "loyalty.membership.me"
       version: "v1.0.0"
       domain: "loyalty"
       description: "读取当前创客的会员档位、到期日与权益"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_membership_me_adapter"
+      pipeline: "OPC_LOYALTY_MEMBERSHIP_ME_PIPELINE"
 
     - scenario: "loyalty.membership.subscribe"
       version: "v1.0.0"
       domain: "loyalty"
       description: "开通 / 续期会员（积分兑换或现金下单）"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_membership_subscribe_adapter"
+      pipeline: "OPC_LOYALTY_SUBSCRIBE_PIPELINE"
       required_permission: "content:interact"
 
     - scenario: "loyalty.membership.auto-renew"
@@ -562,7 +543,7 @@ gateway:
       domain: "loyalty"
       description: "开启 / 关闭会员自动续费"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_membership_auto_renew_adapter"
+      pipeline: "OPC_LOYALTY_AUTO_RENEW_PIPELINE"
       required_permission: "content:interact"
 
     - scenario: "loyalty.rewards.items"
@@ -570,14 +551,14 @@ gateway:
       domain: "loyalty"
       description: "读取积分兑换商城目录与库存"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_rewards_items_adapter"
+      pipeline: "OPC_LOYALTY_REWARDS_ITEMS_PIPELINE"
 
     - scenario: "loyalty.rewards.redeem"
       version: "v1.0.0"
       domain: "loyalty"
       description: "积分兑换会员时长、数字权益或产品周边"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_rewards_redeem_adapter"
+      pipeline: "OPC_LOYALTY_REDEEM_PIPELINE"
       required_permission: "content:interact"
 
     - scenario: "loyalty.rewards.orders"
@@ -585,21 +566,21 @@ gateway:
       domain: "loyalty"
       description: "读取当前创客的积分兑换订单"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_rewards_orders_adapter"
+      pipeline: "OPC_LOYALTY_REWARDS_ORDERS_PIPELINE"
 
     - scenario: "loyalty.content.read"
       version: "v1.0.0"
       domain: "loyalty"
       description: "记录内容阅读并为作者发放小额阅读积分（同一读者每日一次）"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_content_read_adapter"
+      pipeline: "OPC_LOYALTY_CONTENT_READ_PIPELINE"
 
     - scenario: "loyalty.admin.grant"
       version: "v1.0.0"
       domain: "loyalty"
       description: "管理端积分补发 / 扣回（全量审计，不受日常上限约束）"
       is_default: true
-      handler: "src.core.gateway.adapters:loyalty_admin_grant_adapter"
+      pipeline: "OPC_LOYALTY_ADMIN_GRANT_PIPELINE"
       required_permission: "review:audit_all"
 
     # --------------------------------------------------------------------------
@@ -610,7 +591,7 @@ gateway:
       domain: "telemetry"
       description: "全域运营大盘实时核心指标聚合 (由微内核 DAG OPC_OPS_DASHBOARD_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:ops_dashboard_adapter"
+      pipeline: "OPC_OPS_DASHBOARD_PIPELINE"
       required_permission: "review:audit_all"
 
     - scenario: "ops.dashboard"
@@ -618,7 +599,7 @@ gateway:
       domain: "telemetry"
       description: "运营大盘三端指标检索别名 (由微内核 DAG OPC_OPS_DASHBOARD_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:ops_dashboard_adapter"
+      pipeline: "OPC_OPS_DASHBOARD_PIPELINE"
       required_permission: "review:audit_all"
 
     - scenario: "home.overview"
@@ -626,7 +607,7 @@ gateway:
       domain: "home"
       description: "首页全域宏观指标聚合与功能空间地图 (由微内核 DAG OPC_HOME_OVERVIEW_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:home_overview_adapter"
+      pipeline: "OPC_HOME_OVERVIEW_PIPELINE"
 
     # --------------------------------------------------------------------------
     # 8. User Profile & Entitlements (创客档案与权益)
@@ -636,14 +617,14 @@ gateway:
       domain: "user"
       description: "获取创客个人主体档案与已激活权益 (由微内核 DAG OPC_USER_PROFILE_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:user_profile_adapter"
+      pipeline: "OPC_USER_PROFILE_PIPELINE"
 
     - scenario: "user.profile.update"
       version: "v1.0.0"
       domain: "user"
       description: "更新创客基本信息与主体档案"
       is_default: true
-      handler: "src.core.gateway.adapters:user_profile_update_adapter"
+      pipeline: "OPC_USER_PROFILE_UPDATE_PIPELINE"
       owner_check:
         resource_type: "user"
         id_field: "user_id"
@@ -653,84 +634,84 @@ gateway:
       domain: "user"
       description: "激活创客专属商业权益与特权门禁 (由微内核 DAG OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:user_entitlement_activate_adapter"
+      pipeline: "OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE"
 
     - scenario: "auth.register"
       version: "v1.0.0"
       domain: "auth"
       description: "创客商业化邮箱注册、资质存证与租户主体初始化"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_register_adapter"
+      pipeline: "OPC_AUTH_REGISTER_PIPELINE"
 
     - scenario: "auth.captcha"
       version: "v1.0.0"
       domain: "auth"
       description: "获取人机验证与防刷图形 SVG 算术验证码"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_captcha_adapter"
+      pipeline: "OPC_AUTH_CAPTCHA_PIPELINE"
 
     - scenario: "auth.send-code"
       version: "v1.0.0"
       domain: "auth"
       description: "发送邮箱/手机身份所有权核验验证码 (带60s频控与防刷拦截)"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_send_code_adapter"
+      pipeline: "OPC_AUTH_SEND_CODE_PIPELINE"
 
     - scenario: "auth.verify-code"
       version: "v1.0.0"
       domain: "auth"
       description: "预核验邮箱/手机验证码的有效性与时效"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_verify_code_adapter"
+      pipeline: "OPC_AUTH_VERIFY_CODE_PIPELINE"
 
     - scenario: "auth.password-strength"
       version: "v1.0.0"
       domain: "auth"
       description: "评估密码复杂度、熵值与商用安全合规评级"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_password_strength_adapter"
+      pipeline: "OPC_AUTH_PASSWORD_STRENGTH_PIPELINE"
 
     - scenario: "auth.legal-agreements"
       version: "v1.0.0"
       domain: "auth"
       description: "获取平台法定用户服务协议与隐私保护指引正文及版本"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_legal_agreements_adapter"
+      pipeline: "OPC_AUTH_LEGAL_AGREEMENTS_PIPELINE"
 
     - scenario: "auth.mail-providers"
       version: "v1.0.0"
       domain: "auth"
       description: "获取系统已适配支持的主流邮箱服务商配置与路由元数据"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_mail_providers_adapter"
+      pipeline: "OPC_AUTH_MAIL_PROVIDERS_PIPELINE"
 
     - scenario: "auth.login"
       version: "v1.0.0"
       domain: "auth"
       description: "创客邮箱与密码身份鉴权及会话 Token 签发"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_login_adapter"
+      pipeline: "OPC_AUTH_LOGIN_PIPELINE"
 
     - scenario: "auth.change_password"
       version: "v1.0.0"
       domain: "auth"
       description: "轮换登录密码并清除内置管理员首登强制改密标记"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_change_password_adapter"
+      pipeline: "OPC_AUTH_CHANGE_PASSWORD_PIPELINE"
 
     - scenario: "auth.session"
       version: "v1.0.0"
       domain: "auth"
       description: "验证创客会话 Token 并获取登录工作台状态"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_session_adapter"
+      pipeline: "OPC_AUTH_SESSION_PIPELINE"
 
     - scenario: "auth.change-password"
       version: "v1.0.0"
       domain: "auth"
       description: "轮换创客登录密码并清除首次登录强制改密标志"
       is_default: true
-      handler: "src.core.gateway.adapters:auth_change_password_adapter"
+      pipeline: "OPC_AUTH_CHANGE_PASSWORD_PIPELINE"
 
 
 
@@ -742,16 +723,15 @@ gateway:
       domain: "moderation"
       description: "获取内容安全与敏感词审核队列"
       is_default: true
-      handler: "src.domains.moderation.service.moderation_service:list_items"
+      pipeline: "OPC_MODERATION_LIST_PIPELINE"
       required_permission: "review:audit_all"
-      args_type: "kwargs"
 
     - scenario: "moderation.takedown"
       version: "v1.0.0"
       domain: "moderation"
       description: "执行违规内容一键全网下架 (由微内核 DAG OPC_MODERATION_TAKEDOWN_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:moderation_takedown_adapter"
+      pipeline: "OPC_MODERATION_TAKEDOWN_PIPELINE"
       required_permission: "review:audit_all"
 
     - scenario: "moderation.restore"
@@ -759,7 +739,7 @@ gateway:
       domain: "moderation"
       description: "恢复误判下架内容至正常展示 (由微内核 DAG OPC_MODERATION_RESTORE_PIPELINE 驱动)"
       is_default: true
-      handler: "src.core.gateway.adapters:moderation_restore_adapter"
+      pipeline: "OPC_MODERATION_RESTORE_PIPELINE"
       required_permission: "review:audit_all"
 
     - scenario: "moderation.report"
@@ -767,7 +747,7 @@ gateway:
       domain: "moderation"
       description: "用户举报违规/失实内容，进入平台审核队列（用户互动维护内容有效性）"
       is_default: true
-      handler: "src.core.gateway.adapters:content_report_adapter"
+      pipeline: "OPC_MODERATION_REPORT_PIPELINE"
       required_permission: "content:interact"
 
     # --------------------------------------------------------------------------
@@ -778,7 +758,7 @@ gateway:
       domain: "notifications"
       description: "查看当前登录用户的消息箱（含发布敏感词校验结果）"
       is_default: true
-      handler: "src.core.gateway.adapters:notifications_list_adapter"
+      pipeline: "OPC_NOTIFICATION_LIST_PIPELINE"
       required_permission: "notification:read"
 
     - scenario: "notifications.unread_count"
@@ -786,7 +766,7 @@ gateway:
       domain: "notifications"
       description: "获取当前登录用户消息箱未读数（导航角标）"
       is_default: true
-      handler: "src.core.gateway.adapters:notifications_unread_count_adapter"
+      pipeline: "OPC_NOTIFICATION_UNREAD_COUNT_PIPELINE"
       required_permission: "notification:read"
 
     - scenario: "notifications.mark_read"
@@ -794,7 +774,7 @@ gateway:
       domain: "notifications"
       description: "将指定消息标记为已读（仅限本人消息）"
       is_default: true
-      handler: "src.core.gateway.adapters:notifications_mark_read_adapter"
+      pipeline: "OPC_NOTIFICATION_MARK_READ_PIPELINE"
       required_permission: "notification:read"
 
     - scenario: "notifications.mark_all_read"
@@ -802,7 +782,7 @@ gateway:
       domain: "notifications"
       description: "将当前登录用户全部未读消息标记为已读"
       is_default: true
-      handler: "src.core.gateway.adapters:notifications_mark_all_read_adapter"
+      pipeline: "OPC_NOTIFICATION_MARK_ALL_READ_PIPELINE"
       required_permission: "notification:read"
 
     - scenario: "notifications.delete"
@@ -810,7 +790,7 @@ gateway:
       domain: "notifications"
       description: "删除当前登录用户的一条消息"
       is_default: true
-      handler: "src.core.gateway.adapters:notifications_delete_adapter"
+      pipeline: "OPC_NOTIFICATION_DELETE_PIPELINE"
       required_permission: "notification:read"
 
     # --------------------------------------------------------------------------
@@ -821,21 +801,21 @@ gateway:
       domain: "compliance"
       description: "获取合规法条知识库（法律、行政法规、部门规章白话提炼）"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.get_laws"
+      pipeline: "OPC_COMPLIANCE_LAW_LIST_PIPELINE"
 
     - scenario: "compliance.cases"
       version: "v1.0.0"
       domain: "compliance"
       description: "获取典型踩坑与行政处罚案例库"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.get_cases"
+      pipeline: "OPC_COMPLIANCE_CASE_LIST_PIPELINE"
 
     - scenario: "compliance.publish"
       version: "v1.0.0"
       domain: "compliance"
       description: "登录创客发布法条或避坑案例（kind: law | case，统一敏感词预筛门禁）"
       is_default: true
-      handler: "src.core.gateway.adapters:compliance_publish_adapter"
+      pipeline: "OPC_COMPLIANCE_PUBLISH_PIPELINE"
       required_permission: "content:publish"
 
     # 向后兼容别名：旧调用方仍可用 compliance.dimensions 读取法条库
@@ -844,21 +824,21 @@ gateway:
       domain: "compliance"
       description: "获取合规法条知识库（兼容旧场景名）"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.get_laws"
+      pipeline: "OPC_COMPLIANCE_LAW_LIST_PIPELINE"
 
     - scenario: "compliance.checkpoints"
       version: "v1.0.0"
       domain: "compliance"
       description: "获取上线前自检清单与合规门禁条目"
       is_default: true
-      handler: "src.domains.compliance.service:compliance_service.get_checkpoints"
+      pipeline: "OPC_COMPLIANCE_CHECKPOINT_LIST_PIPELINE"
 
     - scenario: "compliance.audit"
       version: "v1.0.0"
       domain: "compliance"
       description: "微内核DAG编排：评估创客产品自检并出具评分报告"
       is_default: true
-      handler: "src.core.gateway.adapters:compliance_audit_adapter"
+      pipeline: "OPC_COMPLIANCE_AUDIT_PIPELINE"
 
 
     # --------------------------------------------------------------------------
@@ -1094,49 +1074,49 @@ gateway:
       domain: "external"
       description: "调用 SiliconFlow 硅基流动 AI 算力大模型进行对话推理与生成"
       is_default: true
-      handler: "src.core.gateway.adapters:external_siliconflow_chat_adapter"
+      pipeline: "OPC_EXTERNAL_SILICONFLOW_CHAT_PIPELINE"
 
     - scenario: "external.siliconflow.summarize"
       version: "v1.0.0"
       domain: "external"
       description: "调用 SiliconFlow 硅基流动 AI 算力提炼政策公文大白话要点"
       is_default: true
-      handler: "src.core.gateway.adapters:external_siliconflow_summarize_adapter"
+      pipeline: "OPC_EXTERNAL_SILICONFLOW_SUMMARIZE_PIPELINE"
 
     - scenario: "external.siliconflow.charter"
       version: "v1.0.0"
       domain: "external"
       description: "调用 SiliconFlow 硅基流动 AI 算力生成一人有限责任公司章程条款"
       is_default: true
-      handler: "src.core.gateway.adapters:external_siliconflow_charter_adapter"
+      pipeline: "OPC_EXTERNAL_SILICONFLOW_CHARTER_PIPELINE"
 
     - scenario: "external.payment.split"
       version: "v1.0.0"
       domain: "external"
       description: "执行微信支付分账或 Stripe Connect 跨境分账结算 (防资金池合规)"
       is_default: true
-      handler: "src.core.gateway.adapters:external_payment_split_adapter"
+      pipeline: "OPC_EXTERNAL_PAYMENT_SPLIT_PIPELINE"
 
     - scenario: "external.gov.sat_policy"
       version: "v1.0.0"
       domain: "external"
       description: "官方渠道爬取并结构化国家税务总局税费减免公告文件"
       is_default: true
-      handler: "src.core.gateway.adapters:external_gov_sat_policy_adapter"
+      pipeline: "OPC_EXTERNAL_GOV_SAT_POLICY_PIPELINE"
 
     - scenario: "external.rag.policy_search"
       version: "v1.0.0"
       domain: "external"
       description: "基于轻量向量引擎与余弦相似度检索政策中心公文库 (RAG 混合召回)"
       is_default: true
-      handler: "src.core.gateway.adapters:external_rag_policy_search_adapter"
+      pipeline: "OPC_EXTERNAL_RAG_POLICY_SEARCH_PIPELINE"
 
     - scenario: "external.rag.forum_qa"
       version: "v1.0.0"
       domain: "external"
       description: "基于轻量向量引擎与大模型协同的一人公司互助社区经验 RAG 智能问答"
       is_default: true
-      handler: "src.core.gateway.adapters:external_rag_forum_qa_adapter"
+      pipeline: "OPC_EXTERNAL_RAG_FORUM_QA_PIPELINE"
 
     # --------------------------------------------------------------------------
     # 22. Framework Governance & Hot-Reload (框架能力治理与热重载)
@@ -1146,34 +1126,34 @@ gateway:
       domain: "framework"
       description: "自省文件感知监听器状态、监控文件数及 STAGED 待生效变更"
       is_default: true
-      handler: "src.core.gateway.adapters:framework_hot_reload_status_adapter"
+      pipeline: "OPC_FRAMEWORK_HOT_RELOAD_STATUS_PIPELINE"
 
     - scenario: "framework.hot-reload.scan"
       version: "v1.0.0"
       domain: "framework"
       description: "主动触发一次文件系统 .py 变更感知与暂存"
       is_default: true
-      handler: "src.core.gateway.adapters:framework_hot_reload_scan_adapter"
+      pipeline: "OPC_FRAMEWORK_HOT_RELOAD_SCAN_PIPELINE"
 
     - scenario: "framework.hot-reload.activate"
       version: "v1.0.0"
       domain: "framework"
       description: "跟随指定版本将处于 STAGED 状态的 Python 模块原子载入内存生效"
       is_default: true
-      handler: "src.core.gateway.adapters:framework_hot_reload_activate_adapter"
+      pipeline: "OPC_FRAMEWORK_HOT_RELOAD_ACTIVATE_PIPELINE"
 
     - scenario: "framework.gateway.reload"
       version: "v1.0.0"
       domain: "framework"
       description: "网关与框架统一重载：感知文件变动、随版本原子加载模块并重载场景路由"
       is_default: true
-      handler: "src.core.gateway.adapters:framework_gateway_reload_adapter"
+      pipeline: "OPC_FRAMEWORK_GATEWAY_RELOAD_PIPELINE"
 
     - scenario: "gateway.rules"
       version: "v1.0.0"
       domain: "framework"
       description: "自省统一网关当前已挂载的所有场景路由与版本策略"
       is_default: true
-      handler: "src.core.gateway.adapters:gateway_rules_adapter"
+      pipeline: "OPC_GATEWAY_RULES_PIPELINE"
 
 

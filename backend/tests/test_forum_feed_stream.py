@@ -58,6 +58,14 @@ async def test_forum_feed_stream_dag_execution():
     assert feed["prefetch_hint"]["recommended_prefetch_cursor"] == 2
 
 
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: feed 缓存与投机预热已按设计移除（热度和排序在 calc.forum.page "
+        "读时计算，场景显式输出 cache_hit/cache_written/prewarmed_next=false）。"
+        "分页/游标行为由 tests/test_forum_feed_stream.py::test_forum_feed_stream_dag_execution "
+        "与 tests/test_forum_operator_flows.py 的 feed 用例覆盖。"
+    )
+)
 @pytest.mark.asyncio
 async def test_forum_feed_cache_hit_and_prewarming():
     """Verify cache read, cache write, and speculative next-batch prewarming."""
@@ -97,6 +105,14 @@ async def test_forum_feed_cache_hit_and_prewarming():
     assert res3.final_output.get("cache_hit") is True
 
 
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: feed 缓存已按设计移除，发布场景不再有 cache_invalidated 输出；"
+        "发布后立即可见的读时排序由 "
+        "tests/test_forum_feed_stream.py::test_forum_feed_stream_dag_execution 与 "
+        "tests/test_forum_operator_flows.py 的列表/feed 用例覆盖。"
+    )
+)
 @pytest.mark.asyncio
 async def test_forum_publish_invalidates_feed_cache():
     """Verify that publishing a new thread invalidates the feed cache via forum.cache.invalidate_operator."""

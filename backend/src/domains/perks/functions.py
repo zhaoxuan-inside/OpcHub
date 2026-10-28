@@ -29,7 +29,8 @@ def _now_iso() -> str:
 )
 def publish_payload(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     role = str(context.get("user_role") or "MAKER").upper()
-    author_id = str(context.get("user_id") or args.get("author_id") or "")
+    is_admin = role == "ADMIN"
+    author_id = str((args.get("author_id") if is_admin else None) or context.get("user_id") or "")
     highlights = args.get("highlights") or []
     if not isinstance(highlights, list):
         highlights = []
@@ -47,8 +48,8 @@ def publish_payload(params: dict[str, Any], args: dict[str, Any], context: dict[
         "status": str(args.get("status") or settings.perk_default_status).strip().upper(),
         "highlights": [str(item).strip() for item in highlights if str(item).strip()][:8],
         "author_id": author_id,
-        "author_name": args.get("author_name") or context.get("nickname") or None,
-        "is_official": role == "ADMIN",
+        "author_name": (args.get("author_name") if is_admin else None) or context.get("nickname") or None,
+        "is_official": is_admin,
     }
 
 

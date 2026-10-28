@@ -200,7 +200,9 @@ def test_comment_sensitive_word_rejected(client):
 # --------------------------------------------------------------- 用户举报
 def test_user_report_enters_moderation_queue_and_dedups(client):
     policies = gw_data(client, "policies.list", {})
-    target = next(p for p in policies if not p.get("is_official"))
+    maker_policy = _maker_dispatch(client, "policies.publish", POLICY_PAYLOAD).json()["data"]
+    target = maker_policy
+    assert target["id"] not in [p["id"] for p in policies]
     payload = {
         "target_type": "POLICY",
         "target_id": target["id"],

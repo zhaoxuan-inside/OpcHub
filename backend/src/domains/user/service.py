@@ -1,123 +1,521 @@
-"""User, authentication, and entitlement management service."""
-import re
+"""Compatibility shim for the user / auth domain.
+
+Business flow now lives in the declarative scenario assets
+(``config/scenarios/auth.yaml`` / ``config/scenarios/user.yaml``), pure
+calculations in :mod:`src.domains.user.functions` and documents in the generic
+entity store (:mod:`src.domains.user.entities`).
+
+This module deliberately contains **no registration / login / verification
+flow**. It only keeps:
+
+* the legacy data surface other modules still import (``_users_by_uid`` /
+  ``_users_by_email`` live views, ``get_profile``, membership mirroring);
+* thin compatibility methods that execute the scenarios (main.py, gateway
+  adapters and older tests still call them).
+"""
+from __future__ import annotations
+
+import json
 import uuid
-from datetime import datetime, timedelta
-from typing import Dict, Set, Optional, Any, List
+from collections.abc import Iterator, MutableMapping
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set
 
 from src.core.config import settings
-from src.core.security import hash_password, verify_password, create_session_token, verify_session_token
-from src.infrastructure.database.repository import db_repository
+from src.core.entity import entity_store
+from src.core.security import hash_password, verify_session_token
+from src.domains.user import entities as _entities  # noqa: F401 - registers EntitySpecs
+from src.domains.user.compat import execute_scenario, execute_scenario_sync, raise_for_failure
+from src.domains.user.entities import (
+    ENTITY_USER_ACCOUNT,
+    ENTITY_USER_ENTITLEMENT,
+    ENTITY_USER_ENTITLEMENT_GRANT,
+)
+from src.domains.user.functions import (
+    BUILTIN_AVATAR_IDS,
+    FOUNDING_VIP_ENTITLEMENT_ID,
+    FOUNDING_VIP_TIER_NAME,
+    MEMBERSHIP_ENTITLEMENT_MAP,
+    MEMBERSHIP_TIER_NAMES,
+    STANDARD_TIER_NAME,
+    profile as calc_profile,
+)
 from src.domains.user.models import (
-    EntitlementItem,
-    MakerProfileResponse,
-    UserProfileUpdateRequest,
+    AuthSessionResponse,
     ChangePasswordRequest,
     EntitlementActivateRequest,
     EntitlementActivateResponse,
-    UserRegisterRequest,
+    MakerProfileResponse,
     UserLoginRequest,
-    AuthSessionResponse,
-)
-from src.domains.user.verification import (
-    captcha_service,
-    email_verification_service,
-    email_provider_registry,
-    email_dispatcher,
-    PasswordPolicyService,
-    LegalAgreementsRepository,
+    UserProfileUpdateRequest,
+    UserRegisterRequest,
 )
 
-# 内置画像头像标识（20 种常见创客用户画像，前端 PersonaAvatar 组件按 id 渲染）
-BUILTIN_AVATAR_IDS = frozenset({
-    "dev", "designer", "writer", "founder", "ecommerce", "consultant",
-    "photographer", "illustrator", "video", "musician", "teacher",
-    "finance", "legal", "crossborder", "researcher", "craftsman",
-    "fitness", "foodie", "traveler", "farmer",
-})
-
-# 创始创客活动赠礼对应的权益（auth.user.entitlements.activate 的 ENT_VIP 别名同指此条）
-FOUNDING_VIP_ENTITLEMENT_ID = "ent_black_diamond_priority"
-FOUNDING_VIP_TIER_NAME = "黑钻创客 VIP"
 _ENTITLEMENT_EXPIRY_FORMAT = "%Y-%m-%d %H:%M:%S"
 
-# 会员档位 -> 现有权益目录映射（loyalty 域开通/续期时统一同步）
-MEMBERSHIP_ENTITLEMENT_MAP = {
-    "PRO": {"ent_ai_tax_assistant"},
-    "BLACK_DIAMOND": {"ent_ai_tax_assistant", "ent_black_diamond_priority"},
-}
-MEMBERSHIP_TIER_NAMES = {
-    "STANDARD": "标准创客",
-    "PRO": "PRO 创客",
-    "BLACK_DIAMOND": FOUNDING_VIP_TIER_NAME,
-}
+CAPTCHA_PIPELINE = "OPC_AUTH_CAPTCHA_PIPELINE"
+SEND_CODE_PIPELINE = "OPC_AUTH_SEND_CODE_PIPELINE"
+VERIFY_CODE_PIPELINE = "OPC_AUTH_VERIFY_CODE_PIPELINE"
+PASSWORD_STRENGTH_PIPELINE = "OPC_AUTH_PASSWORD_STRENGTH_PIPELINE"
+LEGAL_AGREEMENTS_PIPELINE = "OPC_AUTH_LEGAL_AGREEMENTS_PIPELINE"
+MAIL_PROVIDERS_PIPELINE = "OPC_AUTH_MAIL_PROVIDERS_PIPELINE"
+REGISTER_PIPELINE = "OPC_AUTH_REGISTER_PIPELINE"
+LOGIN_PIPELINE = "OPC_AUTH_LOGIN_PIPELINE"
+CHANGE_PASSWORD_PIPELINE = "OPC_AUTH_CHANGE_PASSWORD_PIPELINE"
+SESSION_PIPELINE = "OPC_AUTH_SESSION_PIPELINE"
+PROFILE_PIPELINE = "OPC_USER_PROFILE_PIPELINE"
+PROFILE_UPDATE_PIPELINE = "OPC_USER_PROFILE_UPDATE_PIPELINE"
+ENTITLEMENT_ACTIVATE_PIPELINE = "OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE"
 
 
+# ---------------------------------------------------------------------------
+# Legacy in-memory index views backed by the shared entity store
+# ---------------------------------------------------------------------------
+def _legacy_record(doc: dict[str, Any]) -> Dict[str, Any]:
+    """Project an entity document into the historical service record shape.
+
+    The projection is applied **in place** so older callers that mutate the
+    returned record (e.g. expiring a gift entitlement) still see the change on
+    the next profile read.
+    """
+    record = doc
+    record["active_entitlements"] = set(doc.get("active_entitlements") or [])
+    record["entitlement_expiries"] = doc.get("entitlement_expiries") or {}
+    record["agreement_consent"] = doc.get("agreement_consent") or {}
+    return record
+
+
+def _entity_doc(record: dict[str, Any]) -> dict[str, Any]:
+    """Project a historical record back into an entity document."""
+    doc = dict(record)
+    active = doc.get("active_entitlements")
+    if isinstance(active, (set, tuple)):
+        doc["active_entitlements"] = sorted(str(v) for v in active)
+    expiries = doc.get("entitlement_expiries")
+    if expiries is None:
+        doc["entitlement_expiries"] = {}
+    return doc
+
+
+class _UserIndexView(MutableMapping):
+    """Live mapping over ``user.account`` entities (legacy service surface)."""
+
+    def __init__(self, key_field: str):
+        self._key_field = key_field
+
+    def _docs(self) -> list[dict[str, Any]]:
+        rows, _total = entity_store.list(ENTITY_USER_ACCOUNT, {"limit": 0, "order": "created_at"})
+        return rows
+
+    def _live(self, key: str) -> Optional[dict[str, Any]]:
+        key = str(key)
+        adapter = entity_store.adapter(ENTITY_USER_ACCOUNT)
+        if self._key_field == "uid":
+            live = getattr(adapter, "live", None)
+            if live is not None:
+                return live(key)
+            return entity_store.get(ENTITY_USER_ACCOUNT, {"key": key})
+        live_all = getattr(adapter, "live_all", None)
+        rows = live_all() if live_all is not None else adapter.all()
+        for row in rows:
+            if str(row.get("email")) == key.lower():
+                return row
+        return None
+
+    def __getitem__(self, key):
+        doc = self._live(key)
+        if doc is None:
+            raise KeyError(key)
+        return _legacy_record(doc)
+
+    def __setitem__(self, key, value) -> None:
+        doc = _entity_doc(value)
+        doc.setdefault("uid", str(key) if self._key_field == "uid" else "")
+        if not doc.get("uid"):
+            doc["uid"] = f"usr_{uuid.uuid4().hex[:16]}"
+        existing = entity_store.get(ENTITY_USER_ACCOUNT, {"key": doc["uid"]})
+        if existing is None:
+            entity_store.create(ENTITY_USER_ACCOUNT, doc)
+        else:
+            entity_store.update(ENTITY_USER_ACCOUNT, doc, partial=True)
+
+    def __delitem__(self, key) -> None:
+        doc = self._live(key)
+        if doc is None:
+            raise KeyError(key)
+        entity_store.delete(ENTITY_USER_ACCOUNT, {"key": doc["uid"]})
+
+    def __iter__(self) -> Iterator[str]:
+        for row in self._docs():
+            yield str(row.get(self._key_field) or "")
+
+    def __len__(self) -> int:
+        return len(self._docs())
+
+    def clear(self) -> None:
+        adapter = entity_store.adapter(ENTITY_USER_ACCOUNT)
+        for row in list(adapter.all()):
+            uid = str(row.get("uid") or "")
+            if uid:
+                adapter.delete(uid)
+
+
+# ---------------------------------------------------------------------------
+# Service shim
+# ---------------------------------------------------------------------------
 class UserService:
-    """Manages maker profile, authentication, and entitlements."""
+    """Keeps the legacy data/query surface; flows are scenarios."""
 
     def __init__(self):
+        self._users_by_uid = _UserIndexView("uid")
+        self._users_by_email = _UserIndexView("email")
         self._active_entitlements: Set[str] = set()
-        self._entitlements: Dict[str, EntitlementItem] = {}
-        self._users_by_email: Dict[str, Dict[str, Any]] = {}
-        self._users_by_uid: Dict[str, Dict[str, Any]] = {}
         self.require_email_code: bool = False
         self._seed_default_entitlements()
         self._ensure_builtin_admin()
 
-    def _ensure_builtin_admin(self):
-        """Idempotently provision the built-in administrator (RBAC §1.1).
-
-        Credentials come from env (safe defaults); the account is flagged
-        must_change_password and forced to rotate on first login.
-        """
+    # ------------------------------------------------------------------
+    # Seeding / hydration (data only)
+    # ------------------------------------------------------------------
+    def _ensure_builtin_admin(self) -> None:
+        """Idempotently provision the built-in administrator account document."""
         admin_uid = "usr_admin_builtin"
-        if admin_uid in self._users_by_uid:
+        if entity_store.get(ENTITY_USER_ACCOUNT, {"key": admin_uid}) is not None:
             return
-        admin = {
-            "uid": admin_uid,
-            "email": settings.admin_email.strip().lower(),
-            "nickname": settings.admin_nickname,
-            "role": "ADMIN",
-            "company_name": "OpcHub 平台运营",
-            "phone": "",
-            "credit_code": "",
-            "tier_name": "平台管理员",
-            "password_hash": hash_password(settings.admin_initial_password),
-            "active_entitlements": set(),
-            "must_change_password": True,
-        }
-        self._users_by_uid[admin_uid] = admin
-        self._users_by_email[admin["email"]] = admin
+        entity_store.create(
+            ENTITY_USER_ACCOUNT,
+            {
+                "uid": admin_uid,
+                "email": settings.admin_email.strip().lower(),
+                "nickname": settings.admin_nickname,
+                "role": "ADMIN",
+                "company_name": "OpcHub 平台运营",
+                "phone": "",
+                "credit_code": "",
+                "tier_name": "平台管理员",
+                "password_hash": hash_password(settings.admin_initial_password),
+                "active_entitlements": [],
+                "entitlement_expiries": {},
+                "must_change_password": True,
+            },
+        )
 
+    def _seed_default_entitlements(self) -> None:
+        """Load the entitlement catalog from external seed data (data only)."""
+        search_paths = [
+            Path("backend/data/seeds/entitlements.json"),
+            Path("data/seeds/entitlements.json"),
+            Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "entitlements.json",
+        ]
+        items: List[Dict[str, Any]] = []
+        for path in search_paths:
+            if path.is_file():
+                try:
+                    with open(path, "r", encoding="utf-8") as handle:
+                        items = json.load(handle)
+                    break
+                except Exception:  # pragma: no cover - defensive
+                    items = []
+        for raw in items:
+            ent_id = str(raw.get("id") or "").strip()
+            if not ent_id:
+                continue
+            doc = {
+                "id": ent_id,
+                "name": raw.get("name", ""),
+                "tier": raw.get("tier", "STANDARD"),
+                "price_cny": float(raw.get("price_cny", 0.0)),
+                "description": raw.get("description", ""),
+                "is_active": False,
+                "quota_desc": raw.get("quota_desc", ""),
+            }
+            if entity_store.get(ENTITY_USER_ENTITLEMENT, {"key": ent_id}) is None:
+                entity_store.create(ENTITY_USER_ENTITLEMENT, doc)
+
+    async def hydrate_from_db(self) -> int:
+        """Rebuild the account working set from the canonical ``users`` table."""
+        adapter = entity_store.adapter(ENTITY_USER_ACCOUNT)
+        hydrate = getattr(adapter, "hydrate_from_repository", None)
+        if hydrate is None:
+            return 0
+        count = await hydrate()
+        self._ensure_builtin_admin()
+        return count
+
+    async def _next_registration_ordinal(self) -> int:
+        count = await self._maker_count()
+        return count + 1
+
+    async def _maker_count(self) -> int:
+        rows, _total = entity_store.list(
+            ENTITY_USER_ACCOUNT,
+            {"filters": {"role": {"ne": "ADMIN"}}, "limit": 0},
+        )
+        return len(rows)
+
+    # ------------------------------------------------------------------
+    # Compatibility surface delegated to scenario assets
+    # ------------------------------------------------------------------
+    def generate_captcha(self) -> Dict[str, Any]:
+        result = execute_scenario_sync(CAPTCHA_PIPELINE)
+        return raise_for_failure(result).get("response", {})
+
+    def send_verification_code(
+        self,
+        email: str,
+        captcha_id: Optional[str] = None,
+        captcha_code: Optional[str] = None,
+        client_ip: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        result = execute_scenario_sync(
+            SEND_CODE_PIPELINE,
+            {
+                "email": email,
+                "captcha_id": captcha_id,
+                "captcha_code": captcha_code,
+                "client_ip": client_ip,
+            },
+        )
+        return raise_for_failure(result).get("response", {})
+
+    def verify_email_code(self, email: str, code: str) -> bool:
+        result = execute_scenario_sync(VERIFY_CODE_PIPELINE, {"email": email, "code": code})
+        try:
+            raise_for_failure(result)
+        except ValueError as exc:
+            if "连续错误次数超限" in str(exc):
+                raise
+            return False
+        return True
+
+    def evaluate_password_strength(self, password: str, email: Optional[str] = None) -> Dict[str, Any]:
+        result = execute_scenario_sync(
+            PASSWORD_STRENGTH_PIPELINE, {"password": password, "email": email}
+        )
+        return raise_for_failure(result).get("response", {})
+
+    def get_legal_agreements(self) -> Dict[str, Any]:
+        result = execute_scenario_sync(LEGAL_AGREEMENTS_PIPELINE)
+        return raise_for_failure(result).get("response", {})
+
+    def get_supported_mail_providers(self) -> List[Dict[str, Any]]:
+        result = execute_scenario_sync(MAIL_PROVIDERS_PIPELINE)
+        return raise_for_failure(result).get("response", [])
+
+    def resolve_mail_provider(self, email: str) -> Dict[str, Any]:
+        result = execute_scenario_sync(MAIL_PROVIDERS_PIPELINE, {"email": email})
+        return raise_for_failure(result).get("response", {})
+
+    async def register_by_email(self, req: UserRegisterRequest) -> AuthSessionResponse:
+        payload = req.model_dump()
+        result = await execute_scenario(REGISTER_PIPELINE, payload)
+        output = raise_for_failure(result)
+        response = output.get("response") or {}
+        return AuthSessionResponse(**response)
+
+    async def login_by_email(self, req: UserLoginRequest) -> AuthSessionResponse:
+        payload = req.model_dump()
+        result = await execute_scenario(LOGIN_PIPELINE, payload)
+        output = raise_for_failure(result)
+        response = output.get("response") or {}
+        return AuthSessionResponse(**response)
+
+    login_user = login_by_email
+
+    async def get_session_by_token(self, token: str) -> Optional[AuthSessionResponse]:
+        result = await execute_scenario(SESSION_PIPELINE, {"token": token})
+        try:
+            output = raise_for_failure(result)
+        except (ValueError, PermissionError):
+            return None
+        response = output.get("response") or {}
+        if not response:
+            return None
+        return AuthSessionResponse(
+            token=response.get("token", token),
+            uid=response.get("uid", ""),
+            email=response.get("email", ""),
+            nickname=response.get("nickname", "创客"),
+            role=response.get("role", "MAKER"),
+            tier_name=response.get("tier_name", STANDARD_TIER_NAME),
+            message="会话有效",
+        )
+
+    async def update_profile(
+        self,
+        req: UserProfileUpdateRequest,
+        token: Optional[str] = None,
+    ) -> MakerProfileResponse:
+        uid = req.user_id
+        if token:
+            payload = verify_session_token(token)
+            if payload and payload.get("uid"):
+                uid = payload.get("uid")
+        if not uid or uid == "usr_guest":
+            raise ValueError("无法为未登录访客更新档案，请先登录")
+        inputs = req.model_dump()
+        inputs["token"] = token or ""
+        result = await execute_scenario(
+            PROFILE_UPDATE_PIPELINE,
+            inputs,
+            {"user_id": uid, "user_role": "MAKER", "token": token or ""},
+        )
+        output = raise_for_failure(result)
+        return MakerProfileResponse(**output.get("profile", {}))
+
+    async def activate_entitlement(
+        self,
+        req: EntitlementActivateRequest,
+    ) -> EntitlementActivateResponse:
+        result = await execute_scenario(
+            ENTITLEMENT_ACTIVATE_PIPELINE,
+            req.model_dump(),
+            {"user_id": req.user_id, "user_role": "MAKER"},
+        )
+        output = raise_for_failure(result)
+        return EntitlementActivateResponse(**output.get("activation", {}))
+
+    async def change_password(self, req: ChangePasswordRequest) -> AuthSessionResponse:
+        uid = req.user_id
+        if req.token:
+            payload = verify_session_token(req.token)
+            if payload and payload.get("uid"):
+                uid = payload.get("uid")
+        if not uid or uid == "usr_guest":
+            raise ValueError("无法为未登录访客修改密码，请先登录")
+        result = await execute_scenario(
+            CHANGE_PASSWORD_PIPELINE,
+            {"old_password": req.old_password, "new_password": req.new_password, "token": req.token or ""},
+            {"user_id": uid, "user_role": "MAKER", "token": req.token or ""},
+        )
+        output = raise_for_failure(result)
+        return AuthSessionResponse(**output.get("response", {}))
+
+    # ------------------------------------------------------------------
+    # Data / query compatibility surface
+    # ------------------------------------------------------------------
+    def get_profile(self, uid: Optional[str] = None) -> MakerProfileResponse:
+        """Fetch a maker profile from the entity store (guest profile when absent)."""
+        catalog, _total = entity_store.list(ENTITY_USER_ENTITLEMENT, {"limit": 0, "order": "id"})
+        grants: list[dict[str, Any]] = []
+        user_doc: Optional[dict[str, Any]] = None
+        if uid and uid != "usr_guest":
+            user_doc = entity_store.get(ENTITY_USER_ACCOUNT, {"key": uid})
+            grants, _grant_total = entity_store.list(
+                ENTITY_USER_ENTITLEMENT_GRANT,
+                {"filters": {"user_id": uid}, "limit": 0},
+            )
+        profile_doc = calc_profile(
+            {},
+            {
+                "uid": uid or "usr_guest",
+                "user": user_doc,
+                "catalog": catalog,
+                "grants": grants,
+            },
+            {},
+        )
+        profile_doc.pop("orchestrated_by", None)
+        return MakerProfileResponse(**profile_doc)
+
+    async def sync_membership(self, uid: str, tier: str, expires_at: str) -> None:
+        """Mirror a loyalty membership grant onto the legacy profile fields."""
+        doc = entity_store.get(ENTITY_USER_ACCOUNT, {"key": str(uid)})
+        if not doc:
+            return
+        tier = str(tier or "STANDARD").upper()
+        if tier not in MEMBERSHIP_ENTITLEMENT_MAP:
+            tier = "STANDARD"
+        owned = {"ent_ai_tax_assistant", "ent_black_diamond_priority"}
+        active = set(doc.get("active_entitlements") or [])
+        expiries = dict(doc.get("entitlement_expiries") or {})
+        for ent_id in owned:
+            active.discard(ent_id)
+            expiries.pop(ent_id, None)
+            entity_store.delete(
+                ENTITY_USER_ENTITLEMENT_GRANT,
+                {"user_id": str(uid), "entitlement_id": ent_id, "key": f"{uid}::{ent_id}"},
+            )
+        for ent_id in MEMBERSHIP_ENTITLEMENT_MAP.get(tier, set()):
+            active.add(ent_id)
+            expiries[ent_id] = expires_at
+            entity_store.upsert(
+                ENTITY_USER_ENTITLEMENT_GRANT,
+                {
+                    "user_id": str(uid),
+                    "entitlement_id": ent_id,
+                    "status": "ACTIVE",
+                    "receipt_no": "",
+                    "expires_at": expires_at,
+                    "activated_at": datetime.now().strftime(_ENTITLEMENT_EXPIRY_FORMAT),
+                },
+            )
+        entity_store.update(
+            ENTITY_USER_ACCOUNT,
+            {
+                "uid": str(uid),
+                "tier_name": MEMBERSHIP_TIER_NAMES.get(tier, STANDARD_TIER_NAME),
+                "membership_tier": tier,
+                "membership_expires_at": expires_at,
+                "active_entitlements": sorted(active),
+                "entitlement_expiries": expiries,
+            },
+            partial=True,
+        )
+
+    async def deactivate_entitlement(
+        self,
+        entitlement_id: str,
+        user_id: Optional[str] = None,
+    ) -> bool:
+        ent_id = entitlement_id
+        if ent_id not in self._active_entitlements and ent_id == "ENT_VIP":
+            ent_id = FOUNDING_VIP_ENTITLEMENT_ID
+        removed = ent_id in self._active_entitlements
+        self._active_entitlements.discard(ent_id)
+
+        targets = [user_id] if user_id else [str(row.get("uid")) for row in entity_store.adapter(ENTITY_USER_ACCOUNT).all()]
+        for uid in targets:
+            doc = entity_store.get(ENTITY_USER_ACCOUNT, {"key": uid})
+            if not doc:
+                continue
+            active = set(doc.get("active_entitlements") or [])
+            expiries = dict(doc.get("entitlement_expiries") or {})
+            if ent_id in active:
+                active.discard(ent_id)
+                expiries.pop(ent_id, None)
+                removed = True
+            tier_name = doc.get("tier_name") or STANDARD_TIER_NAME
+            if ent_id == FOUNDING_VIP_ENTITLEMENT_ID and tier_name == FOUNDING_VIP_TIER_NAME:
+                tier_name = STANDARD_TIER_NAME
+            entity_store.update(
+                ENTITY_USER_ACCOUNT,
+                {
+                    "uid": uid,
+                    "active_entitlements": sorted(active),
+                    "entitlement_expiries": expiries,
+                    "tier_name": tier_name,
+                },
+                partial=True,
+            )
+            entity_store.delete(
+                ENTITY_USER_ENTITLEMENT_GRANT,
+                {"user_id": uid, "entitlement_id": ent_id, "key": f"{uid}::{ent_id}"},
+            )
+        return removed
+
+    # ------------------------------------------------------------------
+    # Legacy read-side helpers (kept for older callers)
+    # ------------------------------------------------------------------
     @classmethod
     def _record_from_db_user(cls, db_user: Any) -> Dict[str, Any]:
-        """Project a persisted User row into the service's in-memory record shape."""
-        meta = db_user.metadata_payload or {}
-        record = {
-            "uid": db_user.uid,
-            "email": db_user.email,
-            "nickname": db_user.nickname,
-            "role": db_user.role,
-            "company_name": db_user.company_name or "",
-            "phone": meta.get("phone", ""),
-            "credit_code": getattr(db_user, "unified_social_credit_code", None) or meta.get("credit_code", ""),
-            "tier_name": meta.get("tier_name", "标准创客"),
-            "membership_tier": meta.get("membership_tier", "STANDARD"),
-            "membership_expires_at": meta.get("membership_expires_at", ""),
-            "account_type": meta.get("account_type", "MAKER"),
-            "industry_track": meta.get("industry_track", ""),
-            "password_hash": db_user.password_hash or "",
-            "active_entitlements": set(meta.get("active_entitlements", [])),
-            "entitlement_expiries": dict(meta.get("entitlement_expiries", {})),
-            "must_change_password": bool(meta.get("must_change_password", False)),
-            "avatar_id": meta.get("avatar_id", ""),
-        }
-        cls._prune_expired_entitlements(record)
-        return record
+        from src.domains.user.entities import UserAccountAdapter
+
+        return _legacy_record(UserAccountAdapter.document_from_user(db_user))
 
     @staticmethod
     def _entitlement_window_elapsed(expiries: Dict[str, Any], ent_id: str) -> bool:
-        """True when a granted entitlement's validity window has passed (absent entry = permanent)."""
         raw = (expiries or {}).get(ent_id, "")
         if not raw:
             return False
@@ -128,11 +526,6 @@ class UserService:
 
     @classmethod
     def _prune_expired_entitlements(cls, record: Dict[str, Any]) -> None:
-        """Drop entitlements whose validity window elapsed and demote the VIP tier label.
-
-        Read-side normalization: persisted metadata keeps the historical grant, so this
-        runs idempotently on every record load / profile read.
-        """
         expiries = record.get("entitlement_expiries") or {}
         if not expiries:
             return
@@ -141,727 +534,29 @@ class UserService:
             active.discard(ent_id)
             expiries.pop(ent_id, None)
         if FOUNDING_VIP_ENTITLEMENT_ID not in active and record.get("tier_name") == FOUNDING_VIP_TIER_NAME:
-            record["tier_name"] = "标准创客"
+            record["tier_name"] = STANDARD_TIER_NAME
         membership_tier = str(record.get("membership_tier") or "").upper()
         if membership_tier == "PRO" and "ent_ai_tax_assistant" not in active:
             if record.get("tier_name") == MEMBERSHIP_TIER_NAMES["PRO"]:
-                record["tier_name"] = "标准创客"
+                record["tier_name"] = STANDARD_TIER_NAME
         elif membership_tier == "BLACK_DIAMOND" and FOUNDING_VIP_ENTITLEMENT_ID not in active:
             if record.get("tier_name") == MEMBERSHIP_TIER_NAMES["BLACK_DIAMOND"]:
-                record["tier_name"] = "标准创客"
-
-    async def _next_registration_ordinal(self) -> int:
-        """1-based sequence number the next MAKER registration will occupy (built-in admin excluded)."""
-        db_count = await db_repository.count_makers()
-        memory_count = sum(1 for rec in self._users_by_email.values() if rec.get("role") != "ADMIN")
-        return max(db_count, memory_count) + 1
-
-    async def hydrate_from_db(self) -> int:
-        """Rebuild the in-memory user index from the canonical ``users`` table on startup."""
-        rows = await db_repository.list_users()
-        for db_user in rows:
-            record = self._record_from_db_user(db_user)
-            self._users_by_uid[record["uid"]] = record
-            self._users_by_email[record["email"]] = record
-        return len(rows)
-
-    def _seed_default_entitlements(self):
-        """Load entitlements catalog from external seed data file (zero hardcoded catalog data in code)."""
-        import json
-        from pathlib import Path
-
-        search_paths = [
-            Path("backend/data/seeds/entitlements.json"),
-            Path("data/seeds/entitlements.json"),
-            Path(__file__).resolve().parent.parent.parent.parent / "data" / "seeds" / "entitlements.json",
-        ]
-        items_raw: List[Dict[str, Any]] = []
-        for p in search_paths:
-            if p.is_file():
-                try:
-                    with open(p, "r", encoding="utf-8") as f:
-                        items_raw = json.load(f)
-                    break
-                except Exception:
-                    pass
-
-        for raw in items_raw:
-            eid = raw.get("id")
-            if eid:
-                self._entitlements[eid] = EntitlementItem(
-                    id=eid,
-                    name=raw.get("name", ""),
-                    tier=raw.get("tier", "STANDARD"),
-                    price_cny=float(raw.get("price_cny", 0.0)),
-                    description=raw.get("description", ""),
-                    is_active=(eid in self._active_entitlements) or bool(raw.get("is_active", False)),
-                    quota_desc=raw.get("quota_desc", ""),
-                )
+                record["tier_name"] = STANDARD_TIER_NAME
 
     def validate_email(self, email: str) -> bool:
-        """Validate standard email format."""
-        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-        return bool(re.match(pattern, email.strip()))
+        import re
 
-    def generate_captcha(self) -> Dict[str, Any]:
-        """Generate a lightweight anti-bot SVG challenge."""
-        return captcha_service.generate()
-
-    def send_verification_code(
-        self,
-        email: str,
-        captcha_id: Optional[str] = None,
-        captcha_code: Optional[str] = None,
-        client_ip: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """Send 6-digit email verification code with anti-bot check and rate limiting."""
-        clean_email = email.strip().lower()
-        if not self.validate_email(clean_email):
-            raise ValueError(f"邮箱格式不正确: {email}")
-
-        # If a captcha was requested or provided, enforce single-use verification
-        if captcha_id:
-            if not captcha_service.verify(captcha_id, captcha_code):
-                raise ValueError("图形验证码错误或已失效，请重新输入")
-
-        return email_verification_service.send_code(clean_email, client_ip=client_ip)
-
-    def verify_email_code(self, email: str, code: str) -> bool:
-        """Directly verify if the email verification code is valid."""
-        return email_verification_service.verify_code(email, code)
-
-    def evaluate_password_strength(self, password: str, email: Optional[str] = None) -> Dict[str, Any]:
-        """Evaluate password entropy, complexity, and compliance suggestions."""
-        return PasswordPolicyService.evaluate(password, email=email)
-
-    def get_legal_agreements(self) -> Dict[str, Any]:
-        """Retrieve statutory platform user terms and privacy policy documents."""
-        return LegalAgreementsRepository.get_agreements()
-
-    def get_supported_mail_providers(self) -> List[Dict[str, Any]]:
-        """List all supported commercial email providers and preset metadata."""
-        return email_provider_registry.list_supported_providers()
-
-    def resolve_mail_provider(self, email: str) -> Dict[str, Any]:
-        """Resolve email provider preset and active configuration state."""
-        return email_dispatcher.get_provider_config(email)
-
-    async def register_by_email(self, req: UserRegisterRequest) -> AuthSessionResponse:
-        """Register a new maker using email, password, and commercial validations."""
-        email = req.email.strip().lower()
-        if not self.validate_email(email):
-            raise ValueError(f"邮箱格式不正确: {req.email}")
-
-        # 1. Statutory Consent (网络安全法 / 个人信息保护法: 明确同意条款且禁止默认勾选)
-        if not req.agreed_terms:
-            raise ValueError("必须阅读并同意《用户服务协议》与《隐私保护指引》方可完成注册")
-
-        # 2. Password Strength & Policy
-        if len(req.password) < 6:
-            raise ValueError("密码长度不能少于 6 位")
-
-        if req.password.lower() in PasswordPolicyService.COMMON_WEAK_PASSWORDS:
-            raise ValueError("密码过于简单，属于常见弱口令字典，请设置更安全的密码")
-
-        # 3. Ownership Proof & Anti-Bot Protection
-        if req.verification_code:
-            # Primary commercial registration flow: Email verification code proves mailbox ownership.
-            # Anti-bot captcha was already challenged and consumed during auth.send-code.
-            if not email_verification_service.verify_code(email, req.verification_code):
-                raise ValueError("邮箱验证码错误或已过期，请重新获取")
-        elif req.captcha_id:
-            # Fallback for flows where email verification code is not configured
-            if not captcha_service.verify(req.captcha_id, req.captcha_code):
-                raise ValueError("图形验证码错误或已失效，请重新输入")
-        elif self.require_email_code:
-            raise ValueError("请输入邮箱验证码以核验账号真实性")
-
-        # 5. Commercial Identity & Credit Code validation
-        credit_code = (req.credit_code or "").strip().upper()
-        if credit_code:
-            if not re.match(r"^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$", credit_code) and (
-                len(credit_code) < 15 or len(credit_code) > 18
-            ):
-                raise ValueError("统一社会信用代码格式不正确 (应为18位标准代码)")
-
-        # 6. Duplicate Check in DB & Memory
-        db_user = await db_repository.get_user_by_email(email)
-        if db_user is not None:
-            raise ValueError("该邮箱已被注册，请直接登录")
-
-        if email in self._users_by_email:
-            raise ValueError("该邮箱已被注册，请直接登录")
-
-        nickname = req.nickname.strip() if req.nickname else email.split("@")[0]
-        company = req.company_name.strip() if req.company_name else ""
-        account_type = req.account_type or "MAKER"
-        industry_track = req.industry_track or "独立软件全栈开发"
-        phone = (req.phone or "").strip()
-        pwd_hash = hash_password(req.password)
-        uid = str(uuid.uuid4())
-
-        # 7. Founding member campaign: the first N registered makers receive a 1-year VIP gift
-        registration_ordinal = await self._next_registration_ordinal()
-        founding_vip = registration_ordinal <= settings.founding_member_quota
-        entitlements_active: Set[str] = set()
-        entitlement_expiries: Dict[str, str] = {}
-        vip_expiry = ""
-        tier_name = "标准创客"
-        if founding_vip:
-            entitlements_active.add(FOUNDING_VIP_ENTITLEMENT_ID)
-            vip_expiry = (datetime.now() + timedelta(days=settings.founding_member_vip_days)).strftime(
-                _ENTITLEMENT_EXPIRY_FORMAT
-            )
-            entitlement_expiries[FOUNDING_VIP_ENTITLEMENT_ID] = vip_expiry
-            tier_name = FOUNDING_VIP_TIER_NAME
-
-        metadata = {
-            "tier": "STANDARD",
-            "tier_name": tier_name,
-            "account_type": account_type,
-            "industry_track": industry_track,
-            "phone": phone,
-            "credit_code": credit_code,
-            "invitation_code": req.invitation_code or "",
-            "agreement_consent": {
-                "agreed_terms": True,
-                "agreed_privacy": True,
-                "version": req.agreement_version,
-                "client_ip": req.client_ip or "127.0.0.1",
-            },
-            "created_source": "COMMERCIAL_REG",
-            "active_entitlements": sorted(entitlements_active),
-            "entitlement_expiries": entitlement_expiries,
-        }
-
-        # 7. Persist to PostgreSQL database (Mandatory Commercial Strong Persistence)
-        created_db_user = await db_repository.create_user(
-            email=email,
-            password_plain=req.password,
-            nickname=nickname,
-            company_name=company,
-            role="MAKER",
-            credit_code=credit_code if credit_code else None,
-            metadata=metadata,
-        )
-        if created_db_user:
-            uid = created_db_user.uid
-
-        # 8. Save to in-memory cache
-        user_record = {
-            "uid": uid,
-            "email": email,
-            "nickname": nickname,
-            "role": "MAKER",
-            "company_name": company,
-            "phone": phone,
-            "credit_code": credit_code,
-            "tier_name": tier_name,
-            "account_type": account_type,
-            "industry_track": industry_track,
-            "password_hash": pwd_hash,
-            "active_entitlements": entitlements_active,
-            "entitlement_expiries": entitlement_expiries,
-        }
-        self._users_by_email[email] = user_record
-        self._users_by_uid[uid] = user_record
-
-        # 9. Issue signed token
-        token = create_session_token({
-            "uid": uid,
-            "email": email,
-            "nickname": nickname,
-            "role": "MAKER",
-            "account_type": account_type,
-        })
-
-        if founding_vip:
-            register_message = (
-                f"商用创客账号注册成功！您是平台第 {registration_ordinal} 位创始创客，"
-                f"已赠送 1 年黑钻 VIP 权益（有效期至 {vip_expiry[:10]}）"
-            )
-        else:
-            register_message = "商用创客账号注册成功，已初始化超级个体工作区！"
-
-        return AuthSessionResponse(
-            token=token,
-            uid=uid,
-            email=email,
-            nickname=nickname,
-            role="MAKER",
-            company_name=company,
-            tier_name=tier_name,
-            account_type=account_type,
-            industry_track=industry_track,
-            message=register_message,
-        )
-
-    async def _fetch_user_record_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        clean_email = email.strip().lower()
-        db_user = await db_repository.get_user_by_email(clean_email)
-        if db_user is not None:
-            return self._record_from_db_user(db_user)
-        if clean_email in self._users_by_email:
-            return self._users_by_email[clean_email]
-        return None
-
-    async def _fetch_user_record_by_account(self, account: str) -> Optional[Dict[str, Any]]:
-        clean = account.strip()
-        clean_lower = clean.lower()
-        db_user = await db_repository.get_user_by_account(clean)
-        if db_user is not None:
-            return self._record_from_db_user(db_user)
-        if clean_lower in self._users_by_email:
-            return self._users_by_email[clean_lower]
-        if clean in self._users_by_uid:
-            return self._users_by_uid[clean]
-        for u in self._users_by_uid.values():
-            if u.get("nickname") == clean or u.get("email") == clean_lower:
-                return u
-        return None
-
-    def _build_auth_session_response(
-        self, user_record: Dict[str, Any], message: str = "登录成功，已恢复创客工作台会话"
-    ) -> AuthSessionResponse:
-        must_chg = bool(user_record.get("must_change_password", False))
-        token = create_session_token({
-            "uid": user_record["uid"],
-            "email": user_record["email"],
-            "nickname": user_record["nickname"],
-            "role": user_record.get("role", "MAKER"),
-            "account_type": user_record.get("account_type", "MAKER"),
-            "must_change_password": must_chg,
-        })
-        return AuthSessionResponse(
-            token=token,
-            uid=user_record["uid"],
-            email=user_record["email"],
-            nickname=user_record["nickname"],
-            role=user_record.get("role", "MAKER"),
-            company_name=user_record.get("company_name"),
-            tier_name=user_record.get("tier_name", "标准创客"),
-            account_type=user_record.get("account_type", "MAKER"),
-            industry_track=user_record.get("industry_track", ""),
-            message=message,
-            must_change_password=must_chg,
-        )
-
-    async def login_by_email(self, req: UserLoginRequest) -> AuthSessionResponse:
-        """Authenticate user by account/password, email/code, or email/password."""
-        login_type = req.login_type or ""
-        code = req.code or req.verification_code
-        email = (req.email or "").strip().lower()
-        account = (req.account or "").strip()
-
-        # Deduce login_type if not explicitly set
-        if not login_type:
-            if code:
-                login_type = "email_code"
-            elif account and not email:
-                login_type = "account_password"
-            else:
-                login_type = "email_password"
-
-        if login_type == "email_code":
-            if not email:
-                raise ValueError("请输入登录邮箱")
-            if not self.validate_email(email):
-                raise ValueError(f"邮箱格式不正确: {email}")
-            if not code:
-                raise ValueError("请输入邮箱验证码")
-
-            if not email_verification_service.verify_code(email, code):
-                raise ValueError("邮箱验证码错误或已失效，请重新获取")
-
-            user_record = await self._fetch_user_record_by_email(email)
-            if not user_record:
-                raise ValueError("该邮箱尚未注册创客账号，请先完成注册")
-
-            return self._build_auth_session_response(user_record, message="验证码核验成功，已恢复创客工作台会话")
-
-        elif login_type == "account_password":
-            target_account = account or email
-            if not target_account:
-                raise ValueError("请输入创客账号、用户名或邮箱")
-            if not req.password:
-                raise ValueError("请输入登录密码")
-
-            user_record = await self._fetch_user_record_by_account(target_account)
-            if not user_record:
-                raise ValueError("该账号未注册或不存在")
-
-            pwd_hash = user_record.get("password_hash")
-            if not pwd_hash or not verify_password(req.password, pwd_hash):
-                raise ValueError("账号或密码错误")
-
-            return self._build_auth_session_response(user_record, message="登录成功，已恢复创客工作台会话")
-
-        else:  # email_password
-            target_email = email or account
-            if not target_email:
-                raise ValueError("请输入登录邮箱")
-            if not req.password:
-                raise ValueError("请输入登录密码")
-
-            user_record = await self._fetch_user_record_by_email(target_email)
-            if not user_record:
-                user_record = await self._fetch_user_record_by_account(target_email)
-
-            if not user_record:
-                raise ValueError("该邮箱未注册或密码不正确")
-
-            pwd_hash = user_record.get("password_hash")
-            if not pwd_hash or not verify_password(req.password, pwd_hash):
-                raise ValueError("邮箱或密码错误")
-
-            return self._build_auth_session_response(user_record, message="登录成功，已恢复创客工作台会话")
-
-    login_user = login_by_email
-
-    async def get_session_by_token(self, token: str) -> AuthSessionResponse | None:
-        """Decode and verify session token, returning session response or None."""
-        payload = verify_session_token(token)
-        if not payload:
-            return None
-        uid = payload.get("uid")
-        email = payload.get("email")
-
-        # Query DB or fallback
-        db_user = await db_repository.get_user_by_email(email) if email else None
-        if db_user:
-            db_meta = db_user.metadata_payload or {}
-            return AuthSessionResponse(
-                token=token,
-                uid=db_user.uid,
-                email=db_user.email,
-                nickname=db_user.nickname,
-                role=db_user.role,
-                company_name=db_user.company_name,
-                tier_name=db_meta.get("tier_name", "标准创客"),
-                message="会话有效",
-                must_change_password=bool(db_meta.get("must_change_password", False)),
-            )
-        user_record = self._users_by_uid.get(uid) or self._users_by_email.get(email)
-        if user_record:
-            return AuthSessionResponse(
-                token=token,
-                uid=user_record["uid"],
-                email=user_record["email"],
-                nickname=user_record["nickname"],
-                role=user_record.get("role", "MAKER"),
-                company_name=user_record.get("company_name"),
-                tier_name=user_record.get("tier_name", "标准创客"),
-                message="会话有效",
-                must_change_password=bool(user_record.get("must_change_password", False)),
-            )
-        return AuthSessionResponse(
-            token=token,
-            uid=payload.get("uid", ""),
-            email=payload.get("email", ""),
-            nickname=payload.get("nickname", "创客"),
-            role=payload.get("role", "MAKER"),
-            company_name=payload.get("company_name"),
-            tier_name="标准创客",
-            message="会话有效",
-        )
-
-    def get_profile(self, uid: Optional[str] = None) -> MakerProfileResponse:
-        """Fetch maker profile. Unauthenticated or unknown users get the guest profile."""
-        if not uid or uid == "usr_guest":
-            ent_list = []
-            for e in self._entitlements.values():
-                e_copy = e.model_copy()
-                e_copy.is_active = False
-                ent_list.append(e_copy)
-            return MakerProfileResponse(
-                uid="usr_guest",
-                nickname="未登录创客",
-                role="GUEST",
-                company_name="",
-                credit_code="",
-                tier_name="访客创客",
-                account_type="MAKER",
-                industry_track="",
-                avatar_id="",
-                phone="",
-                email="",
-                entitlements=ent_list,
-            )
-
-        user_record = self._users_by_uid.get(uid)
-        if user_record:
-            # 长驻进程内存档案跨过有效期时同样需要读时修剪
-            self._prune_expired_entitlements(user_record)
-            nickname = user_record.get("nickname", "创客")
-            role = user_record.get("role", "MAKER")
-            company = user_record.get("company_name", "")
-            credit_code = user_record.get("credit_code", "")
-            tier_name = user_record.get("tier_name", "标准创客")
-            account_type = user_record.get("account_type", "MAKER")
-            industry_track = user_record.get("industry_track", "")
-            avatar_id = user_record.get("avatar_id", "")
-            phone = user_record.get("phone", "")
-            email = user_record.get("email", "")
-            agreement_version = (user_record.get("agreement_consent") or {}).get("version", "")
-        else:
-            nickname = "创客"
-            role = "MAKER"
-            company = ""
-            credit_code = ""
-            tier_name = "标准创客"
-            account_type = "MAKER"
-            industry_track = ""
-            avatar_id = ""
-            phone = ""
-            email = ""
-            agreement_version = ""
-
-        ent_list = []
-        for e in self._entitlements.values():
-            e_copy = e.model_copy()
-            user_active = user_record.get("active_entitlements", set()) if user_record else set()
-            e_copy.is_active = (e.id in user_active) or (e.tier == "STANDARD")
-            ent_list.append(e_copy)
-
-        return MakerProfileResponse(
-            uid=uid,
-            nickname=nickname,
-            role=role,
-            company_name=company,
-            credit_code=credit_code,
-            tier_name=tier_name,
-            account_type=account_type,
-            industry_track=industry_track,
-            avatar_id=avatar_id,
-            phone=phone,
-            email=email,
-            agreement_version=agreement_version,
-            entitlements=ent_list,
-        )
-
-    async def update_profile(self, req: UserProfileUpdateRequest, token: Optional[str] = None) -> MakerProfileResponse:
-        """Update maker profile fields in memory and DB."""
-        uid = req.user_id
-        if token:
-            payload = verify_session_token(token)
-            if payload and payload.get("uid"):
-                uid = payload.get("uid")
-
-        if not uid or uid == "usr_guest":
-            raise ValueError("无法为未登录访客更新档案，请先登录")
-
-        user_record = self._users_by_uid.get(uid)
-        if not user_record:
-            user_record = {
-                "uid": uid,
-                "email": "",
-                "nickname": req.nickname or "创客",
-                "role": "MAKER",
-                "company_name": req.company_name or "",
-                "credit_code": req.credit_code or "",
-                "phone": req.phone or "",
-                "tier_name": "标准创客",
-                "password_hash": "",
-                "active_entitlements": set(),
-            }
-            self._users_by_uid[uid] = user_record
-
-        if req.nickname is not None:
-            user_record["nickname"] = req.nickname.strip()
-        if req.phone is not None:
-            user_record["phone"] = req.phone.strip()
-        if req.company_name is not None:
-            user_record["company_name"] = req.company_name.strip()
-        if req.credit_code is not None:
-            user_record["credit_code"] = req.credit_code.strip()
-        if req.industry_track is not None:
-            user_record["industry_track"] = req.industry_track.strip()
-        if req.avatar_id is not None:
-            normalized_avatar = req.avatar_id.strip()
-            if normalized_avatar and normalized_avatar not in BUILTIN_AVATAR_IDS:
-                raise ValueError("不支持的头像标识，请从平台内置画像头像中选择")
-            user_record["avatar_id"] = normalized_avatar
-
-        # Update DB if available
-        metadata_patch: Dict[str, Any] = {}
-        if req.phone is not None:
-            metadata_patch["phone"] = req.phone.strip()
-        if req.credit_code is not None:
-            metadata_patch["credit_code"] = req.credit_code.strip()
-        if req.industry_track is not None:
-            metadata_patch["industry_track"] = req.industry_track.strip()
-        if req.avatar_id is not None:
-            metadata_patch["avatar_id"] = req.avatar_id.strip()
-        await db_repository.update_user_fields(
-            uid,
-            nickname=req.nickname.strip() if req.nickname is not None else None,
-            company_name=req.company_name.strip() if req.company_name is not None else None,
-            metadata_patch=metadata_patch or None,
-        )
-
-        return self.get_profile(uid)
-
-    async def activate_entitlement(self, req: EntitlementActivateRequest) -> EntitlementActivateResponse:
-        ent_id = req.entitlement_id
-        if ent_id not in self._entitlements:
-            if ent_id == "ENT_VIP":
-                ent_id = "ent_black_diamond_priority"
-            elif f"ent_{ent_id.lower()}" in self._entitlements:
-                ent_id = f"ent_{ent_id.lower()}"
-            else:
-                raise KeyError(f"Entitlement {req.entitlement_id} not found")
-
-        self._active_entitlements.add(ent_id)
-        if req.user_id in self._users_by_uid:
-            rec = self._users_by_uid[req.user_id]
-            if "active_entitlements" not in rec:
-                rec["active_entitlements"] = set()
-            rec["active_entitlements"].add(ent_id)
-            # 付费激活清空旧赠期窗口，权益转为永久有效
-            rec.setdefault("entitlement_expiries", {}).pop(ent_id, None)
-            if ent_id == "ent_black_diamond_priority":
-                rec["tier_name"] = "黑钻创客 VIP"
-            await db_repository.update_user_fields(
-                req.user_id,
-                metadata_patch={
-                    "active_entitlements": sorted(rec.get("active_entitlements", set())),
-                    "entitlement_expiries": rec.get("entitlement_expiries", {}),
-                    "tier_name": rec.get("tier_name", "标准创客"),
-                },
-            )
-
-        receipt = "REC-" + uuid.uuid4().hex[:10].upper()
-        return EntitlementActivateResponse(
-            user_id=req.user_id,
-            entitlement_id=ent_id,
-            is_active=True,
-            status="ACTIVATED",
-            receipt_no=receipt,
-            message="专属创客收费权益已激活并绑定，权限即刻生效！",
-        )
-
-    async def sync_membership(self, uid: str, tier: str, expires_at: str) -> None:
-        """Project a loyalty membership grant onto the legacy profile fields.
-
-        The loyalty domain remains the single source of truth for the membership
-        window; this method only mirrors it into ``tier_name`` /
-        ``active_entitlements`` / ``entitlement_expiries`` so older clients and
-        the entitlement catalog keep working.
-        """
-        record = self._users_by_uid.get(str(uid))
-        if not record:
-            return
-        tier = str(tier or "STANDARD").upper()
-        if tier not in MEMBERSHIP_ENTITLEMENT_MAP:
-            tier = "STANDARD"
-        owned = {"ent_ai_tax_assistant", "ent_black_diamond_priority"}
-        active = record.setdefault("active_entitlements", set())
-        expiries = record.setdefault("entitlement_expiries", {})
-        for ent_id in owned:
-            active.discard(ent_id)
-            expiries.pop(ent_id, None)
-        for ent_id in MEMBERSHIP_ENTITLEMENT_MAP.get(tier, set()):
-            active.add(ent_id)
-            expiries[ent_id] = expires_at
-        record["tier_name"] = MEMBERSHIP_TIER_NAMES.get(tier, "标准创客")
-        record["membership_tier"] = tier
-        record["membership_expires_at"] = expires_at
-        try:
-            await db_repository.update_user_fields(
-                str(uid),
-                metadata_patch={
-                    "tier_name": record["tier_name"],
-                    "membership_tier": tier,
-                    "membership_expires_at": expires_at,
-                    "active_entitlements": sorted(active),
-                    "entitlement_expiries": expiries,
-                },
-            )
-        except Exception:
-            pass
-
-    async def deactivate_entitlement(self, entitlement_id: str, user_id: Optional[str] = None) -> bool:
-        ent_id = entitlement_id
-        if ent_id not in self._active_entitlements and ent_id == "ENT_VIP":
-            ent_id = "ent_black_diamond_priority"
-
-        removed = False
-        if ent_id in self._active_entitlements:
-            self._active_entitlements.remove(ent_id)
-            removed = True
-
-        # Keep per-user active_entitlements consistent (Saga compensation symmetry)
-        targets = [user_id] if user_id else list(self._users_by_uid.keys())
-        for uid in targets:
-            rec = self._users_by_uid.get(uid)
-            if not rec:
-                continue
-            if "active_entitlements" in rec and ent_id in rec["active_entitlements"]:
-                rec["active_entitlements"].discard(ent_id)
-                removed = True
-            if ent_id == "ent_black_diamond_priority" and rec.get("tier_name") == "黑钻创客 VIP":
-                rec["tier_name"] = "标准创客"
-            await db_repository.update_user_fields(
-                uid,
-                metadata_patch={
-                    "active_entitlements": sorted(rec.get("active_entitlements", set())),
-                    "tier_name": rec.get("tier_name", "标准创客"),
-                },
-            )
-        return removed
-
-
-    async def change_password(self, req: ChangePasswordRequest) -> AuthSessionResponse:
-        """Rotate a maker's password; clears must_change_password and re-issues a token."""
-        uid = req.user_id
-        if req.token:
-            payload = verify_session_token(req.token)
-            if payload and payload.get("uid"):
-                uid = payload.get("uid")
-        if not uid or uid == "usr_guest":
-            raise ValueError("无法为未登录访客修改密码，请先登录")
-
-        user_record = self._users_by_uid.get(uid)
-        if not user_record:
-            raise KeyError(f"User '{uid}' not found")
-
-        stored_hash = user_record.get("password_hash") or ""
-        if not stored_hash or not verify_password(req.old_password, stored_hash):
-            raise ValueError("原密码不正确")
-        if len(req.new_password) < 8:
-            raise ValueError("新密码长度不能少于 8 位")
-        if req.new_password == req.old_password:
-            raise ValueError("新密码不能与原密码相同")
-
-        new_hash = hash_password(req.new_password)
-        user_record["password_hash"] = new_hash
-        user_record["must_change_password"] = False
-
-        # Durable rotation: persist the new credential + clear the first-login flag
-        await db_repository.update_user_fields(
-            uid,
-            password_hash=new_hash,
-            metadata_patch={"must_change_password": False},
-        )
-
-        token = create_session_token({
-            "uid": user_record["uid"],
-            "email": user_record.get("email", ""),
-            "nickname": user_record.get("nickname", "创客"),
-            "role": user_record.get("role", "MAKER"),
-            "must_change_password": False,
-        })
-        return AuthSessionResponse(
-            token=token,
-            uid=user_record["uid"],
-            email=user_record.get("email", ""),
-            nickname=user_record.get("nickname", "创客"),
-            role=user_record.get("role", "MAKER"),
-            company_name=user_record.get("company_name"),
-            tier_name=user_record.get("tier_name", "标准创客"),
-            message="密码修改成功，请使用新密码登录",
-            must_change_password=False,
-        )
+        return bool(re.match(r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$", (email or "").strip()))
 
 
 user_service = UserService()
+
+__all__ = [
+    "BUILTIN_AVATAR_IDS",
+    "FOUNDING_VIP_ENTITLEMENT_ID",
+    "FOUNDING_VIP_TIER_NAME",
+    "MEMBERSHIP_ENTITLEMENT_MAP",
+    "MEMBERSHIP_TIER_NAMES",
+    "UserService",
+    "user_service",
+]

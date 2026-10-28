@@ -69,7 +69,20 @@ class RouteRule:
                     raise PermissionError(message)
                 raise ValueError(message)
             output = dict(result.final_output or {})
-            return output.get("response", output)
+            if "response" in output:
+                return output["response"]
+            # Legacy response shapes: publish/claim/vote scenarios expose one
+            # primary result key. Unwrap it so the gateway envelope stays stable.
+            for key in (
+                "created_thread", "created_answer", "created_comment", "created_product",
+                "created_policy", "created_demand", "created_bid", "created_perk",
+                "created_claim", "created_entry", "created_doc", "updated_thread",
+                "review_submission", "vote_result", "feed", "feed_result", "profile",
+                "activation", "audit_report", "report", "result",
+            ):
+                if key in output:
+                    return output[key]
+            return output
 
         if not self.handler:
             raise KeyError(f"Route '{self.scenario}' has no pipeline or handler")
@@ -375,6 +388,9 @@ class ScenarioRouter:
         ctx["user_id"] = identity["uid"]
         ctx["user_role"] = identity["role"]
         ctx["token"] = resolved_token or ""
+        ctx["nickname"] = identity.get("nickname", "")
+        ctx["email"] = identity.get("email", "")
+        ctx["account_type"] = identity.get("account_type", "MAKER")
         ctx["requested_version"] = requested_ver
         ctx["matched_version"] = rule.version
         ctx["is_fallback"] = (rule.version != requested_ver and rule.version != "*")

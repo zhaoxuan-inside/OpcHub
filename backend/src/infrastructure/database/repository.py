@@ -99,11 +99,13 @@ class DatabaseRepository:
         role: str = "MAKER",
         credit_code: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        uid: Optional[str] = None,
+        password_hash: Optional[str] = None,
     ) -> User:
         clean_email = email.strip().lower()
         clean_nick = nickname.strip() if nickname else clean_email.split("@")[0]
-        uid = str(uuid.uuid4())
-        pwd_hash = hash_password(password_plain)
+        uid = uid or str(uuid.uuid4())
+        pwd_hash = password_hash or hash_password(password_plain)
 
         user_meta = {"tier": "STANDARD", "created_source": "COMMERCIAL_REG"}
         if metadata:
@@ -177,6 +179,20 @@ class DatabaseRepository:
         async with session_maker() as session:
             stmt = select(User).order_by(User.created_at.asc()).limit(limit)
             return list((await session.execute(stmt)).scalars().all())
+
+    async def delete_user_by_uid(self, uid: str) -> bool:
+        """Delete one persisted user row (idempotent; used by saga compensation)."""
+        if not await self.is_ready():
+            return False
+        session_maker = get_async_sessionmaker()
+        async with session_maker() as session:
+            stmt = select(User).where(User.uid == uid)
+            user = (await session.execute(stmt)).scalar_one_or_none()
+            if user is None:
+                return False
+            await session.delete(user)
+            await session.commit()
+            return True
 
     async def count_makers(self) -> int:
         """Count persisted non-ADMIN users; campaign ordinals must skip the built-in admin."""

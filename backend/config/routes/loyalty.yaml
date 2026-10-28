@@ -1,0 +1,92 @@
+# Loyalty (晨光积分 / 会员 / 积分兑换) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "loyalty.account"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取当前创客的晨光积分余额、成长等级与会员状态"
+    is_default: true
+    pipeline: "OPC_LOYALTY_ACCOUNT_PIPELINE"
+
+  - gateway: "loyalty.ledger"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取当前创客的积分收支流水"
+    is_default: true
+    pipeline: "OPC_LOYALTY_LEDGER_PIPELINE"
+
+  - gateway: "loyalty.rules"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取当前生效的积分获取规则与上限"
+    is_default: true
+    pipeline: "OPC_LOYALTY_RULES_PIPELINE"
+
+  - gateway: "loyalty.membership.plans"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取会员套餐与权益对比"
+    is_default: true
+    pipeline: "OPC_LOYALTY_MEMBERSHIP_PLANS_PIPELINE"
+
+  - gateway: "loyalty.membership.me"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取当前创客的会员档位、到期日与权益"
+    is_default: true
+    pipeline: "OPC_LOYALTY_MEMBERSHIP_ME_PIPELINE"
+
+  - gateway: "loyalty.membership.subscribe"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "开通 / 续期会员（积分兑换或现金下单）"
+    is_default: true
+    pipeline: "OPC_LOYALTY_SUBSCRIBE_PIPELINE"
+    required_permission: "content:interact"
+
+  - gateway: "loyalty.membership.auto-renew"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "开启 / 关闭会员自动续费"
+    is_default: true
+    pipeline: "OPC_LOYALTY_AUTO_RENEW_PIPELINE"
+    required_permission: "content:interact"
+
+  - gateway: "loyalty.rewards.items"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取积分兑换商城目录与库存"
+    is_default: true
+    pipeline: "OPC_LOYALTY_REWARDS_ITEMS_PIPELINE"
+
+  - gateway: "loyalty.rewards.redeem"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "积分兑换会员时长、数字权益或产品周边"
+    is_default: true
+    pipeline: "OPC_LOYALTY_REDEEM_PIPELINE"
+    required_permission: "content:interact"
+
+  - gateway: "loyalty.rewards.orders"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "读取当前创客的积分兑换订单"
+    is_default: true
+    pipeline: "OPC_LOYALTY_REWARDS_ORDERS_PIPELINE"
+
+  - gateway: "loyalty.content.read"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "记录内容阅读并为作者发放小额阅读积分（同一读者每日一次）"
+    is_default: true
+    pipeline: "OPC_LOYALTY_CONTENT_READ_PIPELINE"
+
+  - gateway: "loyalty.admin.grant"
+    version: "v1.0.0"
+    domain: "loyalty"
+    description: "管理端积分补发 / 扣回（全量审计，不受日常上限约束）"
+    is_default: true
+    pipeline: "OPC_LOYALTY_ADMIN_GRANT_PIPELINE"
+    required_permission: "review:audit_all"

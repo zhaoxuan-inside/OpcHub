@@ -32,6 +32,8 @@ from src.domains.user.models import (
     VerifyCodeRequest,
     PasswordStrengthRequest,
 )
+from src.domains.orchestration.models import ScenarioExecuteRequest
+from src.domains.orchestration.service import orchestration_service
 from src.infrastructure.database.repository import db_repository
 from src.infrastructure.database.persistence import domain_persistence
 from src.core.gateway import (
@@ -490,11 +492,37 @@ async def run_security_audit_archive(
 # ==========================================
 # Commercial Authentication & Registration Endpoints
 # ==========================================
+async def _execute_auth_pipeline(
+    scenario_code: str,
+    inputs: dict[str, Any] | None = None,
+    context: dict[str, Any] | None = None,
+) -> Any:
+    """Execute one auth scenario and map failures onto the legacy HTTP contract."""
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code=scenario_code,
+            version="v1.0.0",
+            inputs=dict(inputs or {}),
+            context=dict(context or {}),
+        )
+    )
+    if res.status != "SUCCESS":
+        message = (res.error_message or "场景执行失败").replace("Guard check failed: ", "")
+        if message.startswith("Node ") and " execution error: " in message:
+            message = message.split(" execution error: ", 1)[1]
+        message = message.strip()
+        if "权限" in message or "需要登录" in message:
+            raise HTTPException(status_code=403, detail=message)
+        raise HTTPException(status_code=400, detail=message)
+    output = dict(res.final_output or {})
+    return output.get("response", output)
+
+
 @app.get("/api/auth/captcha", tags=["Authentication & Commercial Onboarding"])
 @app.get(f"{settings.api_prefix}/auth/captcha", tags=["Authentication & Commercial Onboarding"])
 async def get_captcha():
-    """Generate anti-bot SVG challenge."""
-    return user_service.generate_captcha()
+    """Generate anti-bot SVG challenge through the captcha scenario asset."""
+    return await _execute_auth_pipeline("OPC_AUTH_CAPTCHA_PIPELINE")
 
 
 @app.post("/api/auth/send-code", tags=["Authentication & Commercial Onboarding"])
@@ -502,48 +530,48 @@ async def get_captcha():
 async def send_verification_code(req: SendCodeRequest, request: Request):
     """Dispatch verification code to email with rate-limiting and anti-bot validation."""
     client_ip = req.client_ip or (request.client.host if request.client else "127.0.0.1")
-    try:
-        return user_service.send_verification_code(
-            email=req.email,
-            captcha_id=req.captcha_id,
-            captcha_code=req.captcha_code,
-            client_ip=client_ip,
-        )
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await _execute_auth_pipeline(
+        "OPC_AUTH_SEND_CODE_PIPELINE",
+        {
+            "email": req.email,
+            "captcha_id": req.captcha_id,
+            "captcha_code": req.captcha_code,
+            "client_ip": client_ip,
+        },
+    )
 
 
 @app.post("/api/auth/verify-code", tags=["Authentication & Commercial Onboarding"])
 @app.post(f"{settings.api_prefix}/auth/verify-code", tags=["Authentication & Commercial Onboarding"])
 async def verify_code(req: VerifyCodeRequest):
     """Pre-verify verification code."""
-    valid = user_service.verify_email_code(req.email, req.code)
-    if not valid:
-        raise HTTPException(status_code=400, detail="验证码错误或已失效")
-    return {"valid": True, "message": "验证码有效"}
+    return await _execute_auth_pipeline(
+        "OPC_AUTH_VERIFY_CODE_PIPELINE", {"email": req.email, "code": req.code}
+    )
 
 
 @app.post("/api/auth/password-strength", tags=["Authentication & Commercial Onboarding"])
 @app.post(f"{settings.api_prefix}/auth/password-strength", tags=["Authentication & Commercial Onboarding"])
 async def check_password_strength(req: PasswordStrengthRequest):
     """Evaluate password strength against commercial standards."""
-    return user_service.evaluate_password_strength(req.password, email=req.email)
+    return await _execute_auth_pipeline(
+        "OPC_AUTH_PASSWORD_STRENGTH_PIPELINE",
+        {"password": req.password, "email": req.email},
+    )
 
 
 @app.get("/api/auth/agreements", tags=["Authentication & Commercial Onboarding"])
 @app.get(f"{settings.api_prefix}/auth/agreements", tags=["Authentication & Commercial Onboarding"])
 async def get_agreements():
     """Retrieve statutory user terms of service and privacy policy."""
-    return user_service.get_legal_agreements()
+    return await _execute_auth_pipeline("OPC_AUTH_LEGAL_AGREEMENTS_PIPELINE")
 
 
 @app.get("/api/auth/mail-providers", tags=["Authentication & Commercial Onboarding"])
 @app.get(f"{settings.api_prefix}/auth/mail-providers", tags=["Authentication & Commercial Onboarding"])
 async def get_mail_providers(email: Optional[str] = None):
     """Retrieve supported email provider list and resolved SMTP configuration for target email."""
-    if email:
-        return user_service.resolve_mail_provider(email)
-    return user_service.get_supported_mail_providers()
+    return await _execute_auth_pipeline("OPC_AUTH_MAIL_PROVIDERS_PIPELINE", {"email": email})
 
 
 @app.post("/api/auth/register", tags=["Authentication & Commercial Onboarding"])
@@ -552,22 +580,14 @@ async def register_maker(req: UserRegisterRequest, request: Request):
     """Commercial maker account registration with legal consent and ownership proof."""
     if not req.client_ip and request.client:
         req.client_ip = request.client.host
-    try:
-        res = await user_service.register_by_email(req)
-        return res.model_dump()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await _execute_auth_pipeline("OPC_AUTH_REGISTER_PIPELINE", req.model_dump())
 
 
 @app.post("/api/auth/login", tags=["Authentication & Commercial Onboarding"])
 @app.post(f"{settings.api_prefix}/auth/login", tags=["Authentication & Commercial Onboarding"])
 async def login_maker(req: UserLoginRequest):
     """Maker email and password authentication."""
-    try:
-        res = await user_service.login_by_email(req)
-        return res.model_dump()
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return await _execute_auth_pipeline("OPC_AUTH_LOGIN_PIPELINE", req.model_dump())
 
 
 if __name__ == "__main__":

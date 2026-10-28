@@ -1,0 +1,801 @@
+# 创客账户与身份安全（注册 / 登录 / 验证码 / 会话）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 边界：
+# * 账户文档由 `entity.*` 写入 `user.account`（自定义 EntityAdapter 包装 users 表）。
+# * 图形验证码、邮箱验证码、IP 限流窗口都是短生命周期安全状态，使用内存
+#   EntitySpec（永不落库）。
+# * 邮件 I/O 只发生在 `external.email.send`；正文由纯函数 `assemble.auth.verification_mail` 组装。
+# * 密码哈希、验证码签发/校验、token 签名/解析都在 `calc.auth.*` 纯函数中完成。
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # 图形验证码
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_CAPTCHA_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 生成单次使用的 SVG 防刷图形验证码
+    saga: false
+    nodes:
+      - id: challenge
+        operator: calc.auth.captcha
+      - id: persist
+        operator: entity.create
+        params: {entity: user.captcha}
+        inputs:
+          data: $nodes.challenge.captcha
+      - id: response
+        operator: response.build
+        params:
+          source: challenge
+          fields: [captcha_id, captcha_svg, captcha_image, expires_in]
+        inputs:
+          challenge: $nodes.challenge
+    edges:
+      - [challenge, persist]
+      - [persist, response]
+
+  # ---------------------------------------------------------------------------
+  # 密码强度评估（纯计算，无写操作）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_PASSWORD_STRENGTH_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 评估密码复杂度、熵值与商用安全合规评级
+    saga: false
+    nodes:
+      - id: strength
+        operator: calc.auth.password_strength
+        inputs:
+          password: $inputs.password
+          email: $inputs.email
+      - id: response
+        operator: response.build
+        params: {source: strength}
+        inputs:
+          strength: $nodes.strength
+    edges:
+      - [strength, response]
+
+  # ---------------------------------------------------------------------------
+  # 法定协议与隐私指引
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_LEGAL_AGREEMENTS_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 获取平台法定用户服务协议与隐私保护指引正文及版本
+    saga: false
+    nodes:
+      - id: agreements
+        operator: calc.auth.legal_agreements
+      - id: response
+        operator: response.build
+        params: {source: agreements}
+        inputs:
+          agreements: $nodes.agreements
+    edges:
+      - [agreements, response]
+
+  # ---------------------------------------------------------------------------
+  # 邮箱服务商目录 / 单邮箱 SMTP 解析
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_MAIL_PROVIDERS_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 列出已适配邮箱服务商，或解析指定邮箱的活动 SMTP 通道
+    saga: false
+    nodes:
+      - id: providers
+        operator: calc.auth.mail_providers
+      - id: resolved
+        operator: calc.auth.mail_provider
+        when: inputs.email
+        inputs:
+          email: $inputs.email
+      - id: response
+        operator: assemble.auth.mail_providers
+        inputs:
+          providers: $nodes.providers.providers
+          resolved: $nodes.resolved
+    edges:
+      - [providers, resolved]
+      - [providers, response]
+      - [resolved, response]
+
+  # ---------------------------------------------------------------------------
+  # 发送邮箱验证码（图形验证码 + 60s 冷却 + IP 频控）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_SEND_CODE_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 发送邮箱归属核验验证码（单次使用、5 分钟有效、60 秒冷却与 IP 限流）
+    saga: false
+    nodes:
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            email:
+              type: string
+              required: true
+              pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+              message: 邮箱格式不正确
+        inputs:
+          email: $inputs.email
+      - id: norm
+        operator: calc.auth.email_normalize
+        inputs:
+          email: $inputs.email
+      - id: captcha_get
+        operator: entity.get
+        params: {entity: user.captcha, required: false}
+        when: inputs.captcha_id
+        inputs:
+          key: $inputs.captcha_id
+      - id: captcha_check
+        operator: calc.auth.captcha_verify
+        when: inputs.captcha_id
+        inputs:
+          captcha_id: $inputs.captcha_id
+          captcha_code: $inputs.captcha_code
+          record: $nodes.captcha_get.entity
+      - id: captcha_drop
+        operator: entity.delete
+        params: {entity: user.captcha}
+        when: nodes.captcha_get.found
+        inputs:
+          key: $nodes.captcha_get.entity.captcha_id
+      - id: captcha_rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not inputs.captcha_id or args.valid"
+              message: 图形验证码错误或已失效，请重新输入
+        inputs:
+          valid: $nodes.captcha_check.valid
+      - id: code_get
+        operator: entity.get
+        params: {entity: user.verification_code, required: false}
+        inputs:
+          key: $nodes.norm.email
+      - id: cooldown
+        operator: calc.auth.verification_cooldown
+        inputs:
+          record: $nodes.code_get.entity
+      - id: cooldown_rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: args.allowed
+              message: 验证码发送过于频繁，请稍候再试
+        inputs:
+          allowed: $nodes.cooldown.allowed
+      - id: rate_get
+        operator: entity.get
+        params: {entity: user.rate_limit, required: false}
+        when: inputs.client_ip
+        inputs:
+          scope: IP_SEND_CODE
+          key: $inputs.client_ip
+      - id: rate
+        operator: calc.auth.rate_limit
+        params: {limit: 30, window_seconds: 3600}
+        inputs:
+          record: $nodes.rate_get.entity
+      - id: rate_rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not inputs.client_ip or args.allowed"
+              message: 当前 IP 发送请求过于频繁，请稍后再试
+        inputs:
+          allowed: $nodes.rate.allowed
+      - id: rate_upsert
+        operator: entity.upsert
+        params: {entity: user.rate_limit}
+        when: inputs.client_ip
+        inputs:
+          data:
+            scope: IP_SEND_CODE
+            key: $inputs.client_ip
+            count: $nodes.rate.record.count
+            window_start: $nodes.rate.record.window_start
+      - id: generate
+        operator: calc.auth.verification_code
+        inputs:
+          email: $nodes.norm.email
+      - id: code_upsert
+        operator: entity.upsert
+        params: {entity: user.verification_code}
+        inputs:
+          data: $nodes.generate.record
+      - id: provider
+        operator: calc.auth.mail_provider
+        inputs:
+          email: $nodes.norm.email
+      - id: mail
+        operator: assemble.auth.verification_mail
+        inputs:
+          code: $nodes.generate.code
+          provider_name: $nodes.provider.provider_name
+      - id: send
+        operator: external.email.send
+        inputs:
+          to_email: $nodes.norm.email
+          subject: $nodes.mail.subject
+          text: $nodes.mail.text
+          html: $nodes.mail.html
+          code: $nodes.generate.code
+      - id: result
+        operator: assemble.auth.send_code_result
+        inputs:
+          email: $nodes.norm.email
+          code: $nodes.generate.code
+          dispatch: $nodes.send.dispatch
+          cooldown_seconds: $nodes.generate.cooldown_seconds
+          expires_in: $nodes.generate.expires_in
+    edges:
+      - [fields, norm]
+      # 图形验证码分支（可选）：失败即拒绝，但不得阻断主链路。
+      - [norm, captcha_get]
+      - [captcha_get, captcha_check]
+      - [captcha_check, captcha_drop]
+      - [captcha_drop, captcha_rule]
+      # 主链路：冷却 + IP 频控 + 验证码签发。
+      - [norm, code_get]
+      - [captcha_rule, code_get]
+      - [code_get, cooldown]
+      - [cooldown, cooldown_rule]
+      - [cooldown_rule, rate_get]
+      - [rate_get, rate]
+      - [rate, rate_rule]
+      - [rate_rule, rate_upsert]
+      - [cooldown_rule, generate]
+      - [rate_upsert, generate]
+      - [generate, code_upsert]
+      - [code_upsert, provider]
+      - [provider, mail]
+      - [mail, send]
+      - [send, result]
+
+  # ---------------------------------------------------------------------------
+  # 预核验邮箱验证码
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_VERIFY_CODE_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 预核验邮箱验证码的时效、错误次数与单次使用语义
+    saga: false
+    nodes:
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            email:
+              type: string
+              required: true
+              pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+              message: 邮箱格式不正确
+            code:
+              type: string
+              required: true
+              message: 请输入邮箱验证码
+        inputs:
+          email: $inputs.email
+          code: $inputs.code
+      - id: norm
+        operator: calc.auth.email_normalize
+        inputs:
+          email: $inputs.email
+      - id: code_get
+        operator: entity.get
+        params: {entity: user.verification_code, required: false}
+        inputs:
+          key: $nodes.norm.email
+      - id: verify
+        operator: calc.auth.verification_verify
+        inputs:
+          record: $nodes.code_get.entity
+          code: $inputs.code
+      - id: persist_attempts
+        operator: entity.patch
+        params: {entity: user.verification_code}
+        when: nodes.verify.record
+        inputs:
+          data: $nodes.verify.record
+      - id: drop
+        operator: entity.delete
+        params: {entity: user.verification_code}
+        when: nodes.verify.drop
+        inputs:
+          key: $nodes.norm.email
+      - id: attempts_rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not args.error"
+              message: 验证码连续错误次数超限，请重新获取验证码
+        inputs:
+          error: $nodes.verify.error
+      - id: valid_rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: args.valid
+              message: 验证码错误或已失效
+        inputs:
+          valid: $nodes.verify.valid
+      - id: response
+        operator: assemble.auth.verify_code_result
+    edges:
+      - [fields, norm]
+      - [norm, code_get]
+      - [code_get, verify]
+      - [verify, persist_attempts]
+      - [verify, drop]
+      - [persist_attempts, drop]
+      # 计数器/清理为可选分支，主裁决链路直接从 verify 继续。
+      - [verify, attempts_rule]
+      - [attempts_rule, valid_rule]
+      - [valid_rule, response]
+      - [drop, response]
+
+  # ---------------------------------------------------------------------------
+  # 商用创客注册
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_REGISTER_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 创客商业化邮箱注册、资质存证、创始会员赠礼与租户主体初始化
+    saga: true
+    nodes:
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            email:
+              type: string
+              required: true
+              pattern: "^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\\.[a-zA-Z0-9-.]+$"
+              message: 邮箱格式不正确
+            password:
+              type: string
+              required: true
+              message: 密码长度不能少于 6 位
+        inputs:
+          email: $inputs.email
+          password: $inputs.password
+      - id: norm
+        operator: calc.auth.email_normalize
+        inputs:
+          email: $inputs.email
+      - id: code_get
+        operator: entity.get
+        params: {entity: user.verification_code, required: false}
+        when: inputs.verification_code
+        inputs:
+          key: $nodes.norm.email
+      - id: code_verify
+        operator: calc.auth.verification_verify
+        when: inputs.verification_code
+        inputs:
+          record: $nodes.code_get.entity
+          code: $inputs.verification_code
+      - id: code_patch
+        operator: entity.patch
+        params: {entity: user.verification_code}
+        when: nodes.code_verify.record
+        inputs:
+          data: $nodes.code_verify.record
+      - id: code_drop
+        operator: entity.delete
+        params: {entity: user.verification_code}
+        when: nodes.code_verify.drop
+        inputs:
+          key: $nodes.norm.email
+      - id: captcha_get
+        operator: entity.get
+        params: {entity: user.captcha, required: false}
+        when: inputs.captcha_id
+        inputs:
+          key: $inputs.captcha_id
+      - id: captcha_check
+        operator: calc.auth.captcha_verify
+        when: inputs.captcha_id
+        inputs:
+          captcha_id: $inputs.captcha_id
+          captcha_code: $inputs.captcha_code
+          record: $nodes.captcha_get.entity
+      - id: captcha_drop
+        operator: entity.delete
+        params: {entity: user.captcha}
+        when: nodes.captcha_get.found
+        inputs:
+          key: $nodes.captcha_get.entity.captcha_id
+      - id: validate
+        operator: calc.auth.register_validate
+        inputs:
+          email: $inputs.email
+          password: $inputs.password
+          nickname: $inputs.nickname
+          company_name: $inputs.company_name
+          account_type: $inputs.account_type
+          industry_track: $inputs.industry_track
+          credit_code: $inputs.credit_code
+          phone: $inputs.phone
+          invitation_code: $inputs.invitation_code
+          client_ip: $inputs.client_ip
+          agreement_version: $inputs.agreement_version
+          agreed_terms: $inputs.agreed_terms
+          require_email_code: $inputs.require_email_code
+          verification_code: $inputs.verification_code
+          verification_valid: $nodes.code_verify.valid
+          verification_error: $nodes.code_verify.error
+          captcha_id: $inputs.captcha_id
+          captcha_valid: $nodes.captcha_check.valid
+      - id: unique
+        operator: guard.unique
+        params:
+          entity: user.account
+          message: 该邮箱已被注册，请直接登录
+        inputs:
+          email: $nodes.validate.email
+      - id: hash
+        operator: calc.auth.password_hash
+        inputs:
+          password: $inputs.password
+      - id: count
+        operator: entity.count
+        params:
+          entity: user.account
+          filters:
+            role: {ne: ADMIN}
+      - id: founding
+        operator: calc.user.founding_grant
+        inputs:
+          count: $nodes.count.total
+      - id: account
+        operator: assemble.auth.account
+        inputs:
+          identity: $nodes.validate
+          password_hash: $nodes.hash.password_hash
+          founding: $nodes.founding
+      - id: create
+        operator: entity.create
+        params: {entity: user.account}
+        inputs:
+          data: $nodes.account.account
+      - id: grant_create
+        operator: entity.create
+        params: {entity: user.entitlement_grant}
+        when: nodes.founding.is_founding
+        inputs:
+          data:
+            user_id: $nodes.create.entity.uid
+            entitlement_id: $nodes.founding.grant.entitlement_id
+            status: ACTIVE
+            receipt_no: ""
+            expires_at: $nodes.founding.grant.expires_at
+            activated_at: $nodes.founding.grant.activated_at
+      - id: session
+        operator: calc.auth.session
+        params: {mode: issue}
+        inputs:
+          user: $nodes.create.entity
+      - id: response
+        operator: assemble.auth.session
+        inputs:
+          user: $nodes.create.entity
+          session: $nodes.session
+          message: $nodes.founding.message
+      - id: metric
+        operator: metric.incr
+        params: {metric: auth.register}
+      - id: audit
+        operator: audit.write
+        params:
+          action: auth.register
+          resource_type: user
+        inputs:
+          resource_id: $nodes.create.entity.uid
+    edges:
+      - [fields, norm]
+      # 验证码分支（可选）：不参与时不阻断主链路。
+      - [norm, code_get]
+      - [code_get, code_verify]
+      - [code_verify, code_patch]
+      - [code_verify, code_drop]
+      - [code_patch, code_drop]
+      - [norm, captcha_get]
+      - [captcha_get, captcha_check]
+      - [captcha_check, captcha_drop]
+      # 主链路：校验 → 唯一性 → 口令哈希 → 创始赠礼 → 建号 → 签发会话。
+      - [norm, validate]
+      - [code_drop, validate]
+      - [captcha_drop, validate]
+      - [validate, unique]
+      - [unique, hash]
+      - [hash, count]
+      - [count, founding]
+      - [founding, account]
+      - [account, create]
+      - [create, grant_create]
+      - [create, session]
+      - [grant_create, session]
+      - [session, response]
+      - [response, metric]
+      - [metric, audit]
+
+  # ---------------------------------------------------------------------------
+  # 登录（账号密码 / 邮箱密码 / 邮箱验证码）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_LOGIN_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 创客三模式身份鉴权与会话 Token 签发
+    saga: false
+    nodes:
+      - id: norm
+        operator: calc.auth.login_normalize
+        inputs:
+          email: $inputs.email
+          account: $inputs.account
+          password: $inputs.password
+          code: $inputs.code
+          verification_code: $inputs.verification_code
+          login_type: $inputs.login_type
+      - id: by_email
+        operator: entity.list
+        params:
+          entity: user.account
+          query: {limit: 1}
+        when: nodes.norm.email
+        inputs:
+          filters: {email: $nodes.norm.email}
+      - id: by_account_email
+        operator: entity.list
+        params:
+          entity: user.account
+          query: {limit: 1}
+        when: nodes.norm.account_email
+        inputs:
+          filters: {email: $nodes.norm.account_email}
+      - id: by_uid
+        operator: entity.list
+        params:
+          entity: user.account
+          query: {limit: 1}
+        when: nodes.norm.account
+        inputs:
+          filters: {uid: $nodes.norm.account}
+      - id: by_nick
+        operator: entity.list
+        params:
+          entity: user.account
+          query: {limit: 1}
+        when: nodes.norm.account
+        inputs:
+          filters: {nickname: $nodes.norm.account}
+      - id: code_get
+        operator: entity.get
+        params: {entity: user.verification_code, required: false}
+        when: nodes.norm.code
+        inputs:
+          key: $nodes.norm.email
+      - id: code_verify
+        operator: calc.auth.verification_verify
+        when: nodes.norm.code
+        inputs:
+          record: $nodes.code_get.entity
+          code: $nodes.norm.code
+      - id: code_patch
+        operator: entity.patch
+        params: {entity: user.verification_code}
+        when: nodes.code_verify.record
+        inputs:
+          data: $nodes.code_verify.record
+      - id: code_drop
+        operator: entity.delete
+        params: {entity: user.verification_code}
+        when: nodes.code_verify.drop
+        inputs:
+          key: $nodes.norm.email
+      - id: login
+        operator: calc.auth.login_validate
+        inputs:
+          login_type: $nodes.norm.login_type
+          email: $nodes.norm.email
+          account: $nodes.norm.account
+          password: $nodes.norm.password
+          code: $nodes.norm.code
+          verification_valid: $nodes.code_verify.valid
+          verification_error: $nodes.code_verify.error
+          by_email: $nodes.by_email.items
+          by_account_email: $nodes.by_account_email.items
+          by_uid: $nodes.by_uid.items
+          by_nick: $nodes.by_nick.items
+      - id: session
+        operator: calc.auth.session
+        params: {mode: issue}
+        inputs:
+          user: $nodes.login.user
+      - id: response
+        operator: assemble.auth.session
+        inputs:
+          user: $nodes.login.user
+          session: $nodes.session
+          message: $nodes.login.message
+      - id: metric
+        operator: metric.incr
+        params: {metric: auth.login}
+      - id: audit
+        operator: audit.write
+        params:
+          action: auth.login
+          resource_type: user
+        inputs:
+          resource_id: $nodes.login.user.uid
+    edges:
+      - [norm, by_email]
+      - [norm, by_account_email]
+      - [norm, by_uid]
+      - [norm, by_nick]
+      - [norm, code_get]
+      - [code_get, code_verify]
+      - [code_verify, code_patch]
+      - [code_verify, code_drop]
+      - [code_patch, code_drop]
+      # 账户索引/验证码分支均可跳过；norm 保证主裁决总是执行。
+      - [norm, login]
+      - [by_email, login]
+      - [by_account_email, login]
+      - [by_uid, login]
+      - [by_nick, login]
+      - [code_patch, login]
+      - [code_drop, login]
+      - [login, session]
+      - [session, response]
+      - [response, metric]
+      - [metric, audit]
+
+  # ---------------------------------------------------------------------------
+  # 修改密码
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_CHANGE_PASSWORD_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 轮换登录密码并清除首次登录强制改密标记
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params: {entity: user.account}
+        inputs:
+          key: $context.user_id
+      - id: verify_old
+        operator: calc.auth.password_verify
+        inputs:
+          password: $inputs.old_password
+          password_hash: $nodes.load.entity.password_hash
+      - id: rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: args.old_valid
+              message: 原密码不正确
+            - expr: "len(args.new_password or '') >= 8"
+              message: 新密码长度不能少于 8 位
+            - expr: "args.new_password != args.old_password"
+              message: 新密码不能与原密码相同
+        inputs:
+          old_valid: $nodes.verify_old.valid
+          new_password: $inputs.new_password
+          old_password: $inputs.old_password
+      - id: hash
+        operator: calc.auth.password_hash
+        inputs:
+          password: $inputs.new_password
+      - id: patch
+        operator: entity.patch
+        params: {entity: user.account}
+        inputs:
+          data:
+            uid: $context.user_id
+            password_hash: $nodes.hash.password_hash
+            must_change_password: false
+      - id: session
+        operator: calc.auth.session
+        params: {mode: issue}
+        inputs:
+          user: $nodes.patch.entity
+      - id: response
+        operator: assemble.auth.session
+        inputs:
+          user: $nodes.patch.entity
+          session: $nodes.session
+          message: 密码修改成功，请使用新密码登录
+      - id: audit
+        operator: audit.write
+        params:
+          action: auth.change_password
+          resource_type: user
+        inputs:
+          resource_id: $context.user_id
+    edges:
+      - [auth, load]
+      - [load, verify_old]
+      - [verify_old, rule]
+      - [rule, hash]
+      - [hash, patch]
+      - [patch, session]
+      - [session, response]
+      - [response, audit]
+
+  # ---------------------------------------------------------------------------
+  # 会话校验
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_AUTH_SESSION_PIPELINE
+    version: v1.0.0
+    domain: auth
+    description: 验证创客会话 Token 并返回登录工作台状态
+    saga: false
+    nodes:
+      - id: session
+        operator: calc.auth.session
+        params: {mode: parse}
+        inputs:
+          token: $inputs.token
+      - id: rule
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: args.valid
+              message: 会话已失效或未提供有效登录凭据
+        inputs:
+          valid: $nodes.session.valid
+      - id: query
+        operator: calc.user.profile_query
+        inputs:
+          user_id: $nodes.session.uid
+      - id: load
+        operator: entity.get
+        params: {entity: user.account, required: false}
+        when: nodes.query.uid
+        inputs:
+          key: $nodes.query.uid
+      - id: catalog
+        operator: entity.list
+        params:
+          entity: user.entitlement
+          query: {limit: 0}
+      - id: grants
+        operator: entity.list
+        params:
+          entity: user.entitlement_grant
+          query: {limit: 0}
+        when: nodes.query.uid
+        inputs:
+          filters: {user_id: $nodes.query.uid}
+      - id: profile
+        operator: calc.user.profile
+        inputs:
+          uid: $nodes.query.uid
+          user: $nodes.load.entity
+          catalog: $nodes.catalog.items
+          grants: $nodes.grants.items
+      - id: response
+        operator: assemble.auth.session_state
+        inputs:
+          session: $nodes.session
+          profile: $nodes.profile
+    edges:
+      - [session, rule]
+      - [rule, query]
+      - [query, load]
+      - [load, catalog]
+      - [catalog, grants]
+      - [grants, profile]
+      - [profile, response]

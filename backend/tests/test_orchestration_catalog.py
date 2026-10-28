@@ -299,10 +299,10 @@ def test_operator_create_sandbox_rejects_forbidden_script():
 
 def test_operator_builtin_not_deletable():
     """内置算子（代码注册）不可删除。"""
-    acquire_lock("operator", "gateway_ingress", _admin_token())
+    acquire_lock("operator", "guard.authn", _admin_token())
     res = fail(
         "orchestration.operators.delete",
-        {"action": "operators.delete", "payload": {"name": "gateway_ingress"}},
+        {"action": "operators.delete", "payload": {"name": "guard.authn"}},
         _admin_token(),
     )
     assert res["code"] == 400
@@ -326,8 +326,8 @@ def _tax_guard_graph() -> dict:
         "entry_node": "n_auth",
         "exit_node": "n_tax",
         "nodes": [
-            {"id": "n_auth", "operator": "auth_guard", "type": "GUARD"},
-            {"id": "n_tax", "operator": "invoice_tax_calc", "type": "BIZ"},
+            {"id": "n_auth", "operator": "guard.authn", "type": "GUARD"},
+            {"id": "n_tax", "operator": "calc.policy.tax_assessment", "type": "BIZ"},
         ],
         "edges": [{"from_node": "n_auth", "to_node": "n_tax"}],
     }
@@ -342,7 +342,7 @@ def test_subgraph_create_compose_publish():
         {"action": "subgraphs.version.save", "payload": {"code": "SG_TAX_GUARD", "graph": _tax_guard_graph()}},
         _admin_token(),
     )
-    assert saved["versions"][0]["graph"]["nodes"][0]["operator"] == "auth_guard"
+    assert saved["versions"][0]["graph"]["nodes"][0]["operator"] == "guard.authn"
 
     published = ok(
         "orchestration.subgraphs.publish",
@@ -350,7 +350,7 @@ def test_subgraph_create_compose_publish():
         _admin_token(),
     )
     compiled = published["versions"][0]["compiled"]
-    assert [n["action_handler"] for n in compiled["nodes"]] == ["auth_guard", "invoice_tax_calc"]
+    assert [n["action_handler"] for n in compiled["nodes"]] == ["guard.authn", "calc.policy.tax_assessment"]
     assert published["current_version"] == "v1.0.0"
 
     # 子图引用未发布算子时拒绝发布
@@ -376,7 +376,7 @@ def test_subgraph_create_compose_publish():
                     "entry_node": "a",
                     "exit_node": "b",
                     "nodes": [
-                        {"id": "a", "operator": "auth_guard"},
+                        {"id": "a", "operator": "guard.authn"},
                         {"id": "b", "operator": "dynamic.unpub"},
                     ],
                     "edges": [{"from_node": "a", "to_node": "b"}],
@@ -406,8 +406,8 @@ def test_subgraph_publish_rejects_cycle_and_multi_entry():
                     "entry_node": "a",
                     "exit_node": "b",
                     "nodes": [
-                        {"id": "a", "operator": "auth_guard"},
-                        {"id": "b", "operator": "invoice_tax_calc"},
+                        {"id": "a", "operator": "guard.authn"},
+                        {"id": "b", "operator": "calc.policy.tax_assessment"},
                     ],
                     "edges": [{"from_node": "a", "to_node": "b"}, {"from_node": "b", "to_node": "a"}],
                 },
@@ -433,9 +433,9 @@ def test_subgraph_publish_rejects_cycle_and_multi_entry():
                     "entry_node": "a",
                     "exit_node": "c",
                     "nodes": [
-                        {"id": "a", "operator": "auth_guard"},
-                        {"id": "b", "operator": "auth_guard"},
-                        {"id": "c", "operator": "invoice_tax_calc"},
+                        {"id": "a", "operator": "guard.authn"},
+                        {"id": "b", "operator": "guard.authn"},
+                        {"id": "c", "operator": "calc.policy.tax_assessment"},
                     ],
                     "edges": [{"from_node": "b", "to_node": "c"}],
                 },
@@ -470,9 +470,9 @@ def _mixed_graph() -> dict:
         "exit_node": "audit",
         "enable_saga_compensation": False,
         "nodes": [
-            {"id": "ingress", "kind": "OPERATOR", "operator": "gateway_ingress", "type": "GATEWAY"},
+            {"id": "ingress", "kind": "OPERATOR", "operator": "guard.authn", "type": "GATEWAY"},
             {"id": "guard", "kind": "SUBGRAPH", "subgraph": "SG_TAX_GUARD", "type": "GUARD"},
-            {"id": "audit", "kind": "OPERATOR", "operator": "es_audit_sync", "type": "STORAGE"},
+            {"id": "audit", "kind": "OPERATOR", "operator": "audit.write", "type": "STORAGE"},
         ],
         "edges": [
             {"from_node": "ingress", "to_node": "guard"},
@@ -584,7 +584,7 @@ def test_operator_delete_blocked_by_published_subgraph():
                     "entry_node": "a",
                     "exit_node": "b",
                     "nodes": [
-                        {"id": "a", "operator": "auth_guard"},
+                        {"id": "a", "operator": "guard.authn"},
                         {"id": "b", "operator": "dynamic.blocked"},
                     ],
                     "edges": [{"from_node": "a", "to_node": "b"}],
@@ -636,12 +636,12 @@ def test_catalog_write_reseeds_missing_pipeline():
 def test_operator_builtin_version_and_usage():
     """预置算子统一带平台版本 v1.0.0；使用状态覆盖子图/场景/系统流程三类引用。"""
     ops = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}
-    guard = ops["auth_guard"]
+    guard = ops["guard.authn"]
     assert guard["source"] == "builtin"
     assert guard["current_version"] == "v1.0.0"
     assert guard["versions"][0]["version"] == "v1.0.0"
     assert guard["versions"][0]["status"] == "PUBLISHED"
-    # auth_guard 被系统预置流程（如税务测算管线）引用 → 使用中
+    # guard.authn 被系统预置流程（如税务测算管线）引用 → 使用中
     assert guard["in_use"] is True
     assert any(ref.startswith("流程 ") for ref in guard["referenced_by"])
 
@@ -660,7 +660,7 @@ def test_operator_builtin_version_and_usage():
     lonely = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}["dynamic.usage.lonely"]
     assert lonely["in_use"] is False
 
-    # 发布引用 auth_guard 的子图后 → 引用方新增子图条目
+    # 发布引用 guard.authn 的子图后 → 引用方新增子图条目
     acquire_lock("subgraph", "SG_USAGE_PROBE", _admin_token())
     ok(
         "orchestration.subgraphs.create",
@@ -677,8 +677,8 @@ def test_operator_builtin_version_and_usage():
                     "entry_node": "a",
                     "exit_node": "b",
                     "nodes": [
-                        {"id": "a", "operator": "auth_guard"},
-                        {"id": "b", "operator": "invoice_tax_calc"},
+                        {"id": "a", "operator": "guard.authn"},
+                        {"id": "b", "operator": "calc.policy.tax_assessment"},
                     ],
                     "edges": [{"from_node": "a", "to_node": "b"}],
                 },
@@ -692,10 +692,10 @@ def test_operator_builtin_version_and_usage():
         _admin_token(),
     )
     ops2 = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}
-    refs = ops2["auth_guard"]["referenced_by"]
+    refs = ops2["guard.authn"]["referenced_by"]
     assert any("SG_USAGE_PROBE" in ref for ref in refs)
     assert any(ref.startswith("流程 ") for ref in refs)
-    assert ops2["invoice_tax_calc"]["in_use"] is True
+    assert ops2["calc.policy.tax_assessment"]["in_use"] is True
     # 详情接口同样返回使用状态
-    detail = ok("orchestration.catalog.operator", {"name": "auth_guard"})
+    detail = ok("orchestration.catalog.operator", {"name": "guard.authn"})
     assert detail["in_use"] is True and detail["current_version"] == "v1.0.0"

@@ -1,0 +1,20 @@
+# Telemetry / ops dashboard scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "telemetry.dashboard"
+    version: "v1.0.0"
+    domain: "telemetry"
+    description: "全域运营大盘实时核心指标聚合"
+    is_default: true
+    pipeline: "OPC_OPS_DASHBOARD_PIPELINE"
+    required_permission: "review:audit_all"
+
+  - gateway: "ops.dashboard"
+    version: "v1.0.0"
+    domain: "telemetry"
+    description: "运营大盘三端指标检索别名"
+    is_default: true
+    pipeline: "OPC_OPS_DASHBOARD_PIPELINE"
+    required_permission: "review:audit_all"

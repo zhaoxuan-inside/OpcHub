@@ -6,6 +6,7 @@ registry.
 """
 from src.core.operators import entity as _entity  # noqa: F401
 from src.core.operators import external as _external  # noqa: F401
+from src.core.operators import framework as _framework  # noqa: F401
 from src.core.operators import guard as _guard  # noqa: F401
 from src.core.operators import response as _response  # noqa: F401
 from src.core.operators import side_effects as _side_effects  # noqa: F401

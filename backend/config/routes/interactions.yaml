@@ -1,0 +1,72 @@
+# Unified content interactions (统一互动：点赞/收藏/喜欢/踩/评分/评论)
+# gateway scenario -> pipeline mapping, aggregated by the main control plane
+# into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "content.interaction.toggle"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "统一切换公开内容互动：点赞 LIKE / 收藏 FAVORITE / 喜欢 LOVE / 踩 DISLIKE"
+    is_default: true
+    pipeline: "OPC_INTERACTION_TOGGLE_PIPELINE"
+    required_permission: "content:interact"
+
+  - gateway: "content.interaction.rate"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "对公开内容进行 1-5 星打分（可重复打分覆盖）"
+    is_default: true
+    pipeline: "OPC_INTERACTION_RATE_PIPELINE"
+    required_permission: "content:interact"
+
+  - gateway: "content.interactions.state"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "读取单个公开内容的互动计数与当前登录用户的互动状态"
+    is_default: true
+    pipeline: "OPC_INTERACTION_STATE_PIPELINE"
+
+  - gateway: "content.interactions.batch"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "批量读取公开内容的互动计数与当前登录用户的互动状态"
+    is_default: true
+    pipeline: "OPC_INTERACTION_BATCH_STATE_PIPELINE"
+
+  - gateway: "content.interactions.counts"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "查询互动计数（统计行缺失时以目标实体历史计数初始化）"
+    is_default: true
+    pipeline: "OPC_INTERACTION_COUNTS_PIPELINE"
+
+  - gateway: "content.interactions.mine"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "读取当前创客的点赞、收藏、喜欢与评论记录"
+    is_default: true
+    pipeline: "OPC_INTERACTION_MINE_PIPELINE"
+
+  - gateway: "content.comments.list"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "读取公开内容的评论列表"
+    is_default: true
+    pipeline: "OPC_INTERACTION_COMMENTS_LIST_PIPELINE"
+
+  - gateway: "content.comments.create"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "对公开内容发表评论"
+    is_default: true
+    pipeline: "OPC_CONTENT_COMMENT_PUBLISH_PIPELINE"
+    required_permission: "content:comment"
+
+  - gateway: "content.comments.delete"
+    version: "v1.0.0"
+    domain: "interactions"
+    description: "删除自己发表的公开内容评论"
+    is_default: true
+    pipeline: "OPC_INTERACTION_COMMENT_DELETE_PIPELINE"
+    required_permission: "content:comment"

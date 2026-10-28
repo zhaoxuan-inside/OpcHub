@@ -45,7 +45,7 @@ __operator_version__ = "v1.3.4"
 
 def test_file_addition_staging_and_versioned_activation():
     """Verify that added file is staged, not directly executed, and activates only on target version."""
-    temp_dir = Path("backend/src/domains/_dynamic_test")
+    temp_dir = Path(__file__).resolve().parents[1] / "src" / "domains" / "_dynamic_test"
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_file = temp_dir / "hot_op_v1.py"
 
@@ -117,7 +117,7 @@ def test_file_addition_staging_and_versioned_activation():
 
 def test_syntax_error_quarantine_safety():
     """Verify that files with syntax errors are quarantined and do not crash the engine."""
-    temp_dir = Path("backend/src/domains/_dynamic_test")
+    temp_dir = Path(__file__).resolve().parents[1] / "src" / "domains" / "_dynamic_test"
     temp_dir.mkdir(parents=True, exist_ok=True)
     bad_file = temp_dir / "bad_syntax.py"
 

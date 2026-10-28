@@ -44,3 +44,19 @@ def _resolve(expression: Any, args: dict[str, Any], default: dict[str, Any]) -> 
     if expression.startswith("$entity."):
         return default.get(expression[len("$entity.") :])
     return expression
+
+
+@operator("response.collection", category="RESPONSE", description="Project a search collection into the legacy list envelope")
+def collection(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    items = args.get("items") or []
+    if not isinstance(items, list):
+        items = []
+    return {
+        "response": {
+            "status": "SUCCESS",
+            "query": str(args.get("query") or ""),
+            "category": args.get("category") or "ALL",
+            "total": len(items),
+            "items": items,
+        }
+    }

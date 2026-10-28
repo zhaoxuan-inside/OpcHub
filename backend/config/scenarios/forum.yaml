@@ -1266,3 +1266,24 @@ scenarios:
       - [follows, assemble]
       - [assemble, envelope]
       - [envelope, result]
+
+  - scenario: OPC_FORUM_SEMANTIC_SEARCH_PIPELINE
+    version: v1.0.0
+    domain: forum
+    description: 基于向量相似度的论坛帖子语义检索
+    saga: false
+    nodes:
+      - id: search
+        operator: external.rag.forum_search
+        inputs:
+          query: $inputs.query
+          top_k: $inputs.top_k
+          category_code: $inputs.category_code
+      - id: result
+        operator: response.collection
+        inputs:
+          items: $nodes.search.results
+          query: $inputs.query
+          category_code: $inputs.category_code
+    edges:
+      - [search, result]

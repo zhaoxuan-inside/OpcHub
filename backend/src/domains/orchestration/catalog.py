@@ -57,9 +57,9 @@ def ensure_catalog_pipeline() -> None:
                 "exit_node": "step_telemetry",
                 "enable_saga_compensation": False,
                 "nodes": [
-                    {"id": "step_guard", "action_handler": "orchestration.catalog.guard", "type": "GUARD"},
-                    {"id": "step_persist", "action_handler": "orchestration.catalog.persist", "type": "BIZ"},
-                    {"id": "step_telemetry", "action_handler": "orchestration.catalog.telemetry.incr", "type": "BIZ"},
+                    {"id": "step_guard", "action_handler": "orchestration.catalog.guard", "type": "GUARD", "params": {"legacy_inputs": True}},
+                    {"id": "step_persist", "action_handler": "orchestration.catalog.persist", "type": "BIZ", "params": {"legacy_inputs": True}},
+                    {"id": "step_telemetry", "action_handler": "orchestration.catalog.telemetry.incr", "type": "BIZ", "params": {"legacy_inputs": True}},
                 ],
                 "edges": [
                     {"from": "step_guard", "to": "step_persist"},

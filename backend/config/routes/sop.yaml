@@ -1,0 +1,177 @@
+# SOP（合规文书 / 流程模板 / 发布审核）gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "sop.templates"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取合规流程阶段与文档模板列表"
+    is_default: true
+    pipeline: "OPC_SOP_TEMPLATE_LIST_PIPELINE"
+
+  - gateway: "sop.documents"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取标准文书库列表（含作者、来源机构、喜欢/收藏/真实使用数）"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_CATALOG_PIPELINE"
+
+  - gateway: "sop.flow.templates"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取平台流程模板库列表（含作者、来源机构、喜欢/收藏/使用数）"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_TEMPLATE_LIST_PIPELINE"
+
+  - gateway: "sop.flow.template.detail"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取单个平台流程模板及其展开后的文书步骤"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_TEMPLATE_DETAIL_PIPELINE"
+
+  - gateway: "sop.graph"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取完整合规流程图谱：阶段、节点(文书/子图)、依赖边与目标反查索引"
+    is_default: true
+    pipeline: "OPC_SOP_GRAPH_PIPELINE"
+
+  - gateway: "sop.node"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取单个流程节点上下文：子文档、前置依赖与本步产出说明"
+    is_default: true
+    pipeline: "OPC_SOP_NODE_CONTEXT_PIPELINE"
+
+  - gateway: "sop.flow.list"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取创客自建的流程清单"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_LIST_PIPELINE"
+
+  - gateway: "sop.myflow.cards"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取创客私有流程卡片列表（与平台流程卡片同构）"
+    is_default: true
+    pipeline: "OPC_SOP_MY_FLOW_CARDS_PIPELINE"
+
+  - gateway: "sop.flow.get"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取单个自建流程及其展开后的文书清单"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_DETAIL_PIPELINE"
+
+  - gateway: "sop.flow.create"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "创建并持久化一条创客自建流程"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_CREATE_PIPELINE"
+    required_permission: "sop:save_progress"
+
+  - gateway: "sop.flow.update"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "更新一条创客自建流程"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_UPDATE_PIPELINE"
+    required_permission: "sop:save_progress"
+
+  - gateway: "sop.flow.delete"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "删除一条创客自建流程"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_DELETE_PIPELINE"
+    required_permission: "sop:save_progress"
+
+  - gateway: "sop.template.publish"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "发布并登记新合规文书模板"
+    is_default: true
+    pipeline: "OPC_SOP_TEMPLATE_PUBLISH_PIPELINE"
+    required_permission: "data:schema_manage"
+
+  - gateway: "sop.document.render"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "微内核DAG编排：根据用户输入渲染并持久化合规文书"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_RENDER_PIPELINE"
+    required_permission: "sop:save_progress"
+
+  - gateway: "sop.document.draft"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "文本编辑器起草：保存自由编辑的私有文书草稿（可选基于标准模板，注册创客可用）"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_DRAFT_PIPELINE"
+    required_permission: "content:publish"
+
+  - gateway: "sop.document.get"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "按 ID 获取已生成的文书实例"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_DETAIL_PIPELINE"
+
+  - gateway: "sop.document.list"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取创客已保存的文书历史列表"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_MINE_PIPELINE"
+
+  - gateway: "sop.document.delete"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "删除一条创客已保存的文书实例"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_DELETE_PIPELINE"
+    required_permission: "sop:save_progress"
+
+  - gateway: "sop.document.publish"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "发布「我的文书」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
+    is_default: true
+    pipeline: "OPC_SOP_DOCUMENT_PUBLISH_PIPELINE"
+    required_permission: "content:publish"
+
+  - gateway: "sop.flow.publish"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "发布「我的流程」至审核队列（所有注册用户可发布，管理员发布自动打官方标签）"
+    is_default: true
+    pipeline: "OPC_SOP_FLOW_PUBLISH_PIPELINE"
+    required_permission: "content:publish"
+
+  - gateway: "sop.review.queue"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "获取文书与流程发布审核队列（含合法性/合规性/敏感词审核状态）"
+    is_default: true
+    pipeline: "OPC_SOP_REVIEW_QUEUE_PIPELINE"
+    required_permission: "review:audit_all"
+
+  - gateway: "sop.review.process"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "消费审核队列：逐项检查合法性/合规性/敏感词，通过后发布至标准文书与流程向导"
+    is_default: true
+    pipeline: "OPC_SOP_REVIEW_PROCESS_PIPELINE"
+    required_permission: "review:audit_all"
+
+  - gateway: "sop.review.withdraw"
+    version: "v1.0.0"
+    domain: "sop"
+    description: "撤回发布审核提交，把文书或流程退回可编辑状态"
+    is_default: true
+    pipeline: "OPC_SOP_REVIEW_WITHDRAW_PIPELINE"
+    required_permission: "content:publish"

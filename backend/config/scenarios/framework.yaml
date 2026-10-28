@@ -1,0 +1,115 @@
+# 框架治理（热重载 / 网关路由自省）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 边界：
+# * 全部为框架运维能力，必须 ADMIN；权限码取现有 RBAC 矩阵中的
+#   `data:schema_manage`（USER/MAKER 不具备，ADMIN 通配）。
+# * 算子实现位于 `core/operators/framework.py`，只调用 hot_reload_engine /
+#   scenario_router / GatewayConfigLoader，不 import `src.domains`。
+
+scenarios:
+  - scenario: OPC_FRAMEWORK_HOT_RELOAD_STATUS_PIPELINE
+    version: v1.0.0
+    domain: framework
+    description: 自省文件感知监听器状态、监控文件数及 STAGED 待生效变更
+    saga: false
+    nodes:
+      - id: gate
+        operator: guard.permission
+        params: {permission: "data:schema_manage", message: "权限不足：框架热重载状态仅限平台管理员查看"}
+      - id: status
+        operator: query.framework.hot_reload_status
+      - id: response
+        operator: response.build
+        params: {source: status}
+        inputs:
+          status: $nodes.status.status
+    edges:
+      - [gate, status]
+      - [status, response]
+
+  - scenario: OPC_FRAMEWORK_HOT_RELOAD_SCAN_PIPELINE
+    version: v1.0.0
+    domain: framework
+    description: 主动触发一次文件系统 .py 变更感知与暂存
+    saga: false
+    nodes:
+      - id: gate
+        operator: guard.permission
+        params: {permission: "data:schema_manage", message: "权限不足：框架热重载扫描仅限平台管理员执行"}
+      - id: scan
+        operator: transform.framework.hot_reload_scan
+      - id: response
+        operator: response.build
+        params: {source: scan}
+        inputs:
+          scan: $nodes.scan.scan
+    edges:
+      - [gate, scan]
+      - [scan, response]
+
+  - scenario: OPC_FRAMEWORK_HOT_RELOAD_ACTIVATE_PIPELINE
+    version: v1.0.0
+    domain: framework
+    description: 跟随指定版本将处于 STAGED 状态的 Python 模块原子载入内存生效
+    saga: false
+    nodes:
+      - id: gate
+        operator: guard.permission
+        params: {permission: "data:schema_manage", message: "权限不足：框架热重载生效仅限平台管理员执行"}
+      - id: activate
+        operator: transform.framework.hot_reload_activate
+        inputs:
+          version: $inputs.version
+          file_paths: $inputs.file_paths
+      - id: response
+        operator: response.build
+        params: {source: activation}
+        inputs:
+          activation: $nodes.activate.activation
+    edges:
+      - [gate, activate]
+      - [activate, response]
+
+  - scenario: OPC_FRAMEWORK_GATEWAY_RELOAD_PIPELINE
+    version: v1.0.0
+    domain: framework
+    description: 网关与框架统一重载：激活待生效模块并按配置重载场景路由
+    saga: false
+    nodes:
+      - id: gate
+        operator: guard.permission
+        params: {permission: "data:schema_manage", message: "权限不足：网关重载仅限平台管理员执行"}
+      - id: reload
+        operator: transform.framework.gateway_reload
+        inputs:
+          version: $inputs.version
+      - id: response
+        operator: response.build
+        params: {source: reload}
+        inputs:
+          reload: $nodes.reload.reload
+    edges:
+      - [gate, reload]
+      - [reload, response]
+
+  - scenario: OPC_GATEWAY_RULES_PIPELINE
+    version: v1.0.0
+    domain: framework
+    description: 自省统一网关当前已挂载的所有场景路由与版本策略
+    saga: false
+    nodes:
+      - id: gate
+        operator: guard.permission
+        params: {permission: "data:schema_manage", message: "权限不足：网关路由规则仅限平台管理员查看"}
+      - id: rules
+        operator: query.framework.gateway_rules
+      # 路由清单是数组，response.build 只投影对象，故用通用派生算子保留列表形态。
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.rules"}
+        inputs:
+          rules: $nodes.rules.rules
+    edges:
+      - [gate, rules]
+      - [rules, response]

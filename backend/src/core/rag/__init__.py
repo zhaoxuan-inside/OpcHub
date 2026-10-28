@@ -16,8 +16,10 @@ from .vector_store import (
 from .service import (
     PolicyRagService,
     ForumRagService,
+    ProductRagService,
     policy_rag_service,
     forum_rag_service,
+    product_rag_service,
 )
 
 __all__ = [
@@ -33,6 +35,8 @@ __all__ = [
     "default_vector_store",
     "PolicyRagService",
     "ForumRagService",
+    "ProductRagService",
     "policy_rag_service",
     "forum_rag_service",
+    "product_rag_service",
 ]

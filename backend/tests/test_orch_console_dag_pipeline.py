@@ -29,10 +29,10 @@ async def test_orchestration_operators_list_pipeline():
         operators = data["data"]
         assert len(operators) >= 15
         op_names = [op["name"] for op in operators]
-        assert "auth_guard" in op_names
-        assert "policy.calculate_tax" in op_names
-        assert "compliance.evaluate_audit" in op_names
-        assert "moderation.takedown.persist" in op_names
+        assert "guard.authn" in op_names
+        assert "calc.policy.tax_assessment" in op_names
+        assert "calc.compliance.score" in op_names
+        assert "policy.moderation.transition" in op_names
 
 
 @pytest.mark.asyncio
@@ -45,8 +45,8 @@ async def test_orchestration_control_pipeline_save_dag_success():
             "topology": "DAG",
             "entry_node": "n1",
             "nodes": [
-                {"id": "n1", "action_handler": "auth_guard", "type": "GUARD"},
-                {"id": "n2", "action_handler": "policy.calculate_tax", "type": "BIZ"}
+                {"id": "n1", "action_handler": "guard.authn", "type": "GUARD"},
+                {"id": "n2", "action_handler": "calc.policy.tax_assessment", "type": "BIZ"}
             ],
             "edges": [
                 {"from": "n1", "to": "n2"}
@@ -90,7 +90,7 @@ async def test_orchestration_control_saga_rollback_on_downstream_failure():
         test_topo = {
             "topology": "DAG",
             "entry_node": "n1",
-            "nodes": [{"id": "n1", "action_handler": "auth_guard", "type": "GUARD"}],
+            "nodes": [{"id": "n1", "action_handler": "guard.authn", "type": "GUARD"}],
             "edges": []
         }
         req_body = {

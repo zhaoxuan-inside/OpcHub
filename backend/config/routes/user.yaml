@@ -1,0 +1,28 @@
+# User (创客档案与权益) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "user.profile"
+    version: "v1.0.0"
+    domain: "user"
+    description: "获取创客个人主体档案与已激活权益"
+    is_default: true
+    pipeline: "OPC_USER_PROFILE_PIPELINE"
+
+  - gateway: "user.profile.update"
+    version: "v1.0.0"
+    domain: "user"
+    description: "更新创客基本信息与主体档案"
+    is_default: true
+    pipeline: "OPC_USER_PROFILE_UPDATE_PIPELINE"
+    owner_check:
+      resource_type: "user"
+      id_field: "user_id"
+
+  - gateway: "user.entitlements.activate"
+    version: "v1.0.0"
+    domain: "user"
+    description: "激活创客专属商业权益与特权门禁"
+    is_default: true
+    pipeline: "OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE"

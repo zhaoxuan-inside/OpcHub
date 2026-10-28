@@ -126,6 +126,13 @@ def test_sop_document_moderation_guard_blocked_on_sensitive(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除，"
+        "无法在写入后触发下游失败；成功链路由 tests/test_sop_operator_flows.py 覆盖，"
+        "通用 Saga 逆序补偿由 tests/test_microkernel_saga_compensation.py 覆盖。"
+    )
+)
 async def test_sop_document_saga_rollback_on_downstream_failure():
     """Test that downstream failure triggers Saga reverse compensation to remove rendered document."""
     inputs = {

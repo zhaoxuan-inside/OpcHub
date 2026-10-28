@@ -92,6 +92,8 @@ scenarios:
           consequence: $inputs.consequence
           lesson: $inputs.lesson
           badge_color: $inputs.badge_color
+          author_id: $inputs.author_id
+          author_name: $inputs.author_name
       - id: create
         operator: entity.create
         params: {entity: compliance.item}

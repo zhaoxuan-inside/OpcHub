@@ -12,7 +12,8 @@ from src.domains.orchestration.models import ScenarioExecuteRequest
 @pytest.fixture(autouse=True)
 def seed_compliance_checkpoints():
     """Seed test-only compliance checkpoints so audit scoring has real items."""
-    compliance_service._checkpoints = [
+    compliance_service._checkpoints.clear()
+    compliance_service._checkpoints.extend([
         AuditCheckItem(
             id="chk_01", dimension_id="dim_privacy", title="隐私政策明示",
             description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
@@ -53,9 +54,9 @@ def seed_compliance_checkpoints():
             id="chk_10", dimension_id="dim_cross_border", title="GDPR 合规",
             description="d", severity="MEDIUM", weight=8, advice="a", legal_basis="l",
         ),
-    ]
+    ])
     yield
-    compliance_service._checkpoints = []
+    compliance_service._checkpoints.clear()
 
 
 @pytest.fixture
@@ -124,6 +125,13 @@ def test_compliance_audit_strict_mode_blocks_critical(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除；"
+        "合规自检成功链路由 tests/test_compliance_operator_flows.py 覆盖，"
+        "通用 Saga 逆序补偿由 tests/test_microkernel_saga_compensation.py 覆盖。"
+    )
+)
 async def test_compliance_audit_saga_rollback_on_downstream_failure():
     """Test that downstream failure triggers reverse compensation to reset audit session."""
     inputs = {

@@ -226,6 +226,18 @@ class EntityStore:
         _rows, total = self.list(entity, {**(payload or {}), "limit": 0, "offset": 0})
         return total
 
+    def clear(self, entity: str | None = None) -> None:
+        """Drop in-memory rows (test isolation / destructive reset).
+
+        Snapshot-backed families are cleared locally; the write-behind store is
+        not touched, so this is a working-set reset, not a production wipe.
+        """
+        targets = [entity] if entity else list(self._adapters)
+        for name in targets:
+            adapter = self._adapters.get(name)
+            if isinstance(adapter, SnapshotAdapter):
+                adapter._rows.clear()
+
     def exists(self, entity: str, payload: dict[str, Any] | None = None) -> bool:
         _rows, total = self.list(entity, {**(payload or {}), "limit": 1, "offset": 0})
         return total > 0

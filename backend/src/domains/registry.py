@@ -35,6 +35,10 @@ DOMAIN_FUNCTION_MODULES = [
     "src.domains.home.functions",
 ]
 
+DOMAIN_CONTROL_MODULES = [
+    "src.domains.orchestration.control_ops",
+]
+
 DOMAIN_ENTITY_MODULES = [
     "src.domains.products.entities",
     "src.domains.policies.entities",
@@ -77,6 +81,8 @@ def import_entity_specs() -> list[str]:
 def import_domain_functions() -> list[str]:
     imported: list[str] = []
     import_entity_specs()
+    for module_name in DOMAIN_CONTROL_MODULES:
+        _import_optional(module_name, imported)
     for module_name in DOMAIN_FUNCTION_MODULES:
         _import_optional(module_name, imported)
     return imported

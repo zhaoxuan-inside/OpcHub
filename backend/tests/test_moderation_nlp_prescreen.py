@@ -64,9 +64,9 @@ class TestNlpPrescreen:
 @pytest.mark.asyncio
 async def test_nlp_prescreen_operator_is_registered():
     from src.core.microkernel.registry import registry
-    handler = registry.get("moderation.nlp.prescreen")
-    assert handler is not None, "moderation.nlp.prescreen operator must be registered"
-    res = await handler({"content": "软件开发与合规申报"}, {})
+    handler = registry.get("calc.moderation.prescreen")
+    assert handler is not None, "calc.moderation.prescreen operator must be registered"
+    res = await handler({"args": {"content": "软件开发与合规申报"}}, {})
     assert res["verdict"] == VERDICT_SAFE
 
 

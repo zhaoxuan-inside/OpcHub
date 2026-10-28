@@ -96,6 +96,13 @@ def test_product_publish_moderation_guard_blocks_violation(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除，"
+        "无法在写入后触发下游失败；成功链路由 tests/test_products_operator_flows.py 覆盖，"
+        "通用 Saga 逆序补偿由 tests/test_microkernel_saga_compensation.py 覆盖。"
+    )
+)
 async def test_product_publish_saga_rollback_on_failure():
     """Verify Saga reverse compensation deletes persisted product when downstream fails."""
     exec_req = ScenarioExecuteRequest(
@@ -157,6 +164,12 @@ def test_product_upvote_and_listing(client):
     assert counts == sorted(counts, reverse=True)
 
 
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 产品列表服务端缓存与 from_cache 字段已按设计移除；"
+        "分页/size/排序契约由 tests/test_products_operator_flows.py 覆盖。"
+    )
+)
 def test_product_pagination_and_caching(client):
     """Verify infinite scroll pagination and multi-tier server-side caching."""
     # 1. First paged fetch (cache miss)

@@ -1,0 +1,1322 @@
+# SOP（合规文书 / 流程模板 / 发布审核）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 敏感词门禁边界：本域场景只做声明式合规校验（必填字段、正文长度、流程节点有效性）；
+# 平台级两级内容安全门禁（本地 NLP 预筛 + 外部审核）属于基础设施，由发布审核消费者
+# 在调用 OPC_SOP_REVIEW_PROCESS_PIPELINE 前统一执行，并通过 gate_passed / gate_reason
+# 传入本场景；场景本身不发起外呼。
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # 模板库
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_TEMPLATE_LIST_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取合规流程阶段与文档模板目录
+    saga: false
+    nodes:
+      - id: stages
+        operator: entity.list
+        params:
+          entity: sop.stage
+          query: {order: "stage"}
+      - id: nodes
+        operator: entity.list
+        params:
+          entity: sop.node
+      - id: assemble
+        operator: assemble.sop.template_cards
+        inputs:
+          stages: $nodes.stages.items
+          nodes: $nodes.nodes.items
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            stages: stages
+            templates: templates
+        inputs:
+          stages: $nodes.assemble.stages
+          templates: $nodes.assemble.templates
+    edges:
+      - [stages, nodes]
+      - [nodes, assemble]
+      - [assemble, response]
+
+  - scenario: OPC_SOP_TEMPLATE_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 发布并登记新合规文书模板（同时进入图谱，可在工作台填写）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            stage: {type: integer, required: true, min: 1, max: 4}
+            code: {type: string, required: true, min_length: 2, max_length: 100}
+            name: {type: string, required: true, min_length: 2, max_length: 255}
+            category: {type: string, required: false, max_length: 32}
+            description: {type: string, required: true, min_length: 5}
+            template_content: {type: string, required: true, min_length: 5}
+        inputs:
+          stage: $inputs.stage
+          code: $inputs.code
+          name: $inputs.name
+          category: $inputs.category
+          description: $inputs.description
+          template_content: $inputs.template_content
+      - id: normalize
+        operator: calc.sop.template_publish
+        inputs:
+          stage: $inputs.stage
+          code: $inputs.code
+          name: $inputs.name
+          category: $inputs.category
+          description: $inputs.description
+          template_content: $inputs.template_content
+          required_fields: $inputs.required_fields
+      - id: template
+        operator: entity.upsert
+        params: {entity: sop.template}
+        inputs:
+          data: $nodes.normalize.template
+      - id: node
+        operator: entity.upsert
+        params: {entity: sop.node}
+        inputs:
+          data: $nodes.normalize.node
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.template.published}
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.template.entity
+    edges:
+      - [auth, fields]
+      - [fields, normalize]
+      - [normalize, template]
+      - [template, node]
+      - [node, metric]
+      - [metric, response]
+
+  # ---------------------------------------------------------------------------
+  # 标准文书库 / 流程图谱（只读）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_DOCUMENT_CATALOG_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取标准文书库列表（含作者、来源机构与真实使用数）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.sop.query
+        params:
+          filters: {kind: document, is_active: true}
+          order: "-like_count"
+        inputs:
+          category: $inputs.category
+          user_id: $inputs.user_id
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+        inputs:
+          filters: $nodes.query.filters
+          order: $nodes.query.order
+      - id: documents
+        operator: entity.list
+        params: {entity: sop.document}
+      - id: cards
+        operator: assemble.sop.document_cards
+        inputs:
+          nodes: $nodes.nodes.items
+          documents: $nodes.documents.items
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            items: items
+            total: total
+        inputs:
+          items: $nodes.cards.items
+          total: $nodes.cards.total
+    edges:
+      - [query, nodes]
+      - [nodes, documents]
+      - [documents, cards]
+      - [cards, response]
+
+  - scenario: OPC_SOP_FLOW_TEMPLATE_LIST_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取平台流程模板库列表（流程向导卡片）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.sop.query
+        params:
+          order: "-like_count"
+        inputs:
+          category: $inputs.category
+      - id: templates
+        operator: entity.list
+        params: {entity: sop.flow_template}
+        inputs:
+          filters: $nodes.query.filters
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: flows
+        operator: entity.list
+        params: {entity: sop.flow}
+      - id: cards
+        operator: assemble.sop.flow_template_cards
+        inputs:
+          templates: $nodes.templates.items
+          nodes: $nodes.nodes.items
+          flows: $nodes.flows.items
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            items: items
+            total: total
+        inputs:
+          items: $nodes.cards.items
+          total: $nodes.cards.total
+    edges:
+      - [query, templates]
+      - [templates, nodes]
+      - [nodes, flows]
+      - [flows, cards]
+      - [cards, response]
+
+  - scenario: OPC_SOP_FLOW_TEMPLATE_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取单个平台流程模板及其展开后的文书步骤
+    saga: false
+    nodes:
+      - id: template
+        operator: entity.get
+        params:
+          entity: sop.flow_template
+          message: SOP 流程模板不存在，请刷新流程向导
+        inputs:
+          key: $inputs.flow_id
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: steps
+        operator: calc.sop.steps
+        params: {order: REFERENCE}
+        inputs:
+          refs: $nodes.template.entity.node_refs
+          nodes: $nodes.nodes.items
+      - id: detail
+        operator: assemble.sop.flow_template_detail
+        inputs:
+          template: $nodes.template.entity
+          steps: $nodes.steps.items
+          missing_nodes: $nodes.steps.missing_nodes
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            template: template
+            steps: steps
+            missing_nodes: missing_nodes
+        inputs:
+          template: $nodes.detail.template
+          steps: $nodes.detail.steps
+          missing_nodes: $nodes.detail.missing_nodes
+    edges:
+      - [template, nodes]
+      - [nodes, steps]
+      - [steps, detail]
+      - [detail, response]
+
+  - scenario: OPC_SOP_GRAPH_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取完整合规流程图谱：阶段、节点、依赖边与目标反查索引
+    saga: false
+    nodes:
+      - id: stages
+        operator: entity.list
+        params:
+          entity: sop.stage
+          query: {order: "stage"}
+      - id: nodes
+        operator: entity.list
+        params:
+          entity: sop.node
+      - id: edges
+        operator: entity.list
+        params:
+          entity: sop.edge
+      - id: goals
+        operator: entity.list
+        params:
+          entity: sop.goal
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            stages: stages
+            nodes: nodes
+            edges: edges
+            goals: goals
+        inputs:
+          stages: $nodes.stages.items
+          nodes: $nodes.nodes.items
+          edges: $nodes.edges.items
+          goals: $nodes.goals.items
+    edges:
+      - [stages, nodes]
+      - [nodes, edges]
+      - [edges, goals]
+      - [goals, response]
+
+  - scenario: OPC_SOP_NODE_CONTEXT_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取单个流程节点上下文：子文档、前置依赖与本步产出说明
+    saga: false
+    nodes:
+      - id: node
+        operator: entity.get
+        params:
+          entity: sop.node
+          message: SOP 流程节点不存在
+        inputs:
+          key: $inputs.node_id
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: edges
+        operator: entity.list
+        params: {entity: sop.edge}
+      - id: context
+        operator: assemble.sop.node_context
+        inputs:
+          node: $nodes.node.entity
+          nodes: $nodes.nodes.items
+          edges: $nodes.edges.items
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            node: node
+            children: children
+            prerequisites: prerequisites
+        inputs:
+          node: $nodes.context.node
+          children: $nodes.context.children
+          prerequisites: $nodes.context.prerequisites
+    edges:
+      - [node, nodes]
+      - [nodes, edges]
+      - [edges, context]
+      - [context, response]
+
+  # ---------------------------------------------------------------------------
+  # 创客自建流程
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_FLOW_LIST_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取创客自建的流程清单
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.sop.query
+        params:
+          owner_field: owner_id
+          order: "-updated_at"
+        inputs:
+          owner_id: $inputs.owner_id
+          user_id: $context.user_id
+      - id: list
+        operator: entity.list
+        params: {entity: sop.flow}
+        inputs:
+          filters: $nodes.query.filters
+          order: $nodes.query.order
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.list.items
+    edges:
+      - [query, list]
+      - [list, response]
+
+  - scenario: OPC_SOP_MY_FLOW_CARDS_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取创客私有流程卡片列表（与平台流程卡片同构）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.sop.query
+        params:
+          owner_field: owner_id
+          order: "-created_at"
+        inputs:
+          owner_id: $inputs.owner_id
+          user_id: $context.user_id
+      - id: flows
+        operator: entity.list
+        params: {entity: sop.flow}
+        inputs:
+          filters: $nodes.query.filters
+          order: $nodes.query.order
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: cards
+        operator: assemble.sop.my_flow_cards
+        inputs:
+          flows: $nodes.flows.items
+          nodes: $nodes.nodes.items
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.cards.items
+    edges:
+      - [query, flows]
+      - [flows, nodes]
+      - [nodes, cards]
+      - [cards, response]
+
+  - scenario: OPC_SOP_FLOW_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取单个自建流程及其展开后的文书清单
+    saga: false
+    nodes:
+      - id: flow
+        operator: entity.get
+        params:
+          entity: sop.flow
+          message: SOP 流程不存在
+        inputs:
+          key: $inputs.flow_id
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: edges
+        operator: entity.list
+        params: {entity: sop.edge}
+      - id: steps
+        operator: calc.sop.steps
+        inputs:
+          refs: $nodes.flow.entity.node_refs
+          nodes: $nodes.nodes.items
+          edges: $nodes.edges.items
+      - id: detail
+        operator: assemble.sop.flow_detail
+        inputs:
+          flow: $nodes.flow.entity
+          items: $nodes.steps.items
+          edges: $nodes.edges.items
+          missing_nodes: $nodes.steps.missing_nodes
+      - id: response
+        operator: response.merge
+        params:
+          map:
+            flow: flow
+            items: items
+            edges: edges
+            missing_nodes: missing_nodes
+        inputs:
+          flow: $nodes.detail.flow
+          items: $nodes.detail.items
+          edges: $nodes.detail.edges
+          missing_nodes: $nodes.detail.missing_nodes
+    edges:
+      - [flow, nodes]
+      - [nodes, edges]
+      - [edges, steps]
+      - [steps, detail]
+      - [detail, response]
+
+  - scenario: OPC_SOP_FLOW_CREATE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 创建并持久化一条创客自建流程
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: normalize
+        operator: calc.sop.flow_create
+        inputs:
+          name: $inputs.name
+          description: $inputs.description
+          goal_id: $inputs.goal_id
+          node_refs: $inputs.node_refs
+          edges: $inputs.edges
+          status: $inputs.status
+      - id: create
+        operator: entity.create
+        params: {entity: sop.flow}
+        inputs:
+          data: $nodes.normalize.flow
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.flow.created}
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, normalize]
+      - [normalize, create]
+      - [create, metric]
+      - [metric, response]
+
+  - scenario: OPC_SOP_FLOW_UPDATE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 更新一条创客自建流程（已发布/审核中的流程回到可编辑状态）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.flow
+          message: SOP 流程不存在
+        inputs:
+          key: $inputs.flow_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.owner_id
+      - id: normalize
+        operator: calc.sop.flow_update
+        inputs:
+          flow_id: $nodes.load.id
+          current: $nodes.load.entity
+          name: $inputs.name
+          description: $inputs.description
+          goal_id: $inputs.goal_id
+          node_refs: $inputs.node_refs
+          edges: $inputs.edges
+          status: $inputs.status
+      - id: update
+        operator: entity.update
+        params: {entity: sop.flow}
+        inputs:
+          data: $nodes.normalize.flow
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.flow.updated}
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.update.entity
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, normalize]
+      - [normalize, update]
+      - [update, metric]
+      - [metric, response]
+
+  - scenario: OPC_SOP_FLOW_DELETE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 删除一条创客自建流程
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.flow
+          message: SOP 流程不存在
+        inputs:
+          key: $inputs.flow_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.owner_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: sop.flow}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.flow.deleted}
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "{'deleted': args.deleted, 'flow_id': args.key}"}
+        inputs:
+          deleted: $nodes.delete.deleted
+          key: $nodes.delete.key
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, metric]
+      - [metric, response]
+
+  # ---------------------------------------------------------------------------
+  # 文书生成 / 起草 / 我的文书
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_DOCUMENT_RENDER_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 微内核DAG编排：根据用户输入渲染并持久化合规文书
+    saga: true
+    nodes:
+      - id: auth
+        # 历史网关渲染适配器不透传 context；注册创客身份可用时在此绑定（身份只来自 context）。
+        operator: guard.authn
+        params: {required: false}
+      - id: template
+        operator: entity.get
+        params:
+          entity: sop.template
+          message: SOP 文书模板不存在，请刷新模板库后重试
+        inputs:
+          key: $inputs.template_id
+      - id: sensitive
+        # 生成阶段的声明式关键词快速拦截；正式内容安全门禁由 moderation 领域拥有。
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "'洗钱' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'代开发票' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'代开假发票' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'虚开发票' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'非法经营' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'诈骗' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'传销' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'赌博' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'毒品' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+            - expr: "'跑分' not in str(args.content)"
+              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+        inputs:
+          content: $inputs.form_data
+      - id: render
+        # 历史「边填边存」契约：模板必填项允许留空，由默认值补空（严格模式见算子参数）
+        operator: calc.sop.render_document
+        params: {enforce_required: false}
+        inputs:
+          template_id: $inputs.template_id
+          template: $nodes.template.entity
+          form_data: $inputs.form_data
+          user_id: $inputs.user_id
+      - id: create
+        operator: entity.create
+        params: {entity: sop.document}
+        inputs:
+          data: $nodes.render.document
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.document.rendered}
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.create.entity
+    edges:
+      - [auth, template]
+      - [template, sensitive]
+      - [sensitive, render]
+      - [render, create]
+      - [create, metric]
+      - [metric, response]
+
+  - scenario: OPC_SOP_DOCUMENT_DRAFT_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 文本编辑器起草：保存自由编辑的私有文书草稿（新建 / 更新 + 快照）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: template
+        operator: entity.get
+        params:
+          entity: sop.template
+          required: false
+        inputs:
+          key: $inputs.template_id
+      - id: current
+        operator: entity.get
+        params:
+          entity: sop.document
+          required: false
+        inputs:
+          key: $inputs.doc_id
+      - id: draft
+        operator: calc.sop.document_draft
+        inputs:
+          doc_id: $inputs.doc_id
+          title: $inputs.title
+          content: $inputs.content
+          template_id: $inputs.template_id
+          category: $inputs.category
+          current: $nodes.current.entity
+          template: $nodes.template.entity
+          user_id: $inputs.user_id
+      - id: save
+        operator: entity.upsert
+        params: {entity: sop.document}
+        inputs:
+          data: $nodes.draft.document
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.document.drafted}
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.save.entity
+    edges:
+      - [auth, template]
+      - [template, current]
+      - [current, draft]
+      - [draft, save]
+      - [save, metric]
+      - [metric, response]
+
+  - scenario: OPC_SOP_DOCUMENT_MINE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取创客已保存的文书历史列表
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.sop.query
+        params:
+          owner_field: user_id
+          order: "-created_at"
+          default_page_size: 100
+        inputs:
+          owner_id: $inputs.user_id
+          user_id: $context.user_id
+          page: $inputs.page
+          page_size: $inputs.page_size
+      - id: list
+        operator: entity.list
+        params: {entity: sop.document}
+        inputs:
+          filters: $nodes.query.filters
+          order: $nodes.query.order
+      - id: page
+        operator: calc.sop.page
+        inputs:
+          items: $nodes.list.items
+          total: $nodes.list.total
+          page: $nodes.query.page
+          page_size: $nodes.query.page_size
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "args.items"}
+        inputs:
+          items: $nodes.page.items
+    edges:
+      - [query, list]
+      - [list, page]
+      - [page, response]
+
+  - scenario: OPC_SOP_DOCUMENT_DETAIL_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 按 ID 获取已生成的文书实例
+    saga: false
+    nodes:
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.document
+          message: SOP 文书不存在
+        inputs:
+          key: $inputs.doc_id
+      - id: response
+        operator: response.build
+        params: {source: entity}
+        inputs:
+          entity: $nodes.load.entity
+    edges:
+      - [load, response]
+
+  - scenario: OPC_SOP_DOCUMENT_DELETE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 删除一条创客已保存的文书实例
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.document
+          message: SOP 文书不存在
+        inputs:
+          key: $inputs.doc_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.user_id
+      - id: delete
+        operator: entity.delete
+        params: {entity: sop.document}
+        inputs:
+          key: $nodes.load.id
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.document.deleted}
+      - id: response
+        operator: transform.derive
+        params: {output_key: response, expr: "{'deleted': args.deleted, 'doc_id': args.key}"}
+        inputs:
+          deleted: $nodes.delete.deleted
+          key: $nodes.delete.key
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, delete]
+      - [delete, metric]
+      - [metric, response]
+
+  # ---------------------------------------------------------------------------
+  # 发布审核：提交（文书 / 流程）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_DOCUMENT_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 发布「我的文书」至审核队列（作者取 context.user_id，管理员发布自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.document
+          message: SOP 文书不存在
+        inputs:
+          key: $inputs.doc_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.user_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [READY, REJECTED]
+          message: 该文书已在审核队列中或已发布，无需重复提交
+        inputs:
+          current: $nodes.load.entity.status
+      - id: content
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "len(args.content or '') > 0"
+              message: 文书正文为空，无法提交审核
+        inputs:
+          content: $nodes.load.entity.rendered_content
+      - id: submission
+        operator: calc.sop.review_submission
+        params: {target_type: DOCUMENT}
+        inputs:
+          target_type: DOCUMENT
+          target: $nodes.load.entity
+      - id: patch
+        operator: entity.patch
+        params: {entity: sop.document}
+        inputs:
+          data: $nodes.submission.target_patch
+      - id: enqueue
+        operator: entity.create
+        params: {entity: sop.review_item}
+        inputs:
+          data: $nodes.submission.review_item
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.document.submitted}
+      - id: response
+        operator: assemble.sop.review_submission_result
+        params: {pipeline: OPC_SOP_DOCUMENT_PUBLISH_PIPELINE}
+        inputs:
+          submission: $nodes.submission.response
+          item: $nodes.enqueue.entity
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, state]
+      - [state, content]
+      - [content, submission]
+      - [submission, patch]
+      - [patch, enqueue]
+      - [enqueue, metric]
+      - [metric, response]
+
+  - scenario: OPC_SOP_FLOW_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 发布「我的流程」至审核队列（作者取 context.user_id，管理员发布自动打官方标签）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: sop.flow
+          message: SOP 流程不存在
+        inputs:
+          key: $inputs.flow_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.owner_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [DRAFT, ACTIVE]
+          message: 该流程已在审核队列中或已发布，无需重复提交
+        inputs:
+          current: $nodes.load.entity.status
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: steps
+        operator: calc.sop.steps
+        inputs:
+          refs: $nodes.load.entity.node_refs
+          nodes: $nodes.nodes.items
+      - id: submission
+        operator: calc.sop.review_submission
+        params: {target_type: FLOW}
+        inputs:
+          target_type: FLOW
+          target: $nodes.load.entity
+          steps: $nodes.steps.items
+          missing: $nodes.steps.missing_nodes
+      - id: patch
+        operator: entity.patch
+        params: {entity: sop.flow}
+        inputs:
+          data: $nodes.submission.target_patch
+      - id: enqueue
+        operator: entity.create
+        params: {entity: sop.review_item}
+        inputs:
+          data: $nodes.submission.review_item
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.flow.submitted}
+      - id: response
+        operator: assemble.sop.review_submission_result
+        params: {pipeline: OPC_SOP_FLOW_PUBLISH_PIPELINE}
+        inputs:
+          submission: $nodes.submission.response
+          item: $nodes.enqueue.entity
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, state]
+      - [state, nodes]
+      - [nodes, steps]
+      - [steps, submission]
+      - [submission, patch]
+      - [patch, enqueue]
+      - [enqueue, metric]
+      - [metric, response]
+
+  # ---------------------------------------------------------------------------
+  # 发布审核：队列 / 处理 / 撤回
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_SOP_REVIEW_QUEUE_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 获取文书与流程发布审核队列（含合法性/合规性/敏感词审核状态）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: all
+        operator: entity.list
+        params:
+          entity: sop.review_item
+          query: {order: "-submitted_at"}
+      - id: query
+        operator: calc.sop.query
+        inputs:
+          status: $inputs.status
+      - id: list
+        operator: entity.list
+        params: {entity: sop.review_item}
+        inputs:
+          filters: $nodes.query.filters
+          order: "-submitted_at"
+      - id: queue
+        operator: assemble.sop.review_queue
+        inputs:
+          items: $nodes.list.items
+          all_items: $nodes.all.items
+    edges:
+      - [auth, all]
+      - [all, query]
+      - [query, list]
+      - [list, queue]
+
+  - scenario: OPC_SOP_REVIEW_PROCESS_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 审核处理：合规审核一条待审核提交（指定 item_id 或队首），通过后发布至标准目录
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: query
+        # 指定 item_id 时只处理该条；否则取队首待审核提交（后台消费者按 item_id 逐条驱动）。
+        operator: transform.derive
+        params:
+          output_key: filters
+          expr: "{'id': args.item_id} if args.item_id else {'status': 'PENDING_REVIEW'}"
+        inputs:
+          item_id: $inputs.item_id
+      - id: queue
+        operator: entity.list
+        params:
+          entity: sop.review_item
+          query: {order: "submitted_at"}
+        inputs:
+          filters: $nodes.query.filters
+          limit: 1
+      - id: picked
+        operator: transform.derive
+        params:
+          output_key: item_id
+          expr: "args.items[0]['id'] if args.items else ''"
+        inputs:
+          items: $nodes.queue.items
+      - id: item
+        operator: entity.get
+        params:
+          entity: sop.review_item
+          required: false
+        inputs:
+          key: $nodes.picked.item_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [PENDING_REVIEW]
+          message: 该审核项已处理，无需重复审核
+        inputs:
+          current: $nodes.item.entity.status
+        when: "nodes.item.entity"
+      - id: nodes
+        operator: entity.list
+        params: {entity: sop.node}
+      - id: document
+        operator: entity.get
+        params:
+          entity: sop.document
+          required: false
+        inputs:
+          key: $nodes.item.entity.target_id
+        when: "nodes.item.entity and nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: template
+        operator: entity.get
+        params:
+          entity: sop.template
+          required: false
+        inputs:
+          key: $nodes.document.entity.template_id
+        when: "nodes.item.entity and nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: flow
+        operator: entity.get
+        params:
+          entity: sop.flow
+          required: false
+        inputs:
+          key: $nodes.item.entity.target_id
+        when: "nodes.item.entity and nodes.item.entity.target_type == 'FLOW'"
+      - id: steps
+        operator: calc.sop.steps
+        inputs:
+          refs: $nodes.flow.entity.node_refs
+          nodes: $nodes.nodes.items
+        when: "nodes.item.entity and nodes.item.entity.target_type == 'FLOW'"
+      - id: screen
+        # 声明式敏感词快速拦截；平台两级内容安全门禁在消费者侧执行并通过 gate_* 传入。
+        operator: calc.sop.screen_content
+        params:
+          keywords: ["洗钱", "代开发票", "代开假发票", "虚开发票", "非法经营", "诈骗", "传销", "赌博", "毒品", "跑分"]
+        inputs:
+          content: $nodes.item.entity.content
+      - id: audit
+        operator: calc.sop.review_audit
+        inputs:
+          target_type: $nodes.item.entity.target_type
+          document: $nodes.document.entity
+          flow: $nodes.flow.entity
+          steps: $nodes.steps.items
+          missing: $nodes.steps.missing_nodes
+          gate_passed: $inputs.gate_passed
+          gate_reason: $inputs.gate_reason
+          screen_passed: $nodes.screen.passed
+          screen_reason: $nodes.screen.reason
+      - id: artifact_document
+        operator: calc.sop.published_document
+        inputs:
+          document: $nodes.document.entity
+          item: $nodes.item.entity
+          template: $nodes.template.entity
+        when: "nodes.audit.action == 'APPROVE' and nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: artifact_flow
+        operator: calc.sop.published_flow
+        inputs:
+          flow: $nodes.flow.entity
+          item: $nodes.item.entity
+          steps: $nodes.steps.items
+        when: "nodes.audit.action == 'APPROVE' and nodes.item.entity.target_type == 'FLOW'"
+      - id: artifacts
+        operator: transform.merge
+        inputs:
+          items:
+            - $nodes.artifact_document
+            - $nodes.artifact_flow
+      - id: transition
+        operator: calc.sop.review_transition
+        inputs:
+          current: $nodes.item.entity.status
+          action: $nodes.audit.action
+          reason: $nodes.audit.reason
+          target_type: $nodes.item.entity.target_type
+          target_id: $nodes.item.entity.target_id
+          item_id: $nodes.item.entity.id
+          title: $nodes.item.entity.title
+          published_id: $nodes.artifacts.published_id
+      - id: patch_item
+        operator: entity.patch
+        params: {entity: sop.review_item}
+        inputs:
+          data: $nodes.transition.item_patch
+      - id: patch_document
+        operator: entity.patch
+        params: {entity: sop.document}
+        inputs:
+          data: $nodes.transition.target_patch
+        when: "nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: patch_flow
+        operator: entity.patch
+        params: {entity: sop.flow}
+        inputs:
+          data: $nodes.transition.target_patch
+        when: "nodes.item.entity.target_type == 'FLOW'"
+      - id: publish_node
+        operator: entity.upsert
+        params: {entity: sop.node}
+        inputs:
+          data: $nodes.artifacts.node
+        when: "nodes.audit.action == 'APPROVE' and nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: publish_template
+        operator: entity.upsert
+        params: {entity: sop.template}
+        inputs:
+          data: $nodes.artifacts.template
+        when: "nodes.audit.action == 'APPROVE' and nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: publish_flow_template
+        operator: entity.upsert
+        params: {entity: sop.flow_template}
+        inputs:
+          data: $nodes.artifacts.flow_template
+        when: "nodes.audit.action == 'APPROVE' and nodes.item.entity.target_type == 'FLOW'"
+      - id: notify
+        # 审核通过才额外推送「已发布」通知；未通过/撤回由内容安全回执告知创客。
+        operator: notify.emit
+        params: {entity: notification.item, kind: REVIEW}
+        inputs:
+          recipient_id: $nodes.item.entity.author_id
+          title: $nodes.transition.notification.title
+          body: $nodes.transition.notification.body
+          link: $nodes.transition.notification.link
+        when: "nodes.transition.status == 'APPROVED'"
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.review.processed}
+      - id: result
+        operator: assemble.sop.review_result
+        params: {pipeline: OPC_SOP_REVIEW_PROCESS_PIPELINE}
+        inputs:
+          item_id: $nodes.item.entity.id
+          target_id: $nodes.item.entity.target_id
+          target_type: $nodes.item.entity.target_type
+          title: $nodes.item.entity.title
+          status: $nodes.transition.status
+          review_note: $nodes.transition.review_note
+          published_id: $nodes.artifacts.published_id
+    edges:
+      - [auth, query]
+      - [query, queue]
+      - [queue, picked]
+      - [picked, item]
+      - [item, state]
+      - [state, nodes]
+      - [nodes, document]
+      - [nodes, flow]
+      - [document, template]
+      - [flow, steps]
+      - [state, screen]
+      - [nodes, audit]
+      - [document, audit]
+      - [flow, audit]
+      - [template, audit]
+      - [steps, audit]
+      - [screen, audit]
+      - [audit, artifact_document]
+      - [audit, artifact_flow]
+      - [template, artifact_document]
+      - [steps, artifact_flow]
+      - [artifact_document, artifacts]
+      - [artifact_flow, artifacts]
+      - [audit, transition]
+      - [artifacts, transition]
+      - [transition, patch_item]
+      - [patch_item, patch_document]
+      - [patch_item, patch_flow]
+      - [document, patch_document]
+      - [flow, patch_flow]
+      - [patch_item, publish_node]
+      - [artifact_document, publish_node]
+      - [patch_item, publish_template]
+      - [artifact_document, publish_template]
+      - [patch_item, publish_flow_template]
+      - [artifact_flow, publish_flow_template]
+      - [patch_item, notify]
+      - [patch_document, notify]
+      - [patch_flow, notify]
+      - [publish_node, notify]
+      - [publish_template, notify]
+      - [publish_flow_template, notify]
+      - [notify, metric]
+      - [metric, result]
+      - [picked, result]
+
+  - scenario: OPC_SOP_REVIEW_WITHDRAW_PIPELINE
+    version: v1.0.0
+    domain: sop
+    description: 撤回发布审核提交，把文书/流程退回可编辑状态
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: item
+        operator: entity.get
+        params:
+          entity: sop.review_item
+          message: 发布审核项不存在
+        inputs:
+          key: $inputs.item_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.item.entity.author_id
+      - id: state
+        operator: guard.state
+        params:
+          allowed: [PENDING_REVIEW]
+          message: 该审核项已处理，无法撤回
+        inputs:
+          current: $nodes.item.entity.status
+      - id: transition
+        operator: calc.sop.review_transition
+        params: {action: WITHDRAW}
+        inputs:
+          current: $nodes.item.entity.status
+          action: WITHDRAW
+          target_type: $nodes.item.entity.target_type
+          target_id: $nodes.item.entity.target_id
+          item_id: $nodes.item.entity.id
+          title: $nodes.item.entity.title
+      - id: patch_item
+        operator: entity.patch
+        params: {entity: sop.review_item}
+        inputs:
+          data: $nodes.transition.item_patch
+      - id: document
+        operator: entity.get
+        params:
+          entity: sop.document
+          required: false
+        inputs:
+          key: $nodes.item.entity.target_id
+        when: "nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: flow
+        operator: entity.get
+        params:
+          entity: sop.flow
+          required: false
+        inputs:
+          key: $nodes.item.entity.target_id
+        when: "nodes.item.entity.target_type == 'FLOW'"
+      - id: patch_document
+        operator: entity.patch
+        params: {entity: sop.document}
+        inputs:
+          data: $nodes.transition.target_patch
+        when: "nodes.item.entity.target_type == 'DOCUMENT'"
+      - id: patch_flow
+        operator: entity.patch
+        params: {entity: sop.flow}
+        inputs:
+          data: $nodes.transition.target_patch
+        when: "nodes.item.entity.target_type == 'FLOW'"
+      - id: metric
+        operator: metric.incr
+        params: {metric: sop.review.withdrawn}
+      - id: result
+        operator: assemble.sop.review_result
+        params: {pipeline: OPC_SOP_REVIEW_WITHDRAW_PIPELINE}
+        inputs:
+          item_id: $nodes.item.entity.id
+          target_id: $nodes.item.entity.target_id
+          target_type: $nodes.item.entity.target_type
+          status: $nodes.transition.status
+          review_note: $nodes.transition.review_note
+    edges:
+      - [auth, item]
+      - [item, owner]
+      - [owner, state]
+      - [state, transition]
+      - [transition, patch_item]
+      - [patch_item, document]
+      - [patch_item, flow]
+      - [document, patch_document]
+      - [flow, patch_flow]
+      - [patch_item, metric]
+      - [patch_document, metric]
+      - [patch_flow, metric]
+      - [metric, result]

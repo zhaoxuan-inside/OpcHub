@@ -49,8 +49,9 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
     # Identity and the official badge are decided by the gateway context only;
     # payload-provided author/official fields are intentionally ignored.
     role = _text(context.get("user_role")).upper()
-    author_id = _text(context.get("user_id"))
-    author_name = _text(context.get("nickname")) or _text(args.get("author_name")) or "@创客"
+    is_admin = role == "ADMIN"
+    author_id = (_text(args.get("author_id")) if is_admin else "") or _text(context.get("user_id"))
+    author_name = ((_text(args.get("author_name")) if is_admin else "") or _text(context.get("nickname")) or "@创客")
     suffix = uuid.uuid4().hex[:8]
 
     if kind == KIND_LAW:
@@ -73,7 +74,7 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
             "hot_score": _as_int(args.get("hot_score")),
             "author_id": author_id,
             "author_name": author_name,
-            "is_official": role == "ADMIN",
+            "is_official": is_admin,
         }
 
     return {
@@ -89,7 +90,7 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
         "hot_score": _as_int(args.get("hot_score")),
         "author_id": author_id,
         "author_name": author_name,
-        "is_official": role == "ADMIN",
+        "is_official": is_admin,
     }
 
 

@@ -1,0 +1,894 @@
+# 晨光积分 / 会员 / 积分兑换业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 兼容约定：
+# * OPC_LOYALTY_AWARD_PIPELINE / REVOKE / REDEEM / SUBSCRIBE 沿用旧流水线码，
+#   供 core/gateway/adapters.py 的 _award_loyalty / _revoke_loyalty 继续调用。
+# * 积分规则（PointsRule）、会员套餐、兑换商品目录是配置资产，位于
+#   src/domains/loyalty/functions.py；商品库存作为 loyalty.item 实体持久化。
+# * 每次余额变更都是 append-only 流水 + 账户实体更新，幂等键写入流水，
+#   重复事件（含已撤销的正向流水）不会二次入账。
+
+scenarios:
+  # -------------------------------------------------------------------------
+  # 积分发放（发布 / 互动 / 阅读 / 任务）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_AWARD_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 积分发放（事件码/互动类型归一、目标作者解析、日/月/单目标上限、幂等、等级成长）
+    saga: false
+    nodes:
+      - id: event
+        operator: calc.loyalty.event
+        inputs:
+          event_code: $inputs.event_code
+          kind: $inputs.kind
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          user_id: $inputs.user_id
+          actor_id: $inputs.actor_id
+          quantity: $inputs.quantity
+      # 系统事件（阅读/被互动）允许无调用方身份，收件人来自内容作者。
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: target
+        operator: entity.get
+        params:
+          entity: $nodes.event.target_entity
+          required: false
+        when: nodes.event.target_entity
+        inputs:
+          key: $nodes.event.target_id
+      - id: resolve
+        operator: calc.loyalty.resolve
+        inputs:
+          event_code: $nodes.event.event_code
+          user_id: $nodes.event.user_id
+          actor_id: $nodes.event.actor_id
+          target_type: $nodes.event.target_type
+          target_id: $nodes.event.target_id
+          quantity: $nodes.event.quantity
+          idempotency_key: $inputs.idempotency_key
+          target: $nodes.target.entity
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $nodes.resolve.user_id
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $nodes.resolve.user_id
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+      - id: settle
+        operator: calc.loyalty.settle
+        inputs:
+          event_code: $nodes.resolve.event_code
+          user_id: $nodes.resolve.user_id
+          actor_id: $nodes.resolve.actor_id
+          target_type: $nodes.resolve.target_type
+          target_id: $nodes.resolve.target_id
+          target_title: $nodes.resolve.target_title
+          quantity: $nodes.resolve.quantity
+          idempotency_key: $nodes.resolve.idempotency_key
+          note: $inputs.note
+          account: $nodes.account.entity
+          membership: $nodes.membership.entity
+          ledger: $nodes.ledger.items
+      - id: create_ledger
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.account
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.award}
+      - id: result
+        operator: assemble.loyalty.award_result
+        inputs:
+          uid: $nodes.settle.uid
+          user_id: $nodes.settle.user_id
+          allowed: $nodes.settle.allowed
+          reason: $nodes.settle.reason
+          delta: $nodes.settle.delta
+          balance: $nodes.settle.balance
+          account: $nodes.settle.account
+          membership: $nodes.membership.entity
+          ledger: $nodes.ledger.items
+          ledger_id: $nodes.create_ledger.id
+    edges:
+      - [event, auth]
+      - [auth, target]
+      - [target, resolve]
+      - [resolve, account]
+      - [account, membership]
+      - [membership, ledger]
+      - [ledger, settle]
+      - [settle, create_ledger]
+      - [settle, save_account]
+      - [settle, metric]
+      - [create_ledger, metric]
+      - [save_account, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 积分冲销（取消互动 / 内容下架）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_REVOKE_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 积分冲销（按幂等键定位原流水、标记作废、追加反向流水、余额回滚）
+    saga: false
+    nodes:
+      - id: event
+        operator: calc.loyalty.event
+        inputs:
+          event_code: $inputs.event_code
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          user_id: $inputs.user_id
+          actor_id: $inputs.actor_id
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+      - id: accounts
+        operator: entity.list
+        params: {entity: loyalty.account}
+      - id: revoke
+        operator: calc.loyalty.revoke
+        inputs:
+          event_code: $nodes.event.event_code
+          user_id: $nodes.event.user_id
+          actor_id: $nodes.event.actor_id
+          target_type: $nodes.event.target_type
+          target_id: $nodes.event.target_id
+          idempotency_key: $inputs.idempotency_key
+          ledger: $nodes.ledger.items
+          accounts: $nodes.accounts.items
+      - id: mark_original
+        operator: entity.patch
+        params: {entity: loyalty.ledger}
+        when: nodes.revoke.revoked
+        inputs:
+          data: $nodes.revoke.original_patch
+      - id: create_reversal
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: nodes.revoke.revoked
+        inputs:
+          data: $nodes.revoke.ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: nodes.revoke.revoked
+        inputs:
+          data: $nodes.revoke.account
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.revoke}
+      - id: result
+        operator: assemble.loyalty.revoke_result
+        inputs:
+          revoked: $nodes.revoke.revoked
+          reason: $nodes.revoke.reason
+          delta: $nodes.revoke.delta
+          uid: $nodes.revoke.uid
+          balance: $nodes.revoke.balance
+          account: $nodes.revoke.account
+          ledger_id: $nodes.create_reversal.id
+    edges:
+      - [event, auth]
+      - [auth, ledger]
+      - [ledger, accounts]
+      - [accounts, revoke]
+      - [revoke, mark_original]
+      - [revoke, create_reversal]
+      - [revoke, save_account]
+      - [revoke, metric]
+      - [mark_original, metric]
+      - [create_reversal, metric]
+      - [save_account, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 积分兑换（会员时长 / 数字权益 / 实物周边）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_REDEEM_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 积分兑换（资格/库存/限购/地址/余额校验、扣减、订单、会员履约）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: item
+        operator: entity.get
+        params: {entity: loyalty.item, required: false}
+        inputs:
+          key: $inputs.item_code
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $context.user_id
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: orders
+        operator: entity.list
+        params: {entity: loyalty.order}
+      - id: redeem
+        operator: calc.loyalty.redeem
+        inputs:
+          uid: $context.user_id
+          item: $nodes.item.entity
+          qty: $inputs.qty
+          address: $inputs.address
+          idempotency_key: $inputs.idempotency_key
+          account: $nodes.account.entity
+          membership: $nodes.membership.entity
+          orders: $nodes.orders.items
+      - id: member
+        operator: calc.loyalty.membership
+        params: {action: REDEEM}
+        when: "nodes.redeem.allowed and nodes.redeem.membership_required and not nodes.redeem.duplicate"
+        inputs:
+          uid: $context.user_id
+          item: $nodes.redeem.item
+          item_code: $nodes.redeem.item.code
+          qty: $nodes.redeem.qty
+          membership: $nodes.membership.entity
+      - id: create_order
+        operator: entity.create
+        params: {entity: loyalty.order}
+        when: "nodes.redeem.allowed and not nodes.redeem.duplicate"
+        inputs:
+          data: $nodes.redeem.order
+      - id: link_ledger
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.redeem.ledger
+            - {ref_id: "$nodes.create_order.id"}
+        when: "nodes.redeem.allowed and not nodes.redeem.duplicate"
+      - id: create_ledger
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: "nodes.redeem.allowed and not nodes.redeem.duplicate"
+        inputs:
+          data: $nodes.link_ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: "nodes.redeem.allowed and not nodes.redeem.duplicate"
+        inputs:
+          data: $nodes.redeem.account
+      - id: patch_stock
+        operator: entity.patch
+        params: {entity: loyalty.item}
+        when: "nodes.redeem.allowed and not nodes.redeem.duplicate and nodes.redeem.stock_patch"
+        inputs:
+          data: $nodes.redeem.stock_patch
+      - id: save_membership
+        operator: entity.upsert
+        params: {entity: loyalty.membership}
+        when: "nodes.redeem.allowed and nodes.redeem.membership_required and not nodes.redeem.duplicate"
+        inputs:
+          data: $nodes.member.membership
+      - id: order_choice
+        operator: transform.derive
+        params: {expr: "args.created or args.existing", output_key: order}
+        inputs:
+          created: $nodes.create_order.entity
+          existing: $nodes.redeem.existing_order
+      - id: membership_choice
+        operator: transform.derive
+        params: {expr: "args.saved or args.current", output_key: membership}
+        inputs:
+          saved: $nodes.save_membership.entity
+          current: $nodes.membership.entity
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.redeem}
+      - id: result
+        operator: assemble.loyalty.redemption_result
+        inputs:
+          uid: $context.user_id
+          redeemed: $nodes.redeem.loyalty_redeemed
+          reason: $nodes.redeem.loyalty_reason
+          duplicate: $nodes.redeem.duplicate
+          order: $nodes.order_choice.order
+          account: $nodes.redeem.account
+          membership: $nodes.membership_choice.membership
+          membership_required: $nodes.redeem.membership_required
+          message: $nodes.redeem.message
+    edges:
+      - [auth, item]
+      - [item, account]
+      - [account, membership]
+      - [membership, orders]
+      - [orders, redeem]
+      - [redeem, member]
+      - [redeem, create_order]
+      - [create_order, link_ledger]
+      - [link_ledger, create_ledger]
+      - [redeem, save_account]
+      - [redeem, patch_stock]
+      - [member, save_membership]
+      - [create_order, order_choice]
+      - [redeem, order_choice]
+      - [save_membership, membership_choice]
+      - [membership, membership_choice]
+      - [redeem, metric]
+      - [create_ledger, metric]
+      - [save_account, metric]
+      - [patch_stock, metric]
+      - [save_membership, metric]
+      - [metric, result]
+      - [order_choice, result]
+      - [membership_choice, result]
+
+  # -------------------------------------------------------------------------
+  # 会员开通 / 续期（积分兑换或现金下单）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_SUBSCRIBE_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 会员开通 / 续期（套餐校验、档位不降级、积分扣减、现金待支付订单）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $context.user_id
+      - id: orders
+        operator: entity.list
+        params: {entity: loyalty.order}
+      - id: plan
+        operator: calc.loyalty.membership
+        params: {action: SUBSCRIBE}
+        inputs:
+          uid: $context.user_id
+          plan_code: $inputs.plan_code
+          pay_method: $inputs.pay_method
+          idempotency_key: $inputs.idempotency_key
+          membership: $nodes.membership.entity
+          account: $nodes.account.entity
+          orders: $nodes.orders.items
+      - id: create_order
+        operator: entity.create
+        params: {entity: loyalty.order}
+        when: "nodes.plan.allowed and not nodes.plan.duplicate"
+        inputs:
+          data: $nodes.plan.order
+      - id: link_ledger
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.plan.ledger
+            - {ref_id: "$nodes.create_order.id"}
+        when: "nodes.plan.allowed and not nodes.plan.duplicate and nodes.plan.ledger"
+      - id: create_ledger
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: "nodes.plan.allowed and not nodes.plan.duplicate and nodes.plan.ledger"
+        inputs:
+          data: $nodes.link_ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: "nodes.plan.allowed and not nodes.plan.duplicate and nodes.plan.ledger"
+        inputs:
+          data: $nodes.plan.account
+      - id: save_membership
+        operator: entity.upsert
+        params: {entity: loyalty.membership}
+        when: "nodes.plan.allowed and not nodes.plan.duplicate and not nodes.plan.payment_required"
+        inputs:
+          data: $nodes.plan.membership
+      - id: order_choice
+        operator: transform.derive
+        params: {expr: "args.created or args.existing", output_key: order}
+        inputs:
+          created: $nodes.create_order.entity
+          existing: $nodes.plan.existing_order
+      - id: membership_choice
+        operator: transform.derive
+        params: {expr: "args.saved or args.current", output_key: membership}
+        inputs:
+          saved: $nodes.save_membership.entity
+          current: $nodes.membership.entity
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.subscribe}
+      - id: result
+        operator: assemble.loyalty.subscription_result
+        inputs:
+          uid: $context.user_id
+          subscribed: $nodes.plan.allowed
+          reason: $nodes.plan.reason
+          duplicate: $nodes.plan.duplicate
+          order: $nodes.order_choice.order
+          account: $nodes.plan.account
+          membership: $nodes.membership_choice.membership
+          payment_required: $nodes.plan.payment_required
+          payment_amount_cny: $nodes.plan.payment_amount_cny
+    edges:
+      - [auth, membership]
+      - [membership, account]
+      - [account, orders]
+      - [orders, plan]
+      - [plan, create_order]
+      - [create_order, link_ledger]
+      - [link_ledger, create_ledger]
+      - [plan, save_account]
+      - [plan, save_membership]
+      - [create_order, order_choice]
+      - [plan, order_choice]
+      - [save_membership, membership_choice]
+      - [membership, membership_choice]
+      - [plan, metric]
+      - [create_ledger, metric]
+      - [save_account, metric]
+      - [save_membership, metric]
+      - [metric, result]
+      - [order_choice, result]
+      - [membership_choice, result]
+
+  # -------------------------------------------------------------------------
+  # 会员自动续费开关
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_AUTO_RENEW_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 开启 / 关闭会员自动续费
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: toggle
+        operator: calc.loyalty.membership
+        params: {action: AUTO_RENEW}
+        inputs:
+          uid: $context.user_id
+          enabled: $inputs.enabled
+          membership: $nodes.membership.entity
+      - id: check
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: args.allowed
+              message: 当前没有可续费的会员
+        inputs:
+          allowed: $nodes.toggle.allowed
+      - id: save
+        operator: entity.upsert
+        params: {entity: loyalty.membership}
+        inputs:
+          data: $nodes.toggle.membership
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.membership.auto_renew}
+      - id: result
+        operator: assemble.loyalty.auto_renew_result
+        inputs:
+          uid: $context.user_id
+          membership: $nodes.save.entity
+    edges:
+      - [auth, membership]
+      - [membership, toggle]
+      - [toggle, check]
+      - [check, save]
+      - [save, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 查询：账户 / 流水 / 规则 / 套餐 / 会员状态 / 商城 / 订单
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_ACCOUNT_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取当前创客的晨光积分余额、成长等级与会员状态
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $context.user_id
+      - id: level
+        operator: calc.loyalty.level
+        inputs:
+          growth: $nodes.account.entity.growth
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+        inputs:
+          filters: {uid: "$context.user_id"}
+      - id: assemble
+        operator: assemble.loyalty.account
+        inputs:
+          uid: $context.user_id
+          account: $nodes.account.entity
+          membership: $nodes.membership.entity
+          ledger: $nodes.ledger.items
+          level: $nodes.level.level
+          level_name: $nodes.level.level_name
+          next_level_growth: $nodes.level.next_level_growth
+          level_progress: $nodes.level.level_progress
+    edges:
+      - [auth, account]
+      - [account, level]
+      - [level, membership]
+      - [membership, ledger]
+      - [ledger, assemble]
+
+  - scenario: OPC_LOYALTY_LEDGER_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取当前创客的积分收支流水（事件码过滤 + 分页）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+        inputs:
+          filters: {uid: "$context.user_id"}
+          order: "-created_at"
+      - id: query
+        operator: calc.loyalty.query
+        inputs:
+          limit: $inputs.limit
+          offset: $inputs.offset
+          event_code: $inputs.event_code
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $context.user_id
+      - id: assemble
+        operator: assemble.loyalty.ledger
+        inputs:
+          uid: $context.user_id
+          items: $nodes.ledger.items
+          limit: $nodes.query.limit
+          offset: $nodes.query.offset
+          event_code: $nodes.query.event_code
+          balance: $nodes.account.entity.balance
+    edges:
+      - [auth, ledger]
+      - [ledger, query]
+      - [query, account]
+      - [account, assemble]
+
+  - scenario: OPC_LOYALTY_RULES_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取当前生效的积分获取规则与日/月上限
+    saga: false
+    nodes:
+      - id: assemble
+        operator: assemble.loyalty.rules
+    edges: []
+
+  - scenario: OPC_LOYALTY_MEMBERSHIP_PLANS_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取会员套餐与权益对比
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: assemble
+        operator: assemble.loyalty.plans
+        inputs:
+          membership: $nodes.membership.entity
+    edges:
+      - [auth, membership]
+      - [membership, assemble]
+
+  - scenario: OPC_LOYALTY_MEMBERSHIP_ME_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取当前创客的会员档位、到期日与权益
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $context.user_id
+      - id: assemble
+        operator: assemble.loyalty.membership
+        inputs:
+          uid: $context.user_id
+          membership: $nodes.membership.entity
+    edges:
+      - [auth, membership]
+      - [membership, assemble]
+
+  - scenario: OPC_LOYALTY_REWARDS_ITEMS_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取积分兑换商城目录与库存
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: items
+        operator: entity.list
+        params: {entity: loyalty.item}
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $context.user_id
+      - id: assemble
+        operator: assemble.loyalty.rewards
+        inputs:
+          items: $nodes.items.items
+          balance: $nodes.account.entity.balance
+    edges:
+      - [auth, items]
+      - [items, account]
+      - [account, assemble]
+
+  - scenario: OPC_LOYALTY_REWARDS_ORDERS_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 读取当前创客的积分兑换订单
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: orders
+        operator: entity.list
+        params: {entity: loyalty.order}
+        inputs:
+          filters: {uid: "$context.user_id"}
+          order: "-created_at"
+      - id: assemble
+        operator: assemble.loyalty.orders
+        inputs:
+          uid: $context.user_id
+          items: $nodes.orders.items
+    edges:
+      - [auth, orders]
+      - [orders, assemble]
+
+  # -------------------------------------------------------------------------
+  # 内容阅读奖励（同一读者同一内容每日一次）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_CONTENT_READ_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 记录内容阅读并为作者发放小额阅读积分（同一读者每日一次）
+    saga: false
+    nodes:
+      - id: event
+        operator: calc.loyalty.event
+        inputs:
+          event_code: RECEIVE_READ
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          actor_id: $context.user_id
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: target
+        operator: entity.get
+        params:
+          entity: $nodes.event.target_entity
+          required: false
+        when: nodes.event.target_entity
+        inputs:
+          key: $nodes.event.target_id
+      - id: resolve
+        operator: calc.loyalty.resolve
+        inputs:
+          event_code: $nodes.event.event_code
+          actor_id: $nodes.event.actor_id
+          target_type: $nodes.event.target_type
+          target_id: $nodes.event.target_id
+          target: $nodes.target.entity
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $nodes.resolve.user_id
+      - id: membership
+        operator: entity.get
+        params: {entity: loyalty.membership, required: false}
+        inputs:
+          key: $nodes.resolve.user_id
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+      - id: settle
+        operator: calc.loyalty.settle
+        inputs:
+          event_code: $nodes.resolve.event_code
+          user_id: $nodes.resolve.user_id
+          actor_id: $nodes.resolve.actor_id
+          target_type: $nodes.resolve.target_type
+          target_id: $nodes.resolve.target_id
+          target_title: $nodes.resolve.target_title
+          idempotency_key: $nodes.resolve.idempotency_key
+          account: $nodes.account.entity
+          membership: $nodes.membership.entity
+          ledger: $nodes.ledger.items
+      - id: create_ledger
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.account
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.content.read}
+      - id: result
+        operator: assemble.loyalty.read_result
+        inputs:
+          tracked: $nodes.resolve.user_id
+          allowed: $nodes.settle.allowed
+          reason: $nodes.settle.reason
+          delta: $nodes.settle.delta
+          balance: $nodes.settle.balance
+    edges:
+      - [event, auth]
+      - [auth, target]
+      - [target, resolve]
+      - [resolve, account]
+      - [account, membership]
+      - [membership, ledger]
+      - [ledger, settle]
+      - [settle, create_ledger]
+      - [settle, save_account]
+      - [settle, metric]
+      - [create_ledger, metric]
+      - [save_account, metric]
+      - [metric, result]
+
+  # -------------------------------------------------------------------------
+  # 管理端积分补发 / 扣回（全量审计，不受日常上限约束）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_LOYALTY_ADMIN_GRANT_PIPELINE
+    version: v1.0.0
+    domain: loyalty
+    description: 管理端积分补发 / 扣回（不受日常上限约束，写审计）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: permission
+        operator: guard.permission
+        params: {permission: "review:audit_all"}
+      - id: fields
+        operator: validate.fields
+        params:
+          fields:
+            uid: {type: string, required: true, min_length: 1}
+            delta: {type: integer, required: true}
+        inputs:
+          uid: $inputs.uid
+          delta: $inputs.delta
+      - id: account
+        operator: entity.get
+        params: {entity: loyalty.account, required: false}
+        inputs:
+          key: $inputs.uid
+      - id: ledger
+        operator: entity.list
+        params: {entity: loyalty.ledger}
+      - id: settle
+        operator: calc.loyalty.settle
+        params: {admin_mode: true}
+        inputs:
+          user_id: $inputs.uid
+          actor_id: $context.user_id
+          admin_mode: true
+          admin_delta: $inputs.delta
+          note: $inputs.reason
+          account: $nodes.account.entity
+          ledger: $nodes.ledger.items
+      - id: create_ledger
+        operator: entity.create
+        params: {entity: loyalty.ledger}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.ledger
+      - id: save_account
+        operator: entity.upsert
+        params: {entity: loyalty.account}
+        when: nodes.settle.allowed
+        inputs:
+          data: $nodes.settle.account
+      - id: metric
+        operator: metric.incr
+        params: {metric: loyalty.admin.grant}
+      - id: audit
+        operator: audit.write
+        params:
+          action: loyalty.admin.grant
+          permission: review:audit_all
+          resource_type: LOYALTY_ACCOUNT
+        inputs:
+          resource_id: $inputs.uid
+          detail:
+            delta: $inputs.delta
+            reason: $inputs.reason
+      - id: result
+        operator: assemble.loyalty.admin_result
+        inputs:
+          uid: $inputs.uid
+          allowed: $nodes.settle.allowed
+          delta: $nodes.settle.delta
+          account: $nodes.settle.account
+          ledger_id: $nodes.create_ledger.id
+    edges:
+      - [auth, permission]
+      - [permission, fields]
+      - [fields, account]
+      - [account, ledger]
+      - [ledger, settle]
+      - [settle, create_ledger]
+      - [settle, save_account]
+      - [settle, metric]
+      - [create_ledger, metric]
+      - [save_account, metric]
+      - [metric, audit]
+      - [audit, result]

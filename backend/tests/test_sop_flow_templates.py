@@ -4,10 +4,28 @@ A flow template is the curated, platform-authored counterpart of a user flow:
 an ordered set of node references that completes one business outcome. These
 power the "流程向导" workspace, which mirrors the standard-document workbench.
 """
+import asyncio
+
 import pytest
 
+from src.domains.orchestration.models import ScenarioExecuteRequest
+from src.domains.orchestration.service import orchestration_service
 from src.domains.sop.models import SOPFlowTemplate
 from src.domains.sop.service import sop_service
+
+
+def _toggle(user_id, target_type, target_id, kind):
+    """Run the unified interaction scenario (legacy service.toggle removed in v2)."""
+    res = asyncio.run(orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_INTERACTION_TOGGLE_PIPELINE",
+            version="v1.0.0",
+            inputs={"target_type": target_type, "target_id": target_id, "kind": kind},
+            context={"user_id": user_id, "user_role": "MAKER"},
+        )
+    ))
+    assert res.status == "SUCCESS", res.error_message
+    return res.final_output["response"]
 
 
 def test_flow_templates_are_seeded():
@@ -67,19 +85,19 @@ def test_flow_like_via_unified_interactions():
     flow_id = "flow_soft_copyright_only"
     baseline = sop_service.get_flow_template(flow_id).like_count
     try:
-        first = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
-        assert first.active is True
-        assert first.viewer.loved is True
-        assert sop_service.get_flow_template(flow_id).like_count == first.love_count
-        assert first.love_count == baseline + 1
+        first = _toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
+        assert first["active"] is True
+        assert first["viewer"]["loved"] is True
+        assert sop_service.get_flow_template(flow_id).like_count == first["love_count"]
+        assert first["love_count"] == baseline + 1
 
-        second = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
-        assert second.active is False
+        second = _toggle("usr_like_test", "SOP_FLOW", flow_id, "LOVE")
+        assert second["active"] is False
         assert sop_service.get_flow_template(flow_id).like_count == baseline
 
-        fav = content_interaction_service.toggle("usr_like_test", "SOP_FLOW", flow_id, "FAVORITE")
-        assert fav.active is True
-        assert fav.viewer.favorited is True
+        fav = _toggle("usr_like_test", "SOP_FLOW", flow_id, "FAVORITE")
+        assert fav["active"] is True
+        assert fav["viewer"]["favorited"] is True
     finally:
         content_interaction_service.clear()
 
@@ -90,7 +108,7 @@ def test_flow_catalog_counts_reflect_unified_sync():
     flow_id = "flow_full_lifecycle_compliance"
     baseline = sop_service.get_flow_template(flow_id).like_count
     try:
-        content_interaction_service.toggle("usr_mark_test", "SOP_FLOW", flow_id, "LOVE")
+        _toggle("usr_mark_test", "SOP_FLOW", flow_id, "LOVE")
         catalog = sop_service.list_flow_template_cards()
         target = next(i for i in catalog.items if i.id == flow_id)
         assert target.like_count == baseline + 1

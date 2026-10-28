@@ -56,10 +56,10 @@ class _ModerationIndex(dict):
     """
 
     def merged(self) -> Dict[str, ModerationItemResponse]:
-        docs = _entity_items()
-        # ``dict.items(self)`` reads the legacy cache without re-entering the
-        # overridden ``keys()`` / ``__iter__`` hooks (which would recurse).
-        docs.update(dict.items(self))
+        # Entity store is the authoritative source; the legacy cache only adds
+        # rows that were never migrated to the operator kernel.
+        docs = dict(dict.items(self))
+        docs.update(_entity_items())
         return docs
 
     def __setitem__(self, key: str, value: Any) -> None:

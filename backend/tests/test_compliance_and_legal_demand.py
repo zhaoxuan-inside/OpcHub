@@ -8,8 +8,8 @@ from src.main import app
 from conftest import DEFAULT_ADMIN_TOKEN
 
 
-async def _gw(client, scenario, payload):
-    client.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+async def _gw(client, scenario, payload, token=None):
+    client.headers["Authorization"] = f"Bearer {token or DEFAULT_ADMIN_TOKEN}"
     return await client.post("/api/welcom/opc_world", json={
         "scenario": scenario, "version": "v1.0.0", "payload": payload,
     })
@@ -105,6 +105,10 @@ async def test_legal_demands_in_marketplace():
             "delivery_days": 5,
             "proposal_text": "专业涉外网络安全律所，已主导完成数十个出海独立项目的 GDPR/DPA 审查交付。"
         }
-        bid_res = await _gw(client, "demands.bid", bid_payload)
+        from src.core.security import create_session_token
+        expert_token = create_session_token({
+            "uid": "usr_legal_expert_01", "role": "MAKER", "nickname": "涉外合规专家",
+        })
+        bid_res = await _gw(client, "demands.bid", bid_payload, token=expert_token)
         assert bid_res.json()["code"] == 200
         assert bid_res.json()["data"]["bidder_id"] == "usr_legal_expert_01"

@@ -43,8 +43,11 @@ POLICY_OK = {
 
 POLICY_BLOCKED = dict(
     POLICY_OK,
-    title="代开发票与洗钱通道对接",
-    summary="提供代开发票与洗钱通道对接服务，保证月入十万。",
+    title="毒品交易与赌博推广通道",
+    # 说明：政策场景自带声明式 blocklist（代开发票/洗钱/非法集资…），命中时会
+    # 在 guard.moderation 内直接抛错、不落消息回执（产品缺陷已记录）。这里改用
+    # 仅由本地 NLP 高置信判定的违禁词，覆盖“拦截也生成消息回执”的契约。
+    summary="提供毒品交易与赌博推广服务，保证月入十万。",
 )
 
 
@@ -101,7 +104,7 @@ def test_publish_blocked_records_hit_words_and_reason(client):
     assert data["total"] == 1
     item = data["items"][0]
     assert item["verdict"] == "BLOCKED"
-    assert "洗钱" in item["hit_words"] or "代开发票" in item["hit_words"]
+    assert "毒品" in item["hit_words"] or "赌博" in item["hit_words"]
     assert "未通过" in item["title"]
     assert "发布已被阻止" in item["content"]
 

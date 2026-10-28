@@ -123,4 +123,4 @@ routes:
     domain: "forum"
     description: "检索头脑风暴社区讨论帖（关键字降级；向量语义检索待通用 RAG 检索算子发布后切换）"
     is_default: true
-    pipeline: "OPC_FORUM_LIST_PIPELINE"
+    pipeline: "OPC_FORUM_SEMANTIC_SEARCH_PIPELINE"

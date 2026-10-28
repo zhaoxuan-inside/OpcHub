@@ -17,6 +17,8 @@ scenarios:
         inputs:
           budget_cny: $inputs.budget_cny
           deadline_days: $inputs.deadline_days
+          creator_id: $inputs.creator_id
+          creator_name: $inputs.creator_name
       - id: fields
         operator: validate.fields
         params:

@@ -72,6 +72,14 @@ async def test_prohibited_content_blocked_via_http():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧私有算子 moderation.inspect_content 已按设计移除；"
+        "纯函数预筛由 calc.moderation.prescreen / assemble.moderation.prescreen_decision "
+        "表达（覆盖见 tests/test_moderation_operator_flows.py 与 "
+        "tests/test_moderation_nlp_prescreen.py），HTTP mock 网关本身仍由本文件前序用例覆盖。"
+    )
+)
 async def test_microkernel_moderation_inspect_operator():
     """Verify microkernel operator 'moderation.inspect_content' uses HTTP mock service with mock_data."""
     mod_data = get_moderation_data()

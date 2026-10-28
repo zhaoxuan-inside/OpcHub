@@ -141,7 +141,17 @@ def test_all_domain_services_register_their_document_families():
         "moderation.items", "orchestration.dag_configs", "orchestration.layouts",
     }
     registered = set(persistence_mod.domain_persistence.domains)
-    assert expected.issubset(registered), f"missing: {expected - registered}"
+    # v2: entity-store backed families (e.g. products.items) persist through the
+    # generic SnapshotAdapter and declare their family in the EntitySpec instead
+    # of registering a legacy per-domain hydrator.
+    from src.core.entity import entity_store
+
+    entity_families = {entity_store.spec(name).family for name in entity_store.names}
+    missing = {
+        family for family in expected
+        if family not in registered and family not in entity_families
+    }
+    assert not missing, f"missing: {missing}"
 
 
 @pytest.mark.asyncio
@@ -152,6 +162,11 @@ async def test_hydrator_rebuilds_service_indexes(monkeypatch):
 
     from src.domains.products.service import product_service
     from src.domains.forum.service import forum_service
+
+    # Clear in-memory state BEFORE seeding the fake repository, because the
+    # entity-store views mirror deletes into persistence.
+    product_service._products.clear()
+    forum_service._votes.clear()
 
     fake.store["products.items"] = {
         "p1": {
@@ -168,9 +183,14 @@ async def test_hydrator_rebuilds_service_indexes(monkeypatch):
         }
     }
 
-    product_service._products.clear()
-    forum_service._votes.clear()
-    await persistence_mod.domain_persistence.initialize()
+    # Entity-store hydration is the v2 startup path (SnapshotAdapter families).
+    import src.infrastructure.database.repository as repository_mod
+    from src.core.entity import entity_store
+
+    monkeypatch.setattr(repository_mod, "db_repository", fake)
+    counts = await entity_store.initialize()
+    assert counts["product.item"] == 1
+    assert counts["forum.vote"] == 1
 
     assert product_service._products["p1"].title == "重建产品"
     assert product_service._products["p1"].upvote_count == 3

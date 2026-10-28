@@ -26,17 +26,11 @@ scenarios:
           subsidy_amount_max: $inputs.subsidy_amount_max
           eligible_conditions: $inputs.eligible_conditions
       - id: moderation
-        operator: validate.expression
+        operator: guard.moderation
         params:
-          conditions:
-            - expr: "'代开假发票' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
-              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
-            - expr: "'内嵌自设资金池' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
-              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
-            - expr: "'洗钱' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
-              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
-            - expr: "'非法集资' not in ((args.title or '') + ' ' + (args.summary or '') + ' ' + (args.legal_basis or ''))"
-              message: "内容合规校验未通过：发现敏感或禁止发布的关键词"
+          scene: 政策中心
+          fields: [title, summary, legal_basis]
+          blocklist: [代开假发票, 洗钱, 非法集资, 内嵌自设资金池]
         inputs:
           title: $inputs.title
           summary: $inputs.summary
@@ -55,6 +49,7 @@ scenarios:
           region: $inputs.region
           deadline: $inputs.deadline
           action_text: $inputs.action_text
+          author_id: $inputs.author_id
           author_name: $inputs.author_name
       - id: create
         operator: entity.create
@@ -105,21 +100,16 @@ scenarios:
           filters: $nodes.query.filters
           search: $nodes.query.search
       - id: page
-        operator: calc.policy.page
+        operator: assemble.policy.list
         inputs:
           items: $nodes.list.items
           total: $nodes.list.total
           page: $nodes.query.page
           page_size: $nodes.query.page_size
-      - id: response
-        operator: response.build
-        params: {source: page}
-        inputs:
-          page: $nodes.page
+          paged: $nodes.query.paged
     edges:
       - [query, list]
       - [list, page]
-      - [page, response]
 
   - scenario: OPC_POLICY_MATCH_PIPELINE
     version: v1.0.0

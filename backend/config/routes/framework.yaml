@@ -1,0 +1,44 @@
+# Framework governance scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "framework.hot-reload.status"
+    version: "v1.0.0"
+    domain: "framework"
+    description: "自省文件感知监听器状态、监控文件数及 STAGED 待生效变更"
+    is_default: true
+    pipeline: "OPC_FRAMEWORK_HOT_RELOAD_STATUS_PIPELINE"
+    required_permission: "data:schema_manage"
+
+  - gateway: "framework.hot-reload.scan"
+    version: "v1.0.0"
+    domain: "framework"
+    description: "主动触发一次文件系统 .py 变更感知与暂存"
+    is_default: true
+    pipeline: "OPC_FRAMEWORK_HOT_RELOAD_SCAN_PIPELINE"
+    required_permission: "data:schema_manage"
+
+  - gateway: "framework.hot-reload.activate"
+    version: "v1.0.0"
+    domain: "framework"
+    description: "跟随指定版本将处于 STAGED 状态的 Python 模块原子载入内存生效"
+    is_default: true
+    pipeline: "OPC_FRAMEWORK_HOT_RELOAD_ACTIVATE_PIPELINE"
+    required_permission: "data:schema_manage"
+
+  - gateway: "framework.gateway.reload"
+    version: "v1.0.0"
+    domain: "framework"
+    description: "网关与框架统一重载：感知文件变动、随版本原子加载模块并重载场景路由"
+    is_default: true
+    pipeline: "OPC_FRAMEWORK_GATEWAY_RELOAD_PIPELINE"
+    required_permission: "data:schema_manage"
+
+  - gateway: "gateway.rules"
+    version: "v1.0.0"
+    domain: "framework"
+    description: "自省统一网关当前已挂载的所有场景路由与版本策略"
+    is_default: true
+    pipeline: "OPC_GATEWAY_RULES_PIPELINE"
+    required_permission: "data:schema_manage"

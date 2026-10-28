@@ -61,10 +61,8 @@ class _PerkIndex(dict):
     """
 
     def merged(self) -> Dict[str, PerkResponse]:
-        docs = _entity_perks()
-        # ``dict.items(self)`` reads the legacy cache without re-entering the
-        # overridden ``keys()`` / ``__iter__`` hooks (which would recurse).
-        docs.update(dict.items(self))
+        docs = dict(dict.items(self))
+        docs.update(_entity_perks())
         return docs
 
     def __setitem__(self, key: str, value: Any) -> None:

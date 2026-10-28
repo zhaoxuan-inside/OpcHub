@@ -38,7 +38,7 @@ def test_home_overview_dispatched_via_gateway():
 
 @pytest.mark.asyncio
 async def test_home_overview_direct_microkernel_dag_execution():
-    """Verify that OPC_HOME_OVERVIEW_PIPELINE executes with 3 nodes via MicrokernelEngine."""
+    """Verify that OPC_HOME_OVERVIEW_PIPELINE executes its declarative entity nodes."""
     res = await orchestration_service.execute_scenario(
         ScenarioExecuteRequest(
             scenario_code="OPC_HOME_OVERVIEW_PIPELINE",
@@ -47,15 +47,19 @@ async def test_home_overview_direct_microkernel_dag_execution():
         )
     )
     assert res.status == "SUCCESS"
-    assert len(res.node_traces) == 3
     node_handlers = [trace.get("action_handler") if isinstance(trace, dict) else trace.action_handler for trace in res.node_traces]
+    # v2 拓扑：4 个 entity.count + 2 个 entity.list + assemble + response。
     assert node_handlers == [
-        "home.metrics.collector",
-        "home.sitemap.builder",
-        "home.overview.aggregator",
+        "entity.count",
+        "entity.count",
+        "entity.count",
+        "entity.count",
+        "entity.list",
+        "entity.list",
+        "assemble.home.overview",
+        "response.build",
     ]
-    final_output = res.final_output
-    assert final_output.get("orchestrated_by") == "OPC_HOME_OVERVIEW_PIPELINE"
+    final_output = res.final_output.get("response") or res.final_output
     assert len(final_output.get("quick_links", [])) >= 7
     # 指标必须来自真实服务数据而非硬编码：与各域服务当前规模一致
     from src.domains.products.service import product_service

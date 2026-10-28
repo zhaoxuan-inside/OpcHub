@@ -1,101 +1,46 @@
-"""DAG pipelines that orchestrate the loyalty atomic operators."""
+"""Compatibility entrypoint for the loyalty operator-kernel pipelines.
+
+The four legacy DAG codes are preserved because ``core/gateway/adapters.py``
+imports them by name; the actual topology now lives in
+``config/scenarios/loyalty.yaml`` and is compiled by the scenario loader.
+"""
 from __future__ import annotations
 
-from typing import Any, Dict
+import logging
+
+logger = logging.getLogger("opchub.loyalty.pipelines")
 
 AWARD_PIPELINE = "OPC_LOYALTY_AWARD_PIPELINE"
 REVOKE_PIPELINE = "OPC_LOYALTY_REVOKE_PIPELINE"
 REDEEM_PIPELINE = "OPC_LOYALTY_REDEEM_PIPELINE"
 SUBSCRIBE_PIPELINE = "OPC_LOYALTY_SUBSCRIBE_PIPELINE"
 
-LOYALTY_PIPELINES: Dict[str, Dict[str, Any]] = {
-    AWARD_PIPELINE: {
-        "topology": "DAG",
-        "entry_node": "step_identity",
-        "exit_node": "step_telemetry",
-        "enable_saga_compensation": True,
-        "nodes": [
-            {"id": "step_identity", "action_handler": "loyalty.identity_guard", "type": "GUARD"},
-            {"id": "step_event", "action_handler": "loyalty.event_resolve", "type": "BIZ"},
-            {"id": "step_guard", "action_handler": "loyalty.award_guard", "type": "GUARD"},
-            {"id": "step_settle", "action_handler": "loyalty.points_settle", "type": "STORAGE"},
-            {"id": "step_telemetry", "action_handler": "loyalty.telemetry.incr", "type": "BIZ"},
-        ],
-        "edges": [
-            {"from": "step_identity", "to": "step_event"},
-            {"from": "step_event", "to": "step_guard"},
-            {"from": "step_guard", "to": "step_settle"},
-            {"from": "step_settle", "to": "step_telemetry"},
-        ],
-    },
-    REVOKE_PIPELINE: {
-        "topology": "DAG",
-        "entry_node": "step_identity",
-        "exit_node": "step_telemetry",
-        "enable_saga_compensation": False,
-        "nodes": [
-            {"id": "step_identity", "action_handler": "loyalty.identity_guard", "type": "GUARD"},
-            {"id": "step_event", "action_handler": "loyalty.event_resolve", "type": "BIZ"},
-            {"id": "step_revoke", "action_handler": "loyalty.points_revoke", "type": "STORAGE"},
-            {"id": "step_telemetry", "action_handler": "loyalty.telemetry.incr", "type": "BIZ"},
-        ],
-        "edges": [
-            {"from": "step_identity", "to": "step_event"},
-            {"from": "step_event", "to": "step_revoke"},
-            {"from": "step_revoke", "to": "step_telemetry"},
-        ],
-    },
-    REDEEM_PIPELINE: {
-        "topology": "DAG",
-        "entry_node": "step_identity",
-        "exit_node": "step_telemetry",
-        "enable_saga_compensation": False,
-        "nodes": [
-            {"id": "step_identity", "action_handler": "loyalty.identity_guard", "type": "GUARD"},
-            {"id": "step_guard", "action_handler": "loyalty.redeem_guard", "type": "GUARD"},
-            {"id": "step_settle", "action_handler": "loyalty.redeem_settle", "type": "STORAGE"},
-            {"id": "step_telemetry", "action_handler": "loyalty.telemetry.incr", "type": "BIZ"},
-        ],
-        "edges": [
-            {"from": "step_identity", "to": "step_guard"},
-            {"from": "step_guard", "to": "step_settle"},
-            {"from": "step_settle", "to": "step_telemetry"},
-        ],
-    },
-    SUBSCRIBE_PIPELINE: {
-        "topology": "DAG",
-        "entry_node": "step_identity",
-        "exit_node": "step_telemetry",
-        "enable_saga_compensation": False,
-        "nodes": [
-            {"id": "step_identity", "action_handler": "loyalty.identity_guard", "type": "GUARD"},
-            {"id": "step_guard", "action_handler": "loyalty.subscribe_guard", "type": "GUARD"},
-            {"id": "step_settle", "action_handler": "loyalty.subscribe_settle", "type": "STORAGE"},
-            {"id": "step_telemetry", "action_handler": "loyalty.telemetry.incr", "type": "BIZ"},
-        ],
-        "edges": [
-            {"from": "step_identity", "to": "step_guard"},
-            {"from": "step_guard", "to": "step_settle"},
-            {"from": "step_settle", "to": "step_telemetry"},
-        ],
-    },
-}
+LOYALTY_PIPELINES = (
+    AWARD_PIPELINE,
+    REVOKE_PIPELINE,
+    REDEEM_PIPELINE,
+    SUBSCRIBE_PIPELINE,
+    "OPC_LOYALTY_AUTO_RENEW_PIPELINE",
+    "OPC_LOYALTY_ACCOUNT_PIPELINE",
+    "OPC_LOYALTY_LEDGER_PIPELINE",
+    "OPC_LOYALTY_RULES_PIPELINE",
+    "OPC_LOYALTY_MEMBERSHIP_PLANS_PIPELINE",
+    "OPC_LOYALTY_MEMBERSHIP_ME_PIPELINE",
+    "OPC_LOYALTY_REWARDS_ITEMS_PIPELINE",
+    "OPC_LOYALTY_REWARDS_ORDERS_PIPELINE",
+    "OPC_LOYALTY_CONTENT_READ_PIPELINE",
+    "OPC_LOYALTY_ADMIN_GRANT_PIPELINE",
+)
 
 
 def ensure_loyalty_pipelines() -> None:
-    """Idempotently seed the loyalty DAG pipelines (never overwrites admin edits)."""
-    from src.domains.orchestration.models import DAGConfigSaveRequest
-    from src.domains.orchestration.service import orchestration_service
+    """Idempotently compile the loyalty scenarios and seed their data assets."""
+    from src.core.scenario import ensure_scenarios_loaded
 
-    existing = {config.scenario_code for config in orchestration_service.list_dag_configs()}
-    for scenario_code, topology in LOYALTY_PIPELINES.items():
-        if scenario_code in existing:
-            continue
-        orchestration_service.save_dag_config(
-            DAGConfigSaveRequest(
-                scenario_code=scenario_code,
-                version="v1.0.0",
-                topology_graph=topology,
-                status="ACTIVE",
-            )
-        )
+    ensure_scenarios_loaded()
+    try:
+        from src.domains.loyalty.service import loyalty_service
+
+        loyalty_service.prepare_runtime()
+    except Exception as exc:  # pragma: no cover - data seeding is best effort
+        logger.warning("Loyalty runtime preparation skipped: %s", exc)

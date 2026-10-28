@@ -5,10 +5,28 @@ fillable documents. Provenance (author, publisher, official badge, publish date)
 and the interaction counters (like / favourite / real usage) come from the
 persisted catalog, never from frontend placeholders.
 """
+import asyncio
+
 import pytest
 
+from src.domains.orchestration.models import ScenarioExecuteRequest
+from src.domains.orchestration.service import orchestration_service
 from src.domains.sop.models import SOPNode
 from src.domains.sop.service import sop_service
+
+
+def _toggle(user_id, target_type, target_id, kind):
+    """Run the unified interaction scenario (legacy service.toggle removed in v2)."""
+    res = asyncio.run(orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_INTERACTION_TOGGLE_PIPELINE",
+            version="v1.0.0",
+            inputs={"target_type": target_type, "target_id": target_id, "kind": kind},
+            context={"user_id": user_id, "user_role": "MAKER"},
+        )
+    ))
+    assert res.status == "SUCCESS", res.error_message
+    return res.final_output["response"]
 
 
 def test_catalog_contains_documents_only():
@@ -89,20 +107,20 @@ def test_document_like_via_unified_interactions():
     baseline_like = sop_service.get_node(node_id).like_count
     baseline_fav = sop_service.get_node(node_id).favorite_count
     try:
-        first = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
-        assert first.active is True
-        assert first.viewer.loved is True
+        first = _toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
+        assert first["active"] is True
+        assert first["viewer"]["loved"] is True
         # 统一 LOVE 计数镜像到 SOP 节点的 like_count 字段
-        assert sop_service.get_node(node_id).like_count == first.love_count
-        assert first.love_count == baseline_like + 1
+        assert sop_service.get_node(node_id).like_count == first["love_count"]
+        assert first["love_count"] == baseline_like + 1
 
-        second = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
-        assert second.active is False
+        second = _toggle("usr_like_test", "SOP_DOCUMENT", node_id, "LOVE")
+        assert second["active"] is False
         assert sop_service.get_node(node_id).like_count == baseline_like
 
-        fav = content_interaction_service.toggle("usr_like_test", "SOP_DOCUMENT", node_id, "FAVORITE")
-        assert fav.active is True
-        assert fav.favorite_count == baseline_fav + 1
+        fav = _toggle("usr_like_test", "SOP_DOCUMENT", node_id, "FAVORITE")
+        assert fav["active"] is True
+        assert fav["favorite_count"] == baseline_fav + 1
     finally:
         content_interaction_service.clear()
 
@@ -114,7 +132,7 @@ def test_catalog_counts_reflect_unified_sync():
     node_id = "tpl_soft_copyright_application"
     baseline_like = sop_service.get_node(node_id).like_count
     try:
-        content_interaction_service.toggle("usr_mark_test", "SOP_DOCUMENT", node_id, "LOVE")
+        _toggle("usr_mark_test", "SOP_DOCUMENT", node_id, "LOVE")
         catalog = sop_service.list_document_cards()
         target = next(i for i in catalog.items if i.id == node_id)
         assert target.like_count == baseline_like + 1

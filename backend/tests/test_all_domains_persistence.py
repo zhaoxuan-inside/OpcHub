@@ -8,15 +8,15 @@ from src.main import app
 from conftest import DEFAULT_ADMIN_TOKEN
 
 
-async def _gw(ac, scenario, payload):
-    ac.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+async def _gw(ac, scenario, payload, token=None):
+    ac.headers["Authorization"] = f"Bearer {token or DEFAULT_ADMIN_TOKEN}"
     return await ac.post("/api/welcom/opc_world", json={
         "scenario": scenario, "version": "v1.0.0", "payload": payload,
     })
 
 
-async def _data(ac, scenario, payload):
-    res = await _gw(ac, scenario, payload)
+async def _data(ac, scenario, payload, token=None):
+    res = await _gw(ac, scenario, payload, token=token)
     body = res.json()
     assert body["code"] == 200, f"{scenario} -> {body}"
     return body["data"]
@@ -173,6 +173,13 @@ async def test_sop_templates_and_document_persistence():
         t_reg = next(t for t in data["templates"] if t["id"] == "tpl_individual_biz_reg")
         assert len(t_reg["required_fields"]) >= 4
 
+        # Identity now comes from the gateway context; use the test maker's token.
+        from src.core.security import create_session_token
+        maker_token = create_session_token({
+            "uid": "usr_test_persistence_01", "role": "MAKER",
+            "nickname": "持久化测试创客",
+        })
+
         # 2. Render and save document instance to backend
         form_payload = {
             "template_id": "tpl_individual_biz_reg",
@@ -184,17 +191,17 @@ async def test_sop_templates_and_document_persistence():
                 "registration_office": "杭州市市场监督管理局高新区分局",
             },
         }
-        doc = await _data(ac, "sop.document.render", form_payload)
+        doc = await _data(ac, "sop.document.render", form_payload, token=maker_token)
         doc_id = doc["id"]
         assert doc["compliance_passed"] is True
         assert "持久化测试（杭州）信息技术工作室" in doc["rendered_content"]
 
         # 3. Retrieve saved document by ID
-        fetched = await _data(ac, "sop.document.get", {"doc_id": doc_id})
+        fetched = await _data(ac, "sop.document.get", {"doc_id": doc_id}, token=maker_token)
         assert fetched["id"] == doc_id
 
         # 4. List user documents
-        docs = await _data(ac, "sop.document.list", {"user_id": "usr_test_persistence_01"})
+        docs = await _data(ac, "sop.document.list", {}, token=maker_token)
         assert any(d["id"] == doc_id for d in docs)
 
 
@@ -291,20 +298,33 @@ async def test_perks_and_claims():
         perks = await _data(ac, "perks.list", {})
         assert len(perks) >= 1
 
-        # 2. Claim perk
-        claim = await _data(ac, "perks.claim", {
-            "user_id": "usr_maker_test_88",
-            "perk_id": "perk_aws_activate",
+        from src.core.security import create_session_token
+        claimer_token = create_session_token({
+            "uid": "usr_maker_test_88", "role": "MAKER", "nickname": "领取测试创客",
         })
+
+        # 2. Claim perk (identity comes from the gateway context in v2)
+        claim = await _data(ac, "perks.claim", {
+            "perk_id": "perk_aws_activate",
+        }, token=claimer_token)
         assert "OPC-" in claim["voucher_code"]
         assert claim["status"] == "ACTIVATED"
 
-        # 3. Duplicate claim returns existing voucher
-        claim_dup = await _data(ac, "perks.claim", {
-            "user_id": "usr_maker_test_88",
+        # 3. Duplicate claim is rejected by guard.unique (v2 contract) and must
+        # not deduct quota or issue a second voucher.
+        dup = await _gw(ac, "perks.claim", {
             "perk_id": "perk_aws_activate",
-        })
-        assert claim_dup["voucher_code"] == claim["voucher_code"]
+        }, token=claimer_token)
+        dup_body = dup.json()
+        assert dup_body["code"] != 200
+        assert "领取" in (dup_body.get("message") or "")
+        from src.core.entity import entity_store
+        claims = [
+            row for row in entity_store.adapter("perk.claim").all()
+            if row.get("user_id") == "usr_maker_test_88"
+        ]
+        assert len(claims) == 1
+        assert claims[0]["voucher_code"] == claim["voucher_code"]
 
 
 @pytest.mark.asyncio

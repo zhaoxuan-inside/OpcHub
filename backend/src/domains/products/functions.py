@@ -22,7 +22,9 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
     description = str(args.get("description") or "").strip()
     price = float(args.get("price_cny") or 0.0)
     role = str(context.get("user_role") or "MAKER").upper()
-    author_id = str(context.get("user_id") or args.get("author_id") or "")
+    is_admin = role == "ADMIN"
+    author_id = str((args.get("author_id") if is_admin else None) or context.get("user_id") or "")
+    author_name = str((args.get("author_name") if is_admin else None) or context.get("nickname") or "@创客")
     return {
         "title": title,
         "tagline": tagline,
@@ -36,8 +38,8 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
         "official_url": args.get("official_url"),
         "download_url": args.get("download_url"),
         "author_id": author_id,
-        "author_name": args.get("author_name") or context.get("nickname") or "@创客",
-        "is_official": role == "ADMIN",
+        "author_name": author_name,
+        "is_official": is_admin,
         "screenshots": args.get("screenshots") or [],
         "status": "PUBLISHED",
     }
@@ -58,7 +60,20 @@ def query(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any])
         "search": (args.get("search") or "").strip() or None,
         "page": int(args.get("page") or 1),
         "page_size": int(args.get("page_size") or 6),
+        "paged": args.get("page") is not None or args.get("page_size") is not None,
     }
+
+
+@operator(
+    "assemble.product.list",
+    category="ASSEMBLE",
+    description="Project products as a flat list (legacy) or a paged envelope",
+)
+def list_response(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    items = [dict(item) for item in (args.get("items") or []) if isinstance(item, dict)]
+    if not args.get("paged"):
+        return {"response": items}
+    return {"response": page({}, args, {})}
 
 
 @operator(

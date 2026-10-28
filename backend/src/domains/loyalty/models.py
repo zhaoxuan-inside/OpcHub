@@ -172,6 +172,7 @@ class RedemptionOrder(BaseModel):
     address: Optional[Any] = None
     tracking_no: str = ""
     note: str = ""
+    idempotency_key: str = ""
     created_at: str = ""
     updated_at: str = ""
 

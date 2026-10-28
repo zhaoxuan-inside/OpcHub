@@ -90,6 +90,10 @@ def parse_identity(token: Optional[str]) -> Dict[str, Any]:
         "role": normalize_role(payload.get("role", "USER")),
         "authenticated": True,
         "must_change_password": bool(payload.get("must_change_password", False)),
+        "nickname": payload.get("nickname", ""),
+        "email": payload.get("email", ""),
+        "company_name": payload.get("company_name", ""),
+        "account_type": payload.get("account_type", "MAKER"),
     }
 
 

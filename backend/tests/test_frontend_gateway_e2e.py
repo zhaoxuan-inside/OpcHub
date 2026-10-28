@@ -38,14 +38,17 @@ def seed_e2e_dependencies():
         quota_remaining=150,
     )
 
-    compliance_service._checkpoints = [
+    # v2: `_checkpoints` is a live view over the entity store; mutate through it
+    # instead of replacing the attribute with a plain list.
+    compliance_service._checkpoints.clear()
+    compliance_service._checkpoints.extend([
         AuditCheckItem(
             id=f"chk_{i:02d}", dimension_id=f"dim_{i}",
             title=f"测试检查点 {i}", description="d",
             severity="HIGH", weight=10, advice="a", legal_basis="l",
         )
         for i in range(1, 11)
-    ]
+    ])
 
     sop_service._templates.clear()
     sop_service._documents.clear()
@@ -66,7 +69,7 @@ def seed_e2e_dependencies():
     yield
     perk_service._perks.clear()
     perk_service._claims.clear()
-    compliance_service._checkpoints = []
+    compliance_service._checkpoints.clear()
     sop_service._templates.clear()
     sop_service._documents.clear()
 
@@ -246,9 +249,14 @@ def test_frontend_no_fake_data_and_profile_persistence_e2e():
     test_uid = reg_payload["uid"]
     test_token = reg_payload["token"]
     assert test_uid
-    # Verify UID is in standard UUID format
-    assert uuid.UUID(test_uid)
+    # v2 uids are namespaced strings (usr_<hex>), no longer bare UUIDs
+    assert test_uid.startswith("usr_")
+    assert len(test_uid) > len("usr_")
     assert test_token
+
+    # v2: profile mutations bind identity from the gateway context, so act as the
+    # freshly registered maker instead of the default injected ADMIN.
+    client.headers["Authorization"] = f"Bearer {test_token}"
 
     # 3. Retrieve user profile via user.profile gateway scenario
     prof_resp = client.post("/api/welcom/opc_world", json={

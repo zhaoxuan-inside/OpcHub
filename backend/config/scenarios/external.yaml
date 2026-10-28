@@ -1,0 +1,176 @@
+# 外部生态网关（AI / 支付 / 政务 / RAG）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 边界：
+# * 所有第三方访问都发生在 `core/operators/external.py` 背后的防腐蚀网关里；
+#   本文件只做输入映射与 `response.build`，不写 URL、密钥、账号或模型凭据。
+# * 旧路由直接返回第三方原始结果，因此 `response.build(source=...)` 保持原字段
+#   （reply_text / plain_summary / charter_text / escrow_channel / doc_code /
+#   results / ai_answer 等）；统一网关会取 `response` 作为对外数据。
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # SiliconFlow AI 对话推理
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_SILICONFLOW_CHAT_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 调用 SiliconFlow 硅基流动 AI 算力进行对话推理与生成
+    saga: false
+    nodes:
+      - id: chat
+        operator: external.ai.chat
+        inputs:
+          messages: $inputs.messages
+          prompt: $inputs.prompt
+          model: $inputs.model
+      - id: response
+        operator: response.build
+        params: {source: ai}
+        inputs:
+          ai: $nodes.chat.ai
+    edges:
+      - [chat, response]
+
+  # ---------------------------------------------------------------------------
+  # SiliconFlow AI 政策公文白话提炼
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_SILICONFLOW_SUMMARIZE_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 调用 SiliconFlow 硅基流动 AI 算力提炼政策公文大白话要点
+    saga: false
+    nodes:
+      - id: summarize
+        operator: external.ai.summarize
+        inputs:
+          title: $inputs.title
+          full_text: $inputs.full_text
+      - id: response
+        operator: response.build
+        params: {source: summary}
+        inputs:
+          summary: $nodes.summarize.summary
+    edges:
+      - [summarize, response]
+
+  # ---------------------------------------------------------------------------
+  # SiliconFlow AI 一人有限责任公司章程起草
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_SILICONFLOW_CHARTER_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 调用 SiliconFlow 硅基流动 AI 算力生成一人有限责任公司章程条款
+    saga: false
+    nodes:
+      - id: charter
+        operator: external.ai.charter
+        # 仅提供缺省业务文本，模型与密钥仍由网关托管。
+        params:
+          company_name: 杭州超级个体科技有限公司
+          biz_scope: 软件研发与人工智能算法服务
+          registered_capital_cny: 100000.0
+        inputs:
+          company_name: $inputs.company_name
+          biz_scope: $inputs.biz_scope
+          registered_capital_cny: $inputs.registered_capital_cny
+      - id: response
+        operator: response.build
+        params: {source: charter}
+        inputs:
+          charter: $nodes.charter.charter
+    edges:
+      - [charter, response]
+
+  # ---------------------------------------------------------------------------
+  # 分账结算（微信支付分账 / Stripe Connect）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_PAYMENT_SPLIT_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 执行微信支付分账或 Stripe Connect 跨境分账结算（防资金池合规）
+    saga: false
+    nodes:
+      - id: split
+        operator: external.payment.split
+        inputs:
+          order_id: $inputs.order_id
+          amount_cny: $inputs.amount_cny
+          merchant_account: $inputs.merchant_account
+          maker_account: $inputs.maker_account
+          channel: $inputs.channel
+      - id: response
+        operator: response.build
+        params: {source: payment}
+        inputs:
+          payment: $nodes.split.payment
+    edges:
+      - [split, response]
+
+  # ---------------------------------------------------------------------------
+  # 国家税务总局税费减免公告抓取
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_GOV_SAT_POLICY_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 官方渠道爬取并结构化国家税务总局税费减免公告文件
+    saga: false
+    nodes:
+      - id: fetch
+        operator: external.gov.fetch_announcement
+        inputs:
+          year: $inputs.year
+          num: $inputs.num
+      - id: response
+        operator: response.build
+        params: {source: announcement}
+        inputs:
+          announcement: $nodes.fetch.announcement
+    edges:
+      - [fetch, response]
+
+  # ---------------------------------------------------------------------------
+  # 政策中心向量混合召回
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_RAG_POLICY_SEARCH_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 基于轻量向量引擎与余弦相似度检索政策中心公文库（RAG 混合召回）
+    saga: false
+    nodes:
+      - id: search
+        operator: external.rag.policy_search
+        inputs:
+          query: $inputs.query
+          top_k: $inputs.top_k
+          region: $inputs.region
+          category: $inputs.category
+      - id: response
+        operator: response.build
+        params: {source: results}
+        inputs:
+          results: $nodes.search.results
+    edges:
+      - [search, response]
+
+  # ---------------------------------------------------------------------------
+  # 社区经验 RAG 智能问答
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_EXTERNAL_RAG_FORUM_QA_PIPELINE
+    version: v1.0.0
+    domain: external
+    description: 基于轻量向量引擎与大模型协同的一人公司互助社区经验 RAG 智能问答
+    saga: false
+    nodes:
+      - id: answer
+        operator: external.rag.forum_qa
+        inputs:
+          question: $inputs.question
+          top_k: $inputs.top_k
+      - id: response
+        operator: response.build
+        params: {source: answer}
+        inputs:
+          answer: $nodes.answer.answer
+    edges:
+      - [answer, response]

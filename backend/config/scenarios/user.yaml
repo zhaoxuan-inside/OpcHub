@@ -1,0 +1,211 @@
+# 创客档案与商业权益（资料 / 权益激活）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# * `user.account` 是 SQL users 表上的自定义 EntityAdapter 实体。
+# * 权益目录 `user.entitlement` 与用户授权 `user.entitlement_grant` 分离：
+#   档案读取按授权窗口实时计算 is_active，不再依赖进程内全局集合。
+
+scenarios:
+  # ---------------------------------------------------------------------------
+  # 创客档案读取（含权益有效窗口）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_USER_PROFILE_PIPELINE
+    version: v1.0.0
+    domain: user
+    description: 获取创客个人主体档案与已激活权益（未登录返回访客档案）
+    saga: false
+    nodes:
+      - id: query
+        operator: calc.user.profile_query
+        inputs:
+          user_id: $inputs.user_id
+      - id: load
+        operator: entity.get
+        params: {entity: user.account, required: false}
+        when: nodes.query.uid
+        inputs:
+          key: $nodes.query.uid
+      - id: catalog
+        operator: entity.list
+        params:
+          entity: user.entitlement
+          query: {limit: 0}
+      - id: grants
+        operator: entity.list
+        params:
+          entity: user.entitlement_grant
+          query: {limit: 0}
+        when: nodes.query.uid
+        inputs:
+          filters: {user_id: $nodes.query.uid}
+      - id: profile
+        operator: calc.user.profile
+        inputs:
+          uid: $nodes.query.uid
+          user: $nodes.load.entity
+          catalog: $nodes.catalog.items
+          grants: $nodes.grants.items
+      - id: response
+        operator: assemble.user.profile
+        params: {pipeline: OPC_USER_PROFILE_PIPELINE}
+        inputs:
+          profile: $nodes.profile
+      - id: metric
+        operator: metric.incr
+        params: {metric: user.profile.read}
+    edges:
+      - [query, load]
+      - [query, catalog]
+      - [query, grants]
+      - [load, profile]
+      - [catalog, profile]
+      - [grants, profile]
+      - [profile, response]
+      - [response, metric]
+
+  # ---------------------------------------------------------------------------
+  # 创客资料更新（头像/昵称/主体信息）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_USER_PROFILE_UPDATE_PIPELINE
+    version: v1.0.0
+    domain: user
+    description: 更新创客基本信息与主体档案（限本人）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: session
+        operator: calc.auth.session
+        params: {mode: parse}
+        inputs:
+          token: $inputs.token
+      - id: normalize
+        operator: calc.user.profile_update
+        inputs:
+          user_id: $inputs.user_id
+          nickname: $inputs.nickname
+          phone: $inputs.phone
+          company_name: $inputs.company_name
+          credit_code: $inputs.credit_code
+          industry_track: $inputs.industry_track
+          avatar_id: $inputs.avatar_id
+          session: $nodes.session
+      - id: save
+        operator: entity.upsert
+        params: {entity: user.account}
+        inputs:
+          data: $nodes.normalize.account
+      - id: catalog
+        operator: entity.list
+        params:
+          entity: user.entitlement
+          query: {limit: 0}
+      - id: grants
+        operator: entity.list
+        params:
+          entity: user.entitlement_grant
+          query: {limit: 0}
+        inputs:
+          filters: {user_id: $nodes.save.entity.uid}
+      - id: profile
+        operator: calc.user.profile
+        inputs:
+          uid: $nodes.save.entity.uid
+          user: $nodes.save.entity
+          catalog: $nodes.catalog.items
+          grants: $nodes.grants.items
+      - id: response
+        operator: assemble.user.profile
+        params: {pipeline: OPC_USER_PROFILE_UPDATE_PIPELINE}
+        inputs:
+          profile: $nodes.profile
+      - id: audit
+        operator: audit.write
+        params:
+          action: user.profile.update
+          resource_type: user
+        inputs:
+          resource_id: $nodes.save.entity.uid
+    edges:
+      - [auth, session]
+      - [session, normalize]
+      - [normalize, save]
+      - [save, catalog]
+      - [catalog, grants]
+      - [grants, profile]
+      - [profile, response]
+      - [response, audit]
+
+  # ---------------------------------------------------------------------------
+  # 商业权益激活（幂等授权 + 档案镜像 + 收据）
+  # ---------------------------------------------------------------------------
+  - scenario: OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE
+    version: v1.0.0
+    domain: user
+    description: 激活创客专属商业权益与特权门禁，写入授权记录并镜像到档案
+    saga: true
+    nodes:
+      # 网关已完成 RBAC/ABAC；直接调用场景时允许以 payload.user_id 指定主体，
+      # 若请求携带登录身份则只允许本人（ADMIN 例外），由下方纯函数裁决。
+      - id: target
+        operator: calc.user.profile_query
+        inputs:
+          user_id: $inputs.user_id
+      - id: auth
+        operator: guard.authn
+        params: {required: false}
+      - id: account
+        operator: entity.get
+        params: {entity: user.account, required: false}
+        inputs:
+          key: $nodes.target.uid
+      - id: catalog
+        operator: entity.list
+        params:
+          entity: user.entitlement
+          query: {limit: 0}
+      - id: decision
+        operator: calc.user.entitlement_activate
+        inputs:
+          user_id: $nodes.target.uid
+          entitlement_id: $inputs.entitlement_id
+          entitlement_code: $inputs.entitlement_code
+          user: $nodes.account.entity
+          catalog: $nodes.catalog.items
+      - id: grant
+        operator: entity.upsert
+        params: {entity: user.entitlement_grant}
+        inputs:
+          data: $nodes.decision.grant
+      - id: patch
+        operator: entity.patch
+        params: {entity: user.account}
+        when: nodes.account.found
+        inputs:
+          data: $nodes.decision.patch
+      - id: response
+        operator: assemble.user.entitlement
+        params: {pipeline: OPC_USER_ENTITLEMENT_ACTIVATE_PIPELINE}
+        inputs:
+          activation: $nodes.decision.activation
+      - id: metric
+        operator: metric.incr
+        params: {metric: user.entitlement.activated}
+      - id: audit
+        operator: audit.write
+        params:
+          action: user.entitlement.activate
+          resource_type: user_entitlement
+        inputs:
+          resource_id: $nodes.decision.activation.entitlement_id
+    edges:
+      - [target, auth]
+      - [auth, account]
+      - [account, catalog]
+      - [catalog, decision]
+      - [decision, grant]
+      - [grant, patch]
+      - [grant, response]
+      - [patch, response]
+      - [response, metric]
+      - [metric, audit]

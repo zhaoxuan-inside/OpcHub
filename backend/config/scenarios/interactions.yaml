@@ -1,0 +1,881 @@
+# 统一互动（点赞/收藏/喜欢/踩/评分/评论）业务编排资产
+# 业务 = 算子编排；算子只做单件事，业务规则由本文件声明。
+#
+# 迁移说明（算子内核 v2）：
+# * 计数（like/favorite/love/comment/dislike/rating）由纯函数增量计算，
+#   写入 `interaction.stat`（复合键 target_type + target_id），不再由 service 隐式维护。
+# * 互动记录/评分/评论分别是 `interaction.record`、`interaction.rating`、`content.comment`
+#   实体；取消点赞 = 删除记录行，重复评分 = upsert 覆盖。
+# * 跨域计数回写：`calc.interaction.target` 产出 {entity, key, patch}，
+#   由 `entity.patch` 以动态实体名回写 product/policy/demand/forum/perk 等目标；
+#   目标实体未迁移（SOP）或不存在时 `found=false`，回写节点被 when 跳过，不影响主流程。
+# * 积分联动属于 loyalty 域，本文件不 import、不编排，由上层场景组合处理。
+
+scenarios:
+  # -------------------------------------------------------------------------
+  # 互动切换：LIKE / FAVORITE / LOVE / DISLIKE
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_TOGGLE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 统一切换公开内容互动（点赞/收藏/喜欢/踩），增量维护计数并回写目标实体
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      # calc.interaction.toggle 第一次调用只做请求归一化（target_type/kind/user_id），
+      # 结果供后续 entity.get 使用；第二次调用才做真正的切换决策。
+      - id: request
+        operator: calc.interaction.toggle
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+          kind: $inputs.kind
+          user_id: $context.user_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+      - id: record
+        operator: entity.get
+        params: {entity: interaction.record, required: false}
+        inputs:
+          user_id: $nodes.request.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          kind: $nodes.request.kind
+      - id: rating
+        operator: entity.get
+        params: {entity: interaction.rating, required: false}
+        inputs:
+          user_id: $nodes.request.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      # 目标实体可能未迁移或已删除：required=false，存在性由下面的 check 统一裁决。
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.target.entity, required: false}
+        when: nodes.target.exists
+        inputs:
+          key: $nodes.target.key.id
+      - id: seed
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: decision
+        operator: calc.interaction.toggle
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          kind: $nodes.request.kind
+          user_id: $nodes.request.user_id
+          target_title: $inputs.target_title
+          target: $nodes.target_load.entity
+          existing: $nodes.record.entity
+          counts: $nodes.seed.counts
+      - id: check
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not args.exists or args.found"
+              message: 互动目标不存在或已被删除
+        inputs:
+          exists: $nodes.target.exists
+          found: $nodes.target_load.found
+      - id: create_record
+        operator: entity.create
+        params: {entity: interaction.record}
+        when: nodes.decision.active
+        inputs:
+          data: $nodes.decision.record
+      - id: delete_record
+        operator: entity.delete
+        params: {entity: interaction.record}
+        when: "not nodes.decision.active"
+        inputs:
+          user_id: $nodes.decision.user_id
+          target_type: $nodes.decision.target_type
+          target_id: $nodes.decision.target_id
+          kind: $nodes.decision.kind
+      - id: save_stat
+        operator: entity.upsert
+        params: {entity: interaction.stat}
+        inputs:
+          data: $nodes.decision.stat
+      - id: records
+        operator: entity.list
+        params: {entity: interaction.record}
+        inputs:
+          filters:
+            user_id: $nodes.request.user_id
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+      - id: comments
+        operator: entity.list
+        params: {entity: content.comment}
+        inputs:
+          filters:
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+            author_id: $nodes.request.user_id
+      - id: state
+        operator: calc.interaction.state
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.decision.counts
+          records: $nodes.records.items
+          comments: $nodes.comments.items
+          rating: $nodes.rating.entity
+          viewer_id: $nodes.request.user_id
+      - id: backfill
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.decision.counts
+          target: $nodes.target_load.entity
+      - id: write_target
+        operator: entity.patch
+        params: {entity: $nodes.backfill.entity}
+        when: nodes.backfill.found
+        inputs:
+          data: $nodes.backfill.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: interaction.toggled}
+      - id: result
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.state
+            - kind: $nodes.decision.kind
+              active: $nodes.decision.active
+              count: $nodes.decision.count
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.result
+    edges:
+      - [auth, request]
+      - [request, stat]
+      - [request, target]
+      - [request, record]
+      - [request, rating]
+      - [request, comments]
+      - [target, target_load]
+      - [stat, seed]
+      - [target_load, seed]
+      - [record, decision]
+      - [seed, decision]
+      - [target, check]
+      - [target_load, check]
+      - [check, create_record]
+      - [decision, create_record]
+      - [check, delete_record]
+      - [decision, delete_record]
+      - [decision, save_stat]
+      - [create_record, save_stat]
+      - [delete_record, save_stat]
+      - [create_record, records]
+      - [delete_record, records]
+      - [records, state]
+      - [comments, state]
+      - [rating, state]
+      - [decision, state]
+      - [decision, backfill]
+      - [target_load, backfill]
+      - [backfill, write_target]
+      - [write_target, metric]
+      - [save_stat, metric]
+      - [state, result]
+      - [decision, result]
+      - [result, response]
+      - [metric, response]
+
+  # -------------------------------------------------------------------------
+  # 1-5 星评分
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_RATE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 对公开内容提交/更新 1-5 星评分（覆盖而非重复计数）
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: rating_load
+        operator: entity.get
+        params: {entity: interaction.rating, required: false}
+        inputs:
+          user_id: $context.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.request.entity, required: false}
+        when: nodes.request.exists
+        inputs:
+          key: $nodes.request.key.id
+      - id: seed
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: check
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not args.exists or args.found"
+              message: 评分目标不存在或已被删除
+        inputs:
+          exists: $nodes.request.exists
+          found: $nodes.target_load.found
+      - id: rating
+        operator: calc.interaction.rating
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          user_id: $context.user_id
+          score: $inputs.score
+          counts: $nodes.seed.counts
+          previous: $nodes.rating_load.entity.score
+      - id: save_rating
+        operator: entity.upsert
+        params: {entity: interaction.rating}
+        inputs:
+          data: $nodes.rating.rating
+      - id: save_stat
+        operator: entity.upsert
+        params: {entity: interaction.stat}
+        inputs:
+          data: $nodes.rating.stat
+      - id: records
+        operator: entity.list
+        params: {entity: interaction.record}
+        inputs:
+          filters:
+            user_id: $context.user_id
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+      - id: comments
+        operator: entity.list
+        params: {entity: content.comment}
+        inputs:
+          filters:
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+            author_id: $context.user_id
+      - id: state
+        operator: calc.interaction.state
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.rating.counts
+          records: $nodes.records.items
+          comments: $nodes.comments.items
+          rating: $nodes.save_rating.entity
+          viewer_id: $context.user_id
+      - id: backfill
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.rating.counts
+          target: $nodes.target_load.entity
+      - id: write_target
+        operator: entity.patch
+        params: {entity: $nodes.backfill.entity}
+        when: nodes.backfill.found
+        inputs:
+          data: $nodes.backfill.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: interaction.rated}
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.state
+    edges:
+      - [auth, request]
+      - [request, stat]
+      - [request, rating_load]
+      - [request, target_load]
+      - [request, records]
+      - [request, comments]
+      - [stat, seed]
+      - [target_load, seed]
+      - [request, check]
+      - [target_load, check]
+      - [seed, rating]
+      - [rating_load, rating]
+      - [check, save_rating]
+      - [rating, save_rating]
+      - [save_rating, save_stat]
+      - [save_rating, state]
+      - [records, state]
+      - [comments, state]
+      - [save_stat, backfill]
+      - [target_load, backfill]
+      - [backfill, write_target]
+      - [write_target, metric]
+      - [save_stat, metric]
+      - [state, response]
+      - [metric, response]
+
+  # -------------------------------------------------------------------------
+  # 互动状态（单个目标：计数 + viewer 状态）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_STATE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 读取单个目标的互动计数与当前登录用户的互动状态
+    saga: false
+    nodes:
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.request.entity, required: false}
+        when: nodes.request.exists
+        inputs:
+          key: $nodes.request.key.id
+      - id: seed
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: records
+        operator: entity.list
+        params: {entity: interaction.record}
+        inputs:
+          filters:
+            user_id: $context.user_id
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+      - id: comments
+        operator: entity.list
+        params: {entity: content.comment}
+        inputs:
+          filters:
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+            author_id: $context.user_id
+      - id: rating
+        operator: entity.get
+        params: {entity: interaction.rating, required: false}
+        inputs:
+          user_id: $context.user_id
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: state
+        operator: calc.interaction.state
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.seed.counts
+          records: $nodes.records.items
+          comments: $nodes.comments.items
+          rating: $nodes.rating.entity
+          viewer_id: $context.user_id
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.state
+    edges:
+      - [request, stat]
+      - [request, target_load]
+      - [request, records]
+      - [request, comments]
+      - [request, rating]
+      - [stat, seed]
+      - [target_load, seed]
+      - [seed, state]
+      - [records, state]
+      - [comments, state]
+      - [rating, state]
+      - [state, response]
+
+  # -------------------------------------------------------------------------
+  # 批量互动状态（列表页卡片）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_BATCH_STATE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 批量读取多个目标的互动计数与当前登录用户的互动状态
+    saga: false
+    nodes:
+      - id: request
+        operator: transform.derive
+        params: {expr: "context.user_id", output_key: viewer_id}
+      - id: stats
+        operator: entity.list
+        params: {entity: interaction.stat}
+      - id: records
+        operator: entity.list
+        params: {entity: interaction.record}
+        inputs:
+          filters: {user_id: $nodes.request.viewer_id}
+      - id: comments
+        operator: entity.list
+        params: {entity: content.comment}
+        inputs:
+          filters: {author_id: $nodes.request.viewer_id}
+      - id: assemble
+        operator: assemble.interaction.batch
+        inputs:
+          targets: $inputs.targets
+          stats: $nodes.stats.items
+          records: $nodes.records.items
+          comments: $nodes.comments.items
+          viewer_id: $nodes.request.viewer_id
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.assemble
+    edges:
+      - [request, stats]
+      - [request, records]
+      - [request, comments]
+      - [stats, assemble]
+      - [records, assemble]
+      - [comments, assemble]
+      - [assemble, response]
+
+  # -------------------------------------------------------------------------
+  # 评论：列表 / 创建 / 删除
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_COMMENTS_LIST_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 读取公开内容的评论列表（按创建时间升序）
+    saga: false
+    nodes:
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+      - id: list
+        operator: entity.list
+        params:
+          entity: content.comment
+          query: {order: created_at}
+        inputs:
+          filters:
+            target_type: $nodes.request.target_type
+            target_id: $nodes.request.target_id
+      - id: assemble
+        operator: assemble.interaction.comments
+        inputs:
+          items: $nodes.list.items
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.assemble
+    edges:
+      - [request, list]
+      - [list, assemble]
+      - [assemble, response]
+
+  - scenario: OPC_CONTENT_COMMENT_PUBLISH_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 对公开内容发表评论并增量维护评论计数（兼容旧 code）
+    saga: true
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.request.entity, required: false}
+        when: nodes.request.exists
+        inputs:
+          key: $nodes.request.key.id
+      - id: seed
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: check
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "not args.exists or args.found"
+              message: 评论目标不存在或已被删除
+        inputs:
+          exists: $nodes.request.exists
+          found: $nodes.target_load.found
+      - id: comment
+        operator: calc.interaction.comment
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          content: $inputs.content
+          author_id: $context.user_id
+          author_name: $context.nickname
+          parent_id: $inputs.parent_id
+          target_title: $inputs.target_title
+          target: $nodes.target_load.entity
+      - id: create
+        operator: entity.create
+        params: {entity: content.comment}
+        inputs:
+          data: $nodes.comment.data
+      # 统一敏感词门禁：评论与发布内容共用审核域纯函数预筛（无网络调用）。
+      - id: prescreen
+        operator: calc.moderation.prescreen
+        inputs:
+          content: $nodes.comment.data.content
+      - id: moderation
+        operator: validate.expression
+        params:
+          conditions:
+            - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
+              message: 内容合规校验未通过：命中平台内容安全预筛规则
+        inputs:
+          verdict: $nodes.prescreen.verdict
+      - id: delta
+        operator: transform.derive
+        params: {expr: "int(args.current or 0) + 1", output_key: comment_count}
+        inputs:
+          current: $nodes.seed.counts.comment_count
+      - id: merged
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.seed.counts
+            - target_type: $nodes.request.target_type
+              target_id: $nodes.request.target_id
+              comment_count: $nodes.delta.comment_count
+      - id: save_stat
+        operator: entity.upsert
+        params: {entity: interaction.stat}
+        inputs:
+          data: $nodes.merged
+      - id: backfill
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.merged
+          target: $nodes.target_load.entity
+      - id: write_target
+        operator: entity.patch
+        params: {entity: $nodes.backfill.entity}
+        when: nodes.backfill.found
+        inputs:
+          data: $nodes.backfill.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: content.comment.created}
+      - id: result
+        operator: transform.merge
+        params:
+          items:
+            - created_comment: $nodes.create.entity
+              response: $nodes.create.entity
+              target_type: $nodes.request.target_type
+              target_id: $nodes.request.target_id
+              comment_count: $nodes.merged.comment_count
+    edges:
+      - [auth, request]
+      - [request, stat]
+      - [request, target_load]
+      - [request, comment]
+      # comment 需要目标的展示标题，因此必须等 target_load 完成。
+      - [target_load, comment]
+      - [stat, seed]
+      - [target_load, seed]
+      - [request, check]
+      - [target_load, check]
+      - [check, create]
+      - [comment, prescreen]
+      - [prescreen, moderation]
+      - [moderation, create]
+      - [create, delta]
+      - [seed, delta]
+      - [delta, merged]
+      - [merged, save_stat]
+      - [save_stat, backfill]
+      - [target_load, backfill]
+      - [backfill, write_target]
+      - [write_target, metric]
+      - [save_stat, metric]
+      - [create, result]
+      - [metric, result]
+
+  - scenario: OPC_INTERACTION_COMMENT_DELETE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 删除本人（或管理员）发表的公开内容评论，并回退评论计数
+    saga: false
+    nodes:
+      - id: auth
+        operator: guard.authn
+      - id: load
+        operator: entity.get
+        params:
+          entity: content.comment
+          message: Comment not found / 评论不存在或已被删除
+        inputs:
+          key: $inputs.comment_id
+      - id: owner
+        operator: guard.owner
+        inputs:
+          owner_id: $nodes.load.entity.author_id
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.load.entity.target_type
+          target_id: $nodes.load.entity.target_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.request.entity, required: false}
+        when: nodes.request.exists
+        inputs:
+          key: $nodes.request.key.id
+      - id: seed
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: delta
+        operator: transform.derive
+        params: {expr: "max(0, int(args.current or 0) - 1)", output_key: comment_count}
+        inputs:
+          current: $nodes.seed.counts.comment_count
+      - id: merged
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.seed.counts
+            - target_type: $nodes.request.target_type
+              target_id: $nodes.request.target_id
+              comment_count: $nodes.delta.comment_count
+      - id: delete
+        operator: entity.delete
+        params: {entity: content.comment}
+        inputs:
+          key: $nodes.load.id
+      - id: save_stat
+        operator: entity.upsert
+        params: {entity: interaction.stat}
+        inputs:
+          data: $nodes.merged
+      - id: backfill
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.merged
+          target: $nodes.target_load.entity
+      - id: write_target
+        operator: entity.patch
+        params: {entity: $nodes.backfill.entity}
+        when: nodes.backfill.found
+        inputs:
+          data: $nodes.backfill.patch
+      - id: metric
+        operator: metric.incr
+        params: {metric: content.comment.deleted}
+      - id: audit
+        operator: audit.write
+        params:
+          action: interaction.comment.delete
+          resource_type: CONTENT_COMMENT
+        inputs:
+          resource_id: $nodes.load.id
+      - id: summary
+        operator: transform.merge
+        params:
+          items:
+            - deleted: true
+              comment_id: $nodes.load.id
+              target_type: $nodes.request.target_type
+              target_id: $nodes.request.target_id
+              comment_count: $nodes.merged.comment_count
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.summary
+    edges:
+      - [auth, load]
+      - [load, owner]
+      - [owner, request]
+      - [request, stat]
+      - [request, target_load]
+      - [stat, seed]
+      - [target_load, seed]
+      - [seed, delta]
+      - [delta, merged]
+      - [owner, delete]
+      - [merged, save_stat]
+      - [delete, save_stat]
+      - [save_stat, backfill]
+      - [target_load, backfill]
+      - [backfill, write_target]
+      - [write_target, metric]
+      - [save_stat, metric]
+      - [metric, audit]
+      - [load, summary]
+      - [merged, summary]
+      - [audit, response]
+      - [summary, response]
+
+  # -------------------------------------------------------------------------
+  # 我的互动足迹
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_MINE_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 读取当前创客的点赞、收藏、喜欢、踩与评论记录
+    saga: false
+    nodes:
+      - id: request
+        operator: transform.derive
+        params: {expr: "context.user_id", output_key: viewer_id}
+      - id: records
+        operator: entity.list
+        params: {entity: interaction.record}
+        inputs:
+          filters: {user_id: $nodes.request.viewer_id}
+      - id: comments
+        operator: entity.list
+        params: {entity: content.comment}
+        inputs:
+          filters: {author_id: $nodes.request.viewer_id}
+      - id: assemble
+        operator: assemble.interaction.mine
+        inputs:
+          records: $nodes.records.items
+          comments: $nodes.comments.items
+          viewer_id: $nodes.request.viewer_id
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.assemble
+    edges:
+      - [request, records]
+      - [request, comments]
+      - [records, assemble]
+      - [comments, assemble]
+      - [assemble, response]
+
+  # -------------------------------------------------------------------------
+  # 互动计数初始 / 查询（首次读取时从目标实体旧计数播种）
+  # -------------------------------------------------------------------------
+  - scenario: OPC_INTERACTION_COUNTS_PIPELINE
+    version: v1.0.0
+    domain: interactions
+    description: 查询互动计数；统计行缺失时以目标实体的历史计数作为初始值
+    saga: false
+    nodes:
+      - id: request
+        operator: calc.interaction.target
+        inputs:
+          target_type: $inputs.target_type
+          target_id: $inputs.target_id
+      - id: stat
+        operator: entity.get
+        params: {entity: interaction.stat, required: false}
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+      - id: target_load
+        operator: entity.get
+        params: {entity: $nodes.request.entity, required: false}
+        when: nodes.request.exists
+        inputs:
+          key: $nodes.request.key.id
+      - id: counters
+        operator: calc.interaction.target
+        inputs:
+          target_type: $nodes.request.target_type
+          target_id: $nodes.request.target_id
+          counts: $nodes.stat.entity
+          target: $nodes.target_load.entity
+      - id: result
+        operator: transform.merge
+        params:
+          items:
+            - $nodes.counters.counts
+            - target_type: $nodes.request.target_type
+              target_id: $nodes.request.target_id
+              has_stat: $nodes.stat.found
+              target_exists: $nodes.counters.found
+      - id: response
+        operator: transform.derive
+        params: {expr: "args.data", output_key: response}
+        inputs:
+          data: $nodes.result
+    edges:
+      - [request, stat]
+      - [request, target_load]
+      - [stat, counters]
+      - [target_load, counters]
+      - [counters, result]
+      - [result, response]

@@ -113,12 +113,30 @@ async def rag_forum(params: dict[str, Any], args: dict[str, Any], context: dict[
     return {"answer": result}
 
 
+@operator("external.rag.forum_search", category="ADAPTER", description="Semantic forum thread search")
+async def rag_forum_search(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    from src.core.rag import forum_rag_service
+
+    query = str(args.get("query") or params.get("query") or "")
+    if not query.strip():
+        return {"results": []}
+    result = await forum_rag_service.search_threads(
+        query=query,
+        top_k=int(args.get("top_k") or params.get("top_k") or 15),
+        category_code=args.get("category_code") or params.get("category_code"),
+    )
+    return {"results": result}
+
+
 @operator("external.rag.product_search", category="ADAPTER", description="Semantic product search")
 async def rag_product(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     from src.core.rag import product_rag_service
 
+    query = str(args.get("query") or params.get("query") or "")
+    if not query.strip():
+        return {"results": []}
     result = await product_rag_service.search_products(
-        query=str(args.get("query") or params.get("query") or ""),
+        query=query,
         top_k=int(args.get("top_k") or params.get("top_k") or 5),
         category=args.get("category") or params.get("category"),
     )

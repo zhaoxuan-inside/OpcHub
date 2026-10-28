@@ -1,72 +1,113 @@
-"""SOP Service managing workflow stages, document templates, the workflow graph, and generated document instances."""
+"""Compatibility shim for the SOP (合规文书 / 流程模板 / 发布审核) domain.
+
+Business flow now lives in ``config/scenarios/sop.yaml`` (operator orchestration),
+single-responsibility calculations in ``src.domains.sop.functions`` and documents
+in the generic entity store (``src.domains.sop.entities``).
+
+This module only keeps the legacy data / query surface that other modules and
+the gateway adapters still import:
+
+* in-memory indexes that mirror ``domain_snapshots`` (``_nodes`` / ``_edges`` /
+  ``_templates`` / ``_documents`` / ``_flows`` / ``_flow_templates`` /
+  ``_review_queue``) plus their ``hydrate_*`` hydrators;
+* read-only projections (catalog cards, graph queries, goal plans, flow detail);
+* thin synchronous adapters over the shared pure functions for old callers;
+* the background publish-review consumer, which periodically executes
+  ``OPC_SOP_REVIEW_PROCESS_PIPELINE`` per pending submission.
+
+It contains **no rendering, review decisioning or catalog publishing flow**:
+those are computed by the pure operators and persisted by ``entity.*``
+operators inside the scenario assets.
+"""
+from __future__ import annotations
+
 import asyncio
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 
+from src.core.entity import entity_store
+from src.domains.sop.entities import (
+    ENTITY_SOP_DOCUMENT,
+    ENTITY_SOP_FLOW,
+    ENTITY_SOP_FLOW_TEMPLATE,
+    ENTITY_SOP_NODE,
+    ENTITY_SOP_REVIEW_ITEM,
+    ENTITY_SOP_TEMPLATE,
+)
 from src.domains.sop.models import (
-    SOPStage,
-    SOPTemplate,
-    SOPTemplateCreate,
-    SOPTemplatesResponse,
+    SOPDocumentCatalogResponse,
     SOPDocumentCreate,
     SOPDocumentDraftCreate,
     SOPDocumentResponse,
-    SOPNode,
     SOPEdge,
-    SOPGoal,
-    SOPGraphResponse,
-    SOPGoalPlan,
-    SOPGoalPlanItem,
+    SOPField,
     SOPFlow,
     SOPFlowCreate,
     SOPFlowItem,
     SOPFlowResponse,
     SOPFlowTemplate,
-    SOPFlowTemplateCard,
-    SOPMyFlowCard,
     SOPFlowTemplateCatalogResponse,
     SOPFlowTemplateDetail,
     SOPFlowTemplateStep,
-    SOPDocumentCard,
-    SOPDocumentCatalogResponse,
-    SOPReviewItem,
-    SOPReviewQueueResponse,
-    SOPReviewProcessResult,
+    SOPGoal,
+    SOPGoalPlan,
+    SOPGoalPlanItem,
+    SOPGraphResponse,
+    SOPMyFlowCard,
+    SOPNode,
     SOPPublishResponse,
+    SOPReviewItem,
+    SOPReviewProcessResult,
+    SOPReviewQueueResponse,
+    SOPStage,
+    SOPTemplate,
+    SOPTemplateCreate,
+    SOPTemplatesResponse,
+    SOP_FLOW_STATUS_ACTIVE,
     SOP_NODE_DOCUMENT,
     SOP_NODE_SUBGRAPH,
-    SOP_EDGE_PREREQUISITE,
-    SOP_FLOW_STATUS_ACTIVE,
-    SOP_FLOW_STATUS_DRAFT,
-    SOP_FLOW_STATUS_PENDING_REVIEW,
-    SOP_FLOW_STATUS_PUBLISHED,
-    SOP_FLOW_STATUS_REJECTED,
-    SOP_DOC_STATUS_READY,
-    SOP_DOC_STATUS_PENDING_REVIEW,
-    SOP_DOC_STATUS_PUBLISHED,
-    SOP_DOC_STATUS_REJECTED,
+    SOP_REVIEW_STATUS_APPROVED,
+    SOP_REVIEW_STATUS_PENDING,
+    SOP_REVIEW_STATUS_REJECTED,
     SOP_REVIEW_TARGET_DOCUMENT,
     SOP_REVIEW_TARGET_FLOW,
-    SOP_REVIEW_STATUS_PENDING,
-    SOP_REVIEW_STATUS_APPROVED,
-    SOP_REVIEW_STATUS_REJECTED,
-    SOPFlowTemplateRef,
 )
 from src.infrastructure.database.persistence import domain_persistence
 
 logger = logging.getLogger("opchub.sop")
+
+REVIEW_PROCESS_PIPELINE = "OPC_SOP_REVIEW_PROCESS_PIPELINE"
+REVIEW_WITHDRAW_PIPELINE = "OPC_SOP_REVIEW_WITHDRAW_PIPELINE"
+REVIEW_ACTOR_ID = "review_engine"
+
+
+class _LazyFunctions:
+    """Resolve ``src.domains.sop.functions`` on first use (breaks an import cycle)."""
+
+    def __getattr__(self, name: str) -> Any:
+        from src.domains.sop import functions
+
+        return getattr(functions, name)
+
+
+fn = _LazyFunctions()
 
 
 def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-class SOPService:
-    """Manages business registration and compliance document templates and generated instances."""
+def _dump(value: Any) -> dict[str, Any]:
+    if hasattr(value, "model_dump"):
+        return value.model_dump(mode="json")
+    return dict(value)
 
-    def __init__(self):
+
+class SOPService:
+    """Legacy data / query surface over the SOP entity store."""
+
+    def __init__(self) -> None:
         self._stages: List[SOPStage] = []
         self._nodes: Dict[str, SOPNode] = {}
         self._edges: List[SOPEdge] = []
@@ -81,11 +122,15 @@ class SOPService:
         # Background consumer that audits and promotes approved submissions.
         self._review_consumer_task = None
         self._review_consumer_running = False
+        self.review_consumer_interval = 5.0
 
     def _require_db(self) -> None:
         """SOP content is database-backed; refuse memory-only mutations."""
         domain_persistence.require("sop")
 
+    # ------------------------------------------------------------------
+    # Template catalog (document nodes are also renderable templates)
+    # ------------------------------------------------------------------
     def _register_template_from_node(self, node: SOPNode) -> None:
         """Project a document-kind graph node into the legacy template catalog."""
         self._templates[node.id] = SOPTemplate(
@@ -101,13 +146,7 @@ class SOPService:
         )
 
     def _ensure_template_registered(self, template_id: str) -> bool:
-        """Re-project a document node into the template catalog if it went missing.
-
-        The template catalog and the graph are two views of the same data. Isolated
-        tests (and future admin tooling) may reset the catalog directly; in that case
-        the document node is the surviving source of truth and can rebuild its
-        template on demand.
-        """
+        """Re-project a document node into the template catalog if it went missing."""
         if template_id in self._templates:
             return True
         node = self._nodes.get(template_id)
@@ -116,65 +155,45 @@ class SOPService:
         self._register_template_from_node(node)
         return True
 
-    # ------------------------------------------------------------------
-    # Legacy template accessors (kept for backward compatibility)
-    # ------------------------------------------------------------------
     def get_stages_and_templates(self) -> SOPTemplatesResponse:
-        """Get all SOP stages and available active document templates."""
+        """Get all SOP stages and available document templates."""
         # Self-heal: if the template catalog was reset, rebuild it from the graph.
         for node in self._nodes.values():
             if node.kind == SOP_NODE_DOCUMENT and node.id not in self._templates:
                 self._register_template_from_node(node)
-        return SOPTemplatesResponse(
-            stages=self._stages,
-            templates=list(self._templates.values()),
-        )
+        return SOPTemplatesResponse(stages=self._stages, templates=list(self._templates.values()))
+
+    def _template_or_none(self, template_id: Optional[str]) -> Optional[SOPTemplate]:
+        """Self-healing lookup used by legacy adapters (graph is the source of truth)."""
+        if not template_id:
+            return None
+        try:
+            return self.get_template(template_id)
+        except KeyError:
+            return None
 
     def get_template(self, template_id: str) -> SOPTemplate:
-        """Fetch template by ID."""
+        """Fetch template by ID (the graph is the source of truth)."""
         if template_id not in self._templates:
-            # The graph is the source of truth; rebuild the template if it was reset.
             self._ensure_template_registered(template_id)
         if template_id not in self._templates:
             raise KeyError(f"SOP template with ID {template_id} not found")
         return self._templates[template_id]
 
     def create_template(self, req: SOPTemplateCreate) -> SOPTemplate:
+        """Register a new template (thin adapter over ``calc.sop.template_publish``)."""
         self._require_db()
-        """Create and register a new SOP compliance document template."""
-        tid = f"tpl_{uuid.uuid4().hex[:8]}"
-        template = SOPTemplate(
-            id=tid,
-            stage=req.stage,
-            code=req.code,
-            name=req.name,
-            category=req.category,
-            description=req.description,
-            template_content=req.template_content,
-            required_fields=req.required_fields,
-            is_active=True,
-        )
-        self._templates[tid] = template
-        # Keep the graph in sync so a runtime-published template is fillable in the workbench.
-        self._nodes[tid] = SOPNode(
-            id=tid,
-            kind=SOP_NODE_DOCUMENT,
-            code=req.code,
-            name=req.name,
-            stage=req.stage,
-            category=req.category,
-            description=req.description,
-            template_content=req.template_content,
-            required_fields=list(req.required_fields),
-        )
-        domain_persistence.write("sop.templates", tid, template)
+        prepared = fn.template_publish({}, req.model_dump(mode="json"), {})
+        template = SOPTemplate(**prepared["template"])
+        node = SOPNode(**prepared["node"])
+        entity_store.create(ENTITY_SOP_TEMPLATE, template.model_dump(mode="json"))
+        entity_store.create(ENTITY_SOP_NODE, node.model_dump(mode="json"))
         return template
 
     # ------------------------------------------------------------------
-    # Workflow graph
+    # Workflow graph (read-only)
     # ------------------------------------------------------------------
     def get_graph(self) -> SOPGraphResponse:
-        """Return the whole workflow graph: stages, nodes, edges and goals."""
         return SOPGraphResponse(
             stages=list(self._stages),
             nodes=list(self._nodes.values()),
@@ -183,66 +202,39 @@ class SOPService:
         )
 
     def get_node(self, node_id: str) -> SOPNode:
-        """Fetch a graph node (document or subgraph) by ID."""
         if node_id not in self._nodes:
             raise KeyError(f"SOP node with ID {node_id} not found")
         return self._nodes[node_id]
 
     def get_goals(self) -> List[SOPGoal]:
-        """List all business goals available for reverse lookup."""
         return list(self._goals.values())
 
     def get_goal(self, goal_id: str) -> SOPGoal:
-        """Fetch a single business goal."""
         if goal_id not in self._goals:
             raise KeyError(f"SOP goal with ID {goal_id} not found")
         return self._goals[goal_id]
 
+    def _node_rows(self) -> List[dict[str, Any]]:
+        return [_dump(node) for node in self._nodes.values()]
+
+    def _edge_rows(self) -> List[dict[str, Any]]:
+        return [_dump(edge) for edge in self._edges]
+
     # ------------------------------------------------------------------
     # Standard document catalog (标准文书库)
-    #
-    # The workbench lists documents only. Subgraphs are workflow structures that
-    # bundle several documents; they are not themselves fillable, so they never
-    # appear in this catalog.
     # ------------------------------------------------------------------
     def list_document_cards(
         self,
         user_id: Optional[str] = None,
         category: Optional[str] = None,
     ) -> SOPDocumentCatalogResponse:
-        """List the standard document catalog with the caller's own interactions."""
-        live_usage = self._usage_counts()
-        cards: List[SOPDocumentCard] = []
-
-        for node in self._nodes.values():
-            if node.kind != SOP_NODE_DOCUMENT or not node.is_active:
-                continue
-            if category and category.lower() != "all" and node.category != category:
-                continue
-            cards.append(
-                SOPDocumentCard(
-                    id=node.id,
-                    name=node.name,
-                    summary=node.summary or node.description,
-                    author_name=node.author_name,
-                    author_title=node.author_title,
-                    publisher_org=node.publisher_org,
-                    is_official=node.is_official,
-                    published_at=node.published_at,
-                    stage=node.stage,
-                    category=node.category,
-                    like_count=node.like_count,
-                    favorite_count=node.favorite_count,
-                    # The seeded baseline is the platform-wide usage figure;
-                    # any document instance persisted on this deployment adds to it.
-                    usage_count=node.usage_count + live_usage.get(node.id, 0),
-                    field_count=len(node.required_fields),
-                )
-            )
-
-        # Most-liked first; ties broken by the newest publish date.
-        cards.sort(key=lambda c: (c.like_count, c.published_at), reverse=True)
-        return SOPDocumentCatalogResponse(items=cards, total=len(cards))
+        """List the standard document catalog (projection of ``assemble.sop.document_cards``)."""
+        nodes = self._node_rows()
+        if category and category.lower() != "all":
+            nodes = [node for node in nodes if node.get("category") == category]
+        documents = [_dump(doc) for doc in self._documents.values()]
+        cards = fn.document_cards({}, {"nodes": nodes, "documents": documents}, {})
+        return SOPDocumentCatalogResponse(items=cards["items"], total=cards["total"])
 
     def _usage_counts(self) -> Dict[str, int]:
         """Count how many generated document instances each template has."""
@@ -253,100 +245,66 @@ class SOPService:
 
     # ------------------------------------------------------------------
     # Platform flow templates (平台流程模板)
-    #
-    # The "流程向导" workspace lists these; the structure mirrors the standard
-    # document catalog so both workspaces share one card idiom.
     # ------------------------------------------------------------------
     def list_flow_template_cards(
         self,
         user_id: Optional[str] = None,
         category: Optional[str] = None,
     ) -> SOPFlowTemplateCatalogResponse:
-        """List the platform flow catalog with the caller's own interactions."""
-        cards: List[SOPFlowTemplateCard] = []
-
-        for flow in self._flow_templates.values():
-            if category and category.lower() != "all" and flow.category != category:
-                continue
-            steps, missing = self._resolve_flow_steps(flow)
-            doc_count = sum(
-                1 for step in steps if step.kind == SOP_NODE_DOCUMENT
-            )
-            cards.append(
-                SOPFlowTemplateCard(
-                    id=flow.id,
-                    name=flow.name,
-                    summary=flow.summary,
-                    description=flow.description,
-                    category=flow.category,
-                    stages=list(flow.stages),
-                    step_count=len(steps),
-                    doc_count=doc_count,
-                    outcome=flow.outcome,
-                    unlocks=list(flow.unlocks),
-                    author_name=flow.author_name,
-                    author_title=flow.author_title,
-                    publisher_org=flow.publisher_org,
-                    is_official=flow.is_official,
-                    published_at=flow.published_at,
-                    like_count=flow.like_count,
-                    favorite_count=flow.favorite_count,
-                    usage_count=flow.usage_count + self._flow_usage_counts().get(flow.id, 0),
-                )
-            )
-            void = missing
-
-        cards.sort(key=lambda c: (c.like_count, c.published_at), reverse=True)
-        return SOPFlowTemplateCatalogResponse(items=cards, total=len(cards))
+        """List the platform flow catalog (projection of ``assemble.sop.flow_template_cards``)."""
+        templates = [_dump(flow) for flow in self._flow_templates.values()]
+        if category and category.lower() != "all":
+            templates = [flow for flow in templates if flow.get("category") == category]
+        cards = fn.flow_template_cards(
+            {},
+            {
+                "templates": templates,
+                "nodes": self._node_rows(),
+                "flows": [_dump(flow) for flow in self._flows.values()],
+            },
+            {},
+        )
+        return SOPFlowTemplateCatalogResponse(items=cards["items"], total=cards["total"])
 
     def _resolve_flow_steps(self, flow: SOPFlowTemplate) -> tuple:
         """Expand a flow template into its ordered document steps."""
-        steps: List[SOPFlowTemplateStep] = []
-        missing: List[str] = []
-        seen: Set[str] = set()
-
-        def walk(node_id: str, note: str, required: bool, depth: int) -> None:
-            if node_id in seen:
-                return
-            seen.add(node_id)
-            node = self._nodes.get(node_id)
-            if node is None:
-                missing.append(node_id)
-                return
-            if node.kind == SOP_NODE_SUBGRAPH:
-                for child_id in node.children:
-                    walk(child_id, note, required, depth + 1)
-                return
-            steps.append(
-                SOPFlowTemplateStep(
-                    node_id=node.id,
-                    name=node.name,
-                    kind=node.kind,
-                    stage=node.stage,
-                    category=node.category,
-                    description=node.description,
-                    outcome=node.outcome,
-                    note=note,
-                    required=required,
-                    order=0,
-                    required_fields=list(node.required_fields),
-                )
+        result = fn.steps(
+            {"order": "REFERENCE"},
+            {"refs": [_dump(ref) for ref in flow.node_refs], "nodes": self._node_rows()},
+            {},
+        )
+        steps = [
+            SOPFlowTemplateStep(
+                node_id=item["node_id"],
+                name=item["name"],
+                kind=item["kind"],
+                stage=item["stage"],
+                category=item["category"],
+                description=item["description"],
+                outcome=item["outcome"],
+                note=item["note"],
+                required=item["required"],
+                order=item["order"],
+                required_fields=list(item["required_fields"]),
             )
-
-        for ref in flow.node_refs:
-            walk(ref.node_id, ref.note, ref.required, 0)
-
-        for idx, step in enumerate(steps):
-            step.order = idx + 1
-        return steps, missing
+            for item in result["items"]
+        ]
+        return steps, result["missing_nodes"]
 
     def get_flow_template_detail(self, flow_id: str) -> SOPFlowTemplateDetail:
         """Resolve a flow template into its ordered document steps."""
-        if flow_id not in self._flow_templates:
-            raise KeyError(f"SOP flow template with ID {flow_id} not found")
-        flow = self._flow_templates[flow_id]
+        flow = self.get_flow_template(flow_id)
         steps, missing = self._resolve_flow_steps(flow)
-        return SOPFlowTemplateDetail(template=flow, steps=steps, missing_nodes=missing)
+        detail = fn.flow_template_detail(
+            {},
+            {"template": _dump(flow), "steps": [_dump(step) for step in steps], "missing_nodes": missing},
+            {},
+        )
+        return SOPFlowTemplateDetail(
+            template=flow,
+            steps=steps,
+            missing_nodes=detail["missing_nodes"],
+        )
 
     def _flow_usage_counts(self) -> Dict[str, int]:
         """Count user flows forked from each platform flow template."""
@@ -358,23 +316,15 @@ class SOPService:
         return counts
 
     def get_flow_template(self, flow_id: str) -> SOPFlowTemplate:
-        """Fetch a platform flow template by ID."""
         if flow_id not in self._flow_templates:
             raise KeyError(f"SOP flow template with ID {flow_id} not found")
         return self._flow_templates[flow_id]
 
-    def hydrate_flow_templates(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._flow_templates[r["id"]] = SOPFlowTemplate(**r)
-        return len(rows)
-
+    # ------------------------------------------------------------------
+    # Graph resolution helpers
+    # ------------------------------------------------------------------
     def expand_subgraph(self, node_id: str, _seen: Optional[Set[str]] = None) -> List[SOPNode]:
-        """Flatten a node into the document nodes it contains.
-
-        A subgraph contributes its own children; a document node contributes itself.
-        Nested subgraphs are expanded recursively, so a subgraph may itself be
-        composed of other subgraphs.
-        """
+        """Flatten a node into the document nodes it contains."""
         seen = _seen if _seen is not None else set()
         if node_id in seen:
             return []
@@ -389,29 +339,13 @@ class SOPService:
             expanded.extend(self.expand_subgraph(child_id, seen))
         return expanded
 
-    def _incoming_prerequisites(self, node_id: str) -> List[str]:
-        """Return prerequisite node ids for a node (excluding optional relations)."""
-        return [
-            e.from_node
-            for e in self._edges
-            if e.to_node == node_id and e.relation != "optional"
-        ]
-
     def resolve_goal_plan(self, goal_id: str) -> SOPGoalPlan:
-        """Reverse-resolve a business goal into an ordered list of required documents.
-
-        Required and recommended node ids may point at either a single document or a
-        composite subgraph; subgraphs are expanded into their constituent documents.
-        The resulting set is ordered by the dependency edges so the maker sees the
-        documents in an executable sequence.
-        """
+        """Reverse-resolve a business goal into an ordered list of required documents."""
         goal = self.get_goal(goal_id)
-
         plan, missing = self._build_plan_items(
             [(node_id, True) for node_id in goal.required_nodes]
             + [(node_id, False) for node_id in goal.recommended_nodes]
         )
-
         return SOPGoalPlan(
             goal=goal,
             items=plan,
@@ -420,179 +354,114 @@ class SOPService:
         )
 
     def _edges_for(self, items: List[Any]) -> List[SOPEdge]:
-        """Restrict the global dependency edges to the nodes present in a plan."""
         node_ids = {item.node_id for item in items}
         return [
-            edge for edge in self._edges
+            edge
+            for edge in self._edges
             if edge.from_node in node_ids and edge.to_node in node_ids
         ]
 
-    def _build_plan_items(
-        self,
-        refs: List[tuple],
-    ) -> tuple:
-        """Expand node references into ordered plan items.
-
-        ``refs`` is a list of ``(node_id, required)`` pairs. A reference to a subgraph
-        is expanded into its constituent documents, which inherit the subgraph's
-        required flag and record it as their parent. The expanded set is then ordered
-        by the dependency edges.
-        """
-        plan: List[SOPGoalPlanItem] = []
-        seen: Set[str] = set()
-        missing: List[str] = []
-
-        def collect(node_id: str, required: bool, parent_id: Optional[str], depth: int) -> None:
-            if node_id in seen:
-                return
-            seen.add(node_id)
-            node = self._nodes.get(node_id)
-            if node is None:
-                missing.append(node_id)
-                return
-            if node.kind == SOP_NODE_SUBGRAPH:
-                for child_id in node.children:
-                    collect(child_id, required, node_id, depth + 1)
-                return
-            plan.append(
-                SOPGoalPlanItem(
-                    node_id=node.id,
-                    name=node.name,
-                    kind=node.kind,
-                    stage=node.stage,
-                    category=node.category,
-                    description=node.description,
-                    outcome=node.outcome,
-                    next_hint=node.next_hint,
-                    required=required,
-                    order=0,
-                    depth=depth,
-                    parent_id=parent_id,
-                    required_fields=list(node.required_fields),
-                )
+    def _build_plan_items(self, refs: List[tuple]) -> tuple:
+        """Expand node references into ordered plan items via ``calc.sop.steps``."""
+        result = fn.steps(
+            {},
+            {
+                "refs": [{"node_id": node_id, "required": required} for node_id, required in refs],
+                "nodes": self._node_rows(),
+                "edges": self._edge_rows(),
+            },
+            {},
+        )
+        plan = [
+            SOPGoalPlanItem(
+                node_id=item["node_id"],
+                name=item["name"],
+                kind=item["kind"],
+                stage=item["stage"],
+                category=item["category"],
+                description=item["description"],
+                outcome=item["outcome"],
+                next_hint=item["next_hint"],
+                required=item["required"],
+                order=item["order"],
+                depth=item["depth"],
+                parent_id=item["parent_id"],
+                required_fields=[SOPField(**field) for field in item["required_fields"]],
             )
+            for item in result["items"]
+        ]
+        return plan, result["missing_nodes"]
 
-        for node_id, required in refs:
-            collect(node_id, required, None, 0)
-
-        ordered = self._topological_order([item.node_id for item in plan])
-        rank = {node_id: idx for idx, node_id in enumerate(ordered)}
-        for item in plan:
-            item.order = rank.get(item.node_id, 0) + 1
-        plan.sort(key=lambda i: (i.order, i.node_id))
-
-        return plan, missing
+    def get_node_context(self, node_id: str) -> Dict[str, Any]:
+        """Collect everything the workspace needs to explain one node to a maker."""
+        node = self.get_node(node_id)
+        context = fn.node_context(
+            {},
+            {"node": _dump(node), "nodes": self._node_rows(), "edges": self._edge_rows()},
+            {},
+        )
+        return {
+            "node": node,
+            "children": [self._nodes[child["id"]] for child in context["children"]],
+            "prerequisites": context["prerequisites"],
+        }
 
     # ------------------------------------------------------------------
-    # User-authored flows
+    # Maker-owned flows
     # ------------------------------------------------------------------
     def create_flow(self, req: SOPFlowCreate) -> SOPFlow:
+        """Create a user-owned flow (thin adapter over ``calc.sop.flow_create``)."""
         self._require_db()
-        """Create a user-owned flow from an ordered list of node references."""
-        fid = f"flow_{uuid.uuid4().hex[:10]}"
-        now = utc_now_iso()
-        flow = SOPFlow(
-            id=fid,
-            name=req.name.strip(),
-            description=req.description.strip(),
-            owner_id=req.owner_id or "",
-            goal_id=req.goal_id,
-            node_refs=list(req.node_refs),
-            edges=list(req.edges),
-            status=req.status or SOP_FLOW_STATUS_ACTIVE,
-            created_at=now,
-            updated_at=now,
-        )
-        self._flows[fid] = flow
-        domain_persistence.write("sop.flows", fid, flow)
-        return flow
+        prepared = fn.flow_create({}, req.model_dump(mode="json"), {"user_id": req.owner_id or ""})
+        created = entity_store.create(ENTITY_SOP_FLOW, prepared["flow"])
+        return self._flows[created["id"]]
 
     def list_flows(self, owner_id: Optional[str] = None) -> List[SOPFlow]:
-        """List stored flows, optionally filtered by owner."""
         flows = list(self._flows.values())
         if owner_id:
-            flows = [f for f in flows if f.owner_id == owner_id]
-        flows.sort(key=lambda f: f.updated_at, reverse=True)
+            flows = [flow for flow in flows if flow.owner_id == owner_id]
+        flows.sort(key=lambda flow: flow.updated_at, reverse=True)
         return flows
 
     def list_my_flow_cards(self, owner_id: Optional[str] = None) -> List[SOPMyFlowCard]:
-        """List the maker's own flows as cards for the private my-flows grid.
-
-        Mirrors ``list_flow_template_cards`` so both workspaces share one card
-        idiom; a private flow expands its node references into document counts.
-        """
-        cards: List[SOPMyFlowCard] = []
-        for flow in self._flows.values():
-            if owner_id and flow.owner_id != owner_id:
-                continue
-            steps, _missing = self._build_plan_items(
-                [(ref.node_id, ref.required) for ref in flow.node_refs]
-            )
-            stages = sorted({step.stage for step in steps})
-            cards.append(
-                SOPMyFlowCard(
-                    id=flow.id,
-                    name=flow.name,
-                    summary=(flow.description or "").split("。")[0] if flow.description else "",
-                    description=flow.description or "",
-                    goal_id=flow.goal_id,
-                    category="MY",
-                    stages=stages,
-                    step_count=len(steps),
-                    doc_count=len(steps),
-                    status=flow.status,
-                    author_name="我",
-                    publisher_org="私有流程",
-                    is_official=False,
-                    published_at=flow.created_at,
-                )
-            )
-        cards.sort(key=lambda c: c.published_at, reverse=True)
-        return cards
+        """List the maker's own flows as cards (projection over the shared assembler)."""
+        flows = [
+            _dump(flow)
+            for flow in self._flows.values()
+            if not owner_id or flow.owner_id == owner_id
+        ]
+        cards = fn.my_flow_cards({}, {"flows": flows, "nodes": self._node_rows()}, {})
+        return [SOPMyFlowCard(**card) for card in cards["items"]]
 
     def get_flow(self, flow_id: str) -> SOPFlow:
-        """Fetch a stored flow by ID."""
         if flow_id not in self._flows:
             raise KeyError(f"SOP flow with ID {flow_id} not found")
         return self._flows[flow_id]
 
     def update_flow(self, flow_id: str, req: SOPFlowCreate) -> SOPFlow:
+        """Replace the content of an existing flow (thin adapter over the pure diff)."""
         self._require_db()
-        """Replace the content of an existing flow."""
         flow = self.get_flow(flow_id)
-        flow.name = req.name.strip()
-        flow.description = req.description.strip()
-        flow.goal_id = req.goal_id
-        flow.node_refs = list(req.node_refs)
-        flow.edges = list(req.edges)
-        flow.status = req.status or flow.status
-        # Editing a published / rejected flow produces a fresh draft so the maker
-        # can revise it and submit for review again.
-        if flow.status in (SOP_FLOW_STATUS_PUBLISHED, SOP_FLOW_STATUS_REJECTED, SOP_FLOW_STATUS_PENDING_REVIEW):
-            flow.status = SOP_FLOW_STATUS_ACTIVE
-        flow.updated_at = utc_now_iso()
-        domain_persistence.write("sop.flows", flow_id, flow)
-        return flow
+        prepared = fn.flow_update(
+            {},
+            {"flow_id": flow_id, "current": _dump(flow), **req.model_dump(mode="json")},
+            {"user_id": req.owner_id or flow.owner_id},
+        )
+        entity_store.update(ENTITY_SOP_FLOW, prepared["flow"])
+        return self._flows[prepared["flow"]["id"]]
 
     def delete_flow(self, flow_id: str) -> bool:
         self._require_db()
-        """Delete a stored flow."""
-        if flow_id in self._flows:
-            del self._flows[flow_id]
-            domain_persistence.delete("sop.flows", flow_id)
-            return True
-        return False
+        if flow_id not in self._flows:
+            return False
+        return entity_store.delete(ENTITY_SOP_FLOW, {"key": flow_id})
 
     def resolve_flow(self, flow_id: str) -> SOPFlowResponse:
-        """Resolve a stored flow into its ordered document list.
-
-        The flow's own ordering wins; the global dependency edges are used to derive
-        the execution order among the referenced documents.
-        """
+        """Resolve a stored flow into its ordered document list."""
         flow = self.get_flow(flow_id)
-        refs = [(ref.node_id, ref.required) for ref in flow.node_refs]
-        plan, missing = self._build_plan_items(refs)
-
+        plan, missing = self._build_plan_items(
+            [(ref.node_id, ref.required) for ref in flow.node_refs]
+        )
         items = [
             SOPFlowItem(
                 node_id=item.node_id,
@@ -611,89 +480,28 @@ class SOPService:
             )
             for item in plan
         ]
+        detail = fn.flow_detail(
+            {},
+            {
+                "flow": _dump(flow),
+                "items": [_dump(item) for item in items],
+                "edges": self._edge_rows(),
+                "missing_nodes": missing,
+            },
+            {},
+        )
         return SOPFlowResponse(
             flow=flow,
             items=items,
-            edges=self._edges_for(items),
-            missing_nodes=missing,
+            edges=[SOPEdge(**edge) for edge in detail["edges"]],
+            missing_nodes=detail["missing_nodes"],
         )
-
-    def hydrate_flows(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._flows[r["id"]] = SOPFlow(**r)
-        return len(rows)
-
-    def _topological_order(self, node_ids: List[str]) -> List[str]:
-        """Order node ids so that prerequisites come before their dependents."""
-        node_set = set(node_ids)
-        # Only consider edges whose both endpoints participate in this plan.
-        relevant = [
-            e for e in self._edges
-            if e.from_node in node_set and e.to_node in node_set and e.relation != "optional"
-        ]
-
-        # Stage ordering is a stable tie-breaker so the plan reads top-down.
-        def stage_of(node_id: str) -> int:
-            node = self._nodes.get(node_id)
-            return node.stage if node else 99
-
-        indegree: Dict[str, int] = {n: 0 for n in node_set}
-        adjacency: Dict[str, List[str]] = {n: [] for n in node_set}
-        for edge in relevant:
-            adjacency[edge.from_node].append(edge.to_node)
-            indegree[edge.to_node] = indegree.get(edge.to_node, 0) + 1
-
-        ready = sorted(
-            [n for n in node_set if indegree.get(n, 0) == 0],
-            key=lambda n: (stage_of(n), n),
-        )
-        ordered: List[str] = []
-        while ready:
-            current = ready.pop(0)
-            ordered.append(current)
-            for nxt in adjacency.get(current, []):
-                indegree[nxt] -= 1
-                if indegree[nxt] == 0:
-                    ready.append(nxt)
-            ready.sort(key=lambda n: (stage_of(n), n))
-
-        # Cycles or dangling edges: append the rest deterministically.
-        if len(ordered) < len(node_set):
-            remaining = [n for n in node_set if n not in ordered]
-            remaining.sort(key=lambda n: (stage_of(n), n))
-            ordered.extend(remaining)
-        return ordered
-
-    def get_node_context(self, node_id: str) -> Dict[str, Any]:
-        """Collect everything the workspace needs to explain one node to a maker.
-
-        For a subgraph this includes the child documents; for any node it includes
-        the plain-language outcome, the next step hint and the prerequisite rationale.
-        """
-        node = self.get_node(node_id)
-        children = [self._nodes[c] for c in node.children if c in self._nodes]
-        prerequisites = []
-        for edge in self._edges:
-            if edge.to_node == node_id and edge.relation != "optional":
-                dep = self._nodes.get(edge.from_node)
-                if dep is not None:
-                    prerequisites.append({
-                        "node_id": dep.id,
-                        "name": dep.name,
-                        "kind": dep.kind,
-                        "rationale": edge.rationale,
-                    })
-        return {
-            "node": node,
-            "children": children,
-            "prerequisites": prerequisites,
-        }
 
     # ------------------------------------------------------------------
-    # Document rendering & persistence
+    # Documents
     # ------------------------------------------------------------------
     def validate_render_payload(self, inputs: dict) -> dict:
-        template_id = inputs.get("template_id", "").strip()
+        template_id = str((inputs or {}).get("template_id") or "").strip()
         if not template_id:
             raise ValueError("template_id is required for document rendering")
         template = self.get_template(template_id)
@@ -709,122 +517,46 @@ class SOPService:
         }
 
     def render_and_save_document(self, payload: SOPDocumentCreate) -> SOPDocumentResponse:
+        """Render a template and persist the instance (legacy synchronous entry)."""
         self._require_db()
-        """Render document template with maker input data and persist instance to backend."""
         template = self.get_template(payload.template_id)
-
-        # Merge defaults and inputs
-        merged_data: Dict[str, Any] = {}
-        for field in template.required_fields:
-            val = payload.form_data.get(field.key, field.default or "")
-            merged_data[field.key] = val
-
-        # Extra dynamic fields
-        merged_data["verify_serial"] = "VER-" + uuid.uuid4().hex[:12].upper()
-
-        # Render template content safely
-        try:
-            rendered = template.template_content.format(**merged_data)
-        except Exception:
-            # Fallback simple replacement if formatting tags fail
-            rendered = template.template_content
-            for k, v in merged_data.items():
-                rendered = rendered.replace(f"{{{k}}}", str(v))
-
-        doc_id = str(uuid.uuid4())
-        now = utc_now_iso()
-        company = merged_data.get("company_name", "创客主体")
-        doc_title = f"{template.name} - {company}"
-
-        document = SOPDocumentResponse(
-            id=doc_id,
-            template_id=template.id,
-            user_id=payload.user_id,
-            document_title=doc_title,
-            form_data=merged_data,
-            rendered_content=rendered,
-            compliance_passed=True,
-            category=template.category,
-            status="READY",
-            created_at=now,
-            updated_at=now,
+        prepared = fn.render_document(
+            {"enforce_required": False},
+            {
+                "template_id": payload.template_id,
+                "template": _dump(template),
+                "form_data": payload.form_data,
+                "user_id": payload.user_id,
+            },
+            {"user_id": payload.user_id},
         )
-
-        self._documents[doc_id] = document
-        domain_persistence.write("sop.documents", doc_id, document)
-        return document
+        created = entity_store.create(ENTITY_SOP_DOCUMENT, prepared["document"])
+        return self._documents[created["id"]]
 
     def save_draft_document(self, payload: SOPDocumentDraftCreate) -> SOPDocumentResponse:
+        """Persist a freely-edited draft (legacy synchronous entry)."""
         self._require_db()
-        """Persist a freely-edited document draft from the text editor.
-
-        This is the write path behind 「起草新文书」: the maker may start from a
-        template (``template_id`` records provenance and supplies the category)
-        but the body is the text they actually edited, stored verbatim with no
-        ``{placeholder}`` interpolation. Saving an existing ``doc_id`` updates
-        that private draft in place.
-        """
-        content = (payload.content or "").strip()
-        if not content:
-            raise ValueError("文书正文不能为空，请先撰写内容")
-
-        now = utc_now_iso()
-        template = None
-        if payload.template_id:
-            try:
-                template = self.get_template(payload.template_id)
-            except KeyError:
-                template = None
-
-        category = (
-            payload.category
-            or (template.category if template is not None else "")
-            or "LEGAL"
+        current = self._documents.get(payload.doc_id) if payload.doc_id else None
+        template = self._template_or_none(payload.template_id)
+        prepared = fn.document_draft(
+            {},
+            {
+                "doc_id": payload.doc_id,
+                "title": payload.title,
+                "content": payload.content,
+                "template_id": payload.template_id,
+                "category": payload.category,
+                "current": _dump(current) if current is not None else None,
+                "template": _dump(template) if template is not None else None,
+            },
+            {"user_id": payload.user_id},
         )
-
-        if payload.doc_id:
-            document = self.get_document(payload.doc_id)
-            if document.user_id and payload.user_id and document.user_id != payload.user_id:
-                raise ValueError("只能编辑本人创建的文书")
-            if document.status in (SOP_DOC_STATUS_PENDING_REVIEW, SOP_DOC_STATUS_PUBLISHED):
-                raise ValueError("审核中或已发布的文书不能直接修改")
-            document.document_title = self._draft_title(payload.title, document.document_title)
-            document.rendered_content = content
-            document.template_id = payload.template_id or document.template_id
-            document.category = category
-            document.status = SOP_DOC_STATUS_READY
-            document.updated_at = now
-            domain_persistence.write("sop.documents", document.id, document)
-            return document
-
-        doc_id = str(uuid.uuid4())
-        document = SOPDocumentResponse(
-            id=doc_id,
-            template_id=payload.template_id or "",
-            user_id=payload.user_id,
-            document_title=self._draft_title(payload.title, ""),
-            form_data={},
-            rendered_content=content,
-            compliance_passed=True,
-            category=category,
-            status=SOP_DOC_STATUS_READY,
-            created_at=now,
-            updated_at=now,
-        )
-        self._documents[doc_id] = document
-        domain_persistence.write("sop.documents", doc_id, document)
-        return document
-
-    @staticmethod
-    def _draft_title(title: str, fallback: str) -> str:
-        """Resolve the display title of an edited draft."""
-        clean = (title or "").strip()
-        if clean:
-            return clean[:255]
-        if fallback:
-            return fallback
-        stamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        return f"未命名文书 {stamp}"
+        document = prepared["document"]
+        if entity_store.get(ENTITY_SOP_DOCUMENT, {"key": document["id"]}) is None:
+            entity_store.create(ENTITY_SOP_DOCUMENT, document)
+        else:
+            entity_store.update(ENTITY_SOP_DOCUMENT, document)
+        return self._documents[document["id"]]
 
     def snapshot_draft(self, doc_id: str) -> dict:
         """Capture the mutable fields of a draft for Saga rollback."""
@@ -839,48 +571,36 @@ class SOPService:
         }
 
     def restore_draft_snapshot(self, doc_id: str, snapshot: dict) -> bool:
-        self._require_db()
         """Restore a draft from a snapshot taken before an atomic save."""
-        doc = self._documents.get(str(doc_id))
-        if doc is None or not snapshot:
+        self._require_db()
+        if str(doc_id) not in self._documents or not snapshot:
             return False
-        for field in ("document_title", "rendered_content", "template_id",
-                      "category", "status", "updated_at"):
-            if field in snapshot:
-                setattr(doc, field, snapshot[field])
-        domain_persistence.write("sop.documents", doc.id, doc)
+        entity_store.update(
+            ENTITY_SOP_DOCUMENT,
+            {"id": str(doc_id), **{key: value for key, value in snapshot.items() if value is not None}},
+        )
         return True
 
     def get_document(self, doc_id: str) -> SOPDocumentResponse:
-        """Retrieve persisted document by ID."""
         if doc_id not in self._documents:
             raise KeyError(f"SOP document with ID {doc_id} not found")
         return self._documents[doc_id]
 
     def list_documents(self, user_id: Optional[str] = None) -> List[SOPDocumentResponse]:
-        """List persisted documents, optionally filtered by maker user_id."""
         docs = list(self._documents.values())
         if user_id:
-            docs = [d for d in docs if d.user_id == user_id]
-        docs.sort(key=lambda d: d.created_at, reverse=True)
+            docs = [doc for doc in docs if doc.user_id == user_id]
+        docs.sort(key=lambda doc: doc.created_at, reverse=True)
         return docs
 
     def delete_document(self, doc_id: str) -> bool:
         self._require_db()
-        """Physically delete persisted document by ID for Saga rollback."""
-        if doc_id in self._documents:
-            del self._documents[doc_id]
-            domain_persistence.delete("sop.documents", doc_id)
-            return True
-        return False
+        if doc_id not in self._documents:
+            return False
+        return entity_store.delete(ENTITY_SOP_DOCUMENT, {"key": doc_id})
 
     # ------------------------------------------------------------------
     # Publish review queue (发布审核队列)
-    #
-    # A maker publishes a private document / flow by submitting it for
-    # review. The submission enters PENDING_REVIEW and is consumed by
-    # ``process_review_queue``, which audits legality / compliance / sensitive
-    # words and promotes approved items into the platform catalogs.
     # ------------------------------------------------------------------
     def _resolve_author_name(self, user_id: str) -> str:
         """Resolve a maker's display name for published provenance."""
@@ -888,6 +608,7 @@ class SOPService:
             return "创客"
         try:
             from src.domains.user.service import user_service
+
             profile = user_service.get_profile(uid=user_id)
             if profile and getattr(profile, "nickname", None):
                 return profile.nickname
@@ -901,142 +622,70 @@ class SOPService:
         flat = " ".join((text or "").split())
         return flat[:limit] if limit else flat
 
-    def _enqueue_review(
+    def _submit_for_review(
         self,
         target_type: str,
-        target_id: str,
-        title: str,
-        content: str,
-        author_id: str,
-        is_official: bool = False,
-    ) -> SOPReviewItem:
-        """Append one submission to the review queue in PENDING_REVIEW state."""
-        item = SOPReviewItem(
-            id=f"rev_{uuid.uuid4().hex[:10]}",
-            target_type=target_type,
-            target_id=target_id,
-            title=title,
-            content=content,
-            author_id=author_id or "",
-            author_name=self._resolve_author_name(author_id),
-            is_official=bool(is_official),
-            status=SOP_REVIEW_STATUS_PENDING,
-            submitted_at=utc_now_iso(),
+        target: dict[str, Any],
+        user_id: str,
+        is_official: bool,
+        extra: Optional[dict[str, Any]] = None,
+    ) -> SOPPublishResponse:
+        """Shared thin adapter around ``calc.sop.review_submission`` + entity writes."""
+        prepared = fn.review_submission(
+            {"target_type": target_type},
+            {"target_type": target_type, "target": target, "author_name": self._resolve_author_name(user_id), **(extra or {})},
+            {"user_id": user_id, "user_role": "ADMIN" if is_official else "MAKER"},
         )
-        self._review_queue[item.id] = item
-        domain_persistence.write("sop.review_queue", item.id, item)
-        return item
+        entity_type = ENTITY_SOP_DOCUMENT if target_type == SOP_REVIEW_TARGET_DOCUMENT else ENTITY_SOP_FLOW
+        entity_store.update(entity_type, prepared["target_patch"])
+        item = entity_store.create(ENTITY_SOP_REVIEW_ITEM, prepared["review_item"])
+        logger.debug("Queued review submission %s for %s", item.get("id"), target.get("id"))
+        return SOPPublishResponse(**prepared["response"])
 
     def submit_document_for_review(self, doc_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
+        """Submit one of the maker's own documents for publish review (legacy entry)."""
         self._require_db()
-        """Submit one of the maker's own documents for publish review.
-
-        The document moves to PENDING_REVIEW (待审核) and a review item is
-        enqueued for the backend consumer to audit. ``is_official`` is decided
-        by the caller's role at the gateway (ADMIN ⇒ 官方发布).
-        """
-        doc = self.get_document(doc_id)
-        if doc.user_id and user_id and doc.user_id != user_id:
-            raise ValueError("只能发布本人创建的文书")
-        if doc.status in (SOP_DOC_STATUS_PENDING_REVIEW, SOP_DOC_STATUS_PUBLISHED):
-            raise ValueError("该文书已在审核队列中或已发布，无需重复提交")
-        if not doc.rendered_content or not doc.rendered_content.strip():
-            raise ValueError("文书正文为空，无法提交审核")
-
-        doc.status = SOP_DOC_STATUS_PENDING_REVIEW
-        doc.updated_at = utc_now_iso()
-        item = self._enqueue_review(
-            target_type=SOP_REVIEW_TARGET_DOCUMENT,
-            target_id=doc.id,
-            title=doc.document_title,
-            content=f"{doc.document_title}\n{self._flatten_text(doc.rendered_content)}",
-            author_id=user_id or doc.user_id,
-            is_official=is_official,
-        )
-        domain_persistence.write("sop.documents", doc.id, doc)
-        return SOPPublishResponse(
-            item_id=item.id,
-            target_id=doc.id,
-            target_type=SOP_REVIEW_TARGET_DOCUMENT,
-            status=SOP_DOC_STATUS_PENDING_REVIEW,
-            submitted_at=item.submitted_at,
-            message="发布成功，文书已进入待审核状态，审核通过后将发布至标准文书库",
+        document = self.get_document(doc_id)
+        return self._submit_for_review(
+            SOP_REVIEW_TARGET_DOCUMENT, _dump(document), user_id, is_official
         )
 
     def submit_flow_for_review(self, flow_id: str, user_id: str, is_official: bool = False) -> SOPPublishResponse:
+        """Submit one of the maker's own flows for publish review (legacy entry)."""
         self._require_db()
-        """Submit one of the maker's own flows for publish review.
-
-        The flow moves to PENDING_REVIEW (待审核) and a review item is
-        enqueued for the backend consumer to audit. ``is_official`` is decided
-        by the caller's role at the gateway (ADMIN ⇒ 官方发布).
-        """
         flow = self.get_flow(flow_id)
-        if flow.owner_id and user_id and flow.owner_id != user_id:
-            raise ValueError("只能发布本人创建的流程")
-        if flow.status in (SOP_FLOW_STATUS_PENDING_REVIEW, SOP_FLOW_STATUS_PUBLISHED):
-            raise ValueError("该流程已在审核队列中或已发布，无需重复提交")
-
-        steps, missing = self._build_plan_items(
+        plan, missing = self._build_plan_items(
             [(ref.node_id, ref.required) for ref in flow.node_refs]
         )
-        step_names = "、".join(step.name for step in steps)
-        content = f"{flow.name}\n{flow.description or ''}\n流程步骤：{step_names}"
-        if missing:
-            content = f"{content}\n失效节点：{'、'.join(missing)}"
-
-        flow.status = SOP_FLOW_STATUS_PENDING_REVIEW
-        flow.updated_at = utc_now_iso()
-        item = self._enqueue_review(
-            target_type=SOP_REVIEW_TARGET_FLOW,
-            target_id=flow.id,
-            title=flow.name,
-            content=content,
-            author_id=user_id or flow.owner_id,
-            is_official=is_official,
-        )
-        domain_persistence.write("sop.flows", flow.id, flow)
-        return SOPPublishResponse(
-            item_id=item.id,
-            target_id=flow.id,
-            target_type=SOP_REVIEW_TARGET_FLOW,
-            status=SOP_FLOW_STATUS_PENDING_REVIEW,
-            submitted_at=item.submitted_at,
-            message="发布成功，流程已进入待审核状态，审核通过后将发布至流程向导",
+        return self._submit_for_review(
+            SOP_REVIEW_TARGET_FLOW,
+            _dump(flow),
+            user_id,
+            is_official,
+            {"steps": [_dump(step) for step in plan], "missing": missing},
         )
 
     def withdraw_review_submission(self, item_id: str) -> bool:
+        """Legacy Saga compensation: drop the queue item and roll the target back."""
         self._require_db()
-        """Withdraw a queued review submission (Saga compensation).
-
-        Removes the queue item and returns the owning document/flow to its
-        editable READY / ACTIVE state so the maker can revise and resubmit.
-        """
-        item = self._review_queue.pop(str(item_id), None)
+        item = self._review_queue.get(str(item_id))
         if item is None:
             return False
         if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
-            doc = self._documents.get(item.target_id)
-            if doc is not None and doc.status == SOP_DOC_STATUS_PENDING_REVIEW:
-                doc.status = SOP_DOC_STATUS_READY
-                doc.updated_at = utc_now_iso()
-                domain_persistence.write("sop.documents", doc.id, doc)
-        else:
-            flow = self._flows.get(item.target_id)
-            if flow is not None and flow.status == SOP_FLOW_STATUS_PENDING_REVIEW:
-                flow.status = SOP_FLOW_STATUS_ACTIVE
-                flow.updated_at = utc_now_iso()
-                domain_persistence.write("sop.flows", flow.id, flow)
-        domain_persistence.delete("sop.review_queue", item.id)
+            if item.target_id in self._documents:
+                entity_store.update(ENTITY_SOP_DOCUMENT, {"id": item.target_id, "status": fn.STATUS_READY})
+        elif item.target_id in self._flows:
+            entity_store.update(ENTITY_SOP_FLOW, {"id": item.target_id, "status": SOP_FLOW_STATUS_ACTIVE})
+        entity_store.delete(ENTITY_SOP_REVIEW_ITEM, {"key": item.id})
         return True
 
     def list_review_queue(self, status: Optional[str] = None) -> SOPReviewQueueResponse:
         """List the publish review queue, optionally filtered by status."""
         items = list(self._review_queue.values())
         if status:
-            items = [i for i in items if i.status.upper() == status.upper()]
-        items.sort(key=lambda i: i.submitted_at, reverse=True)
-        statuses = [i.status for i in self._review_queue.values()]
+            items = [item for item in items if item.status.upper() == status.upper()]
+        items.sort(key=lambda item: item.submitted_at, reverse=True)
+        statuses = [item.status for item in self._review_queue.values()]
         return SOPReviewQueueResponse(
             items=items,
             total=len(items),
@@ -1045,253 +694,142 @@ class SOPService:
             rejected=statuses.count(SOP_REVIEW_STATUS_REJECTED),
         )
 
-    async def process_review_queue(self, limit: Optional[int] = None) -> SOPReviewProcessResult:
-        """Consume the pending review queue.
-
-        For every queued item the consumer audits legality / compliance and
-        sensitive words (via the content-moderation gateway). Approved items are
-        published into the standard document catalog / flow guide; failed items
-        are marked REJECTED with the reason recorded.
-        """
-        pending = [i for i in self._review_queue.values() if i.status == SOP_REVIEW_STATUS_PENDING]
-        pending.sort(key=lambda i: i.submitted_at)
-        if limit is not None and limit > 0:
-            pending = pending[: int(limit)]
-
-        result = SOPReviewProcessResult(
-            processed=len(pending),
-            approved=0,
-            rejected=0,
-            published_documents=[],
-            published_flows=[],
-            details=[],
-        )
-
-        for item in pending:
-            try:
-                await self._audit_review_item(item)
-                self._approve_review_item(item)
-                result.approved += 1
-                if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
-                    result.published_documents.append(item.target_id)
-                else:
-                    result.published_flows.append(item.target_id)
-                result.details.append({
-                    "item_id": item.id,
-                    "title": item.title,
-                    "status": SOP_REVIEW_STATUS_APPROVED,
-                    "note": item.review_note,
-                })
-            except Exception as e:
-                logger.warning("Review item %s rejected: %s", item.id, e)
-                self._reject_review_item(item, str(e))
-                result.rejected += 1
-                result.details.append({
-                    "item_id": item.id,
-                    "title": item.title,
-                    "status": SOP_REVIEW_STATUS_REJECTED,
-                    "note": item.review_note,
-                })
-        return result
-
-    async def _audit_review_item(self, item: SOPReviewItem) -> None:
-        """Audit one queued submission: sensitive words + legality/compliance.
-
-        Uses the unified two-tier moderation gate: the local NLP pre-screen
-        answers CONFIRMED_SAFE / CONFIRMED_VIOLATION itself; only UNCERTAIN
-        content is deferred to the external moderation service.
-        """
-        from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
-
-        # 1. Sensitive-word / content-safety gate (敏感词与内容安全).
-        await prescreen_and_record(
-            item.content,
-            field_name=f"{item.target_type} 发布审核",
-            user_id=item.author_id,
-            scene="流程文书审核",
-            title=item.title,
-            target_type=item.target_type,
-            target_id=item.target_id,
-        )
-
-        # 2. Legality & compliance completeness checks (合法性与合规性).
-        if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
-            doc = self.get_document(item.target_id)
-            if not doc.compliance_passed:
-                raise ValueError("文书合规校验未通过，无法发布")
-            body = self._flatten_text(doc.rendered_content)
-            if len(body) < 10:
-                raise ValueError("文书正文内容过短，缺少可发布的合规条款")
-        elif item.target_type == SOP_REVIEW_TARGET_FLOW:
-            flow = self.get_flow(item.target_id)
-            steps, missing = self._build_plan_items(
-                [(ref.node_id, ref.required) for ref in flow.node_refs]
-            )
-            if missing:
-                raise ValueError(f"流程包含失效节点：{'、'.join(missing)}")
-            if not steps:
-                raise ValueError("流程未包含任何文书步骤，无法发布")
-        return None
-
-    def _approve_review_item(self, item: SOPReviewItem) -> None:
-        self._require_db()
-        """Promote an audited submission into the platform catalogs."""
-        now = utc_now_iso()
-        if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
-            doc = self.get_document(item.target_id)
-            node_id = self.publish_document_to_catalog(doc, is_official=item.is_official)
-            doc.status = SOP_DOC_STATUS_PUBLISHED
-            doc.updated_at = now
-            domain_persistence.write("sop.documents", doc.id, doc)
-            item.review_note = f"审核通过：内容合法合规，已发布至标准文书库（{node_id}）"
-        else:
-            flow = self.get_flow(item.target_id)
-            template_id = self.publish_flow_to_catalog(flow, is_official=item.is_official)
-            flow.status = SOP_FLOW_STATUS_PUBLISHED
-            flow.updated_at = now
-            domain_persistence.write("sop.flows", flow.id, flow)
-            item.review_note = f"审核通过：内容合法合规，已发布至流程向导（{template_id}）"
-        item.status = SOP_REVIEW_STATUS_APPROVED
-        item.reviewed_at = now
-        item.moderator_id = "review_engine"
-        domain_persistence.write("sop.review_queue", item.id, item)
-
-    def _reject_review_item(self, item: SOPReviewItem, reason: str) -> None:
-        self._require_db()
-        """Mark an audited submission as rejected and roll the source back."""
-        now = utc_now_iso()
-        if item.target_type == SOP_REVIEW_TARGET_DOCUMENT:
-            doc = self.get_document(item.target_id)
-            doc.status = SOP_DOC_STATUS_REJECTED
-            doc.updated_at = now
-            domain_persistence.write("sop.documents", doc.id, doc)
-        else:
-            flow = self.get_flow(item.target_id)
-            flow.status = SOP_FLOW_STATUS_REJECTED
-            flow.updated_at = now
-            domain_persistence.write("sop.flows", flow.id, flow)
-        item.status = SOP_REVIEW_STATUS_REJECTED
-        item.reviewed_at = now
-        item.review_note = f"审核未通过：{reason}"
-        item.moderator_id = "review_engine"
-        domain_persistence.write("sop.review_queue", item.id, item)
-
     def publish_document_to_catalog(self, doc: SOPDocumentResponse, is_official: bool = False) -> str:
+        """Promote a document into the standard catalog (legacy synchronous entry)."""
         self._require_db()
-        """Promote a maker's document into the standard document catalog (标准文书库).
-
-        The rendered document becomes a fillable document node in the graph, so it
-        shows up in the workbench alongside the curated standard documents.
-        """
-        template = None
-        if doc.template_id:
-            try:
-                template = self.get_template(doc.template_id)
-            except KeyError:
-                template = None
-        stage = template.stage if template is not None else 1
-        category = doc.category or (template.category if template is not None else "LEGAL")
-        node_id = f"tpl_pub_{uuid.uuid4().hex[:8]}"
-        body = self._flatten_text(doc.rendered_content)
-        node = SOPNode(
-            id=node_id,
-            kind=SOP_NODE_DOCUMENT,
-            code=f"PUB_{uuid.uuid4().hex[:6].upper()}",
-            name=doc.document_title,
-            stage=stage,
-            category=category,
-            description=body[:120],
-            outcome="由创客发布的标准文书，可直接查看与复用" if not is_official else "官方发布的标准文书，可直接查看与复用",
-            next_hint="查看文书正文，按需用于商事与合规申报。",
-            summary=body[:90] or "创客发布的合规文书",
-            author_name=self._resolve_author_name(doc.user_id),
-            author_title="官方发布" if is_official else "创客发布",
-            publisher_org="官方发布" if is_official else "创客发布",
-            is_official=is_official,
-            published_at=utc_now_iso(),
-            template_content=doc.rendered_content,
-            required_fields=[],
-            is_active=True,
+        template = self._template_or_none(doc.template_id)
+        prepared = fn.published_document(
+            {},
+            {
+                "document": _dump(doc),
+                "item": {"is_official": is_official, "author_name": self._resolve_author_name(doc.user_id)},
+                "template": _dump(template) if template is not None else None,
+            },
+            {},
         )
-        self._nodes[node_id] = node
-        self._register_template_from_node(node)
-        domain_persistence.write("sop.nodes", node_id, node)
-        domain_persistence.write("sop.templates", node_id, self._templates[node_id])
-        return node_id
+        entity_store.create(ENTITY_SOP_NODE, prepared["node"])
+        entity_store.create(ENTITY_SOP_TEMPLATE, prepared["template"])
+        return prepared["published_id"]
 
     def publish_flow_to_catalog(self, flow: SOPFlow, is_official: bool = False) -> str:
+        """Promote a flow into the platform flow guide (legacy synchronous entry)."""
         self._require_db()
-        """Promote a maker's flow into the platform flow guide (流程向导)."""
-        steps, _missing = self._build_plan_items(
+        plan, _missing = self._build_plan_items(
             [(ref.node_id, ref.required) for ref in flow.node_refs]
         )
-        stages = sorted({step.stage for step in steps})
-        summary = (flow.description or "").split("。")[0] if flow.description else flow.name
-        template_id = f"flowpub_{uuid.uuid4().hex[:8]}"
-        template = SOPFlowTemplate(
-            id=template_id,
-            code=f"USER_PUB_{uuid.uuid4().hex[:6].upper()}",
-            name=flow.name,
-            summary=summary or "创客发布的办事流程",
-            description=flow.description or summary,
-            category=self._derive_flow_category(steps),
-            stages=stages,
-            node_refs=[
-                SOPFlowTemplateRef(node_id=ref.node_id, required=ref.required, note=ref.note)
-                for ref in flow.node_refs
-            ],
-            outcome=f"由创客编排的办事流程，共 {len(steps)} 个步骤" if not is_official else f"官方编排的办事流程，共 {len(steps)} 个步骤",
-            author_name=self._resolve_author_name(flow.owner_id),
-            author_title="官方发布" if is_official else "创客发布",
-            publisher_org="官方发布" if is_official else "创客发布",
-            is_official=is_official,
-            published_at=utc_now_iso(),
+        prepared = fn.published_flow(
+            {},
+            {
+                "flow": _dump(flow),
+                "item": {"is_official": is_official, "author_name": self._resolve_author_name(flow.owner_id)},
+                "steps": [_dump(step) for step in plan],
+            },
+            {},
         )
-        self._flow_templates[template_id] = template
-        domain_persistence.write("sop.flow_templates", template_id, template)
-        return template_id
-
-    @staticmethod
-    def _derive_flow_category(steps: List[Any]) -> str:
-        """Map the majority document category to a flow-guide category."""
-        counts: Dict[str, int] = {}
-        for step in steps:
-            cat = {
-                "ENTITY": "ENTITY",
-                "IP": "IP",
-                "CROSS_BORDER": "CROSS_BORDER",
-            }.get(step.category, "COMPLIANCE")
-            counts[cat] = counts.get(cat, 0) + 1
-        if not counts:
-            return "COMPLIANCE"
-        return max(counts, key=counts.get)
-
-    def hydrate_review_queue(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._review_queue[r["id"]] = SOPReviewItem(**r)
-        return len(rows)
+        entity_store.create(ENTITY_SOP_FLOW_TEMPLATE, prepared["flow_template"])
+        return prepared["published_id"]
 
     # ------------------------------------------------------------------
-    # Background review-queue consumer
-    #
-    # Mirrors the hot-reload watcher: a lightweight asyncio loop that keeps
-    # draining PENDING_REVIEW submissions so approved documents / flows are
-    # automatically promoted into the platform catalogs.
+    # Review consumer: executes the review scenario per pending submission
     # ------------------------------------------------------------------
+    async def _content_safety_gate(self, item: SOPReviewItem) -> Dict[str, Any]:
+        """Run the platform content-safety gate (infrastructure) before the scenario.
+
+        The sensitive-word / legality gate is a platform capability, not a SOP
+        business decision: it is executed by the shared moderation gateway and its
+        verdict is handed to ``OPC_SOP_REVIEW_PROCESS_PIPELINE`` through
+        ``gate_passed`` / ``gate_reason`` so the scenario stays free of I/O.
+        """
+        try:
+            from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+
+            await prescreen_and_record(
+                item.content,
+                field_name=f"{item.target_type} 发布审核",
+                user_id=item.author_id,
+                scene="流程文书审核",
+                title=item.title,
+                target_type=item.target_type,
+                target_id=item.target_id,
+            )
+            return {"passed": True, "reason": ""}
+        except Exception as exc:  # noqa: BLE001 - a failed gate rejects the submission
+            return {"passed": False, "reason": str(exc)}
+
+    async def _process_one(self, item: SOPReviewItem) -> Dict[str, Any]:
+        from src.domains.orchestration.models import ScenarioExecuteRequest
+        from src.domains.orchestration.service import orchestration_service
+
+        gate = await self._content_safety_gate(item)
+        result = await orchestration_service.execute_scenario(
+            ScenarioExecuteRequest(
+                scenario_code=REVIEW_PROCESS_PIPELINE,
+                version="v1.0.0",
+                inputs={
+                    "item_id": item.id,
+                    "gate_passed": gate["passed"],
+                    "gate_reason": gate["reason"],
+                },
+                context={
+                    "user_id": REVIEW_ACTOR_ID,
+                    "user_role": "SYSTEM",
+                    "nickname": "审核引擎",
+                },
+            )
+        )
+        decision = dict((result.final_output or {}).get("review_decision") or {})
+        if result.status != "SUCCESS":
+            logger.warning("Review item %s failed: %s", item.id, result.error_message)
+            decision.setdefault("item_id", item.id)
+            decision.setdefault("target_id", item.target_id)
+            decision.setdefault("target_type", item.target_type)
+            decision.setdefault("status", "FAILED")
+            decision.setdefault("review_note", result.error_message or "审核处理失败")
+        return decision
+
+    async def process_review_queue(self, limit: Optional[int] = None) -> SOPReviewProcessResult:
+        """Consume the pending review queue through ``OPC_SOP_REVIEW_PROCESS_PIPELINE``."""
+        pending = [item for item in self._review_queue.values() if item.status == SOP_REVIEW_STATUS_PENDING]
+        pending.sort(key=lambda item: item.submitted_at)
+        if limit is not None and int(limit) > 0:
+            pending = pending[: int(limit)]
+
+        summary = SOPReviewProcessResult(processed=len(pending))
+        for item in pending:
+            decision = await self._process_one(item)
+            status = str(decision.get("status") or "")
+            if status == SOP_REVIEW_STATUS_APPROVED:
+                summary.approved += 1
+                if str(decision.get("target_type")) == SOP_REVIEW_TARGET_DOCUMENT:
+                    summary.published_documents.append(str(decision.get("target_id")))
+                else:
+                    summary.published_flows.append(str(decision.get("target_id")))
+            elif status == SOP_REVIEW_STATUS_REJECTED:
+                summary.rejected += 1
+            summary.details.append(
+                {
+                    "item_id": decision.get("item_id") or item.id,
+                    "title": item.title,
+                    "status": status,
+                    "note": decision.get("review_note", ""),
+                }
+            )
+        return summary
+
     async def _review_consumer_loop(self) -> None:
         logger.info("[SOP Review] Publish review consumer loop started")
         while self._review_consumer_running:
             try:
                 await self.process_review_queue()
-            except Exception as e:
-                logger.warning("[SOP Review] Consumer cycle exception: %s", e)
+            except Exception as exc:  # noqa: BLE001 - a cycle failure must not stop the loop
+                logger.warning("[SOP Review] Consumer cycle exception: %s", exc)
             try:
                 await asyncio.sleep(self.review_consumer_interval)
             except asyncio.CancelledError:
                 break
 
     def start_review_consumer(self, interval: float = 5.0) -> None:
-        """Start the non-blocking background consumer of the publish review queue."""
+        """Start the non-blocking consumer that drains the publish review queue."""
         self.review_consumer_interval = float(interval)
         if self._review_consumer_running:
             return
@@ -1303,50 +841,68 @@ class SOPService:
             self._review_consumer_running = False
 
     def stop_review_consumer(self) -> None:
-        """Stop the background review-queue consumer."""
         self._review_consumer_running = False
         if self._review_consumer_task and not self._review_consumer_task.done():
             self._review_consumer_task.cancel()
             self._review_consumer_task = None
 
     def review_consumer_status(self) -> Dict[str, Any]:
-        """Introspection payload for the background consumer."""
         return {
             "running": self._review_consumer_running,
-            "interval_seconds": getattr(self, "review_consumer_interval", 5.0),
+            "interval_seconds": self.review_consumer_interval,
             "queue_size": len(self._review_queue),
-            "pending": sum(1 for i in self._review_queue.values() if i.status == SOP_REVIEW_STATUS_PENDING),
+            "pending": sum(1 for item in self._review_queue.values() if item.status == SOP_REVIEW_STATUS_PENDING),
+            "pipeline": REVIEW_PROCESS_PIPELINE,
         }
 
+    # ------------------------------------------------------------------
+    # Hydrators (domain_snapshots -> in-memory indexes)
+    # ------------------------------------------------------------------
     def hydrate_templates(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._templates[r["id"]] = SOPTemplate(**r)
+        for row in rows:
+            self._templates[row["id"]] = SOPTemplate(**row)
         return len(rows)
 
     def hydrate_documents(self, rows: List[Dict]) -> int:
-        for r in rows:
-            self._documents[r["id"]] = SOPDocumentResponse(**r)
+        for row in rows:
+            self._documents[row["id"]] = SOPDocumentResponse(**row)
+        return len(rows)
+
+    def hydrate_flows(self, rows: List[Dict]) -> int:
+        for row in rows:
+            self._flows[row["id"]] = SOPFlow(**row)
         return len(rows)
 
     def hydrate_nodes(self, rows: List[Dict]) -> int:
-        for r in rows:
-            node = SOPNode(**r)
+        for row in rows:
+            node = SOPNode(**row)
             self._nodes[node.id] = node
             if node.kind == SOP_NODE_DOCUMENT:
                 self._register_template_from_node(node)
         return len(rows)
 
     def hydrate_edges(self, rows: List[Dict]) -> int:
-        for r in rows:
-            edge = SOPEdge(**r)
+        for row in rows:
+            edge = SOPEdge(**row)
             self._edges.append(edge)
         return len(rows)
 
     def hydrate_goals(self, rows: List[Dict]) -> int:
-        for r in rows:
-            goal = SOPGoal(**r)
+        for row in rows:
+            goal = SOPGoal(**row)
             self._goals[goal.id] = goal
         return len(rows)
+
+    def hydrate_flow_templates(self, rows: List[Dict]) -> int:
+        for row in rows:
+            self._flow_templates[row["id"]] = SOPFlowTemplate(**row)
+        return len(rows)
+
+    def hydrate_review_queue(self, rows: List[Dict]) -> int:
+        for row in rows:
+            self._review_queue[row["id"]] = SOPReviewItem(**row)
+        return len(rows)
+
 
 sop_service = SOPService()
 

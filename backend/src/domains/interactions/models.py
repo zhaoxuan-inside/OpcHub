@@ -97,6 +97,9 @@ class ContentComment(BaseModel):
     author_name: Optional[str] = "创客"
     content: str
     parent_id: Optional[str] = None
+    # Snapshot of the owning target's display title, so the personal interaction
+    # centre can be assembled without cross-domain lookups.
+    target_title: Optional[str] = ""
     created_at: str
 
 

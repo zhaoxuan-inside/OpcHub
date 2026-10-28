@@ -51,12 +51,9 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
         code = f"POL-{year}-{uuid.uuid4().hex[:4].upper()}"
 
     role = str(context.get("user_role") or "MAKER").upper()
-    is_official = args.get("is_official")
-    if is_official is None:
-        is_official = role == "ADMIN"
-
-    author_id = str(context.get("user_id") or args.get("author_id") or "")
-    author_name = args.get("author_name") or context.get("nickname") or "@创客"
+    is_admin = role == "ADMIN"
+    author_id = str((args.get("author_id") if is_admin else None) or context.get("user_id") or "")
+    author_name = (args.get("author_name") if is_admin else None) or context.get("nickname") or "@创客"
 
     return {
         "title": title,
@@ -72,7 +69,7 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
         "action_text": str(args.get("action_text") or DEFAULT_ACTION_TEXT).strip(),
         "author_id": author_id,
         "author_name": author_name,
-        "is_official": bool(is_official),
+        "is_official": is_admin,
     }
 
 
@@ -98,6 +95,7 @@ def query(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any])
         "search": str(args.get("search") or "").strip() or None,
         "page": int(args.get("page") or 1),
         "page_size": int(args.get("page_size") or 20),
+        "paged": args.get("page") is not None or args.get("page_size") is not None,
     }
 
 
@@ -121,6 +119,32 @@ def page(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) 
         "page_size": page_size,
         "total_pages": total_pages,
         "has_more": start + page_size < total,
+    }
+
+
+@operator(
+    "assemble.policy.list",
+    category="ASSEMBLE",
+    description="Project policies as a flat list (legacy) or a paged envelope",
+)
+def list_response(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    items = [dict(item) for item in (args.get("items") or []) if isinstance(item, dict)]
+    if not args.get("paged"):
+        return {"response": items}
+    total = int(args.get("total") if args.get("total") is not None else len(items))
+    page_no = max(1, int(args.get("page") or 1))
+    page_size = max(1, min(100, int(args.get("page_size") or 20)))
+    total_pages = max(1, -(-total // page_size))
+    start = (page_no - 1) * page_size
+    return {
+        "response": {
+            "items": items[start : start + page_size],
+            "total": total,
+            "page": page_no,
+            "page_size": page_size,
+            "total_pages": total_pages,
+            "has_more": start + page_size < total,
+        }
     }
 
 
@@ -271,3 +295,11 @@ def match_response(params: dict[str, Any], args: dict[str, Any], context: dict[s
 def published(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     """Expose the created document under the publish contract key."""
     return {"created_policy": args.get("entity") or {}}
+
+@operator(
+    "policy.calculate_tax",
+    category="CALC",
+    description="Compatibility alias: assess VAT exemption and savings",
+)
+def calculate_tax(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    return tax_assessment(params, args, context)

@@ -61,6 +61,13 @@ seed_compliance(compliance_service)
 seed_sop(sop_service)
 
 
+@pytest.fixture(scope="session", autouse=True)
+def _load_scenario_assets():
+    from src.core.scenario import ensure_scenarios_loaded
+
+    ensure_scenarios_loaded(force=True)
+
+
 @pytest.fixture(autouse=True)
 def _ensure_test_catalogs():
     """Re-hydrate test-only catalogs if an earlier test cleared a shared singleton."""
@@ -77,6 +84,46 @@ def _ensure_test_catalogs():
     if not sop_service._nodes:
         seed_sop(sop_service)
     yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_operator_kernel_state():
+    """Keep the generic entity store hermetic across tests.
+
+    The working set is cleared and the representative catalog fixtures are
+    re-seeded before every test, so test order cannot leak state.
+    """
+    from src.core.entity import entity_store
+
+    def _clear_all() -> None:
+        for name in entity_store.names:
+            if name.startswith("user."):
+                continue
+            entity_store.clear(name)
+
+    _clear_all()
+    seed_products(product_service)
+    seed_policies(policy_service)
+    seed_demands(demand_service)
+    seed_perks(perk_service)
+    seed_compliance(compliance_service)
+    seed_sop(sop_service)
+    yield
+    _clear_all()
+    for holder in (
+        product_service,
+        policy_service,
+        demand_service,
+        perk_service,
+        compliance_service,
+        sop_service,
+    ):
+        clear = getattr(holder, "clear", None)
+        if callable(clear):
+            try:
+                clear()
+            except Exception:
+                pass
 
 
 DEFAULT_ADMIN_TOKEN = create_session_token({

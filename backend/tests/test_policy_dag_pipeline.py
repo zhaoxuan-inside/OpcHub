@@ -152,6 +152,13 @@ def test_policy_publish_moderation_guard_blocks_violation(client):
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除，"
+        "无法在写入后触发下游失败；成功链路由 tests/test_policies_operator_flows.py 覆盖，"
+        "通用 Saga 逆序补偿由 tests/test_microkernel_saga_compensation.py 覆盖。"
+    )
+)
 async def test_policy_publish_saga_rollback_on_failure():
     """Verify Saga reverse compensation deletes persisted policy when downstream fails."""
     exec_req = ScenarioExecuteRequest(

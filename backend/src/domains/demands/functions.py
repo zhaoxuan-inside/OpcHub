@@ -57,16 +57,17 @@ def normalize_publish(params: dict[str, Any], args: dict[str, Any], context: dic
     category = _as_text(args.get("category") or DEFAULT_CATEGORY).upper()
     # Display name is server-resolved: the gateway context wins so a client cannot
     # impersonate another maker (``creator_name`` is only a fallback).
-    creator_name = _as_text(context.get("nickname") or args.get("creator_name")) or None
+    is_admin = role == "ADMIN"
+    creator_name = _as_text((args.get("creator_name") if is_admin else None) or context.get("nickname")) or None
     return {
         "title": _as_text(args.get("title")),
         "description": _as_text(args.get("description")),
         "budget_cny": float(args.get("budget_cny") or 0.0),
         "category": category if category in CATEGORIES else DEFAULT_CATEGORY,
         "deadline_at": _as_iso(args.get("deadline_at")),
-        "creator_id": _as_text(context.get("user_id")),
+        "creator_id": _as_text((args.get("creator_id") if is_admin else None) or context.get("user_id")),
         "creator_name": creator_name,
-        "is_official": role == "ADMIN",
+        "is_official": is_admin,
         "status": "OPEN",
         "bidders_count": 0,
     }

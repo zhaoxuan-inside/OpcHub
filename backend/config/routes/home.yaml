@@ -1,0 +1,11 @@
+# Home overview scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "home.overview"
+    version: "v1.0.0"
+    domain: "home"
+    description: "首页全域宏观指标聚合与功能空间地图"
+    is_default: true
+    pipeline: "OPC_HOME_OVERVIEW_PIPELINE"

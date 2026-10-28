@@ -1,0 +1,81 @@
+# Auth (创客注册 / 登录 / 验证码 / 会话) gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "auth.register"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "创客商业化邮箱注册、资质存证与租户主体初始化"
+    is_default: true
+    pipeline: "OPC_AUTH_REGISTER_PIPELINE"
+
+  - gateway: "auth.captcha"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "获取人机验证与防刷图形 SVG 算术验证码"
+    is_default: true
+    pipeline: "OPC_AUTH_CAPTCHA_PIPELINE"
+
+  - gateway: "auth.send-code"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "发送邮箱/手机身份所有权核验验证码 (带 60s 频控与防刷拦截)"
+    is_default: true
+    pipeline: "OPC_AUTH_SEND_CODE_PIPELINE"
+
+  - gateway: "auth.verify-code"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "预核验邮箱/手机验证码的有效性与时效"
+    is_default: true
+    pipeline: "OPC_AUTH_VERIFY_CODE_PIPELINE"
+
+  - gateway: "auth.password-strength"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "评估密码复杂度、熵值与商用安全合规评级"
+    is_default: true
+    pipeline: "OPC_AUTH_PASSWORD_STRENGTH_PIPELINE"
+
+  - gateway: "auth.legal-agreements"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "获取平台法定用户服务协议与隐私保护指引正文及版本"
+    is_default: true
+    pipeline: "OPC_AUTH_LEGAL_AGREEMENTS_PIPELINE"
+
+  - gateway: "auth.mail-providers"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "获取系统已适配支持的主流邮箱服务商配置与路由元数据"
+    is_default: true
+    pipeline: "OPC_AUTH_MAIL_PROVIDERS_PIPELINE"
+
+  - gateway: "auth.login"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "创客账号/邮箱/验证码三模式身份鉴权及会话 Token 签发"
+    is_default: true
+    pipeline: "OPC_AUTH_LOGIN_PIPELINE"
+
+  - gateway: "auth.change_password"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "轮换登录密码并清除内置管理员首登强制改密标记"
+    is_default: true
+    pipeline: "OPC_AUTH_CHANGE_PASSWORD_PIPELINE"
+
+  - gateway: "auth.change-password"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "轮换创客登录密码并清除首次登录强制改密标志"
+    is_default: true
+    pipeline: "OPC_AUTH_CHANGE_PASSWORD_PIPELINE"
+
+  - gateway: "auth.session"
+    version: "v1.0.0"
+    domain: "auth"
+    description: "验证创客会话 Token 并获取登录工作台状态"
+    is_default: true
+    pipeline: "OPC_AUTH_SESSION_PIPELINE"

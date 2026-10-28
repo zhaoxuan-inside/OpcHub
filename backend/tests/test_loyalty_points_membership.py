@@ -20,6 +20,8 @@ from src.core.security import create_session_token
 from src.domains.interactions.service import content_interaction_service
 from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
 from src.domains.loyalty.service import loyalty_service
+from src.domains.orchestration.models import ScenarioExecuteRequest
+from src.domains.orchestration.service import orchestration_service
 from src.domains.policies.models import PolicyCreate
 from src.domains.policies.service import policy_service
 from src.domains.products.models import ProductCreate
@@ -73,18 +75,77 @@ def client():
     return TestClient(app)
 
 
+async def _run_scenario(scenario: str, inputs: dict, context: dict | None = None):
+    return await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code=scenario,
+            version="v1.0.0",
+            inputs=inputs,
+            context=context or {},
+        )
+    )
+
+
+async def _award(
+    event_code: str,
+    uid: str,
+    *,
+    actor_id: str = "",
+    target_type: str = "",
+    target_id: str = "",
+    key: str | None = None,
+):
+    """Compose the loyalty award scenario (operator-kernel v2 has no service hook)."""
+    return await _run_scenario(
+        "OPC_LOYALTY_AWARD_PIPELINE",
+        {
+            "event_code": event_code,
+            "user_id": uid,
+            "actor_id": actor_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "idempotency_key": key,
+        },
+        {"user_id": actor_id or uid, "user_role": "MAKER"},
+    )
+
+
+async def _revoke(
+    event_code: str,
+    uid: str,
+    *,
+    actor_id: str = "",
+    target_type: str = "",
+    target_id: str = "",
+    key: str | None = None,
+):
+    return await _run_scenario(
+        "OPC_LOYALTY_REVOKE_PIPELINE",
+        {
+            "event_code": event_code,
+            "user_id": uid,
+            "actor_id": actor_id,
+            "target_type": target_type,
+            "target_id": target_id,
+            "idempotency_key": key,
+        },
+        {"user_id": actor_id or uid, "user_role": "MAKER"},
+    )
+
+
 def test_loyalty_operators_are_registered():
     handlers = registry.list_handlers()
     for name in (
-        "loyalty.identity_guard",
-        "loyalty.event_resolve",
-        "loyalty.award_guard",
-        "loyalty.points_settle",
-        "loyalty.points_revoke",
-        "loyalty.redeem_guard",
-        "loyalty.redeem_settle",
-        "loyalty.subscribe_guard",
-        "loyalty.subscribe_settle",
+        "calc.loyalty.event",
+        "calc.loyalty.resolve",
+        "calc.loyalty.settle",
+        "calc.loyalty.revoke",
+        "calc.loyalty.redeem",
+        "calc.loyalty.membership",
+        "assemble.loyalty.award_result",
+        "assemble.loyalty.revoke_result",
+        "assemble.loyalty.redemption_result",
+        "assemble.loyalty.subscription_result",
     ):
         assert name in handlers
 
@@ -102,7 +163,8 @@ def test_rules_are_public(client):
     assert dislike_rule["points"] == 0
 
 
-def test_publish_policy_awards_points(client):
+@pytest.mark.asyncio
+async def test_publish_policy_awards_points(client):
     resp = dispatch(
         client,
         "policies.publish",
@@ -118,6 +180,21 @@ def test_publish_policy_awards_points(client):
         token=AUTHOR_TOKEN,
     ).json()
     assert resp.get("code") == 200, resp
+    policy_id = resp["data"]["id"]
+
+    # 发布场景不再隐式跨域发积分；由上层组合显式调用积分发放场景。
+    first = await _award(
+        "FIRST_PUBLISH", AUTHOR_ID, target_type="POLICY", target_id=policy_id,
+        key=f"once:FIRST_PUBLISH:{AUTHOR_ID}",
+    )
+    assert first.status == "SUCCESS", first.error_message
+    assert first.final_output["loyalty_awarded"] is True
+    publish = await _award(
+        "PUBLISH_POLICY", AUTHOR_ID, target_type="POLICY", target_id=policy_id,
+        key=f"publish:POLICY:{policy_id}",
+    )
+    assert publish.status == "SUCCESS", publish.error_message
+    assert publish.final_output["loyalty_awarded"] is True
     # 发布政策 100 + 首次发布一次性奖励 300
     assert loyalty_service.get_account(AUTHOR_ID).balance == 400
 
@@ -159,38 +236,102 @@ def _seed_product() -> str:
     return product.id
 
 
-def test_like_awards_author_and_cancel_revokes(client):
-    product_id = _seed_product()
+@pytest.mark.asyncio
+async def test_like_awards_author_and_cancel_revokes(client):
+    from src.core.entity import entity_store
+
+    product = entity_store.create(
+        "product.item",
+        {
+            "title": "积分互动测试产品",
+            "tagline": "用于验证点赞与踩的积分联动",
+            "description": "这是一条用于验证互动积分联动与撤销回滚的测试产品描述。",
+            "author_id": AUTHOR_ID,
+            "author_name": "积分作者",
+        },
+    )
+    product_id = product["id"]
     payload = {"target_type": "PRODUCT", "target_id": product_id, "kind": "LIKE"}
+    key = f"like:{READER_ID}:{product_id}"
+
     first = dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()
     assert first.get("code") == 200
     assert first["data"]["active"] is True
+    awarded = await _award(
+        "RECEIVE_LIKE", AUTHOR_ID, actor_id=READER_ID,
+        target_type="PRODUCT", target_id=product_id, key=key,
+    )
+    assert awarded.status == "SUCCESS", awarded.error_message
+    assert awarded.final_output["loyalty_awarded"] is True
     assert loyalty_service.get_account(AUTHOR_ID).balance == 5
 
     second = dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()
     assert second.get("code") == 200
     assert second["data"]["active"] is False
+    revoked = await _revoke(
+        "RECEIVE_LIKE", AUTHOR_ID, actor_id=READER_ID,
+        target_type="PRODUCT", target_id=product_id, key=key,
+    )
+    assert revoked.status == "SUCCESS", revoked.error_message
+    assert revoked.final_output["loyalty_revoked"] is True
     assert loyalty_service.get_account(AUTHOR_ID).balance == 0
 
 
-def test_cancel_then_relike_does_not_recredit(client):
-    product_id = _seed_product()
+@pytest.mark.asyncio
+async def test_cancel_then_relike_does_not_recredit(client):
+    product = product_service.create_product(
+        ProductCreate(
+            title="积分互动测试产品",
+            tagline="用于验证点赞与踩的积分联动",
+            description="这是一条用于验证互动积分联动与撤销回滚的测试产品描述。",
+            author_id=AUTHOR_ID,
+            author_name="积分作者",
+        )
+    )
+    product_id = product.id
     payload = {"target_type": "PRODUCT", "target_id": product_id, "kind": "LIKE"}
+    key = f"like:{READER_ID}:{product_id}"
+
     assert dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()["code"] == 200
+    assert (await _award("RECEIVE_LIKE", AUTHOR_ID, actor_id=READER_ID,
+                         target_type="PRODUCT", target_id=product_id, key=key)).final_output["loyalty_awarded"] is True
     assert loyalty_service.get_account(AUTHOR_ID).balance == 5
+
     assert dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()["code"] == 200
+    assert (await _revoke("RECEIVE_LIKE", AUTHOR_ID, actor_id=READER_ID,
+                          target_type="PRODUCT", target_id=product_id, key=key)).final_output["loyalty_revoked"] is True
     assert loyalty_service.get_account(AUTHOR_ID).balance == 0
+
     assert dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()["code"] == 200
+    relike = await _award("RECEIVE_LIKE", AUTHOR_ID, actor_id=READER_ID,
+                          target_type="PRODUCT", target_id=product_id, key=key)
     # Tombstone: cancel + re-like must not re-credit the same pair.
+    assert relike.final_output["loyalty_awarded"] is False
+    assert relike.final_output["loyalty_reason"] == "duplicate"
     assert loyalty_service.get_account(AUTHOR_ID).balance == 0
 
 
-def test_dislike_never_deducts_points(client):
-    product_id = _seed_product()
+@pytest.mark.asyncio
+async def test_dislike_never_deducts_points(client):
+    product = product_service.create_product(
+        ProductCreate(
+            title="积分互动测试产品",
+            tagline="用于验证点赞与踩的积分联动",
+            description="这是一条用于验证互动积分联动与撤销回滚的测试产品描述。",
+            author_id=AUTHOR_ID,
+            author_name="积分作者",
+        )
+    )
+    product_id = product.id
     payload = {"target_type": "PRODUCT", "target_id": product_id, "kind": "DISLIKE"}
     before = loyalty_service.get_account(AUTHOR_ID).balance
     resp = dispatch(client, "content.interaction.toggle", payload, token=READER_TOKEN).json()
     assert resp.get("code") == 200
+    awarded = await _award(
+        "RECEIVE_DISLIKE", AUTHOR_ID, actor_id=READER_ID,
+        target_type="PRODUCT", target_id=product_id, key=f"dislike:{READER_ID}:{product_id}",
+    )
+    assert awarded.final_output["loyalty_awarded"] is False
     after = loyalty_service.get_account(AUTHOR_ID).balance
     assert after == before
 
@@ -226,8 +367,11 @@ def test_physical_reward_requires_address(client):
         {"item_code": "physical_sticker_pack", "qty": 1},
         token=AUTHOR_TOKEN,
     ).json()
-    assert resp.get("code") != 200
-    assert "收货地址" in resp.get("message", "")
+    # v2 兑换场景用业务结果标记拒绝，而不是抛错：地址缺失 → loyalty_redeemed=False
+    assert resp.get("code") == 200
+    assert resp["data"]["loyalty_redeemed"] is False
+    assert resp["data"]["loyalty_reason"] == "address_required"
+    assert loyalty_service.get_account(AUTHOR_ID).balance == 5000
 
     ok = dispatch(
         client,
@@ -261,6 +405,8 @@ def test_founding_vip_is_exposed_as_membership(client):
     record["tier_name"] = "黑钻创客 VIP"
     record["active_entitlements"] = {"ent_black_diamond_priority"}
     record["entitlement_expiries"] = {"ent_black_diamond_priority": "2099-01-01 00:00:00"}
+    # v2：会员记录是权威数据源，创始会员的旧用户记录由同步算子投影一次。
+    loyalty_service.sync_legacy_memberships()
     me = dispatch(client, "loyalty.membership.me", token=AUTHOR_TOKEN).json()
     assert me.get("code") == 200, me
     assert me["data"]["tier"] == "BLACK_DIAMOND"
@@ -273,6 +419,7 @@ def test_lower_tier_redeem_is_rejected_for_higher_grant(client):
     record["tier_name"] = "黑钻创客 VIP"
     record["active_entitlements"] = {"ent_black_diamond_priority"}
     record["entitlement_expiries"] = {"ent_black_diamond_priority": "2099-01-01 00:00:00"}
+    loyalty_service.sync_legacy_memberships()
     loyalty_service._ensure_account(AUTHOR_ID)["balance"] = 30000
 
     resp = dispatch(
@@ -281,8 +428,9 @@ def test_lower_tier_redeem_is_rejected_for_higher_grant(client):
         {"item_code": "membership_pro_yearly", "qty": 1},
         token=AUTHOR_TOKEN,
     ).json()
-    assert resp.get("code") != 200
-    assert "更高档" in resp.get("message", "")
+    assert resp.get("code") == 200
+    assert resp["data"]["loyalty_redeemed"] is False
+    assert resp["data"]["loyalty_reason"] == "higher_tier_active"
     # 余额未被扣减
     assert loyalty_service.get_account(AUTHOR_ID).balance == 30000
 

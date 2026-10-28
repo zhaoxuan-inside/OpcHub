@@ -40,7 +40,8 @@ def seed_composable_dependencies():
         is_active=True,
     )
 
-    compliance_service._checkpoints = [
+    compliance_service._checkpoints.clear()
+    compliance_service._checkpoints.extend([
         AuditCheckItem(
             id="chk-privacy", dimension_id="dim_privacy", title="隐私政策",
             description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
@@ -53,10 +54,10 @@ def seed_composable_dependencies():
             id="chk-opensource-license", dimension_id="dim_ip_oss", title="开源许可",
             description="d", severity="CRITICAL", weight=12, advice="a", legal_basis="l",
         ),
-    ]
+    ])
     yield
     sop_service._templates.clear()
-    compliance_service._checkpoints = []
+    compliance_service._checkpoints.clear()
 
 
 def test_list_registered_operators_across_domains():
@@ -64,23 +65,24 @@ def test_list_registered_operators_across_domains():
     descriptors = dispatcher.list_descriptors()
     names = {d.name for d in descriptors}
 
-    # Core operators
-    assert "gateway_ingress" in names
-    assert "auth_guard" in names
-    assert "invoice_tax_calc" in names
+    # Core generic operators
+    assert "guard.authn" in names
+    assert "entity.create" in names
+    assert "transform.derive" in names
+    assert "response.build" in names
 
-    # Domain operators
+    # Domain pure-function operators (v2 naming)
     assert "policy.calculate_tax" in names
-    assert "policy.match_subsidies" in names
-    assert "sop.render_document" in names
-    assert "compliance.evaluate_audit" in names
-    assert "moderation.inspect_content" in names
+    assert "calc.policy.rank_matches" in names
+    assert "calc.sop.render_document" in names
+    assert "calc.compliance.score" in names
+    assert "calc.moderation.prescreen" in names
 
     # External gateway operators
-    assert "external.ai.generate_charter" in names
-    assert "external.crawler.fetch_policy" in names
-    assert "external.payment.split_order" in names
-    assert "external.sms.send_auth_code" in names
+    assert "external.ai.charter" in names
+    assert "external.gov.fetch_announcement" in names
+    assert "external.payment.split" in names
+    assert "external.sms.send" in names
 
 
 @pytest.mark.asyncio
@@ -95,9 +97,9 @@ async def test_in_process_direct_dispatch():
         inputs={"quarterly_income": 200000.0},
         context={"trace_id": "test_trace_direct"},
     )
-    assert res["tax_calculated"] is True
     assert res["is_vat_exempt"] is True
-    assert res["estimated_tax_amount"] == 0.0
+    assert res["applicable_tax_rate"] == 0.0
+    assert res["estimated_tax_savings"] >= 0.0
 
 
 @pytest.mark.asyncio
@@ -119,6 +121,14 @@ async def test_operator_mode_toggle():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧组合场景 OPC_COMPLIANCE_STARTUP_FLOW（auth->tax->AI->SOP->合规）"
+        "已按设计拆分为各领域单场景；税务测算由 tests/test_policies_operator_flows.py、"
+        "文书渲染由 tests/test_sop_operator_flows.py、合规评分由 "
+        "tests/test_compliance_operator_flows.py 分别覆盖。"
+    )
+)
 async def test_execute_composable_startup_compliance_flow():
     """Test executing full composable startup flow (auth -> tax -> AI charter -> SOP doc -> compliance)."""
     req = ScenarioExecuteRequest(
@@ -154,6 +164,14 @@ async def test_execute_composable_startup_compliance_flow():
 
 
 @pytest.mark.asyncio
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧组合场景 OPC_POLICY_TAX_AI_MATCH 已移除；"
+        "免税测算 + 政策匹配现由 OPC_POLICY_MATCH_PIPELINE 表达，"
+        "覆盖见 tests/test_policies_operator_flows.py::"
+        "test_match_scenario_calculates_tax_and_ranks_policies。"
+    )
+)
 async def test_execute_composable_policy_match_flow():
     """Test executing policy tax and AI subsidy matching scenario."""
     req = ScenarioExecuteRequest(
@@ -180,40 +198,40 @@ def test_api_list_operators():
     assert len(data) >= 12
     op_names = [item["name"] for item in data]
     assert "policy.calculate_tax" in op_names
-    assert "external.ai.generate_charter" in op_names
+    assert "external.ai.charter" in op_names
 
 
 def test_api_update_operator_mode():
     """Operator mode switching goes through the gateway (orchestration.operators.mode)."""
     payload = {
-        "name": "external.ai.generate_charter",
+        "name": "external.ai.charter",
         "mode": "HTTP_REMOTE",
         "remote_endpoint": "http://ai-svc:8080/generate",
     }
     data = gw_data(client, "orchestration.operators.mode", payload)
-    assert data["name"] == "external.ai.generate_charter"
+    assert data["name"] == "external.ai.charter"
     assert data["mode"] == "HTTP_REMOTE"
 
     # Reset back to IN_PROCESS
     gw_data(client, "orchestration.operators.mode", {
-        "name": "external.ai.generate_charter", "mode": "IN_PROCESS", "remote_endpoint": None,
+        "name": "external.ai.charter", "mode": "IN_PROCESS", "remote_endpoint": None,
     })
 
 
 def test_api_execute_scenario():
     """Scenario execution goes through the gateway (orchestration.scenarios.execute)."""
     payload = {
-        "scenario_code": "OPC_POLICY_TAX_AI_MATCH",
+        "scenario_code": "OPC_POLICY_MATCH_PIPELINE",
         "inputs": {
             "quarterly_income": 150000.0,
-            "city": "杭州",
-            "entity_type": "个体工商户",
+            "maker_type": "INDIVIDUAL",
+            "region": "杭州",
         },
     }
     data = gw_data(client, "orchestration.scenarios.execute", payload)
     assert data["status"] == "SUCCESS"
-    assert data["scenario_code"] == "OPC_POLICY_TAX_AI_MATCH"
+    assert data["scenario_code"] == "OPC_POLICY_MATCH_PIPELINE"
     assert "execution_time_ms" in data
     assert "node_traces" in data
-    assert len(data["node_traces"]) == 5
-    assert data["final_output"]["vat_exemption_eligible"] is True
+    assert len(data["node_traces"]) == 7
+    assert data["final_output"]["is_vat_exempt"] is True

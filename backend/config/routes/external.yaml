@@ -1,0 +1,53 @@
+# External ecosystem gateway scenario -> pipeline mapping.
+# Aggregated by the main control plane into config/gateway_routes.yaml.
+# Route entries must not declare handler/model/args_type (operator kernel v2 §5).
+
+routes:
+  - gateway: "external.siliconflow.chat"
+    version: "v1.0.0"
+    domain: "external"
+    description: "调用 SiliconFlow 硅基流动 AI 算力大模型进行对话推理与生成"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_SILICONFLOW_CHAT_PIPELINE"
+
+  - gateway: "external.siliconflow.summarize"
+    version: "v1.0.0"
+    domain: "external"
+    description: "调用 SiliconFlow 硅基流动 AI 算力提炼政策公文大白话要点"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_SILICONFLOW_SUMMARIZE_PIPELINE"
+
+  - gateway: "external.siliconflow.charter"
+    version: "v1.0.0"
+    domain: "external"
+    description: "调用 SiliconFlow 硅基流动 AI 算力生成一人有限责任公司章程条款"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_SILICONFLOW_CHARTER_PIPELINE"
+
+  - gateway: "external.payment.split"
+    version: "v1.0.0"
+    domain: "external"
+    description: "执行微信支付分账或 Stripe Connect 跨境分账结算 (防资金池合规)"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_PAYMENT_SPLIT_PIPELINE"
+
+  - gateway: "external.gov.sat_policy"
+    version: "v1.0.0"
+    domain: "external"
+    description: "官方渠道爬取并结构化国家税务总局税费减免公告文件"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_GOV_SAT_POLICY_PIPELINE"
+
+  - gateway: "external.rag.policy_search"
+    version: "v1.0.0"
+    domain: "external"
+    description: "基于轻量向量引擎与余弦相似度检索政策中心公文库 (RAG 混合召回)"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_RAG_POLICY_SEARCH_PIPELINE"
+
+  - gateway: "external.rag.forum_qa"
+    version: "v1.0.0"
+    domain: "external"
+    description: "基于轻量向量引擎与大模型协同的一人公司互助社区经验 RAG 智能问答"
+    is_default: true
+    pipeline: "OPC_EXTERNAL_RAG_FORUM_QA_PIPELINE"

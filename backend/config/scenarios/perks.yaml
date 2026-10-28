@@ -124,6 +124,15 @@ scenarios:
         inputs:
           effective_start: $inputs.effective_start
           effective_end: $inputs.effective_end
+      - id: moderation
+        operator: guard.moderation
+        params:
+          fields: [name, provider, summary]
+          blocklist: [洗钱, 代开发票, 非法集资, 内嵌自设资金池]
+        inputs:
+          name: $inputs.name
+          provider: $inputs.provider
+          summary: $inputs.summary
       - id: normalize
         operator: calc.perk.publish_payload
         inputs:
@@ -139,6 +148,8 @@ scenarios:
           priority: $inputs.priority
           status: $inputs.status
           highlights: $inputs.highlights
+          author_id: $inputs.author_id
+          author_name: $inputs.author_name
           author_name: $inputs.author_name
       - id: create
         operator: entity.create
@@ -155,7 +166,8 @@ scenarios:
     edges:
       - [auth, fields]
       - [fields, window]
-      - [window, normalize]
+      - [window, moderation]
+      - [moderation, normalize]
       - [normalize, create]
       - [create, metric]
       - [metric, result]

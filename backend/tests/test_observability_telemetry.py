@@ -68,10 +68,26 @@ async def test_dag_pipeline_trace_id_penetration():
                 "topology": "DAG",
                 "entry_node": "dnode-1",
                 "nodes": [
-                    {"id": "dnode-1", "action_handler": "gateway_ingress", "type": "GATEWAY"},
-                    {"id": "dnode-2", "action_handler": "auth_guard", "type": "GUARD"},
-                    {"id": "dnode-3", "action_handler": "invoice_tax_calc", "type": "BIZ"},
-                    {"id": "dnode-4", "action_handler": "es_audit_sync", "type": "STORAGE"},
+                    {
+                        "id": "dnode-1", "action_handler": "transform.derive", "type": "BIZ",
+                        "params": {"expr": "args.income * 0", "output_key": "rate"},
+                        "inputs_map": {"income": "$inputs.quarterly_income"},
+                    },
+                    {
+                        "id": "dnode-2", "action_handler": "transform.derive", "type": "BIZ",
+                        "params": {"expr": "args.rate + 1", "output_key": "step"},
+                        "inputs_map": {"rate": "$nodes.dnode-1.rate"},
+                    },
+                    {
+                        "id": "dnode-3", "action_handler": "transform.derive", "type": "BIZ",
+                        "params": {"expr": "args.step * 2", "output_key": "doubled"},
+                        "inputs_map": {"step": "$nodes.dnode-2.step"},
+                    },
+                    {
+                        "id": "dnode-4", "action_handler": "transform.derive", "type": "BIZ",
+                        "params": {"expr": "args.doubled + 0", "output_key": "final"},
+                        "inputs_map": {"doubled": "$nodes.dnode-3.doubled"},
+                    },
                 ],
                 "edges": [
                     {"from": "dnode-1", "to": "dnode-2"},

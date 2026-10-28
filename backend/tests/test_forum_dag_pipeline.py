@@ -89,6 +89,14 @@ def test_forum_thread_moderation_guard_blocks_prohibited_content(client):
     assert data["code"] != "OPC_SUCCESS" or "violation" in str(data) or "prohibited" in str(data)
 
 
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除，"
+        "无法再从业务输入触发下游失败；通用 Saga 逆向补偿由 "
+        "tests/test_microkernel_saga_compensation.py 覆盖，场景级补偿由 "
+        "tests/test_unified_publish_pipelines.py 覆盖。"
+    )
+)
 @pytest.mark.asyncio
 async def test_forum_thread_saga_rollback_on_failure():
     """Verify Saga reverse compensation deletes persisted thread when downstream fails."""
@@ -331,6 +339,14 @@ def test_forum_vote_mutual_exclusivity_via_dag(client):
     assert v3["downvote_count"] == down_cnt_1
 
 
+@pytest.mark.skip(
+    reason=(
+        "operator-kernel v2: 旧故障注入 simulate_downstream_failure 已按设计移除，"
+        "无法再从业务输入触发下游失败；通用 Saga 逆向补偿由 "
+        "tests/test_microkernel_saga_compensation.py 覆盖，场景级补偿由 "
+        "tests/test_unified_publish_pipelines.py 覆盖。"
+    )
+)
 @pytest.mark.asyncio
 async def test_forum_answer_saga_rollback_on_failure():
     """Verify Saga reverse compensation deletes persisted answer when downstream fails."""

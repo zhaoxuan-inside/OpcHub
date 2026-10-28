@@ -17,8 +17,8 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 SOP_DOC_PAGE = ROOT / "frontend" / "src" / "components" / "sop" / "SopDocPage.vue"
 
 
-async def _gw(ac, scenario, payload):
-    ac.headers["Authorization"] = f"Bearer {DEFAULT_ADMIN_TOKEN}"
+async def _gw(ac, scenario, payload, token=None):
+    ac.headers["Authorization"] = f"Bearer {token or DEFAULT_ADMIN_TOKEN}"
     return await ac.post("/api/welcom/opc_world", json={
         "scenario": scenario, "version": "v1.0.0", "payload": payload,
     })
@@ -27,6 +27,10 @@ async def _gw(ac, scenario, payload):
 @pytest.mark.asyncio
 async def test_draft_save_document_full_flow():
     """起草新文书并保存：render 创建 → list 查回，完整闭环。"""
+    from src.core.security import create_session_token
+    maker_token = create_session_token({
+        "uid": "usr_draft_test", "role": "MAKER", "nickname": "起草创客",
+    })
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         # 1. 取一份标准文书模板（sop.documents 标准文书库）
         cat_res = await _gw(ac, "sop.documents", {"user_id": "usr_draft_test"})
@@ -38,9 +42,8 @@ async def test_draft_save_document_full_flow():
         # 2. 起草新文书并保存（sop.document.render 微内核 DAG 编排 + PostgreSQL 持久化）
         save_res = await _gw(ac, "sop.document.render", {
             "template_id": template_id,
-            "user_id": "usr_draft_test",
             "form_data": {"company_name": "起草验证有限公司", "founder_name": "张创客"},
-        })
+        }, token=maker_token)
         assert save_res.json()["code"] == 200
         doc = save_res.json()["data"]
         assert doc["id"]
@@ -50,7 +53,7 @@ async def test_draft_save_document_full_flow():
         saved_doc_id = doc["id"]
 
         # 3. 我的文书列表应包含刚保存的文书（sop.document.list）
-        list_res = await _gw(ac, "sop.document.list", {"user_id": "usr_draft_test"})
+        list_res = await _gw(ac, "sop.document.list", {}, token=maker_token)
         assert list_res.json()["code"] == 200
         docs = list_res.json()["data"]
         assert isinstance(docs, list)

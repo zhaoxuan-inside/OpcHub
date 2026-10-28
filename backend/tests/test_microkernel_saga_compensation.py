@@ -1,15 +1,15 @@
 """Unit and Integration Tests for Microkernel Six-Tuple Saga Reverse Compensation Engine."""
 import pytest
 from src.core.microkernel import (
-    microkernel_engine,
-    registry,
     DAGConfig,
-    ExecutionGraph,
-    NodeDef,
     EdgeDef,
-    NodeType,
+    ExecutionGraph,
     ExecutionStatus,
+    NodeDef,
+    NodeType,
 )
+from src.core.microkernel.engine import microkernel_engine
+from src.core.microkernel.registry import registry
 
 
 @pytest.fixture(autouse=True)

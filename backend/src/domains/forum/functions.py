@@ -141,15 +141,16 @@ def hot_score(params: dict[str, Any], args: dict[str, Any], context: dict[str, A
 )
 def thread_publish(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
     role = _text(context.get("user_role") or "MAKER").upper()
-    # Legacy publish contract: an explicit author_id wins (the gateway binds the
-    # authenticated identity only when the payload omits it).
-    author_id = _text(args.get("author_id")) or _text(context.get("user_id"))
+    is_admin = role == "ADMIN"
+    # Identity is server-bound: only ADMIN may attribute content to another author.
+    author_id = (_text(args.get("author_id")) if is_admin else "") or _text(context.get("user_id"))
+    author_name = (_text(args.get("author_name")) if is_admin else "") or _text(context.get("nickname")) or "超级个体创客"
     return {
         "category_code": (_text(args.get("category_code")) or "DEV").upper(),
         "author_id": author_id,
-        "author_name": _text(args.get("author_name")) or _text(context.get("nickname")) or "超级个体创客",
+        "author_name": author_name,
         "author_title": _text(args.get("author_title")) or "独立创业者",
-        "is_official": role == "ADMIN",
+        "is_official": is_admin,
         "title": _text(args.get("title")),
         "content": _text(args.get("content")),
         "view_count": 0,
@@ -193,8 +194,8 @@ def answer_publish(params: dict[str, Any], args: dict[str, Any], context: dict[s
     count = _int(args.get("word_count"), len(content)) or len(content)
     return {
         "thread_id": _text(args.get("thread_id") or args.get("id")),
-        "author_id": _text(args.get("author_id")) or _text(context.get("user_id")),
-        "author_name": _text(args.get("author_name")) or _text(context.get("nickname")) or "创客探索者",
+        "author_id": (_text(args.get("author_id")) if _text(context.get("user_role")).upper() == "ADMIN" else "") or _text(context.get("user_id")),
+        "author_name": (_text(args.get("author_name")) if _text(context.get("user_role")).upper() == "ADMIN" else "") or _text(context.get("nickname")) or "创客探索者",
         "author_title": _text(args.get("author_title")) or "超级个体实战家",
         "content": content,
         "upvote_count": 0,
@@ -221,8 +222,8 @@ def comment_publish(params: dict[str, Any], args: dict[str, Any], context: dict[
         "thread_id": thread_id,
         "target_type": target_type,
         "target_id": target_id,
-        "author_id": _text(args.get("author_id")) or _text(context.get("user_id")),
-        "author_name": _text(args.get("author_name")) or _text(context.get("nickname")) or "独立创客",
+        "author_id": (_text(args.get("author_id")) if _text(context.get("user_role")).upper() == "ADMIN" else "") or _text(context.get("user_id")),
+        "author_name": (_text(args.get("author_name")) if _text(context.get("user_role")).upper() == "ADMIN" else "") or _text(context.get("nickname")) or "独立创客",
         "author_title": _text(args.get("author_title")) or None,
         "content": _text(args.get("content")),
         "parent_id": _text(args.get("parent_id")) or None,

@@ -92,6 +92,41 @@ def unique(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]
     return {"unique": True}
 
 
+def _record_blocked_receipt(
+    params: dict[str, Any],
+    args: dict[str, Any],
+    context: dict[str, Any],
+    content: str,
+    hits: list[str],
+) -> None:
+    """Persist a BLOCKED moderation receipt in the maker's inbox (best effort)."""
+    uid = str(context.get("user_id") or "")
+    if not uid:
+        return
+    try:
+        from src.core.entity import entity_store
+
+        entity_store.spec("notification.item")
+        entity_store.create(
+            "notification.item",
+            {
+                "user_id": uid,
+                "kind": "PUBLISH_MODERATION",
+                "level": "ERROR",
+                "title": str(args.get("title") or params.get("scene") or "内容发布审核"),
+                "content": f"内容合规校验未通过：命中敏感词 {'、'.join(hits)}",
+                "scene": str(params.get("scene") or ""),
+                "target_type": str(args.get("target_type") or params.get("target_type") or ""),
+                "target_id": str(args.get("target_id") or ""),
+                "verdict": "BLOCKED",
+                "hit_words": list(hits),
+                "status": "UNREAD",
+            },
+        )
+    except Exception:  # pragma: no cover - receipts are best effort
+        return
+
+
 _IDEMPOTENCY: dict[str, float] = {}
 
 
@@ -109,3 +144,38 @@ def idempotency(params: dict[str, Any], args: dict[str, Any], context: dict[str,
         raise ValueError(params.get("message") or "请求重复，请勿重复提交")
     _IDEMPOTENCY[key] = now
     return {"deduplicated": True, "key": key}
+
+
+@operator("guard.moderation", category="GUARD", description="Run the unified content safety gate over declared fields")
+async def moderation(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Two-tier content gate (local NLP first, external scan when uncertain).
+
+    The operator is business-agnostic: the scenario declares which fields carry
+    user-generated text. Blocked content raises a ValueError so the gateway
+    returns a 400 without persisting anything.
+    """
+    fields = params.get("fields") or ["content"]
+    content = " ".join(str(args.get(field) or "") for field in fields).strip()
+    if not content:
+        return {"passed": True, "moderation": {"verdict": "CONFIRMED_SAFE", "empty": True}}
+    blocklist = [str(word) for word in (params.get("blocklist") or []) if str(word)]
+    hits = [word for word in blocklist if word in content]
+    if hits:
+        _record_blocked_receipt(params, args, context, content, hits)
+        raise ValueError(f"内容合规校验未通过（敏感词）：{'、'.join(hits)}")
+    from src.infrastructure.external_gateway.content_moderation_gateway import prescreen_and_record
+
+    result = await prescreen_and_record(
+        content,
+        field_name=str(params.get("field_name") or "content"),
+        user_id=str(context.get("user_id") or ""),
+        scene=str(params.get("scene") or args.get("scene") or ""),
+        title=str(args.get("title") or params.get("title") or ""),
+        target_type=str(args.get("target_type") or params.get("target_type") or ""),
+        target_id=str(args.get("target_id") or params.get("target_id") or ""),
+    )
+    if not result.get("passed", True):
+        hits = (result.get("nlp") or {}).get("hit_sensitive") or []
+        suffix = f"：{'、'.join(str(h) for h in hits)}" if hits else ""
+        raise ValueError(f"内容合规校验未通过（敏感词）{suffix}")
+    return {"passed": True, "moderation": result}

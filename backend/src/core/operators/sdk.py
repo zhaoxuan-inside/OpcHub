@@ -57,7 +57,17 @@ def operator(
     def decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         async def handler(inputs: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
             params = dict(inputs.get("params") or {})
-            args = dict(inputs.get("args") or {})
+            if "args" in inputs:
+                args = dict(inputs.get("args") or {})
+            elif params.get("legacy_inputs"):
+                # Explicit opt-in for control-plane nodes without inputs_map.
+                args = {
+                    key: value
+                    for key, value in inputs.items()
+                    if key not in ("params", "context", "_node")
+                }
+            else:
+                args = {}
             result = fn(params, args, context or {})
             if inspect.isawaitable(result):
                 result = await result

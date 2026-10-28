@@ -33,11 +33,12 @@ def test_docker_compose_configuration():
         data = yaml.safe_load(f)
 
     assert "services" in data
-    assert "opchub-server" in data["services"]
-    svc = data["services"]["opchub-server"]
-    assert "build" in svc
+    assert "backend" in data["services"]
+    svc = data["services"]["backend"]
+    # 部署模型改为预构建镜像（docker load / docker build -t），不再内联 build 段
+    assert "build" in svc or "image" in svc
     assert any("8000" in str(p) for p in svc.get("ports", []))
-    assert any("./data:/app/data" in str(v) for v in svc.get("volumes", []))
+    assert any(str(v).endswith(":/app/data") for v in svc.get("volumes", []))
     assert "healthcheck" in svc
     assert "networks" in svc
 

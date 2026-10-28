@@ -1,4 +1,14 @@
-"""Loyalty domain: 晨光积分、成长等级、信誉分、会员与积分兑换."""
-from src.domains.loyalty.service import loyalty_service
+"""Loyalty domain package for OpcHub."""
+from __future__ import annotations
+
+from typing import Any
 
 __all__ = ["loyalty_service"]
+
+
+def __getattr__(name: str) -> Any:  # pragma: no cover - import convenience
+    if name == "loyalty_service":
+        from src.domains.loyalty.service import loyalty_service
+
+        return loyalty_service
+    raise AttributeError(name)

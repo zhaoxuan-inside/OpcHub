@@ -1068,7 +1068,7 @@ async def save_dag_config_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -
     if res.status != "SUCCESS":
         error_msg = res.error_message or "Orchestration control pipeline failed"
         raise ValueError(error_msg)
-    return res.final_output.get("dag_record") or res.final_output
+    return res.final_output
 
 
 async def list_operators_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
@@ -1105,6 +1105,8 @@ def get_frontend_layout_adapter(p: Dict[str, Any]) -> Any:
 
 async def async_scenario_executor(payload: Dict[str, Any], context: Dict[str, Any]) -> Any:
     req = ScenarioExecuteRequest(**payload)
+    if context:
+        req.context = {**context, **req.context}
     return await orchestration_service.execute_scenario(req)
 
 

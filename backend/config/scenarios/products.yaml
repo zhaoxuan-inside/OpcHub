@@ -32,6 +32,15 @@ scenarios:
         inputs:
           tagline: $inputs.tagline
           description: $inputs.description
+      - id: moderation
+        operator: guard.moderation
+        params:
+          fields: [title, tagline, description]
+          blocklist: [洗钱, 代开发票, 非法集资, 内嵌自设资金池]
+        inputs:
+          title: $inputs.title
+          tagline: $inputs.tagline
+          description: $inputs.description
       - id: normalize
         operator: calc.product.normalize_publish
         inputs:
@@ -46,6 +55,7 @@ scenarios:
           version: $inputs.version
           official_url: $inputs.official_url
           download_url: $inputs.download_url
+          author_id: $inputs.author_id
           author_name: $inputs.author_name
           screenshots: $inputs.screenshots
       - id: create
@@ -64,7 +74,8 @@ scenarios:
     edges:
       - [auth, fields]
       - [fields, rule]
-      - [rule, normalize]
+      - [rule, moderation]
+      - [moderation, normalize]
       - [normalize, create]
       - [create, metric]
       - [metric, response]
@@ -91,12 +102,13 @@ scenarios:
           filters: $nodes.query.filters
           search: $nodes.query.search
       - id: page
-        operator: calc.product.page
+        operator: assemble.product.list
         inputs:
           items: $nodes.list.items
           total: $nodes.list.total
           page: $nodes.query.page
           page_size: $nodes.query.page_size
+          paged: $nodes.query.paged
     edges:
       - [query, list]
       - [list, page]
@@ -144,4 +156,11 @@ scenarios:
           query: $inputs.query
           top_k: $inputs.top_k
           category: $inputs.category
-    edges: []
+      - id: result
+        operator: response.collection
+        inputs:
+          items: $nodes.search.results
+          query: $inputs.query
+          category: $inputs.category
+    edges:
+      - [search, result]

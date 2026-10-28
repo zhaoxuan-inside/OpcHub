@@ -247,7 +247,8 @@ class MicrokernelEngine:
                 node_inputs = dict(inputs)
                 node_inputs.update(args)
                 node_inputs["params"] = node_params
-                node_inputs["args"] = args
+                if node_def.inputs_map:
+                    node_inputs["args"] = args
                 node_inputs["_node"] = nid
                 prepared.append((node_def, node_inputs, time.perf_counter()))
 
