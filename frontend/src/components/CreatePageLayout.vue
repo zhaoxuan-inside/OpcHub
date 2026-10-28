@@ -52,6 +52,9 @@ defineEmits(['back']);
   overflow-y: auto;
   box-sizing: border-box;
   scrollbar-width: none;
+  /* Header height (14px padding × 2 + 32px button + borders): sticky children such as the
+     RichEditor toolbar dock flush below it so scrolled content never peeks through a gap. */
+  --create-sticky-top: 62px;
 }
 
 .create-page-layout::-webkit-scrollbar {
@@ -62,6 +65,8 @@ defineEmits(['back']);
   position: sticky;
   top: 0;
   z-index: 20;
+  flex-shrink: 0;
+  margin-bottom: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -131,12 +136,22 @@ defineEmits(['back']);
   flex-shrink: 0;
 }
 
+/* The body is a flex item of the scroll container: it must keep its content
+   height (flex-shrink: 0), otherwise `overflow: hidden` from .glass-box lets it
+   collapse to the viewport and the bottom of the form becomes unreachable.
+   `clip` keeps the rounded corners without creating a scroll container, so
+   sticky descendants still dock against the page scroller. */
 .create-page-body {
-  padding: 20px 22px 24px;
+  flex-shrink: 0;
+  margin-bottom: 0;
+  padding: 24px 28px 30px;
   border-radius: 16px;
+  overflow: hidden;
+  overflow: clip;
 }
 
 .create-page-body-plain {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -150,6 +165,10 @@ defineEmits(['back']);
 
   .create-page-head {
     flex-wrap: wrap;
+  }
+
+  .create-page-body {
+    padding: 18px 16px 22px;
   }
 
   .create-page-meta {
