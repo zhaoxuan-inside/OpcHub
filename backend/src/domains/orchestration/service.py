@@ -196,6 +196,7 @@ class OrchestrationService:
             node_traces=[t.model_dump() for t in res.node_traces],
             final_output=res.final_output,
             error_message=res.error_message,
+            error_type=res.error_type,
             compensation_traces=[c.model_dump() for c in res.compensation_traces],
         )
 

@@ -114,8 +114,12 @@ class VersionedHotReloadEngine:
         self._is_running: bool = False
         self._lock = asyncio.Lock()
 
-        # Initialize baseline snapshot on startup without marking them as changed
+        # Baseline uses mtime only (no content hash): stat-ing the tree is cheap,
+        # while hashing every file at import added seconds to cold start. Content
+        # hashes are computed lazily for files whose mtime actually changed.
+        self._snapshots_ready = False
         self._build_initial_snapshot()
+        self._snapshots_ready = True
 
     def _get_watch_directories(self) -> List[Path]:
         dirs = []
@@ -134,6 +138,13 @@ class VersionedHotReloadEngine:
         except Exception:
             return file_path.stem
 
+    def _ensure_snapshot(self) -> None:
+        """Build the baseline fingerprint exactly once, on first use."""
+        if self._snapshots_ready:
+            return
+        self._build_initial_snapshot()
+        self._snapshots_ready = True
+
     def _build_initial_snapshot(self):
         """Take baseline fingerprint of all existing .py files on startup."""
         for d in self._get_watch_directories():
@@ -145,8 +156,7 @@ class VersionedHotReloadEngine:
                         fp = Path(root) / f
                         try:
                             mtime = fp.stat().st_mtime
-                            h = compute_file_hash(fp)
-                            self._snapshots[str(fp.resolve())] = (mtime, h)
+                            self._snapshots[str(fp.resolve())] = (mtime, "")
                         except Exception:
                             pass
 
@@ -156,6 +166,7 @@ class VersionedHotReloadEngine:
         All detected changes are placed in STAGED status without directly modifying
         the in-memory execution state.
         """
+        self._ensure_snapshot()
         current_files: Set[str] = set()
         newly_detected: List[FileChangeRecord] = []
 

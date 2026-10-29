@@ -65,6 +65,8 @@ Gateway (config/gateway_routes.yaml)
 4. **SOP 互动计数**：`SOP_DOCUMENT → sop.node`、`SOP_FLOW → sop.flow_template`，恢复喜欢/收藏计数回写。
 5. **blocklist 拦截回执**：声明式关键词拦截同样写入 `notification.item` 的 `BLOCKED` 回执。
 6. **管理员代发归属**：products/policies/demands/perks/compliance/forum 统一支持 ADMIN 指定 `author_id/author_name`，普通用户仍强制 context 身份。
+7. **错误语义**：引擎向网关透传 `error_type`，`KeyError` 恢复为 404（论坛详情/投票目标/SOP 文书不存在等），并清理引擎节点前缀与引号。
+8. **数据库兼容闸门**：启动时探测 `users.handle` / `domain_snapshots.entity_key`；旧 schema 下自动禁用持久化并输出迁移命令，算子内核仍可内存启动。
 
 ## 6. 已知边界
 

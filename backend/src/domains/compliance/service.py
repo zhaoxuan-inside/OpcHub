@@ -90,6 +90,13 @@ class _KindCatalog(MutableSequence):
         current = rows[index] if isinstance(index, int) else rows[index][0]
         entity_store.delete(ENTITY_COMPLIANCE_ITEM, {"key": str(current["id"])})
 
+    def replace(self, values: Any) -> None:
+        """Replace the whole kind (legacy ``service._checkpoints = [...]``)."""
+        for row in self._docs():
+            entity_store.delete(ENTITY_COMPLIANCE_ITEM, {"key": str(row["id"])})
+        for value in values or []:
+            self.insert(len(self), value)
+
     def insert(self, index: int, value: Any) -> None:
         doc = _row_document(value)
         doc["kind"] = self._kind
@@ -107,9 +114,35 @@ class ComplianceService:
 
     def __init__(self) -> None:
         # Live views; new writes belong to ``entity.*`` scenario operators.
-        self._laws = _KindCatalog(KIND_LAW)
-        self._cases = _KindCatalog(KIND_CASE)
-        self._checkpoints = _KindCatalog(KIND_CHECKPOINT)
+        self._law_catalog = _KindCatalog(KIND_LAW)
+        self._case_catalog = _KindCatalog(KIND_CASE)
+        self._checkpoint_catalog = _KindCatalog(KIND_CHECKPOINT)
+
+    # Legacy code sometimes assigns a plain list (``service._checkpoints = [...]``).
+    # The setters keep the live view intact instead of silently replacing it.
+    @property
+    def _laws(self):
+        return self._law_catalog
+
+    @_laws.setter
+    def _laws(self, values):
+        self._law_catalog.replace(values)
+
+    @property
+    def _cases(self):
+        return self._case_catalog
+
+    @_cases.setter
+    def _cases(self, values):
+        self._case_catalog.replace(values)
+
+    @property
+    def _checkpoints(self):
+        return self._checkpoint_catalog
+
+    @_checkpoints.setter
+    def _checkpoints(self, values):
+        self._checkpoint_catalog.replace(values)
 
     def _require_db(self) -> None:
         """Compliance content is database-backed; refuse memory-only mutations."""

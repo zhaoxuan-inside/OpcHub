@@ -51,6 +51,12 @@ register_default_scenario_routes()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifecycle manager: initialize DB schema, provision built-in admin, run retention archival."""
+    import logging
+
+    startup_log = logging.getLogger("uvicorn")
+
+    # 1) Optional relational persistence. A legacy/absent schema must not prevent
+    # the operator kernel from booting in memory.
     try:
         await db_repository.ensure_schema_and_seed()
         admin = user_service._users_by_uid.get("usr_admin_builtin")
@@ -61,33 +67,37 @@ async def lifespan(app: FastAPI):
                 nickname=admin["nickname"],
                 password_hash=admin["password_hash"],
             )
-        # Retention: move audit records older than the configured window to cold archive
         await audit_service.archive_older_than()
-        # Rebuild the in-memory domain indexes from persisted state (restart durability)
         await user_service.hydrate_from_db()
+    except Exception as e:
+        startup_log.error(
+            "Relational startup step failed (%s). If the log mentions users.handle, "
+            "run: psql \"$DATABASE_URL\" -f backend/sql/migrate_uuid_ids_20261028.sql",
+            e,
+        )
+
+    # 2) Operator kernel: entity store + scenario assets must always load.
+    try:
         await domain_persistence.initialize()
-        # Hydrate the generic entity store and compile the scenario assets that
-        # define every business flow (business = operator orchestration).
         from src.core.entity import entity_store
         from src.core.scenario import ensure_scenarios_loaded
 
         await entity_store.initialize()
-        ensure_scenarios_loaded(force=True)
-        # Seed the loyalty (points / membership / redemption) DAG pipelines.
+        ensure_scenarios_loaded()
+    except Exception as e:
+        startup_log.error("Operator kernel initialization failed: %s", e)
+
+    # 3) Background workers.
+    try:
         from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
 
         ensure_loyalty_pipelines()
-        # Start the publish review-queue consumer: it keeps auditing pending
-        # document / flow submissions and promotes approved ones into the
-        # standard document catalog and flow guide.
         from src.domains.sop.service import sop_service
 
         sop_service.start_review_consumer(interval=5.0)
-        # Start file sensing watcher for versioned hot-reloading
         hot_reload_engine.start_background_watcher()
     except Exception as e:
-        import logging
-        logging.getLogger("uvicorn").warning(f"Startup initialization note: {e}")
+        startup_log.warning(f"Startup background worker note: {e}")
     yield
     # Flush any outstanding write-behind persistence tasks before shutdown
     try:

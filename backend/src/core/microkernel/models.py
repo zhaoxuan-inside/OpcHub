@@ -108,4 +108,5 @@ class ExecutionResult(BaseModel):
     node_traces: list[NodeExecutionTrace]
     final_output: dict[str, Any]
     error_message: str | None = None
+    error_type: str | None = None
     compensation_traces: list[CompensationTrace] = Field(default_factory=list)

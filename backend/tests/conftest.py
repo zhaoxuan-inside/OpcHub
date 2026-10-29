@@ -31,10 +31,19 @@ async def _database_unavailable() -> bool:
 
 db_repository.is_ready = _database_unavailable
 
+
+async def _schema_unavailable() -> bool:
+    return False
+
+
+db_repository.is_schema_compatible = _schema_unavailable
+
 # The default suite has no PostgreSQL, so allow domain services to keep their
 # deterministic in-memory state. Production runs with ``strict = True`` and therefore
 # refuses to accept content that could not be persisted.
 domain_persistence.strict = False
+# Never let the hermetic suite schedule write-behind tasks against a live DB.
+domain_persistence.enabled = False
 
 # Representative catalog data is now test-only (production ships no seed files).
 # Seed the shared domain singletons once, mirroring the previous import-time behaviour.

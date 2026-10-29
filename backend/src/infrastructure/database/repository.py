@@ -39,6 +39,35 @@ class DatabaseRepository:
         except Exception:
             return False
 
+    async def is_schema_compatible(self) -> bool:
+        """Return True only when the live database has the UUID-identity schema.
+
+        Older deployments used ``users.uid`` / ``domain_snapshots.entity_id``.
+        Writing through the new models against that schema fails with
+        ProgrammingError, so persistence is disabled until the shipped migration
+        is applied.
+        """
+        if not await self.is_ready():
+            return False
+        try:
+            from sqlalchemy import text
+
+            engine = get_async_engine()
+            async with engine.connect() as conn:
+                result = await conn.execute(
+                    text(
+                        "SELECT table_name, column_name FROM information_schema.columns "
+                        "WHERE table_schema = 'public' AND ("
+                        "(table_name = 'users' AND column_name = 'handle') OR "
+                        "(table_name = 'domain_snapshots' AND column_name = 'entity_key'))"
+                    )
+                )
+                found = {(row[0], row[1]) for row in result.fetchall()}
+            return ("users", "handle") in found and ("domain_snapshots", "entity_key") in found
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.warning("Database schema compatibility probe failed: %s", exc)
+            return False
+
     async def ensure_schema_and_seed(self) -> None:
         """Create tables if not exist. No demo seed data is injected (blank initial catalog)."""
         if self._initialized:

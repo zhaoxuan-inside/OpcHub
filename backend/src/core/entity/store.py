@@ -119,7 +119,8 @@ class EntityStore:
         try:
             from src.infrastructure.database.repository import db_repository
 
-            ready = await db_repository.is_ready()
+            compatibility_check = getattr(db_repository, "is_schema_compatible", None)
+            ready = await (compatibility_check() if compatibility_check else db_repository.is_ready())
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Entity store DB probe failed: %s", exc)
             ready = False
@@ -133,7 +134,11 @@ class EntityStore:
                 continue
             from src.infrastructure.database.repository import db_repository
 
-            rows = await db_repository.load_domain_snapshots(spec.family)
+            try:
+                rows = await db_repository.load_domain_snapshots(spec.family)
+            except Exception as exc:  # pragma: no cover - schema/connection drift
+                logger.warning("Entity hydration failed for %s: %s", spec.family, exc)
+                rows = []
             counts[name] = adapter.hydrate(rows) if rows else 0
         logger.info("Entity store hydrated: %s", counts)
         return counts

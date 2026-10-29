@@ -62,11 +62,11 @@ class RouteRule:
                 )
             )
             if result.status != "SUCCESS":
-                message = (result.error_message or "场景执行失败").replace("Node ", "节点 ").replace(
-                    " execution error: ", " 执行失败："
-                )
-                if "权限" in message or "登录" in message:
+                message = _clean_scenario_error(result.error_message or "场景执行失败")
+                if result.error_type == "PermissionError" or "权限" in message or "登录" in message:
                     raise PermissionError(message)
+                if result.error_type == "KeyError":
+                    raise KeyError(message)
                 raise ValueError(message)
             output = dict(result.final_output or {})
             if "response" in output:
@@ -96,6 +96,21 @@ class RouteRule:
         if inspect.iscoroutine(result):
             return await result
         return result
+
+
+def _clean_scenario_error(message: str) -> str:
+    """Strip engine node prefixes/quotes so the gateway envelope stays human-readable."""
+    import re
+
+    cleaned = str(message or "").strip()
+    cleaned = re.sub(r"^(Node\s+\S+\s+execution error:\s*)", "", cleaned)
+    cleaned = re.sub(r"^(节点\s+\S+\s+执行失败：\s*)", "", cleaned)
+    if cleaned.startswith("Guard check failed: "):
+        cleaned = cleaned[len("Guard check failed: "):]
+    cleaned = cleaned.strip()
+    if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in ("'", '"'):
+        cleaned = cleaned[1:-1]
+    return cleaned
 
 
 class ScenarioRouter:

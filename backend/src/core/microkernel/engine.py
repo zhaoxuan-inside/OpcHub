@@ -185,6 +185,7 @@ class MicrokernelEngine:
                 node_traces=[],
                 final_output={},
                 error_message=str(exc),
+                error_type="ValueError",
             )
 
         final_output: dict[str, Any] = {}
@@ -241,7 +242,7 @@ class MicrokernelEngine:
                     return self._fail(
                         config, pipeline_id, tid, start_time, traces, final_output,
                         executed_nodes, inputs, context, None,
-                        str(exc), ExecutionStatus.FAILED, node_def,
+                        str(exc), ExecutionStatus.FAILED, node_def, "ExpressionError",
                     )
 
                 node_inputs = dict(inputs)
@@ -289,7 +290,7 @@ class MicrokernelEngine:
                     return await self._fail(
                         config, pipeline_id, tid, start_time, traces, final_output,
                         executed_nodes, inputs, context, node_inputs,
-                        f"{prefix}{result}", status, node_def,
+                        f"{prefix}{result}", status, node_def, type(result).__name__,
                     )
 
                 out = result if isinstance(result, dict) else {"result": result}
@@ -382,6 +383,7 @@ class MicrokernelEngine:
         error_message: str,
         status: ExecutionStatus,
         node_def: Optional[NodeDef],
+        error_type: str = "Exception",
     ) -> ExecutionResult:
         comp_traces, comp_ok = await self._rollback_saga(
             config=config,
@@ -408,6 +410,7 @@ class MicrokernelEngine:
             node_traces=traces,
             final_output=final_output,
             error_message=error_message,
+            error_type=error_type,
             compensation_traces=comp_traces,
         )
 

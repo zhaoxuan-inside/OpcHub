@@ -74,10 +74,20 @@ class DomainPersistence:
     async def initialize(self) -> Dict[str, int]:
         """Probe the database and hydrate every registered domain index."""
         try:
-            self.enabled = await db_repository.is_ready()
+            compatibility_check = getattr(db_repository, "is_schema_compatible", None)
+            if compatibility_check is not None:
+                self.enabled = await compatibility_check()
+            else:
+                self.enabled = await db_repository.is_ready()
         except Exception as exc:  # pragma: no cover - defensive
             logger.warning("Domain persistence probe failed: %s", exc)
             self.enabled = False
+        if not self.enabled and await db_repository.is_ready():
+            logger.error(
+                "Database schema is not migrated (expected users.handle / "
+                "domain_snapshots.entity_key). Persistence disabled; run: "
+                "psql \"$DATABASE_URL\" -f backend/sql/migrate_uuid_ids_20261028.sql"
+            )
 
         counts: Dict[str, int] = {}
         if not self.enabled:

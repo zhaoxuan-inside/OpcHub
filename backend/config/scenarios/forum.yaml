@@ -65,7 +65,7 @@ scenarios:
         params:
           conditions:
             - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
-              message: 内容合规校验未通过：命中平台内容安全预筛规则
+              message: 内容合规校验未通过：命中平台敏感词预筛规则
         inputs:
           verdict: $nodes.prescreen.verdict
       - id: create
@@ -158,7 +158,7 @@ scenarios:
         params:
           conditions:
             - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
-              message: 内容合规校验未通过：命中平台内容安全预筛规则
+              message: 内容合规校验未通过：命中平台敏感词预筛规则
         inputs:
           verdict: $nodes.prescreen.verdict
       - id: patch
@@ -291,7 +291,7 @@ scenarios:
         params:
           conditions:
             - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
-              message: 内容合规校验未通过：命中平台内容安全预筛规则
+              message: 内容合规校验未通过：命中平台敏感词预筛规则
         inputs:
           verdict: $nodes.prescreen.verdict
       - id: create
@@ -575,7 +575,7 @@ scenarios:
         params:
           conditions:
             - expr: "args.verdict != 'CONFIRMED_VIOLATION'"
-              message: 内容合规校验未通过：命中平台内容安全预筛规则
+              message: 内容合规校验未通过：命中平台敏感词预筛规则
         inputs:
           verdict: $nodes.prescreen.verdict
       - id: answer
