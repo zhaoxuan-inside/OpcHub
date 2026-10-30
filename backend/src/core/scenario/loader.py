@@ -165,7 +165,7 @@ class ScenarioLoader:
             return 0
 
         existing = {
-            (config.scenario_code, config.version)
+            (config.scenario_code, config.version): config
             for config in orchestration_service.list_dag_configs()
         }
         count = 0
@@ -181,18 +181,25 @@ class ScenarioLoader:
                 topology = compile_scenario(asset)
                 code = str(asset["scenario"])
                 version = str(asset.get("version") or "v1.0.0")
-                if (code, version) in existing and not force:
+                current = existing.get((code, version))
+                desired_status = asset.get("status", "ACTIVE")
+                if (
+                    current is not None
+                    and not force
+                    and current.topology_graph == topology
+                    and current.status == desired_status
+                ):
                     continue
                 orchestration_service.save_dag_config(
                     DAGConfigSaveRequest(
                         scenario_code=code,
                         version=version,
                         topology_graph=topology,
-                        status=asset.get("status", "ACTIVE"),
+                        status=desired_status,
                         created_by=asset.get("created_by", "scenario_asset"),
                     )
                 )
-                existing.add((code, version))
+                existing[(code, version)] = orchestration_service.get_dag_config(code, version)
                 count += 1
         self._loaded = True
         logger.info("Loaded %s scenario assets from %s", count, self._directory)

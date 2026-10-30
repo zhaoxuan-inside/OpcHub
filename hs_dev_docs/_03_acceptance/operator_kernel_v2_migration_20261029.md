@@ -68,7 +68,19 @@ Gateway (config/gateway_routes.yaml)
 7. **错误语义**：引擎向网关透传 `error_type`，`KeyError` 恢复为 404（论坛详情/投票目标/SOP 文书不存在等），并清理引擎节点前缀与引号。
 8. **数据库兼容闸门**：启动时探测 `users.handle` / `domain_snapshots.entity_key`；旧 schema 下自动禁用持久化并输出迁移命令，算子内核仍可内存启动。
 
-## 6. 已知边界
+## 6. 数据库迁移执行记录（2026-10-30）
+
+- 实例：`pgsql-18` → `127.0.0.1:5432/opchub`（本地后端配置 `application.yaml`）
+- 备份：`/tmp/opencode/db_backup/opchub_before_uuid_20261030.dump`
+- 执行：`backend/sql/migrate_uuid_ids_20261028.sql`（`ON_ERROR_STOP=1`）
+- 验证：
+  - `id` / `*_id` 非 UUID 列：0 行
+  - `users.handle`、`domain_snapshots.entity_key + id`、`entitlements.code` 均已就位
+  - `is_schema_compatible() == True`
+  - 应用启动 `/healthz` 200；`products.publish` 成功并落库
+  - `domain_snapshots`：133 条 DAG 配置、产品文档已持久化
+
+## 7. 已知边界
 
 1. **内容审核**：`guard.moderation` 组合本地 NLP 预筛与外部审核网关；发布场景可声明 `blocklist` 做确定性关键词拦截。外部服务不可用时按 fail-open 降级。
 2. **Feed 缓存**：算子内核 v2 移除 feed 缓存，排序/游标由纯函数计算；响应保留 `cache_hit=false` 兼容字段。
