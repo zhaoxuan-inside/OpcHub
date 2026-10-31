@@ -341,6 +341,18 @@ class VersionedHotReloadEngine:
             except Exception as e:
                 logger.error(f"[HotReload] Gateway routes sync failed during activation: {e}")
 
+        # 4. Rebuild the MicroFlow release so activated operators execute on the
+        # framework (best effort: the legacy engine keeps serving until rebuilt).
+        microflow_rebuilt = False
+        if activated:
+            try:
+                from src.host.flow_engine import flow_engine
+
+                flow_engine.build()
+                microflow_rebuilt = True
+            except Exception as e:
+                logger.error(f"[HotReload] MicroFlow release rebuild failed: {e}")
+
         return {
             "status": "SUCCESS" if not failed else "PARTIAL",
             "activated_version": target_version,
@@ -349,6 +361,7 @@ class VersionedHotReloadEngine:
             "failed_count": len(failed),
             "failed_items": failed,
             "gateway_reloaded": gateway_reloaded,
+            "microflow_rebuilt": microflow_rebuilt,
             "gateway_routes_count": gateway_routes_count,
             "timestamp": utc_now_iso(),
         }

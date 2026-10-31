@@ -1,4 +1,5 @@
 """Service for saving and loading versioned DAG configs, frontend visual layouts, and executing composable scenarios."""
+import logging
 import uuid
 import hashlib
 import json
@@ -26,6 +27,9 @@ from src.core.microkernel.models import (
 )
 from src.core.telemetry import get_current_trace_id
 from src.infrastructure.database.persistence import domain_persistence
+
+
+logger = logging.getLogger("opchub.orchestration")
 
 
 def utc_now_iso() -> str:
@@ -58,6 +62,8 @@ class OrchestrationService:
     def __init__(self):
         # Key: (scenario_code, version)
         self._dag_configs: Dict[Tuple[str, str], DAGConfigRecord] = {}
+        # Bulk loaders suspend the per-save MicroFlow rebuild and sync once.
+        self._dynamic_sync_suspended = False
         # Key: layout_name
         self._layouts: Dict[str, FrontendLayoutRecord] = {}
 
@@ -79,7 +85,56 @@ class OrchestrationService:
         )
         self._dag_configs[(req.scenario_code, req.version)] = record
         domain_persistence.write("orchestration.dag_configs", f"{req.scenario_code}@@{req.version}", record)
+        if not self._dynamic_sync_suspended:
+            self.sync_dynamic_flows()
         return record
+
+    def sync_dynamic_flows(self) -> None:
+        """Convert workbench-authored DAG configs into MicroFlow flows and rebuild.
+
+        Configs the converter cannot express keep executing on the legacy engine
+        (execute_scenario falls back when the flow id is absent from the release),
+        so authoring never silently loses semantics.
+        """
+        import os
+
+        if os.getenv("OPCHUB_FLOW_ENGINE", "1") == "0" or self._dynamic_sync_suspended:
+            return
+        try:
+            from tools.convert_scenarios import convert_scenario
+
+            from src.host.flow_engine import flow_engine
+        except ImportError:
+            return
+        flows: list[dict[str, Any]] = []
+        failures: list[str] = []
+        for (code, version), record in self._dag_configs.items():
+            if record.status != "ACTIVE":
+                continue
+            topo = record.topology_graph or {}
+            asset = {
+                "scenario": code,
+                "version": version,
+                "domain": topo.get("domain", ""),
+                "nodes": topo.get("nodes") or [],
+                "edges": [[e.get("from"), e.get("to")] for e in (topo.get("edges") or [])],
+            }
+            try:
+                flow, report = convert_scenario(asset)
+            except Exception as exc:  # authoring-time safety: refuse, never guess
+                failures.append(f"{code}@{version}: {exc}")
+                continue
+            if report["unmapped"]:
+                failures.append(f"{code}@{version}: {report['unmapped'][:2]}")
+                continue
+            flows.append(flow)
+        try:
+            flow_engine.set_dynamic_flows(flows)
+        except Exception as exc:
+            logger.error("MicroFlow rebuild after DAG config save failed: %s", exc)
+            return
+        if failures:
+            logger.warning("Dynamic configs kept on the legacy engine: %s", failures)
 
     def get_dag_config(self, scenario_code: str, version: str) -> DAGConfigRecord:
         key = (scenario_code, version)

@@ -168,6 +168,8 @@ class ScenarioLoader:
             (config.scenario_code, config.version): config
             for config in orchestration_service.list_dag_configs()
         }
+        # One MicroFlow rebuild after the bulk import, not one per asset.
+        orchestration_service._dynamic_sync_suspended = True
         count = 0
         for asset_file in sorted(self._directory.glob("*.yaml")):
             try:
@@ -201,6 +203,8 @@ class ScenarioLoader:
                 )
                 existing[(code, version)] = orchestration_service.get_dag_config(code, version)
                 count += 1
+        orchestration_service._dynamic_sync_suspended = False
+        orchestration_service.sync_dynamic_flows()
         self._loaded = True
         logger.info("Loaded %s scenario assets from %s", count, self._directory)
         return count

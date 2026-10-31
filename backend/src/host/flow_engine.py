@@ -71,6 +71,7 @@ class FlowEngine:
     def __init__(self) -> None:
         self._release: Optional[Any] = None
         self._built_at: float = 0.0
+        self._dynamic_flows: list[dict[str, Any]] = []
 
     @property
     def release_id(self) -> str:
@@ -79,6 +80,11 @@ class FlowEngine:
     @property
     def is_ready(self) -> bool:
         return self._release is not None
+
+    def set_dynamic_flows(self, flows: list[dict[str, Any]]) -> str:
+        """Replace workbench-authored flows and recompile the release."""
+        self._dynamic_flows = list(flows or [])
+        return self.build()
 
     def build(self) -> str:
         """Compile the full flow project into a new immutable release."""
@@ -92,9 +98,15 @@ class FlowEngine:
         registry = build_registry()
         for schema_id, schema in (project.get("schemas") or {}).items():
             registry.register_schema(schema_id, schema)
+        flows = list(project["flows"])
+        static_ids = {flow["id"] for flow in flows}
+        for flow in self._dynamic_flows:
+            if flow.get("id") in static_ids:
+                continue  # asset-defined scenarios are the single source of truth
+            flows.append(flow)
         release = compile_release(
             registry,
-            project["flows"],
+            flows,
             defaults=_EPHEMERAL_DEFAULTS,
             source_file=str(_find_flow_file()),
         )

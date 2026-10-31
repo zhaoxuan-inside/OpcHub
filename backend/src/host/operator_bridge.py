@@ -68,11 +68,12 @@ def build_registry() -> Registry:
     """Build a sealed-ready MicroFlow registry from the OpcHub SDK registry."""
     registry = Registry()
     registry.register_schema("opchub.object", INPUT_SCHEMA)
-    seen: set[str] = set()
+    # Hot reload re-imports operator modules, appending duplicates to the SDK
+    # registry; last definition wins, mirroring the legacy atomic registry.
+    latest: dict[str, OperatorDefinition] = {}
     for definition in REGISTRY:
-        if definition.name in seen:
-            raise ValueError(f"Duplicate operator name in SDK registry: {definition.name}")
-        seen.add(definition.name)
+        latest[definition.name] = definition
+    for definition in latest.values():
         registry.register_operator(
             name=definition.name,
             version="1",

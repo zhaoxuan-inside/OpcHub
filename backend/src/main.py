@@ -87,10 +87,13 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         startup_log.error("Operator kernel initialization failed: %s", e)
 
-    # 2b) MicroFlow release: the framework executes every converted scenario.
+    # 2b) MicroFlow release: the framework executes every converted scenario
+    # plus workbench-authored dynamic configs.
     try:
+        from src.domains.orchestration.service import orchestration_service
         from src.host.flow_engine import flow_engine
 
+        orchestration_service.sync_dynamic_flows()
         release_id = flow_engine.build()
         startup_log.info("MicroFlow release %s ready (%d flows)", release_id[:12],
                          len(flow_engine._release.flows))
