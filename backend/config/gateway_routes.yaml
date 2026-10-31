@@ -1028,6 +1028,62 @@ gateway:
       handler: "src.core.gateway.adapters:catalog_write_adapter"
       required_permission: "page:orchestrate"
 
+    - scenario: "orchestration.approvals.list"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "发布审批单列表（按状态过滤）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_release_approvals_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.approvals.request"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "发起发布审批（第二人确认制）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.approvals.approve"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "审批通过并执行发布/回滚（审批人不能与发起人相同）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.approvals.reject"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "驳回/撤回发布审批"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.scenarios.rollback"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "场景版本回滚：重新物化并激活历史已发布版本，需持锁"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.subgraphs.rollback"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "子图版本回滚（新场景编译时生效，已发布场景保持内联副本）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
+    - scenario: "orchestration.operators.rollback"
+      version: "v1.0.0"
+      domain: "orchestration"
+      description: "自定义算子版本回滚（沙箱复检 + 重新注册）"
+      is_default: true
+      handler: "src.core.gateway.adapters:catalog_write_adapter"
+      required_permission: "page:orchestrate"
+
     - scenario: "orchestration.scenarios.publish"
       version: "v1.0.0"
       domain: "orchestration"

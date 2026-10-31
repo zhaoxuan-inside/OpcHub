@@ -10,6 +10,7 @@
 所有变更操作必须持有目标资产的排他锁（见 locks.py）；读取（展示）永远开放。
 """
 import re
+import uuid
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -294,6 +295,9 @@ class CatalogService:
         self._operators: Dict[str, OperatorAsset] = {}
         self._subgraphs: Dict[str, SubgraphAsset] = {}
         self._scenarios: Dict[str, ScenarioAsset] = {}
+        # Release approval tickets (id -> ticket); persisted in
+        # orchestration.release_approvals and hydrated on startup.
+        self._release_approvals: "Dict[str, ReleaseApproval]" = {}
         self._seed_catalog_pipeline()
 
     # ------------------------------------------------------------------
@@ -1032,48 +1036,18 @@ class CatalogService:
         if row.status != VersionStatus.DRAFT:
             raise ValueError(f"版本 {version} 状态为 {row.status.value}，只有草稿可以发布")
 
-        compiled = self._compile_scenario(row)
-        topology = {
-            "topology": "DAG",
-            "entry_node": compiled.entry_node,
-            "exit_node": compiled.exit_node,
-            "enable_saga_compensation": row.graph.enable_saga_compensation,
-            "nodes": [
-                {"id": n.id, "action_handler": n.action_handler, "type": n.type, "timeout_ms": n.timeout_ms}
-                for n in compiled.nodes
-            ],
-            "edges": [{"from": e.from_node, "to": e.to_node} for e in compiled.edges],
-        }
-        orchestration_service.save_dag_config(
-            DAGConfigSaveRequest(
-                scenario_code=code,
-                version=row.version,
-                topology_graph=topology,
-                status="ACTIVE",
-                created_by=actor["user_id"],
-            )
-        )
-        orchestration_service.activate_dag_config(code, row.version)
-
+        deployed = self._deploy_scenario_version(code, row)
         now = utc_now_iso()
         for v in asset.versions:
             if v.status == VersionStatus.PUBLISHED:
                 v.status = VersionStatus.SUPERSEDED
         row.status = VersionStatus.PUBLISHED
-        row.compiled = compiled
         row.published_by = actor["user_id"]
         row.published_at = now
         asset.current_version = row.version
         asset.updated_at = now
         self._persist_scenario(asset)
-        return {
-            **asset.model_dump(),
-            "deployed_dag": {
-                "scenario_code": code,
-                "version": row.version,
-                "compiled_hash": orchestration_service.get_dag_config(code, row.version).compiled_hash,
-            },
-        }
+        return {**asset.model_dump(), "deployed_dag": deployed}
 
     def _compile_scenario(self, row: ScenarioVersion) -> CompiledGraph:
         """Expand subgraph nodes inline and produce the executable flat DAG."""
@@ -1199,11 +1173,260 @@ class CatalogService:
             self._scenarios[asset.code] = asset
         return len(rows or [])
 
+    # ------------------------------------------------------------------
+    # M1-1: deployment helper / rollback / release approvals
+    # ------------------------------------------------------------------
+    def _deploy_scenario_version(self, code: str, row: ScenarioVersion) -> Dict[str, Any]:
+        """Compile (or reuse) a version graph, materialize and activate its DAG config."""
+        compiled = row.compiled or self._compile_scenario(row)
+        topology = {
+            "topology": "DAG",
+            "entry_node": compiled.entry_node,
+            "exit_node": compiled.exit_node,
+            "enable_saga_compensation": row.graph.enable_saga_compensation,
+            "nodes": [
+                {"id": n.id, "action_handler": n.action_handler, "type": n.type, "timeout_ms": n.timeout_ms}
+                for n in compiled.nodes
+            ],
+            "edges": [{"from": e.from_node, "to": e.to_node} for e in compiled.edges],
+        }
+        orchestration_service.save_dag_config(
+            DAGConfigSaveRequest(
+                scenario_code=code,
+                version=row.version,
+                topology_graph=topology,
+                status="ACTIVE",
+                created_by="catalog",
+            )
+        )
+        orchestration_service.activate_dag_config(code, row.version)
+        row.compiled = compiled
+        return {
+            "scenario_code": code,
+            "version": row.version,
+            "compiled_hash": orchestration_service.get_dag_config(code, row.version).compiled_hash,
+        }
+
+    def rollback_scenario(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Roll a scenario back to a previously published version (Argo CD semantics)."""
+        actor = self._actor(payload, context)
+        code = str(payload.get("code") or "").strip()
+        version = str(payload.get("version") or "").strip()
+        asset = self._scenarios.get(code)
+        if not asset:
+            raise KeyError(f"场景 {code} 不存在")
+        lock_manager.require("scenario", code, actor["user_id"])
+        row = next((v for v in asset.versions if v.version == version), None)
+        if not row:
+            raise KeyError(f"场景 {code} 不存在版本 {version}")
+        if row.status == VersionStatus.DRAFT:
+            raise ValueError(f"版本 {version} 是草稿，只有已发布/被取代版本可以回滚")
+
+        now = utc_now_iso()
+        for v in asset.versions:
+            if v.status == VersionStatus.PUBLISHED:
+                v.status = VersionStatus.SUPERSEDED
+        row.status = VersionStatus.PUBLISHED
+        row.published_by = actor["user_id"]
+        row.published_at = now
+        row.changelog = (f"{row.changelog} | " if row.changelog else "") + f"回滚 by {actor['user_id']} @ {now}"
+        asset.current_version = row.version
+        asset.updated_at = now
+        deployed = self._deploy_scenario_version(code, row)
+        self._persist_scenario(asset)
+        return {**asset.model_dump(), "deployed_dag": deployed}
+
+    def rollback_subgraph(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Roll a subgraph back to a published version.
+
+        The rolled-back compiled graph binds at scenario compile time: running
+        scenarios keep their inlined copy until republished (honest boundary).
+        """
+        actor = self._actor(payload, context)
+        code = str(payload.get("code") or "").strip()
+        version = str(payload.get("version") or "").strip()
+        asset = self._subgraphs.get(code)
+        if not asset:
+            raise KeyError(f"子图 {code} 不存在")
+        lock_manager.require("subgraph", code, actor["user_id"])
+        row = next((v for v in asset.versions if v.version == version), None)
+        if not row:
+            raise KeyError(f"子图 {code} 不存在版本 {version}")
+        if row.status == VersionStatus.DRAFT:
+            raise ValueError(f"版本 {version} 是草稿，只有已发布/被取代版本可以回滚")
+        if row.compiled is None:
+            row.compiled = self._compile_subgraph(row)
+
+        now = utc_now_iso()
+        for v in asset.versions:
+            if v.status == VersionStatus.PUBLISHED:
+                v.status = VersionStatus.SUPERSEDED
+        row.status = VersionStatus.PUBLISHED
+        row.published_by = actor["user_id"]
+        row.published_at = now
+        asset.current_version = row.version
+        asset.updated_at = now
+        self._persist_subgraph(asset)
+        return asset.model_dump()
+
+    def rollback_operator(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Roll a custom operator back to a published version (sandbox re-check + re-register)."""
+        actor = self._actor(payload, context)
+        name = str(payload.get("name") or "").strip()
+        version = str(payload.get("version") or "").strip()
+        asset = self._operators.get(name)
+        if not asset:
+            raise KeyError(f"算子 {name} 不存在或为内置算子")
+        lock_manager.require("operator", name, actor["user_id"])
+        row = next((v for v in asset.versions if v.version == version), None)
+        if not row:
+            raise KeyError(f"算子 {name} 不存在版本 {version}")
+        if row.status == VersionStatus.DRAFT:
+            raise ValueError(f"版本 {version} 是草稿，只有已发布/被取代版本可以回滚")
+        try:
+            load_operator_from_source(row.definition.code, row.definition.entry_function)
+        except ValueError as exc:
+            raise ValueError(f"回滚前沙箱复检失败：{exc}") from exc
+        script_ingestion_service.upload_and_register(
+            name=name,
+            code=row.definition.code,
+            operator_id=actor["user_id"],
+            entry_function=row.definition.entry_function,
+            description=asset.description or asset.display_name,
+            overwrite=True,
+        )
+        now = utc_now_iso()
+        for v in asset.versions:
+            if v.status == VersionStatus.PUBLISHED:
+                v.status = VersionStatus.SUPERSEDED
+        row.status = VersionStatus.PUBLISHED
+        row.published_by = actor["user_id"]
+        row.published_at = now
+        asset.current_version = row.version
+        asset.updated_at = now
+        self._persist_operator(asset)
+        return asset.model_dump()
+
+    # -- release approvals (second-person rule, Apollo semantics) --------
+    def request_release_approval(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        actor = self._actor(payload, context)
+        kind = str(payload.get("asset_kind") or "scenario").strip()
+        code = str(payload.get("code") or "").strip()
+        version = str(payload.get("version") or "").strip()
+        if kind not in ("scenario", "subgraph", "operator"):
+            raise ValueError(f"不支持的资产类型：{kind}")
+        asset = {"scenario": self._scenarios, "subgraph": self._subgraphs, "operator": self._operators}[kind].get(code)
+        if not asset:
+            raise KeyError(f"{kind} {code} 不存在")
+        row = next((v for v in asset.versions if v.version == version), None)
+        if not row:
+            raise KeyError(f"{kind} {code} 不存在版本 {version}")
+        if row.status == VersionStatus.PUBLISHED:
+            raise ValueError(f"版本 {version} 已是当前发布版本，无需审批")
+        for pending in self._release_approvals.values():
+            if (
+                pending.status == "PENDING"
+                and pending.asset_kind == kind
+                and pending.code == code
+                and pending.version == version
+            ):
+                raise ValueError(f"{code}@{version} 已有待审批的发布请求（{pending.id}）")
+        approval = ReleaseApproval(
+            id=uuid.uuid4().hex[:16],
+            asset_kind=kind,
+            code=code,
+            version=version,
+            requested_by=actor["user_id"],
+            requested_at=utc_now_iso(),
+            note=str(payload.get("note") or ""),
+        )
+        self._release_approvals[approval.id] = approval
+        domain_persistence.write("orchestration.release_approvals", approval.id, approval.model_dump())
+        return approval.model_dump()
+
+    def approve_release(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """Second-person approval: the approver must differ from the requester."""
+        actor = self._actor(payload, context)
+        approval_id = str(payload.get("approval_id") or "").strip()
+        approval = self._release_approvals.get(approval_id)
+        if not approval:
+            raise KeyError(f"审批单 {approval_id} 不存在")
+        if approval.status != "PENDING":
+            raise ValueError(f"审批单 {approval_id} 状态为 {approval.status}")
+        if approval.requested_by == actor["user_id"]:
+            raise ValueError("发布审批需要第二人确认：审批人不能与发起人相同")
+
+        # A DRAFT version publishes; a SUPERSEDED version rolls back into place.
+        # Both execute under the REQUESTER's identity (they hold the edit lock
+        # and authored the change); the approver only authorizes.
+        asset = {"scenario": self._scenarios, "subgraph": self._subgraphs, "operator": self._operators}[approval.asset_kind][approval.code]
+        row = next(v for v in asset.versions if v.version == approval.version)
+        if row.status == "DRAFT":
+            action = {"scenario": "scenarios.publish", "subgraph": "subgraphs.publish",
+                      "operator": "operators.publish"}[approval.asset_kind]
+        else:
+            action = {"scenario": "scenarios.rollback", "subgraph": "subgraphs.rollback",
+                      "operator": "operators.rollback"}[approval.asset_kind]
+        code_field = {"scenario": "code", "subgraph": "code", "operator": "name"}[approval.asset_kind]
+        publish_context = {**context, "user_id": approval.requested_by}
+        try:
+            result = dispatch_catalog_action(action, {code_field: approval.code, "version": approval.version}, publish_context)
+        except Exception:
+            raise
+        approval.status = "APPROVED"
+        approval.approver = actor["user_id"]
+        approval.approved_at = utc_now_iso()
+        domain_persistence.write("orchestration.release_approvals", approval.id, approval.model_dump())
+        return {"approval": approval.model_dump(), "published": result}
+
+    def reject_release(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        actor = self._actor(payload, context)
+        approval_id = str(payload.get("approval_id") or "").strip()
+        approval = self._release_approvals.get(approval_id)
+        if not approval:
+            raise KeyError(f"审批单 {approval_id} 不存在")
+        if approval.status != "PENDING":
+            raise ValueError(f"审批单 {approval_id} 状态为 {approval.status}")
+        approval.status = "REJECTED"
+        approval.approver = actor["user_id"]
+        approval.approved_at = utc_now_iso()
+        approval.note = (f"{approval.note} | " if approval.note else "") + str(payload.get("note") or "已驳回")
+        domain_persistence.write("orchestration.release_approvals", approval.id, approval.model_dump())
+        return approval.model_dump()
+
+    def list_release_approvals(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        status = str(payload.get("status") or "").strip()
+        rows = [a.model_dump() for a in self._release_approvals.values()]
+        if status:
+            rows = [r for r in rows if r["status"] == status]
+        rows.sort(key=lambda r: r["requested_at"], reverse=True)
+        return {"approvals": rows, "total": len(rows)}
+
+    def hydrate_release_approvals(self, rows: List[Dict]) -> int:
+        for r in rows or []:
+            if isinstance(r, dict) and r.get("id"):
+                self._release_approvals[r["id"]] = ReleaseApproval(**r)
+        return len(self._release_approvals)
+
 
 catalog_service = CatalogService()
 
 # 写操作动作表：所有目录变更统一经 OPC_ORCHESTRATION_CATALOG_PIPELINE 的
 # guard → persist → telemetry 算子链执行（写走 DAG 的框架约定）。
+class ReleaseApproval(BaseModel):
+    """One publish-approval ticket (second-person rule; persisted audit trail)."""
+    id: str
+    asset_kind: str
+    code: str
+    version: str
+    requested_by: str
+    requested_at: str
+    status: str = "PENDING"
+    approver: str = ""
+    approved_at: str = ""
+    note: str = ""
+
+
 CATALOG_ACTIONS: Dict[str, str] = {
     "operators.create": "create_operator",
     "operators.version.save": "save_operator_version",
@@ -1216,6 +1439,12 @@ CATALOG_ACTIONS: Dict[str, str] = {
     "scenarios.version.save": "save_scenario_version",
     "scenarios.publish": "publish_scenario",
     "scenarios.delete": "delete_scenario",
+    "scenarios.rollback": "rollback_scenario",
+    "subgraphs.rollback": "rollback_subgraph",
+    "operators.rollback": "rollback_operator",
+    "approvals.request": "request_release_approval",
+    "approvals.approve": "approve_release",
+    "approvals.reject": "reject_release",
 }
 
 
@@ -1231,3 +1460,4 @@ def dispatch_catalog_action(action: str, payload: Dict[str, Any], context: Dict[
 domain_persistence.register("orchestration.catalog.operators", catalog_service.hydrate_operators)
 domain_persistence.register("orchestration.catalog.subgraphs", catalog_service.hydrate_subgraphs)
 domain_persistence.register("orchestration.catalog.scenarios", catalog_service.hydrate_scenarios)
+domain_persistence.register("orchestration.release_approvals", catalog_service.hydrate_release_approvals)

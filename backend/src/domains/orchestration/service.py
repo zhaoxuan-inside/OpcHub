@@ -82,9 +82,9 @@ class OrchestrationService:
     def sync_dynamic_flows(self) -> None:
         """Convert workbench-authored DAG configs into MicroFlow flows and rebuild.
 
-        Configs the converter cannot express keep executing on the legacy engine
-        (execute_scenario falls back when the flow id is absent from the release),
-        so authoring never silently loses semantics.
+        Configs the converter cannot express (unknown operators, unmappable
+        constructs) are refused with a logged reason — the legacy engine is
+        retired, so authoring never silently degrades.
         """
         import os
 
@@ -96,6 +96,9 @@ class OrchestrationService:
             from src.host.flow_engine import flow_engine
         except ImportError:
             return
+        from src.domains.registry import import_domain_functions
+
+        import_domain_functions()  # idempotent: control-plane ops must be visible
         from src.core.operators.sdk import REGISTRY
 
         known_operators = {d.name for d in REGISTRY}
@@ -140,7 +143,7 @@ class OrchestrationService:
             logger.error("MicroFlow rebuild after DAG config save failed: %s", exc)
             return
         if failures:
-            logger.warning("Dynamic configs kept on the legacy engine: %s", failures)
+            logger.warning("Dynamic configs refused (not convertible to MicroFlow): %s", failures)
 
     def get_dag_config(self, scenario_code: str, version: str) -> DAGConfigRecord:
         key = (scenario_code, version)

@@ -1357,6 +1357,12 @@ def catalog_operators_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] =
     return {"operators": rows, "total": len(rows)}
 
 
+def catalog_release_approvals_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
+    """List release-approval tickets (公开只读，审批状态面)."""
+    from src.domains.orchestration.catalog import catalog_service
+    return catalog_service.list_release_approvals(p or {}, c or {})
+
+
 def catalog_operator_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
     """Fetch one operator asset with its full version history (公开只读)."""
     from src.domains.orchestration.catalog import catalog_service
