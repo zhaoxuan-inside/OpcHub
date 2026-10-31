@@ -38,15 +38,16 @@ def _bridge(definition: OperatorDefinition):
     async def run(input, output, context, metrix, debug, log) -> bool:
         opc_context = context.resource("opchub")
         # OpcHub operators expect plain dicts (isinstance checks, .get chains);
-        # MicroFlow freezes mappings, so thaw before handing data over.
-        params = thaw(input.get("params") or {})
-        args = thaw(input.get("args") or {})
-        if not isinstance(params, dict):
-            params = dict(params)
-        if not isinstance(args, dict):
-            args = dict(args)
+        # MicroFlow freezes mappings, so thaw before handing data over. The
+        # whole mapped input passes through (reserved channels like
+        # __payload__ ride along for dynamic operators).
+        handler_input = thaw(dict(input))
+        params = handler_input.get("params")
+        args = handler_input.get("args")
+        handler_input["params"] = params if isinstance(params, dict) else {}
+        handler_input["args"] = args if isinstance(args, dict) else {}
         try:
-            result = await definition.handler({"params": params, "args": args}, opc_context)
+            result = await definition.handler(handler_input, opc_context)
         except (PermissionError, ValueError, KeyError) as exc:
             # Business rejection: the framework carries the message through
             # Output.reject into the error envelope; the original exception

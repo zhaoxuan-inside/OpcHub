@@ -5,11 +5,8 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.core.security import create_session_token
-from src.core.microkernel.registry import registry
-from src.core.microkernel.dispatcher import dispatcher
 from src.core.microkernel.script_ingestion import script_ingestion_service
-from src.core.microkernel.models import DAGConfig, ExecutionGraph, NodeDef
-from src.core.microkernel.engine import microkernel_engine
+from src.core.operators.sdk import REGISTRY
 
 client = TestClient(app)
 
@@ -54,31 +51,49 @@ def test_upload_registers_operator_into_method_pool():
     assert body["signature_hash"].startswith("sig_sha256_")
     assert body["operator_id"] == "admin_test_001"
 
-    # Registered into the runtime method pool => immediately orchestratable
-    assert name in registry.list_handlers()
-    assert name in {d.name for d in dispatcher.list_descriptors()}
+    # Registered into the SDK registry => the MicroFlow bridge can project it
+    from src.core.operators.sdk import REGISTRY
+
+    assert name in {d.name for d in REGISTRY}
 
 
-def test_dynamic_operator_executes_inside_dag():
-    """Verify a runtime-registered operator can be orchestrated by a DAG node immediately."""
+def test_dynamic_operator_executes_inside_microflow():
+    """A runtime-registered operator executes on the MicroFlow release immediately."""
+    import asyncio
+
     name = "dynamic.triple"
     up = client.post("/api/v1/scripts/upload", json={
         "name": name, "code": VALID_SCRIPT, "token": _admin_token(),
     })
     assert up.status_code == 200, up.text
 
-    cfg = DAGConfig(
+    from src.domains.orchestration.models import DAGConfigSaveRequest
+    from src.domains.orchestration.service import orchestration_service
+
+    orchestration_service.save_dag_config(DAGConfigSaveRequest(
         scenario_code="dynamic.test.pipeline",
-        execution_graph=ExecutionGraph(
-            topology="DAG",
-            entry_node="n1",
-            nodes=[NodeDef(id="n1", action_handler=name, type="BIZ")],
-            edges=[],
-        ),
-    )
-    res = asyncio.run(microkernel_engine.execute_dag(cfg, {"x": 14}))
-    assert res.status.value == "SUCCESS"
-    assert res.final_output.get("tripled") == 42
+        version="v1.0.0",
+        topology_graph={
+            "topology": "DAG",
+            "entry_node": "n1",
+            "nodes": [{"id": "n1", "action_handler": name, "type": "BIZ"}],
+            "edges": [],
+        },
+        status="ACTIVE",
+        created_by="test",
+    ))
+    try:
+        from src.host.flow_engine import flow_engine
+
+        run = asyncio.run(flow_engine.execute(
+            "dynamic.test.pipeline", {"x": 14}, {"user_id": "admin_test_001"}))
+        assert run.final_output.get("tripled") == 42
+    finally:
+        client.post("/api/v1/scripts/unregister", json={
+            "name": name, "token": _admin_token(),
+        })
+        orchestration_service._dag_configs.pop(("dynamic.test.pipeline", "v1.0.0"), None)
+
 
 
 def test_upload_rejects_non_admin():
@@ -93,7 +108,7 @@ def test_upload_rejects_non_admin():
     r2 = c.post("/api/v1/scripts/upload", json={"name": "dynamic.x", "code": VALID_SCRIPT})
     assert r2.status_code == 403
     assert "ADMIN" in r2.json()["detail"]
-    assert "dynamic.x" not in registry.list_handlers()
+    assert "dynamic.x" not in {d.name for d in REGISTRY}
 
 
 def test_reject_forbidden_import():
@@ -105,7 +120,7 @@ def test_reject_forbidden_import():
     })
     assert r.status_code == 400
     assert "Forbidden import" in r.json()["detail"]
-    assert "dynamic.evil_import" not in registry.list_handlers()
+    assert "dynamic.evil_import" not in {d.name for d in REGISTRY}
 
 
 def test_reject_forbidden_call():
@@ -182,12 +197,12 @@ def test_unregister_removes_operator():
     """Verify unregister removes the operator from the pool and 404s when missing."""
     name = "dynamic.temp"
     client.post("/api/v1/scripts/upload", json={"name": name, "code": VALID_SCRIPT, "token": _admin_token()})
-    assert name in registry.list_handlers()
+    assert name in {d.name for d in REGISTRY}
 
     r = client.post(f"/api/v1/scripts/{name}/unregister", json={}, params={"token": _admin_token()})
     assert r.status_code == 200
     assert r.json()["status"] == "UNREGISTERED"
-    assert name not in registry.list_handlers()
+    assert name not in {d.name for d in REGISTRY}
 
     r2 = client.post(f"/api/v1/scripts/{name}/unregister", json={}, params={"token": _admin_token()})
     assert r2.status_code == 404

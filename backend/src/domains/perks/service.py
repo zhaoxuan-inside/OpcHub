@@ -132,7 +132,7 @@ class PerkService:
     # ------------------------------------------------------------------
     def list_perks(self, payload: Optional[Dict[str, Any]] = None) -> List[PerkResponse]:
         """List published discount announcements for the public board."""
-        # Imported lazily: the operator SDK imports the microkernel registry, which
+        # Imported lazily: the operator SDK registry feeds the MicroFlow bridge, which
         # must not be triggered while the domain service module is still loading.
         from src.domains.perks.functions import board as assemble_board
 

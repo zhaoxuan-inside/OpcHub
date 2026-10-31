@@ -4,13 +4,14 @@ Firewalls 1-3 (AST scan / entry-point convention / restricted-namespace load) ar
 delegated to ``core.microkernel.sandbox``. This service performs Firewall 4:
 registration into the AtomicRegistry plus tamper-evident audit logging.
 """
+import inspect
 import logging
 import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from src.core.microkernel.registry import registry
+from src.core.operators.sdk import REGISTRY, OperatorDefinition
 from src.core.microkernel.sandbox import load_operator_from_source
 
 logger = logging.getLogger("opchub.microkernel.script_ingestion")
@@ -85,7 +86,7 @@ class ScriptIngestionService:
                 "Invalid operator name: must start with a letter and contain only "
                 "letters, digits, '_' or '.' (2-64 chars)"
             )
-        if clean_name in registry.list_handlers() and clean_name not in self._dynamic_operators:
+        if any(d.name == clean_name for d in REGISTRY) and clean_name not in self._dynamic_operators:
             self._record(clean_name, operator_id, "REJECTED", "REJECTED", "name collides with a built-in operator")
             raise ValueError(f"Operator name '{clean_name}' already exists as a built-in operator")
         if clean_name in self._dynamic_operators and not overwrite:
@@ -102,13 +103,29 @@ class ScriptIngestionService:
                          entry_function=entry_function or "", source_bytes=len((code or "").encode("utf-8")))
             raise
 
-        # Firewall 4: register into the atomic method pool
-        registry.register(
-            clean_name,
-            loaded.handler,
-            domain=DYNAMIC_DOMAIN,
+        # Firewall 4: register into the SDK registry (the MicroFlow bridge
+        # projects it into the framework release). Dynamic scripts keep the
+        # legacy merged-scope signature `entry(inputs, context)`, so wrap the
+        # bridged params/args envelope into that shape.
+        async def _dynamic_handler(inputs, context, _fn=loaded.handler):
+            from microflow.values import thaw
+
+            args = thaw(inputs.get("args") or {})
+            params = thaw(inputs.get("params") or {})
+            payload = thaw(inputs.get("__payload__") or {})
+            merged = {**payload, **args, "params": params}
+            result = _fn(merged, context)
+            if inspect.isawaitable(result):
+                result = await result
+            return result if isinstance(result, dict) else ({} if result is None else {"result": result})
+
+        REGISTRY.append(OperatorDefinition(
+            name=clean_name,
+            handler=_dynamic_handler,
+            category=DYNAMIC_DOMAIN,
             description=description or f"Dynamic operator uploaded by {operator_id}",
-        )
+            params={},
+        ))
         record = self._record(
             clean_name, operator_id, "REGISTERED", "SUCCESS", "",
             entry_function=loaded.entry_function,
@@ -134,7 +151,7 @@ class ScriptIngestionService:
         if clean_name not in self._dynamic_operators:
             self._record(clean_name, operator_id, "UNREGISTERED", "REJECTED", "not a dynamic operator")
             return False
-        registry.unregister(clean_name)
+        REGISTRY[:] = [d for d in REGISTRY if d.name != clean_name]
         self._dynamic_operators.pop(clean_name, None)
         self._record(clean_name, operator_id, "UNREGISTERED", "SUCCESS")
         return True

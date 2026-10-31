@@ -3,7 +3,7 @@
 Business flows are *configuration*, not Python. Each YAML asset declares a
 scenario code, a version, the operator per node, static params and the input
 mapping. The loader validates the shape and registers the compiled topology with
-the orchestration service, which the microkernel engine then executes.
+the orchestration service; execution happens on the MicroFlow release.
 
 Asset format::
 

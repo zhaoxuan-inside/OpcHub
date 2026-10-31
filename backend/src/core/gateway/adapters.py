@@ -1334,14 +1334,6 @@ async def forum_thread_delete_adapter(p: Dict[str, Any], c: Dict[str, Any] = Non
     return {"thread_id": thread_id, "deleted": True}
 
 
-async def operator_mode_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Update an operator's dispatch mode (IN_PROCESS vs HTTP_REMOTE) — ADMIN orchestration."""
-    from src.domains.orchestration.models import OperatorModeUpdateRequest
-    req = OperatorModeUpdateRequest(**p)
-    res = orchestration_service.update_operator_mode(req)
-    return res.model_dump()
-
-
 # ==========================================
 # Orchestration Catalog (三层编排资产目录：算子/子图/场景 + 排他锁)
 # ==========================================

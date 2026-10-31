@@ -15,14 +15,12 @@ from src.core.telemetry import (
     get_current_trace_id,
     app_start_time,
 )
-from src.core.microkernel.models import DAGConfig, ExecutionResult
-from src.core.microkernel.engine import microkernel_engine
 from src.core.microkernel.sandbox import validate_python_code
 from src.core.microkernel.script_ingestion import script_ingestion_service
 from src.core.microkernel.watcher import hot_reload_engine
 from src.core.audit import audit_service
 from src.core.security import verify_session_token
-from src.core.microkernel.registry import registry
+from src.core.operators.sdk import REGISTRY
 from src.domains.user.service import user_service
 from src.domains.notifications.service import notification_service  # noqa: F401  (register persistence hydrator)
 from src.domains.user.models import (
@@ -244,11 +242,6 @@ def require_admin(token: str | None) -> str:
     return payload.get("uid", "admin")
 
 
-class DAGExecutionRequest(BaseModel):
-    config: DAGConfig
-    inputs: dict[str, Any] | None = None
-
-
 async def dispatch_scenario(payload: DispatchRequest, request: Request):
     """Unified entrypoint receiving any business request and dynamically routing by scenario."""
     if not payload.token:
@@ -331,7 +324,7 @@ async def liveness_probe():
 @app.get("/readyz", tags=["System Probes"])
 async def readiness_probe():
     """Readiness probe checking readiness of database, kernel operators and domain repositories."""
-    ops_count = len(registry.list_handlers())
+    ops_count = len(REGISTRY)
     if ops_count < 4:
         raise HTTPException(status_code=503, detail="Kernel operators below readiness threshold")
     
@@ -364,7 +357,7 @@ async def diagnostics_probe():
         "status": "HEALTHY",
         "uptime_seconds": uptime_sec,
         "trace_id": get_current_trace_id(),
-        "active_operators": len(registry.list_handlers()),
+        "active_operators": len(REGISTRY),
         "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
@@ -377,7 +370,7 @@ async def health_check():
         "service": settings.app_name,
         "version": settings.app_version,
         "trace_id": get_current_trace_id(),
-        "kernel_operators_count": len(registry.list_handlers())
+        "kernel_operators_count": len(REGISTRY)
     }
 
 
@@ -386,20 +379,12 @@ async def health_check():
 # ==========================================
 @app.get(f"{settings.api_prefix}/microkernel/methods", tags=["Microkernel"])
 async def list_registered_methods():
-    """List all currently registered atomic action handlers."""
-    return {"registered_handlers": registry.list_handlers()}
+    """List every operator registered in the SDK registry (MicroFlow bridge input)."""
+    return {"registered_handlers": [
+        {"name": d.name, "domain": d.category, "description": d.description}
+        for d in REGISTRY
+    ]}
 
-
-@app.post(
-    f"{settings.api_prefix}/microkernel/dag/execute",
-    response_model=ExecutionResult,
-    tags=["Microkernel"]
-)
-async def execute_dag_pipeline(payload: DAGExecutionRequest):
-    """Execute a compiled DAG execution graph according to working version."""
-    tid = get_current_trace_id()
-    result = await microkernel_engine.execute_dag(payload.config, payload.inputs, trace_id=tid)
-    return result
 
 
 @app.post(f"{settings.api_prefix}/microkernel/sandbox/validate", tags=["Microkernel"])

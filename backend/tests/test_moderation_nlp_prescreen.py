@@ -10,6 +10,12 @@ Verifies:
    handled locally, high-severity violations are blocked locally without an external call.
 """
 import pytest
+
+from src.core.operators.sdk import REGISTRY
+
+
+def _registry_get(name):
+    return next((d.handler for d in REGISTRY if d.name == name), None)
 import pytest_asyncio
 from unittest.mock import patch
 
@@ -63,8 +69,8 @@ class TestNlpPrescreen:
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
 async def test_nlp_prescreen_operator_is_registered():
-    from src.core.microkernel.registry import registry
-    handler = registry.get("calc.moderation.prescreen")
+    
+    handler = _registry_get("calc.moderation.prescreen")
     assert handler is not None, "calc.moderation.prescreen operator must be registered"
     res = await handler({"args": {"content": "软件开发与合规申报"}}, {})
     assert res["verdict"] == VERDICT_SAFE

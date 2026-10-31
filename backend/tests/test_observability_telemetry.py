@@ -57,58 +57,26 @@ async def test_custom_trace_id_propagation_header():
 
 
 @pytest.mark.asyncio
-async def test_dag_pipeline_trace_id_penetration():
+async def test_gateway_scenario_trace_id_penetration():
+    """X-Trace-ID penetrates the unified gateway into the MicroFlow run."""
     transport = ASGITransport(app=app)
     custom_trace = "trc_pipeline_exec_776655"
-    dag_payload = {
-        "config": {
-            "version": "v1.0.4-draft",
-            "scenario_code": "tax.calculate_vat_exemption",
-            "execution_graph": {
-                "topology": "DAG",
-                "entry_node": "dnode-1",
-                "nodes": [
-                    {
-                        "id": "dnode-1", "action_handler": "transform.derive", "type": "BIZ",
-                        "params": {"expr": "args.income * 0", "output_key": "rate"},
-                        "inputs_map": {"income": "$inputs.quarterly_income"},
-                    },
-                    {
-                        "id": "dnode-2", "action_handler": "transform.derive", "type": "BIZ",
-                        "params": {"expr": "args.rate + 1", "output_key": "step"},
-                        "inputs_map": {"rate": "$nodes.dnode-1.rate"},
-                    },
-                    {
-                        "id": "dnode-3", "action_handler": "transform.derive", "type": "BIZ",
-                        "params": {"expr": "args.step * 2", "output_key": "doubled"},
-                        "inputs_map": {"step": "$nodes.dnode-2.step"},
-                    },
-                    {
-                        "id": "dnode-4", "action_handler": "transform.derive", "type": "BIZ",
-                        "params": {"expr": "args.doubled + 0", "output_key": "final"},
-                        "inputs_map": {"doubled": "$nodes.dnode-3.doubled"},
-                    },
-                ],
-                "edges": [
-                    {"from": "dnode-1", "to": "dnode-2"},
-                    {"from": "dnode-2", "to": "dnode-3"},
-                    {"from": "dnode-3", "to": "dnode-4"},
-                ],
-            },
-        },
-        "inputs": {"quarterly_income": 280000.0, "auth_token": "valid_token"},
-    }
 
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         res = await ac.post(
-            "/api/v1/microkernel/dag/execute",
-            json=dag_payload,
+            "/api/welcom/opc_world",
+            json={"scenario": "auth.captcha", "version": "v1.0.0", "payload": {}},
             headers={"X-Trace-ID": custom_trace},
         )
-        assert res.status_code == 200
+        assert res.status_code == 200, res.text
         assert res.headers["X-Trace-ID"] == custom_trace
         data = res.json()
         assert data["trace_id"] == custom_trace
-        assert len(data["node_traces"]) == 4
-        for trace in data["node_traces"]:
-            assert trace["trace_id"] == custom_trace
+
+        res2 = await ac.post(
+            "/api/welcom/opc_world",
+            json={"scenario": "auth.captcha", "version": "v1.0.0", "payload": {}},
+        )
+        assert res2.status_code == 200
+        assert res2.headers.get("X-Trace-ID", "").startswith("trc_")
+

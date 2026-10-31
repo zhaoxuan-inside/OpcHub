@@ -13,7 +13,11 @@ import pytest
 import yaml
 
 from src.core.entity import entity_store
-from src.core.microkernel.registry import registry
+from src.core.operators.sdk import REGISTRY
+
+
+def _registry_get(name):
+    return next((d.handler for d in REGISTRY if d.name == name), None)
 from src.core.scenario import ensure_scenarios_loaded
 from src.domains.orchestration.models import ScenarioExecuteRequest
 from src.domains.orchestration.service import orchestration_service
@@ -162,7 +166,7 @@ async def test_render_document_requires_existing_template():
 
 async def test_render_operator_enforces_required_fields():
     """The pure operator validates required fields; the legacy render asset is lenient."""
-    handler = registry.get("calc.sop.render_document")
+    handler = _registry_get("calc.sop.render_document")
     template = sop_service.get_template(TEMPLATE_ID)
     with pytest.raises(ValueError) as exc:
         await handler(
@@ -488,7 +492,7 @@ async def test_deleting_a_missing_document_reports_not_found():
 
 
 async def test_malformed_review_transition_is_rejected():
-    handler = registry.get("calc.sop.review_transition")
+    handler = _registry_get("calc.sop.review_transition")
     with pytest.raises(ValueError) as exc:
         await handler(
             {"params": {}, "args": {"current": "APPROVED", "action": "APPROVE", "target_type": "DOCUMENT"}},

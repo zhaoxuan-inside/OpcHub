@@ -852,13 +852,6 @@ gateway:
       handler: "src.core.gateway.adapters:list_operators_adapter"
       required_permission: "page:orchestrate"
 
-    - scenario: "orchestration.operators.mode"
-      version: "v1.0.0"
-      domain: "orchestration"
-      description: "切换算子调度模式 IN_PROCESS / HTTP_REMOTE (管理员编排特权)"
-      is_default: true
-      handler: "src.core.gateway.adapters:operator_mode_adapter"
-      required_permission: "page:orchestrate"
 
     - scenario: "orchestration.dag.save"
       version: "v1.0.0"

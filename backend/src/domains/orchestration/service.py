@@ -12,18 +12,8 @@ from src.domains.orchestration.models import (
     FrontendLayoutSaveRequest,
     FrontendLayoutRecord,
     OperatorDescriptor,
-    OperatorModeUpdateRequest,
     ScenarioExecuteRequest,
     ScenarioExecuteResponse,
-)
-from src.core.microkernel.dispatcher import dispatcher
-from src.core.microkernel.engine import microkernel_engine
-from src.core.microkernel.models import (
-    DAGConfig,
-    ExecutionGraph,
-    NodeDef,
-    EdgeDef,
-    NodeType,
 )
 from src.core.telemetry import get_current_trace_id
 from src.infrastructure.database.persistence import domain_persistence
@@ -106,18 +96,34 @@ class OrchestrationService:
             from src.host.flow_engine import flow_engine
         except ImportError:
             return
+        from src.core.operators.sdk import REGISTRY
+
+        known_operators = {d.name for d in REGISTRY}
         flows: list[dict[str, Any]] = []
         failures: list[str] = []
         for (code, version), record in self._dag_configs.items():
             if record.status != "ACTIVE":
                 continue
             topo = record.topology_graph or {}
+            missing = sorted({
+                str(n.get("operator") or n.get("action_handler") or "")
+                for n in (topo.get("nodes") or [])
+            } - known_operators - {""})
+            if missing:
+                # One unknown operator must not poison the whole rebuild; the
+                # config keeps running on ... it cannot: the legacy engine is
+                # retired, so the config is refused with a logged reason.
+                failures.append(f"{code}@{version}: unknown operators {missing[:3]}")
+                continue
             asset = {
                 "scenario": code,
                 "version": version,
                 "domain": topo.get("domain", ""),
                 "nodes": topo.get("nodes") or [],
-                "edges": [[e.get("from"), e.get("to")] for e in (topo.get("edges") or [])],
+                "edges": [
+                    [e.get("from") or e.get("from_node"), e.get("to") or e.get("to_node")]
+                    for e in (topo.get("edges") or [])
+                ],
             }
             try:
                 flow, report = convert_scenario(asset)
@@ -173,20 +179,13 @@ class OrchestrationService:
         return rec
 
     def list_operators(self) -> List[OperatorDescriptor]:
-        """List all registered atomic operator descriptors across all domains."""
-        return dispatcher.list_descriptors()
+        """List every operator the MicroFlow release can orchestrate (SDK registry)."""
+        from src.core.operators.sdk import REGISTRY
 
-    def update_operator_mode(self, req: OperatorModeUpdateRequest) -> OperatorDescriptor:
-        """Update dispatch mode (IN_PROCESS vs HTTP_REMOTE) for an operator."""
-        dispatcher.set_operator_mode(req.name, req.mode, req.remote_endpoint)
-        mode, endpoint = dispatcher.get_operator_mode(req.name)
-        return OperatorDescriptor(
-            name=req.name,
-            domain="custom",
-            description=f"Operator: {req.name}",
-            mode=mode,
-            remote_endpoint=endpoint,
-        )
+        return [
+            OperatorDescriptor(name=d.name, domain=d.category, description=d.description)
+            for d in REGISTRY
+        ]
 
     async def execute_scenario(
         self,
@@ -195,93 +194,19 @@ class OrchestrationService:
     ) -> ScenarioExecuteResponse:
         """Execute a composable scenario DAG pipeline.
 
-        Converted scenarios (the 129 asset-defined flows) execute on the
-        MicroFlow4Python framework release; anything else (dynamically saved
-        DAG configs, e.g. workbench-authored or test fixtures) keeps the
-        legacy in-process engine until the workbench authoring path is
-        migrated. ``OPCHUB_FLOW_ENGINE=0`` forces the legacy path everywhere.
+        Every scenario executes on the MicroFlow4Python framework release:
+        the 129 asset-defined flows plus workbench-authored configs the
+        converter accepted (sync_dynamic_flows). Unconvertible configs are
+        refused honestly instead of running on a retired engine.
         """
         if _flow_engine_enabled() and _flow_engine_has(req.scenario_code):
             return await self._execute_via_microflow(req, trace_id)
-        tid = trace_id or get_current_trace_id()
-        # Find latest active DAG config for the scenario
-        candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code and c.status == "ACTIVE"]
-        if not candidates:
-            # Scenario assets are the single source of truth for business flows;
-            # load them lazily so direct service/tests do not depend on lifespan.
-            from src.core.scenario import ensure_scenarios_loaded
-
-            ensure_scenarios_loaded()
-            candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code and c.status == "ACTIVE"]
-            if not candidates:
-                candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code]
-
-        if not candidates:
-            raise KeyError(f"Scenario code '{req.scenario_code}' has no configured DAG pipeline")
-
-        config_record = candidates[-1]
-        topo = config_record.topology_graph
-
-        # Convert topology dictionary to DAGConfig
-        nodes = []
-        for n in topo.get("nodes", []):
-            ntype = NodeType[n.get("type", "BIZ")] if n.get("type") in NodeType.__members__ else NodeType.BIZ
-            nodes.append(
-                NodeDef(
-                    id=n["id"],
-                    action_handler=n["action_handler"],
-                    type=ntype,
-                    timeout_ms=n.get("timeout_ms", 3000),
-                    params=n.get("params") or {},
-                    inputs_map=n.get("inputs_map") or n.get("args") or {},
-                    when=n.get("when"),
-                    output_key=n.get("output_key"),
-                )
-            )
-
-        edges = []
-        for e in topo.get("edges", []):
-            edges.append(
-                EdgeDef(
-                    from_node=e.get("from") or e.get("from_node"),
-                    to_node=e.get("to") or e.get("to_node"),
-                    when=e.get("when"),
-                )
-            )
-
-        dag_config = DAGConfig(
-            version=config_record.version,
-            scenario_code=config_record.scenario_code,
-            enable_saga_compensation=topo.get("enable_saga_compensation", True),
-            execution_graph=ExecutionGraph(
-                topology=topo.get("topology", "DAG"),
-                entry_node=topo.get("entry_node", nodes[0].id if nodes else ""),
-                nodes=nodes,
-                edges=edges,
-            ),
-        )
-
-        res = await microkernel_engine.execute_dag(
-            config=dag_config,
-            initial_inputs=req.inputs,
-            initial_context=req.context,
-            trace_id=tid,
-            override_dispatch_mode=req.override_dispatch_mode,
-        )
-
-        effective_mode = req.override_dispatch_mode.value if req.override_dispatch_mode else dispatcher.default_mode.value
-
-        return ScenarioExecuteResponse(
-            scenario_code=req.scenario_code,
-            status=res.status.value,
-            execution_time_ms=res.total_duration_ms,
-            trace_id=res.trace_id,
-            effective_dispatch_mode=effective_mode,
-            node_traces=[t.model_dump() for t in res.node_traces],
-            final_output=res.final_output,
-            error_message=res.error_message,
-            error_type=res.error_type,
-            compensation_traces=[c.model_dump() for c in res.compensation_traces],
+        # No MicroFlow flow for this code: it was authored dynamically and the
+        # converter refused it (see sync_dynamic_flows). The legacy engine is
+        # retired; refuse honestly instead of degrading.
+        raise ValueError(
+            f"Scenario '{req.scenario_code}' is not a MicroFlow flow; its DAG config "
+            f"could not be converted (see orchestration service logs)."
         )
 
     async def _execute_via_microflow(

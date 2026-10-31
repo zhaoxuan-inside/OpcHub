@@ -15,14 +15,13 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from pydantic import BaseModel, Field
 
-from src.core.microkernel.dispatcher import dispatcher
 from src.core.microkernel.sandbox import load_operator_from_source
 from src.core.microkernel.script_ingestion import (
     OPERATOR_NAME_PATTERN,
     script_ingestion_service,
 )
 from src.domains.orchestration.locks import AssetLock, lock_manager
-from src.domains.orchestration.models import DAGConfigSaveRequest
+from src.domains.orchestration.models import DAGConfigSaveRequest, OperatorDescriptor
 from src.domains.orchestration.service import orchestration_service, utc_now_iso
 from src.infrastructure.database.persistence import domain_persistence
 
@@ -405,19 +404,15 @@ class CatalogService:
         for asset in self._operators.values():
             asset.lock_status = lock_manager.status("operator", asset.name)
             descriptor = self._builtin_descriptor(asset.name)
-            if descriptor:
-                asset.runtime_mode = descriptor.mode.value
-            elif asset.current_version:
-                asset.runtime_mode = dispatcher.get_operator_mode(asset.name)[0].value
-            else:
-                asset.runtime_mode = ""
+            # MicroFlow executes in-process; the legacy dispatcher mode is retired.
+            asset.runtime_mode = descriptor.mode.value if descriptor else ""
             holders = sorted(set(usage.get(asset.name, [])))
             asset.in_use = bool(holders)
             asset.referenced_by = holders
             rows.append(asset)
 
         managed = set(self._operators.keys())
-        for desc in dispatcher.list_descriptors():
+        for desc in self._sdk_descriptors():
             if desc.name in managed:
                 continue
             rows.append(self._builtin_asset(desc.name, usage))
@@ -439,8 +434,17 @@ class CatalogService:
         raise KeyError(f"算子 {name} 不存在")
 
     @staticmethod
-    def _builtin_descriptor(name: str):
-        for desc in dispatcher.list_descriptors():
+    def _sdk_descriptors():
+        """Operator descriptors from the SDK registry (MicroFlow bridge input)."""
+        from src.core.operators.sdk import REGISTRY
+
+        return [
+            OperatorDescriptor(name=d.name, domain=d.category, description=d.description)
+            for d in REGISTRY
+        ]
+
+    def _builtin_descriptor(self, name: str):
+        for desc in self._sdk_descriptors():
             if desc.name == name:
                 return desc
         return None
@@ -628,15 +632,6 @@ class CatalogService:
             description=asset.description or asset.display_name,
             overwrite=True,
         )
-        # 版本定义即算子调度配置的权威来源：发布时同步调度模式
-        from src.core.microkernel.dispatcher import DispatchMode
-
-        dispatcher.set_operator_mode(
-            name,
-            DispatchMode(row.definition.dispatch_mode or "IN_PROCESS"),
-            row.definition.remote_endpoint,
-        )
-
         now = utc_now_iso()
         for v in asset.versions:
             if v.status == VersionStatus.PUBLISHED:

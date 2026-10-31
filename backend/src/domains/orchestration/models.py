@@ -1,7 +1,22 @@
 """Data models for DAG Pipeline Configs, Frontend Layouts, and Scenario Execution."""
+from enum import Enum
 from typing import Any, Dict, List, Optional
 from pydantic import BaseModel, Field
-from src.core.microkernel.dispatcher import DispatchMode, OperatorDescriptor
+
+class DispatchMode(str, Enum):
+    """Operator execution mode. MicroFlow executes IN_PROCESS; HTTP_REMOTE is a
+    legacy-engine concept retained only for API compatibility."""
+    IN_PROCESS = "IN_PROCESS"
+    HTTP_REMOTE = "HTTP_REMOTE"
+
+
+class OperatorDescriptor(BaseModel):
+    name: str
+    domain: str
+    description: str
+    mode: DispatchMode = DispatchMode.IN_PROCESS
+    remote_endpoint: Optional[str] = None
+
 
 
 class DAGConfigSaveRequest(BaseModel):

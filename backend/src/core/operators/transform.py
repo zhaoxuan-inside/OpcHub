@@ -5,7 +5,7 @@ import re
 import string
 from typing import Any
 
-from src.core.microkernel.expr import evaluate
+from src.core.expressions import evaluate
 from src.core.operators.sdk import operator
 
 

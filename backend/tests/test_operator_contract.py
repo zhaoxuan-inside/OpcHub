@@ -34,7 +34,6 @@ ALLOWED_GENERIC_PREFIXES = {
 FORBIDDEN_FUNCTION_CALLS = {
     "execute_scenario",
     "execute_dag",
-    "microkernel_engine",
     "orchestration_service",
     "domain_persistence",
 }
@@ -144,10 +143,10 @@ def test_all_scenario_assets_compile() -> None:
 
 
 def test_scenario_operators_are_registered() -> None:
-    from src.core.microkernel.registry import registry
+    from src.core.operators.sdk import REGISTRY
     from src.core.scenario.loader import compile_scenario
 
-    registered = set(registry.list_handlers())
+    registered = {d.name for d in REGISTRY}
     missing: list[str] = []
     for path in sorted(SCENARIOS.glob("*.yaml")):
         payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}

@@ -14,7 +14,7 @@ from src.infrastructure.external_gateway.content_moderation_gateway import (
     content_moderation_gateway,
     check_content_safety,
 )
-from src.core.microkernel.registry import registry
+from src.core.operators.sdk import REGISTRY
 from mock_data.loader import get_moderation_data
 
 MOCK_ENDPOINT = "http://127.0.0.1:8099"
@@ -86,8 +86,8 @@ async def test_microkernel_moderation_inspect_operator():
     safe_text = mod_data["test_cases"]["safe_samples"][0]
     bad_item = mod_data["test_cases"]["prohibited_samples"][0]
 
-    operator = registry.get("moderation.inspect_content")
-    assert operator is not None
+    definition = next(d for d in REGISTRY if d.name == "moderation.inspect_content")
+    operator = definition.handler
 
     # Safe call
     out_safe = await operator({"content": safe_text}, {})

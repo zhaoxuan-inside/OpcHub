@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import ast
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -80,7 +81,7 @@ def _path_of(node: ast.AST) -> str:
         if not rest:
             raise Unmappable("bare 'nodes' reference")
         head, *tail = rest
-        return ".".join(["nodes", head, "output", "data", *tail])
+        return _node_source(head, *tail)
     raise Unmappable(f"expression root '{root}'")
 
 
@@ -171,6 +172,18 @@ def _is_ref(value: Any) -> bool:
     return stripped.startswith(("$inputs.", "$nodes.", "$context.")) or stripped in ("$inputs", "$nodes", "$context")
 
 
+_FIELD_RE = re.compile(r"[A-Za-z_][A-Za-z_0-9-]*")
+
+
+def _node_source(node_id: str, *rest: str) -> str:
+    """Source path into a node's output; quotes ids the dotted form cannot hold."""
+    if _FIELD_RE.fullmatch(node_id):
+        base = f"nodes.{node_id}.output.data"
+    else:
+        base = f'nodes["{node_id}"].output.data'
+    return ".".join([base, *rest]) if rest else base
+
+
 def _map_reference(reference: str) -> str:
     """Resolve one ``$``-reference into a MicroFlow source path."""
     ref = reference.strip()
@@ -186,7 +199,8 @@ def _map_reference(reference: str) -> str:
         head, _, tail2 = tail.partition(".")
         if not head:
             raise Unmappable("bare 'nodes' reference")
-        return ".".join(["nodes", head, "output", "data", tail2]) if tail2 else f"nodes.{head}.output.data"
+        rest = (tail2,) if tail2 else ()
+        return _node_source(head, *rest)
     raise Unmappable(f"reference root '{root}'")
 
 
@@ -303,7 +317,7 @@ def _repair_identity_source(source: str, original: str, authn_id: str | None,
     if authn_id and authn_precedes and source.startswith("flow.input.payload."):
         leaf = source.rsplit(".", 1)[-1]
         if leaf in AUTHN_OUTPUT_KEYS:
-            return f"nodes.{authn_id}.output.data.{leaf}"
+            return _node_source(authn_id, leaf)
     return source
 
 
@@ -398,6 +412,12 @@ def convert_scenario(asset: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
                                          authn_precedes, authn_spreads))
         if inputs:
             node["inputs"] = inputs
+        else:
+            # Nodes without an inputs_map ran against the legacy merged scope
+            # (payload spread + params). Reserve a bridge-only channel carrying
+            # the payload; ordinary operators never read it.
+            node["inputs"] = {"__payload__": {"from": "flow.input.payload",
+                                              "required": False, "default": {}}}
         if raw.get("when"):
             try:
                 node["condition"] = translate_condition(raw["when"])
@@ -424,7 +444,7 @@ def convert_scenario(asset: dict[str, Any]) -> tuple[dict[str, Any], dict[str, A
         "id": code,
         "input_schema": "opchub.flow_input",
         "output_schema": "opchub.flow_output",
-        "options": {"scene": str(asset.get("domain") or ""), "version": str(asset.get("version") or "v1.0.0")},
+        "options": {"scene": str(asset.get("domain") or "") or "opchub", "version": str(asset.get("version") or "v1.0.0")},
         "nodes": mf_nodes,
         "outputs": {},
     }

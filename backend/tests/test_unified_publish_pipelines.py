@@ -18,7 +18,11 @@ from src.domains.orchestration.models import ScenarioExecuteRequest
 from src.domains.orchestration.service import orchestration_service
 from src.domains.sop.models import SOPFlowCreate, SOPDocumentDraftCreate, SOP_DOC_STATUS_READY
 from src.domains.sop.service import sop_service
-from src.core.microkernel.registry import registry
+from src.core.operators.sdk import REGISTRY
+
+
+def _registry_get(name):
+    return next((d for d in REGISTRY if d.name == name), None)
 
 
 MAKER_CONTEXT = {

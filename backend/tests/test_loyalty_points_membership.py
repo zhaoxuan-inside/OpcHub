@@ -15,7 +15,6 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from conftest import dispatch
-from src.core.microkernel.registry import registry
 from src.core.security import create_session_token
 from src.domains.interactions.service import content_interaction_service
 from src.domains.loyalty.pipelines import ensure_loyalty_pipelines
@@ -131,23 +130,6 @@ async def _revoke(
         },
         {"user_id": actor_id or uid, "user_role": "MAKER"},
     )
-
-
-def test_loyalty_operators_are_registered():
-    handlers = registry.list_handlers()
-    for name in (
-        "calc.loyalty.event",
-        "calc.loyalty.resolve",
-        "calc.loyalty.settle",
-        "calc.loyalty.revoke",
-        "calc.loyalty.redeem",
-        "calc.loyalty.membership",
-        "assemble.loyalty.award_result",
-        "assemble.loyalty.revoke_result",
-        "assemble.loyalty.redemption_result",
-        "assemble.loyalty.subscription_result",
-    ):
-        assert name in handlers
 
 
 def test_rules_are_public(client):

@@ -257,7 +257,7 @@ class VersionedHotReloadEngine:
         Steps:
         1. Pre-validates python syntax via AST; fails safely if syntax is invalid.
         2. Unloads old module reference from sys.modules and re-imports freshly.
-        3. Synchronizes with gateway scenario router and microkernel atomic registry.
+        3. Synchronizes with the gateway scenario router and rebuilds the MicroFlow release.
         4. Transitions record status from STAGED to ACTIVATED.
         """
         self.scan_changes()

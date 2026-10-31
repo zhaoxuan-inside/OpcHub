@@ -15,8 +15,11 @@ from fastapi.testclient import TestClient
 
 from src.main import app
 from src.core.security import create_session_token
-from src.core.microkernel.registry import registry
-from src.core.microkernel.dispatcher import dispatcher
+from src.core.operators.sdk import REGISTRY
+
+
+def _registry_get(name):
+    return next((d.handler for d in REGISTRY if d.name == name), None)
 from src.domains.orchestration.catalog import catalog_service
 from src.domains.orchestration.locks import lock_manager
 from src.domains.orchestration.service import orchestration_service
@@ -224,7 +227,7 @@ def test_operator_create_publish_version_delete():
     )
     assert asset["source"] == "custom"
     assert asset["versions"][0]["status"] == "DRAFT"
-    assert registry.get("dynamic.lifecycles") is None  # 草稿未注册
+    assert _registry_get("dynamic.lifecycles") is None  # 草稿未注册
 
     published = ok(
         "orchestration.operators.publish",
@@ -232,9 +235,10 @@ def test_operator_create_publish_version_delete():
         _admin_token(),
     )
     assert published["current_version"] == "v1.0.0"
-    assert registry.get("dynamic.lifecycles") is not None  # 已注册进算子池
-    handler = registry.get("dynamic.lifecycles")
-    out = asyncio.run(handler({"x": 21}, {}))
+    assert _registry_get("dynamic.lifecycles") is not None  # 已注册进算子池
+    handler = _registry_get("dynamic.lifecycles")
+    # Dynamic handlers consume the bridge envelope (args carry mapped inputs).
+    out = asyncio.run(handler({"args": {"x": 21}}, {}))
     assert out["doubled"] == 42
 
     # 已发布版本不可直接编辑
@@ -280,7 +284,7 @@ def test_operator_create_publish_version_delete():
         _admin_token(),
     )
     assert deleted["deleted"] is True
-    assert registry.get("dynamic.lifecycles") is None
+    assert _registry_get("dynamic.lifecycles") is None
     names = [o["name"] for o in ok("orchestration.catalog.operators", {})["operators"]]
     assert "dynamic.lifecycles" not in names
 
