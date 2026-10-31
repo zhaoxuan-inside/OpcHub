@@ -20,6 +20,7 @@ ALLOWED_GENERIC_PREFIXES = {
     "guard",
     "validate",
     "transform",
+    "assemble",
     "entity",
     "notify",
     "audit",

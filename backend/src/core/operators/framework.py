@@ -101,3 +101,19 @@ def gateway_rules(params: dict[str, Any], args: dict[str, Any], context: dict[st
     from src.core.gateway.router import scenario_router
 
     return {"rules": [rule.model_dump() for rule in scenario_router.list_rules()]}
+
+
+@operator(
+    "assemble.list",
+    category="ASSEMBLE",
+    description="按序聚合多个上游输出为列表（场景转换器生成的合成节点专用）",
+)
+def assemble_list(params: dict[str, Any], args: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
+    """Build ``mf_items`` from integer-keyed args (``0``, ``1``, ...).
+
+    The scenario converter synthesizes this node when a params list mixes node
+    references and literals; MicroFlow mappings cannot construct arrays.
+    """
+    indexes = sorted((key for key in args if str(key).startswith("e") and str(key)[1:].isdigit()),
+                     key=lambda k: int(str(k)[1:]))
+    return {"mf_items": [args[key] for key in indexes]}

@@ -87,6 +87,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         startup_log.error("Operator kernel initialization failed: %s", e)
 
+    # 2b) MicroFlow release: the framework executes every converted scenario.
+    try:
+        from src.host.flow_engine import flow_engine
+
+        release_id = flow_engine.build()
+        startup_log.info("MicroFlow release %s ready (%d flows)", release_id[:12],
+                         len(flow_engine._release.flows))
+    except Exception as e:
+        startup_log.error("MicroFlow flow engine build failed; scenarios fall back to the legacy engine: %s", e)
+
     # 3) Background workers.
     try:
         from src.domains.loyalty.pipelines import ensure_loyalty_pipelines

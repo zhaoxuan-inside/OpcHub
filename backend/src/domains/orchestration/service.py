@@ -32,6 +32,26 @@ def utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _flow_engine_enabled() -> bool:
+    """MicroFlow executes converted scenarios unless explicitly disabled."""
+    import os
+
+    return os.getenv("OPCHUB_FLOW_ENGINE", "1") != "0"
+
+
+def _flow_engine_has(scenario_code: str) -> bool:
+    try:
+        from src.host.flow_engine import flow_engine
+
+        if not flow_engine.is_ready:
+            flow_engine.build()
+        return flow_engine.has_flow(scenario_code)
+    except FileNotFoundError:
+        return False
+    except Exception:  # compile failure must not break scenario resolution
+        return False
+
+
 class OrchestrationService:
     """Manages versioned DAG configs, frontend layouts, and executes composable scenarios."""
 
@@ -118,7 +138,16 @@ class OrchestrationService:
         req: ScenarioExecuteRequest,
         trace_id: Optional[str] = None,
     ) -> ScenarioExecuteResponse:
-        """Execute a composable scenario DAG pipeline."""
+        """Execute a composable scenario DAG pipeline.
+
+        Converted scenarios (the 129 asset-defined flows) execute on the
+        MicroFlow4Python framework release; anything else (dynamically saved
+        DAG configs, e.g. workbench-authored or test fixtures) keeps the
+        legacy in-process engine until the workbench authoring path is
+        migrated. ``OPCHUB_FLOW_ENGINE=0`` forces the legacy path everywhere.
+        """
+        if _flow_engine_enabled() and _flow_engine_has(req.scenario_code):
+            return await self._execute_via_microflow(req, trace_id)
         tid = trace_id or get_current_trace_id()
         # Find latest active DAG config for the scenario
         candidates = [c for c in self._dag_configs.values() if c.scenario_code == req.scenario_code and c.status == "ACTIVE"]
@@ -198,6 +227,50 @@ class OrchestrationService:
             error_message=res.error_message,
             error_type=res.error_type,
             compensation_traces=[c.model_dump() for c in res.compensation_traces],
+        )
+
+    async def _execute_via_microflow(
+        self,
+        req: ScenarioExecuteRequest,
+        trace_id: Optional[str],
+    ) -> ScenarioExecuteResponse:
+        """Execute a converted scenario on the MicroFlow4Python release."""
+        import time as _time
+
+        from src.host.flow_engine import flow_engine
+
+        started = _time.perf_counter()
+        tid = trace_id or get_current_trace_id()
+        try:
+            run = await flow_engine.execute(
+                req.scenario_code, dict(req.inputs or {}), dict(req.context or {}),
+            )
+        except KeyError as exc:
+            return ScenarioExecuteResponse(
+                scenario_code=req.scenario_code, status="FAILED",
+                execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
+                trace_id=tid, effective_dispatch_mode="IN_PROCESS",
+                node_traces=[], final_output={},
+                error_message=str(exc), error_type="KeyError",
+            )
+        except (PermissionError, ValueError) as exc:
+            # The legacy engine marked permission failures GUARD_REJECTED.
+            status = "GUARD_REJECTED" if isinstance(exc, PermissionError) else "FAILED"
+            return ScenarioExecuteResponse(
+                scenario_code=req.scenario_code, status=status,
+                execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
+                trace_id=tid, effective_dispatch_mode="IN_PROCESS",
+                node_traces=[], final_output={},
+                error_message=str(exc), error_type=type(exc).__name__,
+            )
+        return ScenarioExecuteResponse(
+            scenario_code=req.scenario_code,
+            status="SUCCESS",
+            execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
+            trace_id=run.trace_id or tid,
+            effective_dispatch_mode="IN_PROCESS",
+            node_traces=run.node_traces,
+            final_output=run.final_output,
         )
 
     def save_frontend_layout(self, req: FrontendLayoutSaveRequest) -> FrontendLayoutRecord:
