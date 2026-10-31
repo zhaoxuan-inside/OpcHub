@@ -1,0 +1,46 @@
+/* OpcHub Console design tokens — shadcn-compatible CSS variables.
+   Single source shared by all three console SPAs; mirrors the main-app
+   Flutter token names so both runtimes speak one design language. */
+:root {
+  --background: oklch(0.99 0.002 250);
+  --foreground: oklch(0.21 0.02 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 255);
+  --muted: oklch(0.968 0.005 250);
+  --muted-foreground: oklch(0.52 0.015 255);
+  --primary: oklch(0.55 0.16 262);
+  --primary-foreground: oklch(0.985 0.005 250);
+  --accent: oklch(0.94 0.012 255);
+  --accent-foreground: oklch(0.3 0.03 262);
+  --destructive: oklch(0.58 0.2 25);
+  --destructive-foreground: oklch(0.985 0.005 250);
+  --success: oklch(0.62 0.14 155);
+  --warning: oklch(0.72 0.15 75);
+  --border: oklch(0.92 0.005 255);
+  --input: oklch(0.92 0.005 255);
+  --ring: oklch(0.55 0.16 262);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0.003 250);
+  --sidebar-foreground: oklch(0.3 0.02 255);
+}
+.dark {
+  --background: oklch(0.17 0.015 260);
+  --foreground: oklch(0.95 0.005 250);
+  --card: oklch(0.21 0.018 260);
+  --card-foreground: oklch(0.95 0.005 250);
+  --muted: oklch(0.26 0.015 260);
+  --muted-foreground: oklch(0.68 0.012 255);
+  --primary: oklch(0.68 0.15 262);
+  --primary-foreground: oklch(0.16 0.02 262);
+  --accent: oklch(0.28 0.02 262);
+  --accent-foreground: oklch(0.93 0.01 255);
+  --destructive: oklch(0.62 0.19 25);
+  --destructive-foreground: oklch(0.98 0.005 250);
+  --success: oklch(0.7 0.13 155);
+  --warning: oklch(0.78 0.14 75);
+  --border: oklch(0.3 0.015 260);
+  --input: oklch(0.3 0.015 260);
+  --ring: oklch(0.68 0.15 262);
+  --sidebar: oklch(0.19 0.016 260);
+  --sidebar-foreground: oklch(0.9 0.008 255);
+}

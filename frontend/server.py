@@ -97,6 +97,42 @@ async def serve_brand_icon():
     return Response(status_code=404)
 
 
+# ----------------------------- Console SPAs -----------------------------
+# 三个支撑平台子项目（编排管理/运维/运营）——Vite 构建产物按路径挂载。
+CONSOLE_ROOT = FRONTEND_DIR.parent / "console"
+
+
+def _console_index(app_name: str):
+    index = CONSOLE_ROOT / app_name / "dist" / "index.html"
+    if not index.is_file():
+        return None
+    return FileResponse(
+        index,
+        media_type="text/html; charset=utf-8",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
+
+
+@app.get("/console/orchestration/{rest:path}", include_in_schema=False)
+async def serve_console_orchestration(rest: str):
+    if rest.startswith("assets/"):
+        asset = CONSOLE_ROOT / "orchestration" / "dist" / rest
+        if asset.is_file():
+            return FileResponse(asset)
+        return Response(status_code=404)
+    return _console_index("orchestration") or HTMLResponse(
+        "<h2>console/orchestration 未构建</h2>", status_code=404
+    )
+
+
+@app.get("/console/{rest:path}", include_in_schema=False)
+async def serve_console_index(rest: str):
+    return HTMLResponse(
+        "<h2>OpcHub Console</h2><p>子平台：/console/orchestration（其余平台建设中）</p>",
+        status_code=200,
+    )
+
+
 _http_client: httpx.AsyncClient | None = None
 
 
