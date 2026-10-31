@@ -1,6 +1,7 @@
 """Tests for RBAC/ABAC enforcement, built-in admin bootstrap, and audit archival (TASK-030)."""
 import pytest
 from fastapi.testclient import TestClient
+from typing import Optional
 
 from src.main import app
 from src.core.config import settings
@@ -114,11 +115,27 @@ def test_abac_owner_check_allows_self_and_admin():
 # ---------------------------------------------------------------------------
 # Built-in admin bootstrap + forced credential rotation
 # ---------------------------------------------------------------------------
-def _login_admin() -> dict:
+def _fresh_admin_bootstrap() -> str:
+    """Re-provision the built-in admin to obtain its deterministic one-time credential."""
+    from src.core.entity import entity_store
+    from src.domains.user.entities import ENTITY_USER_ACCOUNT
+    from src.domains.user.service import user_service
+
+    entity_store.delete(ENTITY_USER_ACCOUNT, {"key": "usr_admin_builtin"})
+    user_service._users_by_uid.pop("usr_admin_builtin", None)
+    user_service._users_by_email.pop(settings.admin_email.strip().lower(), None)
+    bootstrap = user_service._ensure_builtin_admin()
+    assert bootstrap is not None, "built-in admin should be freshly provisioned"
+    return bootstrap
+
+
+def _login_admin(password: Optional[str] = None) -> dict:
+    if password is None:
+        password = _fresh_admin_bootstrap()
     c = _guest_client()
     r = c.post("/api/welcom/opc_world", json={
         "scenario": "auth.login", "version": "v1.0.0",
-        "payload": {"email": settings.admin_email, "password": settings.admin_initial_password},
+        "payload": {"email": settings.admin_email, "password": password},
     })
     assert r.status_code == 200, r.text
     return r.json()["data"]
@@ -143,13 +160,14 @@ def test_builtin_admin_high_risk_blocked_until_rotation():
 
 
 def test_password_rotation_clears_flag_and_unblocks():
-    token = _login_admin()["token"]
+    bootstrap = _fresh_admin_bootstrap()
+    token = _login_admin(bootstrap)["token"]
     c = _guest_client()
     new_password = "OpcHub@Rotated#2026"
     r = c.post("/api/welcom/opc_world", json={
         "scenario": "auth.change-password", "version": "v1.0.0",
         "payload": {
-            "old_password": settings.admin_initial_password,
+            "old_password": bootstrap,
             "new_password": new_password,
         },
         "token": token,
@@ -165,13 +183,6 @@ def test_password_rotation_clears_flag_and_unblocks():
         "scenario": "orchestration.operators.list", "version": "v1.0.0", "payload": {},
     })
     assert r2.json()["code"] == 200
-
-    # Restore the bootstrap credential so the suite remains deterministic
-    c.post("/api/welcom/opc_world", json={
-        "scenario": "auth.change-password", "version": "v1.0.0",
-        "payload": {"old_password": new_password, "new_password": settings.admin_initial_password},
-        "token": new_token,
-    })
 
 
 def test_change_password_rejects_wrong_old_password():

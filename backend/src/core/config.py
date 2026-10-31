@@ -117,10 +117,10 @@ class Settings(BaseSettings):
     database_pool_size: int = int(_DB_SECTION.get("pool_size", 10))
     database_max_overflow: int = int(_DB_SECTION.get("max_overflow", 20))
 
-    # Built-in administrator bootstrap (RBAC §1.1): credentials from env with safe defaults.
-    # The account is flagged must_change_password and forced to rotate on first login.
+    # Built-in administrator bootstrap (RBAC §1.1): identity from env; the password is
+    # never a code constant. Fresh deployments mint a one-time random bootstrap
+    # credential (disclosed once in the startup log) and are forced to rotate on login.
     admin_email: str = os.getenv("OPCHUB_ADMIN_EMAIL", "admin@opchub.cn")
-    admin_initial_password: str = os.getenv("OPCHUB_ADMIN_INITIAL_PASSWORD", "OpcHub@Admin#2026")
     admin_nickname: str = os.getenv("OPCHUB_ADMIN_NICKNAME", "平台超级管理员")
 
     # Audit & archival (legal_compliance §80: encrypted retention >= 180 days)

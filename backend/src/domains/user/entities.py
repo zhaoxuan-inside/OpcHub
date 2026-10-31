@@ -192,6 +192,11 @@ class UserAccountAdapter:
     # ------------------------------------------------------------------
     # Write-behind persistence (storage plumbing, no business logic)
     # ------------------------------------------------------------------
+    async def flush(self) -> None:
+        """Await every outstanding write-behind task (shutdown / test teardown)."""
+        if self._tasks:
+            await asyncio.gather(*list(self._tasks), return_exceptions=True)
+
     def _schedule(self, coroutine: Any) -> None:
         try:
             loop = asyncio.get_running_loop()

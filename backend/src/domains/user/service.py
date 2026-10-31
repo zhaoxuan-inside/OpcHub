@@ -16,6 +16,8 @@ flow**. It only keeps:
 from __future__ import annotations
 
 import json
+import logging
+import secrets
 import uuid
 from collections.abc import Iterator, MutableMapping
 from datetime import datetime
@@ -178,11 +180,27 @@ class UserService:
     # ------------------------------------------------------------------
     # Seeding / hydration (data only)
     # ------------------------------------------------------------------
-    def _ensure_builtin_admin(self) -> None:
-        """Idempotently provision the built-in administrator account document."""
+    def _ensure_builtin_admin(self) -> Optional[str]:
+        """Idempotently provision the built-in administrator account document.
+
+        The password is never a code constant: each fresh provisioning mints a
+        one-time random bootstrap credential, disclosed exactly once via the
+        startup log and returned to the caller. The account is flagged
+        must_change_password so the credential must be rotated on first login;
+        the authoritative password state remains the account store (relational
+        DB whenever hydrated). Returns the bootstrap password, or None when the
+        account already exists.
+        """
         admin_uid = "usr_admin_builtin"
         if entity_store.get(ENTITY_USER_ACCOUNT, {"key": admin_uid}) is not None:
-            return
+            return None
+        bootstrap_password = secrets.token_urlsafe(18)
+        logging.getLogger("opchub.bootstrap").warning(
+            "Built-in admin %s provisioned with one-time bootstrap password: %s "
+            "(rotate on first login; a hydrated database credential always wins)",
+            settings.admin_email,
+            bootstrap_password,
+        )
         entity_store.create(
             ENTITY_USER_ACCOUNT,
             {
@@ -194,12 +212,13 @@ class UserService:
                 "phone": "",
                 "credit_code": "",
                 "tier_name": "平台管理员",
-                "password_hash": hash_password(settings.admin_initial_password),
+                "password_hash": hash_password(bootstrap_password),
                 "active_entitlements": [],
                 "entitlement_expiries": {},
                 "must_change_password": True,
             },
         )
+        return bootstrap_password
 
     def _seed_default_entitlements(self) -> None:
         """Load the entitlement catalog from external seed data (data only)."""

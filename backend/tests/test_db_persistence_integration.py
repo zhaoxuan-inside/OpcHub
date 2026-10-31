@@ -66,7 +66,7 @@ async def _clean_state(live_db):
         async with engine.begin() as conn:
             await conn.execute(text("DELETE FROM domain_snapshots"))
             await conn.execute(text(
-                "DELETE FROM users WHERE email LIKE 'it_%@opchub.test' OR uid = 'usr_admin_builtin'"
+                "DELETE FROM users WHERE email LIKE 'it_%@opchub.test' OR handle = 'usr_admin_builtin'"
             ))
 
     await live_db.ensure_schema_and_seed()
@@ -221,6 +221,22 @@ async def test_orchestration_configs_survive_restart(live_db):
     assert orchestration_service.get_frontend_layout("it_layout").version == "v1"
 
 
+async def _flush_user_writes() -> None:
+    """Await the user adapter's write-behind tasks before simulating a restart.
+
+    Each test runs on a fresh event loop, so a bare sleep cannot guarantee the
+    scheduled tasks run; awaiting them explicitly keeps the restart simulation
+    deterministic.
+    """
+    from src.core.entity import entity_store
+    from src.domains.user.entities import ENTITY_USER_ACCOUNT
+
+    adapter = entity_store.adapter(ENTITY_USER_ACCOUNT)
+    flush = getattr(adapter, "flush", None)
+    if flush is not None:
+        await flush()
+
+
 @pytest.mark.asyncio
 async def test_user_credentials_and_profile_are_durable(live_db):
     """Registration, profile update and password rotation persist to the users table."""
@@ -231,6 +247,9 @@ async def test_user_credentials_and_profile_are_durable(live_db):
     from src.infrastructure.database.persistence import domain_persistence
 
     await domain_persistence.initialize()
+    # Mirror the production startup: hydration is what arms the user adapter's
+    # write-behind persistence (persistent flag), so writes reach PostgreSQL.
+    await user_service.hydrate_from_db()
 
     email = "it_durable@opchub.test"
     session = await user_service.register_by_email(UserRegisterRequest(
@@ -248,6 +267,7 @@ async def test_user_credentials_and_profile_are_durable(live_db):
     assert rotated.must_change_password is False
 
     # Simulate restart: drop the in-memory user index, rebuild from PostgreSQL
+    await _flush_user_writes()
     user_service._users_by_uid.clear()
     user_service._users_by_email.clear()
     restored_count = await user_service.hydrate_from_db()
@@ -273,21 +293,23 @@ async def test_builtin_admin_rotation_is_durable(live_db):
     from src.infrastructure.database.persistence import domain_persistence
 
     await domain_persistence.initialize()
-    # Ensure the built-in admin exists in memory with its initial credential, then rotate
+    # Mirror the production startup: hydration arms the user adapter's write-behind.
+    await user_service.hydrate_from_db()
+    # Ensure the built-in admin exists in memory with its initial credential, then rotate.
+    # The adapter's own write-behind persists the seeded row; bypassing it with a direct
+    # insert would race the scheduled create task (duplicate-key / lost-update).
     user_service._users_by_uid.pop("usr_admin_builtin", None)
     user_service._users_by_email.pop(settings.admin_email.strip().lower(), None)
-    user_service._ensure_builtin_admin()
-    admin = user_service._users_by_uid["usr_admin_builtin"]
-    await live_db.ensure_builtin_admin(
-        uid=admin["uid"], email=admin["email"],
-        nickname=admin["nickname"], password_hash=admin["password_hash"],
-    )
+    bootstrap = user_service._ensure_builtin_admin()
+    assert bootstrap is not None, "built-in admin should be freshly provisioned"
+    await _flush_user_writes()
     await user_service.change_password(ChangePasswordRequest(
-        user_id="usr_admin_builtin", old_password=settings.admin_initial_password,
+        user_id="usr_admin_builtin", old_password=bootstrap,
         new_password="AdminRotated#2026",
     ))
 
     # Restart: hydrate the index from PostgreSQL
+    await _flush_user_writes()
     user_service._users_by_uid.clear()
     user_service._users_by_email.clear()
     await user_service.hydrate_from_db()
