@@ -89,3 +89,46 @@
   防旧进程占用 8000）。
 - 首个动作建议：以内置管理员登录任一平台 → 平台管理 → 创建租户（自动成为租户管理员）→
   添加成员 → 创建项目（自动成为项目所有者）→ 项目成员获得编排读写。
+
+---
+
+## 补记（2026-11-01 · MicroFlow 框架合规化 + mock 数据排查）
+
+用户追加指令：**代码不允许有任何 mock 数据；支持平台也必须使用 MicroFlow 框架开发。**
+
+### MicroFlow 合规化（commit `c568eb6`）
+
+治理写操作此前直连 handler，违反框架"写走 DAG · 读直连"约定，已全部迁入元管线：
+
+- `platform.governance.guard / persist / telemetry.incr` 三个控制面算子（SDK 注册 + registry 挂载）；
+- 元管线**资产化声明**于 `config/scenarios/platform.yaml`（显式 `$inputs/$nodes` 输入映射），
+  `convert_scenarios.py` 重新生成 `opchub_flows.json`（130 flows / 0 unmapped）；
+- 18 个写场景路由 = `platform_write_adapter`（内部执行 `OPC_PLATFORM_GOVERNANCE_PIPELINE`，
+  `{action, payload}` 信封）——与 `catalog_write_adapter` 完全同构；9 个读场景维持直连；
+- 错误映射只信 `error_type`（算子桥忠实携带原始异常类），弃用消息关键词启发式
+  （"未知权限点"曾被"权限"子串误伤抬成 403）；
+- 前端 `packages/admin` 写调用统一 `mutate()` 助手走信封，三 SPA 重建全绿；
+- 治理 33 例全绿（含管线全链路 dispatch 断言），全量回归 661/9 与基线一致。
+
+**修复过程要点（防复发）**：元管线不能靠运行时动态 seed 的 DAG config 执行——converter 对无
+`inputs_map` 节点只产出 `params`（`legacy_inputs` 分支拿不到 `$inputs`，guard 收到空 action）；
+必须走资产 yaml 显式 inputs 映射编译进 flows 资产（asset-defined scenarios are the single
+source of truth，动态同名 config 在 build 时让位）。
+
+### mock 数据排查结论
+
+**本次交付面（治理域 + 三 SPA）：零 mock** —— 全部数据经统一网关真实场景（platform.*、
+orchestration.catalog.*、auth.*、platform.audit.list）；占位页（实验/配置/运营）为纯文案
+说明无假数据；测试夹具为标准 pytest fixture 不属生产 mock。
+
+**存量 mock 面清单（先于本次交付存在，建议专项治理）**：
+
+| 位置 | 现状 | 风险 |
+| --- | --- | --- |
+| `src/core/config.py` `*_mock_mode` 默认 True | siliconflow / wechat_pay / stripe / gov_crawler / sms 五个外部网关在未配凭证时静默模拟 | 生产漏配凭证时支付/LLM/短信**假成功** |
+| `src/domains/user/mailer.py` mock_audit | SMTP 未配置时验证码写审计并**回传客户端**（`mock_code`） | 无邮件通道的部署可被任何人完成邮箱验证 |
+| 测试侧 mock 服务器（9 个已知失败） | third-party mock http / moderation mock | 仅测试基础设施，非生产 mock，不动 |
+
+处置建议：mock_mode 默认值反转为 False（未配凭证 → 显式报错"未配置"）、mailer 未配置时
+拒绝下发验证码而非回传——两者都改变本地开发/测试行为，需单独任务验证（涉注册/支付链路），
+未并入本次提交。
