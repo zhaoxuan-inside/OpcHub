@@ -211,6 +211,8 @@ async def platform_audit_list_adapter(payload: Dict[str, Any], context: Dict[str
         limit=limit,
         actor_id=str(payload.get("actor_id") or "") or None,
         action=str(payload.get("action") or "") or None,
+        result=str(payload.get("result") or "") or None,
+        since=str(payload.get("since") or "") or None,
     )
     return {"logs": logs, "total": len(logs)}
 
