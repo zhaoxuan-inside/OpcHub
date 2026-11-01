@@ -6,6 +6,9 @@ import { useEffect } from "react";
 
 const NAV = [
   { to: "/overview", label: "总览", icon: "◎" },
+  { to: "/funnel", label: "业务漏斗", icon: "⏳" },
+  { to: "/retention", label: "留存", icon: "▦" },
+  { to: "/experiments", label: "实验读出", icon: "⚗" },
 ];
 
 const PLATFORM_NAV = [

@@ -1671,3 +1671,46 @@ gateway:
       is_default: true
       handler: "src.domains.ops.adapters:ops_runs_metrics_adapter"
       required_permission: "platform:audit_read"
+
+    # --------------------------------------------------------------------------
+    # 18. Bizops 运营平台：真实数据聚合（Umami/GrowthBook 读出模式，读直连）
+    # --------------------------------------------------------------------------
+    - scenario: "bizops.overview"
+      version: "v1.0.0"
+      domain: "bizops"
+      description: "运营 KPI 总览（实体在册量 + 近期活动量）"
+      is_default: true
+      handler: "src.domains.bizops.adapters:bizops_overview_adapter"
+      required_permission: "page:bizops_console"
+
+    - scenario: "bizops.actions"
+      version: "v1.0.0"
+      domain: "bizops"
+      description: "高频动作清单（漏斗步骤可选值）"
+      is_default: true
+      handler: "src.domains.bizops.adapters:bizops_actions_adapter"
+      required_permission: "page:bizops_console"
+
+    - scenario: "bizops.trend"
+      version: "v1.0.0"
+      domain: "bizops"
+      description: "按日趋势（事件/拒绝/活跃操作者/场景运行）"
+      is_default: true
+      handler: "src.domains.bizops.adapters:bizops_trend_adapter"
+      required_permission: "page:bizops_console"
+
+    - scenario: "bizops.funnel"
+      version: "v1.0.0"
+      domain: "bizops"
+      description: "业务漏斗（步骤动作 × 去重操作者，口径如实披露）"
+      is_default: true
+      handler: "src.domains.bizops.adapters:bizops_funnel_adapter"
+      required_permission: "page:bizops_console"
+
+    - scenario: "bizops.retention"
+      version: "v1.0.0"
+      domain: "bizops"
+      description: "留存（操作者×日活跃矩阵，D1/D7 复访率）"
+      is_default: true
+      handler: "src.domains.bizops.adapters:bizops_retention_adapter"
+      required_permission: "page:bizops_console"

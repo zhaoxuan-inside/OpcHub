@@ -4,6 +4,9 @@ import { UsersPage, TenantsPage, ProjectsPage, RolesPage } from "@opchub/console
 import { AppShell } from "./shell/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
+import { FunnelPage } from "./pages/FunnelPage";
+import { RetentionPage } from "./pages/RetentionPage";
+import { ExperimentsPage } from "./pages/ExperimentsPage";
 
 export function App() {
   return (
@@ -15,6 +18,9 @@ export function App() {
             <Route element={<AppShell />}>
               <Route index element={<Navigate to="/overview" replace />} />
               <Route path="/overview" element={<OverviewPage />} />
+              <Route path="/funnel" element={<FunnelPage />} />
+              <Route path="/retention" element={<RetentionPage />} />
+              <Route path="/experiments" element={<ExperimentsPage />} />
               <Route path="/platform/users" element={<UsersPage />} />
               <Route path="/platform/tenants" element={<TenantsPage />} />
               <Route path="/platform/projects" element={<ProjectsPage />} />
