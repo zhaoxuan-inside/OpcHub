@@ -8,20 +8,36 @@ Nacos3 模式），许可证均为 MIT/Apache-2.0；AGPL/公平代码项目仅�
 
 | 目录 | 平台 | 状态 |
 |---|---|---|
-| `orchestration/` | 编排管理：算子/场景目录、版本回滚、发布审批、A/B 实验、配置管理 | M1 建设中 |
-| `ops/` | 运维：运行记录/日志搜索/指标看板/瀑布图/调试 | M2 待建 |
-| `bizops/` | 运营：业务埋点采集/漏斗留存/实验读出 | M3 待建（依赖主站 Flutter 埋点） |
+| `orchestration/` | 编排管理：算子/场景目录（按项目隔离）、版本回滚、发布审批、A/B 实验、配置管理 | M1 建设中 |
+| `ops/` | 运维：审计日志检索已接入；运行记录/指标看板/瀑布图/调试 | M2 待建 |
+| `bizops/` | 运营：业务埋点采集/漏斗留存/实验读出 | M3 待建（依赖主站埋点） |
 
-共享：`packages/ui`（设计系统，token 与主站 Flutter 同源）、`packages/api`（统一网关客户端）。
+共享：`packages/ui`（设计系统 + ScopeProvider/切换器/权限门）、`packages/api`（统一网关
+客户端 + 活动租户/项目 scope 存储）、`packages/admin`（平台管理共享页：租户/项目/角色/用户）。
+
+## 治理底座（分租户 · 分用户 · 分权限 · 分项目）
+
+三个平台共用同一套授权模型，全部由后端 `src/domains/platform` 强制：
+
+- **分租户**：租户=组织实体，成员经邀请进入（租户管理员/租户成员）；
+- **分项目**：项目挂在租户下，编排目录资产归属项目且项目间完全隔离，
+  跨项目复用走显式"复制到项目"（编码全局唯一，占用时自动派生新编码）；
+- **分权限**：可配置 RBAC —— 角色即权限点集合（内置 7 角色 + 租户自定义角色），
+  有效权限 = 平台 ∪ 活动租户 ∪ 活动项目 的角色并集，变更即时生效；
+- **分用户**：平台级用户管理（角色/停用/密码重置强制首登轮换）。
+
+前端：每个 SPA 头部有"租户 → 项目"级联切换器，`dispatch` 自动把活动范围注入请求
+context；写操作按钮经 `PermissionGate` 按权限显隐（后端始终强制）。
 
 ## 开发
 
 ```bash
 # 本机为 Samba 共享盘（不支持 symlink），一律 --no-bin-links + node 直调
-npm install --prefix orchestration --no-bin-links
-npm install --no-bin-links            # 根目录共享依赖（react/clsx 供 packages/ui 向上解析）
-cd orchestration && node node_modules/vite/bin/vite.js   # dev（端口 4601，/api 代理到 3000）
-node node_modules/vite/bin/vite.js build                 # build → dist/
+npm install --no-bin-links                        # 根目录共享依赖（react/clsx/@tanstack/react-query 供 packages/* 向上解析）
+npm install --prefix orchestration --no-bin-links  # 三个应用各自安装（4601/4602/4603）
+cd orchestration && node node_modules/vite/bin/vite.js    # dev（/api 代理到 3000）
+node node_modules/vite/bin/vite.js build                  # build → dist/
 ```
 
-构建产物由 `frontend/server.py` 挂载：`/console/orchestration`。
+构建产物由 `frontend/server.py` 挂载：`/console/orchestration`、`/console/ops`、
+`/console/bizops`。

@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
     "jsx": "react-jsx",
@@ -10,10 +14,24 @@
     "noEmit": true,
     "baseUrl": ".",
     "paths": {
-      "@opchub/console-ui": ["../packages/ui/src/index.ts"],
-      "@opchub/console-ui/*": ["../packages/ui/src/*"],
-      "@opchub/console-api": ["../packages/api/src/index.ts"]
+      "@opchub/console-ui": [
+        "../packages/ui/src/index.ts"
+      ],
+      "@opchub/console-ui/*": [
+        "../packages/ui/src/*"
+      ],
+      "@opchub/console-api": [
+        "../packages/api/src/index.ts"
+      ],
+      "@opchub/console-admin": [
+        "../packages/admin/src/index.tsx"
+      ]
     }
   },
-  "include": ["src", "../packages/ui/src", "../packages/api/src"]
+  "include": [
+    "src",
+    "../packages/ui/src",
+    "../packages/api/src",
+    "../packages/admin/src"
+  ]
 }

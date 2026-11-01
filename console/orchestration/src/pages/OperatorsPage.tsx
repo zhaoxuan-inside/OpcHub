@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { dispatch } from "@opchub/console-api";
-import {
-  Badge,
+import { CopyToProject } from "../components/CopyToProject";
+import { Badge, PermissionGate,
   Card,
   EmptyState,
   PageHeader,
@@ -49,6 +49,7 @@ export function OperatorsPage() {
                 <th className="px-5 py-3 font-medium">来源</th>
                 <th className="px-5 py-3 font-medium">被引用</th>
                 <th className="px-5 py-3 font-medium">锁定</th>
+                <th className="px-5 py-3 font-medium">操作</th>
               </tr>
             </thead>
             <tbody>
@@ -74,6 +75,13 @@ export function OperatorsPage() {
                     >
                       {op.lock_status?.holder ? `被 ${op.lock_status.holder} 锁定` : "空闲"}
                     </span>
+                  </td>
+                  <td className="px-5 py-3">
+                    {op.source !== "builtin" && (
+                      <PermissionGate permission="orchestration:write">
+                        <CopyToProject assetKind="operator" code={op.name} />
+                      </PermissionGate>
+                    )}
                   </td>
                 </tr>
               ))}

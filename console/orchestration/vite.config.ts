@@ -9,6 +9,7 @@ export default defineConfig({
     alias: {
       "@opchub/console-ui": path.resolve(__dirname, "../packages/ui/src/index.ts"),
       "@opchub/console-api": path.resolve(__dirname, "../packages/api/src/index.ts"),
+      "@opchub/console-admin": path.resolve(__dirname, "../packages/admin/src/index.tsx"),
     },
   },
   server: {

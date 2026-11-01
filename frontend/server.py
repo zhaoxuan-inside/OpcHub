@@ -100,6 +100,7 @@ async def serve_brand_icon():
 # ----------------------------- Console SPAs -----------------------------
 # 三个支撑平台子项目（编排管理/运维/运营）——Vite 构建产物按路径挂载。
 CONSOLE_ROOT = FRONTEND_DIR.parent / "console"
+CONSOLE_APPS = ("orchestration", "ops", "bizops")
 
 
 def _console_index(app_name: str):
@@ -113,22 +114,28 @@ def _console_index(app_name: str):
     )
 
 
-@app.get("/console/orchestration/{rest:path}", include_in_schema=False)
-async def serve_console_orchestration(rest: str):
-    if rest.startswith("assets/"):
-        asset = CONSOLE_ROOT / "orchestration" / "dist" / rest
-        if asset.is_file():
-            return FileResponse(asset)
-        return Response(status_code=404)
-    return _console_index("orchestration") or HTMLResponse(
-        "<h2>console/orchestration 未构建</h2>", status_code=404
-    )
+def _register_console_app(app_name: str):
+    @app.get(f"/console/{app_name}/{{rest:path}}", include_in_schema=False)
+    async def serve_console_app(rest: str, _app_name: str = app_name):
+        if rest.startswith("assets/"):
+            asset = CONSOLE_ROOT / _app_name / "dist" / rest
+            if asset.is_file():
+                return FileResponse(asset)
+            return Response(status_code=404)
+        return _console_index(_app_name) or HTMLResponse(
+            f"<h2>console/{_app_name} 未构建</h2>", status_code=404
+        )
+
+
+for _console_app in CONSOLE_APPS:
+    _register_console_app(_console_app)
 
 
 @app.get("/console/{rest:path}", include_in_schema=False)
 async def serve_console_index(rest: str):
     return HTMLResponse(
-        "<h2>OpcHub Console</h2><p>子平台：/console/orchestration（其余平台建设中）</p>",
+        "<h2>OpcHub Console</h2>"
+        "<p>子平台：/console/orchestration（编排管理）· /console/ops（运维）· /console/bizops（运营）</p>",
         status_code=200,
     )
 

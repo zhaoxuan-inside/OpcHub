@@ -6,6 +6,8 @@
  */
 const TOKEN_KEY = "opchub_session_token";
 
+import { getScope } from "./scope";
+
 export class ApiError extends Error {
   constructor(
     public code: number,
@@ -34,6 +36,11 @@ export async function dispatch<T = any>(
   version = "v1.0.0",
 ): Promise<T> {
   const token = getToken();
+  const scope = getScope();
+  const context: Record<string, unknown> = { client_timestamp: Date.now(), token };
+  // 活动租户/项目上下文：网关 scope 隔离授权与目录过滤都依赖它
+  if (scope.tenantId) context.tenant_id = scope.tenantId;
+  if (scope.projectId) context.project_id = scope.projectId;
   const res = await fetch("/api/welcom/opc_world", {
     method: "POST",
     headers: {
@@ -44,7 +51,7 @@ export async function dispatch<T = any>(
       scenario,
       version,
       payload,
-      context: { client_timestamp: Date.now(), token },
+      context,
     }),
   });
   if (!res.ok) {

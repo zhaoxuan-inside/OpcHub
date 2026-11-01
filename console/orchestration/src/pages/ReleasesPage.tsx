@@ -4,6 +4,7 @@ import { dispatch } from "@opchub/console-api";
 import {
   Badge,
   Button,
+  PermissionGate,
   Card,
   CardContent,
   CardHeader,
@@ -167,34 +168,36 @@ export function ReleasesPage() {
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1.5">
-                    {v.status !== "PUBLISHED" && (
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          actWithLock.mutate({
-                            scenario: "orchestration.scenarios.rollback",
-                            payload: { action: "scenarios.rollback", payload: { code, version: v.version } },
-                          })
-                        }
-                        disabled={actWithLock.isPending}
-                      >
-                        回滚到此版本
-                      </Button>
-                    )}
-                    {v.status === "DRAFT" && (
-                      <Button
-                        variant="secondary"
-                        onClick={() =>
-                          act.mutate({
-                            scenario: "orchestration.approvals.request",
-                            payload: { action: "approvals.request", payload: { asset_kind: "scenario", code, version: v.version } },
-                          })
-                        }
-                        disabled={act.isPending}
-                      >
-                        提交发布审批
-                      </Button>
-                    )}
+                    <PermissionGate permission="orchestration:write">
+                      {v.status !== "PUBLISHED" && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            actWithLock.mutate({
+                              scenario: "orchestration.scenarios.rollback",
+                              payload: { action: "scenarios.rollback", payload: { code, version: v.version } },
+                            })
+                          }
+                          disabled={actWithLock.isPending}
+                        >
+                          回滚到此版本
+                        </Button>
+                      )}
+                      {v.status === "DRAFT" && (
+                        <Button
+                          variant="secondary"
+                          onClick={() =>
+                            act.mutate({
+                              scenario: "orchestration.approvals.request",
+                              payload: { action: "approvals.request", payload: { asset_kind: "scenario", code, version: v.version } },
+                            })
+                          }
+                          disabled={act.isPending}
+                        >
+                          提交发布审批
+                        </Button>
+                      )}
+                    </PermissionGate>
                   </div>
                 </div>
               ))}
@@ -301,7 +304,7 @@ export function ReleasesPage() {
                     {a.status}
                   </Badge>
                   {a.status === "PENDING" && (
-                    <>
+                    <PermissionGate permission="orchestration:write">
                       <Button
                         variant="secondary"
                         onClick={() =>
@@ -323,7 +326,7 @@ export function ReleasesPage() {
                       >
                         通过并执行
                       </Button>
-                    </>
+                    </PermissionGate>
                   )}
                 </div>
               </div>

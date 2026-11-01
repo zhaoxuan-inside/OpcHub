@@ -803,29 +803,35 @@ class PlatformService:
         uid = self._actor(context)
         role = normalize_role((context or {}).get("user_role", ""))
         is_super = role == "ADMIN" or self.is_platform_super(uid)
+
+        def _role_summary(role_id: str) -> Dict[str, Any]:
+            r = self._roles.get(role_id)
+            return {
+                "role_id": role_id,
+                "name": r.name if r else role_id,
+                "code": r.code if r else "",
+                "permissions": sorted(r.permissions or []) if r else [],
+            }
+
         tenants: List[Dict[str, Any]] = []
-        seen_tenants: Set[str] = set()
         for b in self._bindings.values():
             if b.user_id != uid or b.scope != ScopeKind.TENANT or b.status != "ACTIVE":
                 continue
             tenant = self._tenants.get(b.tenant_id)
             if tenant is None:
                 continue
-            r = self._roles.get(b.role_id)
-            seen_tenants.add(tenant.tenant_id)
             tenants.append(
                 {
                     "tenant_id": tenant.tenant_id,
                     "code": tenant.code,
                     "name": tenant.name,
                     "status": tenant.status,
-                    "role": {"role_id": b.role_id, "name": r.name if r else b.role_id, "code": r.code if r else ""},
+                    "role": _role_summary(b.role_id),
                 }
             )
         projects: List[Dict[str, Any]] = []
         for p in self._visible_projects(uid):
             tenant = self._tenants.get(p.tenant_id)
-            r = self._roles.get(self._project_role_id(uid, p.project_id) or "")
             projects.append(
                 {
                     "project_id": p.project_id,
@@ -834,14 +840,10 @@ class PlatformService:
                     "key": p.key,
                     "name": p.name,
                     "status": p.status,
-                    "role": {"role_id": r.role_id if r else "", "name": r.name if r else "", "code": r.code if r else ""},
+                    "role": _role_summary(self._project_role_id(uid, p.project_id)),
                 }
             )
-        platform_roles = [
-            {"role_id": b.role_id, "name": (self._roles.get(b.role_id).name if self._roles.get(b.role_id) else b.role_id)}
-            for b in self._bindings.values()
-            if b.user_id == uid and b.scope == ScopeKind.PLATFORM and b.status == "ACTIVE"
-        ]
+        platform_roles = [_role_summary(b.role_id) for b in self._bindings.values() if b.user_id == uid and b.scope == ScopeKind.PLATFORM and b.status == "ACTIVE"]
         return {
             "user_id": uid,
             "is_platform_super": is_super,
