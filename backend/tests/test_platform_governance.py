@@ -28,8 +28,35 @@ def _client(role: str = "ADMIN", uid: str = "usr_admin_builtin", must_change: bo
     return c
 
 
+# 写场景走 OPC_PLATFORM_GOVERNANCE_PIPELINE，载荷须 {action, payload} 信封
+_PLATFORM_WRITE_ACTIONS = {
+    "platform.tenants.create": "tenants.create",
+    "platform.tenants.update": "tenants.update",
+    "platform.tenants.status": "tenants.status",
+    "platform.tenants.members.add": "tenants.members.add",
+    "platform.tenants.members.set_role": "tenants.members.set_role",
+    "platform.tenants.members.remove": "tenants.members.remove",
+    "platform.projects.create": "projects.create",
+    "platform.projects.update": "projects.update",
+    "platform.projects.status": "projects.status",
+    "platform.projects.members.add": "projects.members.add",
+    "platform.projects.members.set_role": "projects.members.set_role",
+    "platform.projects.members.remove": "projects.members.remove",
+    "platform.roles.create": "roles.create",
+    "platform.roles.update": "roles.update",
+    "platform.roles.delete": "roles.delete",
+    "platform.users.set_role": "users.set_role",
+    "platform.users.set_active": "users.set_active",
+    "platform.users.reset_password": "users.reset_password",
+}
+
+
 def _post(client: TestClient, scenario: str, payload: dict = None, context: dict = None):
-    body = {"scenario": scenario, "version": "v1.0.0", "payload": payload or {}}
+    body_payload = payload or {}
+    action = _PLATFORM_WRITE_ACTIONS.get(scenario)
+    if action:
+        body_payload = {"action": action, "payload": body_payload}
+    body = {"scenario": scenario, "version": "v1.0.0", "payload": body_payload}
     if context is not None:
         body["context"] = context
     return client.post("/api/welcom/opc_world", json=body).json()

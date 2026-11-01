@@ -1,12 +1,72 @@
-"""平台治理场景适配器：网关统一分发的薄壳（payload/context → platform_service）。
+"""平台治理场景适配器：网关统一分发的薄壳。
 
-管理类场景的权限声明见 backend/config/gateway_routes.yaml 第 14 节；双重权威
-（平台 OR 租户/项目 scope）的成员与角色操作由 service 层自行断言。
+* 读场景直连 handler（payload/context → platform_service），符合框架"读直连"约定；
+* 写场景统一经 OPC_PLATFORM_GOVERNANCE_PIPELINE 的 guard → persist → telemetry
+  算子链执行（platform_write_adapter），载荷须 {action, payload} 信封。
+
+权限声明见 backend/config/gateway_routes.yaml 第 14 节；双重权威（平台 OR
+租户/项目 scope）的成员与角色操作由 service 层自行断言。
 """
 from typing import Any, Dict
 
 from src.core.rbac import P_PLATFORM_AUDIT_READ, P_PLATFORM_TENANT_MANAGE, has_permission, normalize_role
 from src.domains.platform.service import platform_service
+
+
+def _actor_display_name(uid: str) -> str:
+    from src.domains.user.entities import account_entity
+
+    doc = account_entity.adapter.get(uid) if uid else None
+    return str((doc or {}).get("nickname") or (doc or {}).get("email") or uid)
+
+
+async def platform_write_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
+    """Execute one platform governance mutation via OPC_PLATFORM_GOVERNANCE_PIPELINE.
+
+    写走 DAG：guard（动作/身份）→ persist（双重权威断言 + 变更）→ telemetry。
+    引擎会把节点异常压平成字符串，这里把节点前缀剥掉并按 error_type 还原
+    语义化错误（PermissionError→403 / KeyError→404 / ValueError→400）。
+    """
+    from src.domains.orchestration.models import ScenarioExecuteRequest
+    from src.domains.orchestration.service import orchestration_service
+    from src.domains.platform.governance_ops import ensure_platform_pipeline
+
+    # 元管线幂等自愈（治理算子模块可能此前从未导入）
+    ensure_platform_pipeline()
+
+    action = str((p or {}).get("action") or "")
+    ctx = dict(c or {})
+    uid = str(ctx.get("user_id") or "")
+    if uid:
+        ctx.setdefault("user_name", _actor_display_name(uid))
+
+    res = await orchestration_service.execute_scenario(
+        ScenarioExecuteRequest(
+            scenario_code="OPC_PLATFORM_GOVERNANCE_PIPELINE",
+            version="v1.0.0",
+            inputs={"action": action, "payload": (p or {}).get("payload") or {}},
+            context=ctx,
+        )
+    )
+    if res.status != "SUCCESS":
+        message = res.error_message or "Platform governance pipeline failed"
+        # 剥掉执行引擎附加的英文节点前缀，把校验原文（中文）交给前端展示
+        for prefix in (
+            "Node step_persist execution error: ",
+            "Node step_guard execution error: ",
+            "Guard check failed: ",
+        ):
+            if message.startswith(prefix):
+                message = message[len(prefix):]
+                break
+        # error_type 由算子桥忠实携带原始异常类（PermissionError/KeyError/ValueError），
+        # 不用消息关键词猜测（"未知权限点" 一类文案会误伤启发式）
+        if res.error_type == "PermissionError":
+            raise PermissionError(message)
+        if res.error_type == "KeyError":
+            raise KeyError(message)
+        raise ValueError(message)
+    return res.final_output.get("platform_result") or res.final_output
 
 
 # ---------------------------------------------------------------------------
@@ -153,3 +213,10 @@ async def platform_audit_list_adapter(payload: Dict[str, Any], context: Dict[str
         action=str(payload.get("action") or "") or None,
     )
     return {"logs": logs, "total": len(logs)}
+
+
+# 与目录元管线同构：模块导入即幂等种子，flow_engine 启动构建时纳入 release；
+# 写适配器每次写操作前仍会显式重调（懒加载自愈）。
+from src.domains.platform.governance_ops import ensure_platform_pipeline as _ensure
+
+_ensure()

@@ -37,6 +37,7 @@ DOMAIN_FUNCTION_MODULES = [
 
 DOMAIN_CONTROL_MODULES = [
     "src.domains.orchestration.control_ops",
+    "src.domains.platform.governance_ops",
 ]
 
 DOMAIN_ENTITY_MODULES = [

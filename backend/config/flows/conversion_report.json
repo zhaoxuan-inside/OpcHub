@@ -760,6 +760,14 @@
   "source": "perks.yaml"
  },
  {
+  "scenario": "OPC_PLATFORM_GOVERNANCE_PIPELINE",
+  "version": "v1.0.0",
+  "nodes": 3,
+  "conditions": 0,
+  "unmapped": [],
+  "source": "platform.yaml"
+ },
+ {
   "scenario": "OPC_POLICY_PUBLISH_PIPELINE",
   "version": "v1.0.0",
   "nodes": 8,

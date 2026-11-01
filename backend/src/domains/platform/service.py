@@ -998,3 +998,38 @@ domain_persistence.register(FAMILY_TENANTS, platform_service.hydrate_tenants)
 domain_persistence.register(FAMILY_PROJECTS, platform_service.hydrate_projects)
 domain_persistence.register(FAMILY_ROLES, platform_service.hydrate_roles)
 domain_persistence.register(FAMILY_BINDINGS, platform_service.hydrate_bindings)
+
+
+# ----------------------------------------------------------------------
+# MicroFlow 写路径：治理写操作动作表（经 OPC_PLATFORM_GOVERNANCE_PIPELINE
+# 的 guard → persist → telemetry 算子链执行；读场景保持直连 handler）
+# ----------------------------------------------------------------------
+PLATFORM_ACTIONS: Dict[str, str] = {
+    "tenants.create": "create_tenant",
+    "tenants.update": "update_tenant",
+    "tenants.status": "set_tenant_status",
+    "tenants.members.add": "add_tenant_member",
+    "tenants.members.set_role": "set_tenant_member_role",
+    "tenants.members.remove": "remove_tenant_member",
+    "projects.create": "create_project",
+    "projects.update": "update_project",
+    "projects.status": "set_project_status",
+    "projects.members.add": "add_project_member",
+    "projects.members.set_role": "set_project_member_role",
+    "projects.members.remove": "remove_project_member",
+    "roles.create": "create_role",
+    "roles.update": "update_role",
+    "roles.delete": "delete_role",
+    "users.set_role": "set_user_role",
+    "users.set_active": "set_user_active",
+    "users.reset_password": "reset_user_password",
+}
+
+
+def dispatch_platform_action(action: str, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    """Execute one platform governance mutation by action name (called by the persist operator)."""
+    method_name = PLATFORM_ACTIONS.get(action)
+    if not method_name:
+        raise ValueError(f"未知的平台治理操作：{action}")
+    method = getattr(platform_service, method_name)
+    return method(payload or {}, context or {})

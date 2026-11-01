@@ -31,6 +31,36 @@ function useInvalidate() {
   };
 }
 
+
+// 治理写操作统一经 OPC_PLATFORM_GOVERNANCE_PIPELINE（MicroFlow 元管线）执行：
+// 场景名去掉 platform. 前缀即动作名，载荷走 {action, payload} 信封。
+const WRITE_SCENARIOS: Record<string, string> = {
+  "tenants.create": "platform.tenants.create",
+  "tenants.update": "platform.tenants.update",
+  "tenants.status": "platform.tenants.status",
+  "tenants.members.add": "platform.tenants.members.add",
+  "tenants.members.set_role": "platform.tenants.members.set_role",
+  "tenants.members.remove": "platform.tenants.members.remove",
+  "projects.create": "platform.projects.create",
+  "projects.update": "platform.projects.update",
+  "projects.status": "platform.projects.status",
+  "projects.members.add": "platform.projects.members.add",
+  "projects.members.set_role": "platform.projects.members.set_role",
+  "projects.members.remove": "platform.projects.members.remove",
+  "roles.create": "platform.roles.create",
+  "roles.update": "platform.roles.update",
+  "roles.delete": "platform.roles.delete",
+  "users.set_role": "platform.users.set_role",
+  "users.set_active": "platform.users.set_active",
+  "users.reset_password": "platform.users.reset_password",
+};
+
+async function mutate(action: string, payload: Record<string, unknown>) {
+  const scenario = WRITE_SCENARIOS[action];
+  if (!scenario) throw new Error(`未知的平台治理操作：${action}`);
+  return dispatch(scenario, { action, payload });
+}
+
 async function run<T>(fn: () => Promise<T>): Promise<string | null> {
   try {
     await fn();
@@ -114,18 +144,18 @@ export function UsersPage() {
   });
 
   const setRole = async (uid: string, role: string) => {
-    const err = await run(() => dispatch("platform.users.set_role", { user_id: uid, role }));
+    const err = await run(() => mutate("users.set_role", { user_id: uid, role }));
     setError(err);
     if (!err) invalidate("platform", "users");
   };
   const setActive = async (uid: string, is_active: boolean) => {
-    const err = await run(() => dispatch("platform.users.set_active", { user_id: uid, is_active }));
+    const err = await run(() => mutate("users.set_active", { user_id: uid, is_active }));
     setError(err);
     if (!err) invalidate("platform", "users");
   };
   const resetPassword = async (uid: string) => {
     const err = await run(() =>
-      dispatch("platform.users.reset_password", { user_id: uid, new_password: newPassword }),
+      mutate("users.reset_password", { user_id: uid, new_password: newPassword }),
     );
     setError(err);
     if (!err) {
@@ -255,7 +285,7 @@ export function TenantsPage() {
   const tenantRoles = useRoles("TENANT");
 
   const create = async () => {
-    const err = await run(() => dispatch("platform.tenants.create", form));
+    const err = await run(() => mutate("tenants.create", form));
     setError(err);
     if (!err) {
       setForm({ code: "", name: "", description: "" });
@@ -263,7 +293,7 @@ export function TenantsPage() {
     }
   };
   const setStatus = async (tenant_id: string, status: string) => {
-    const err = await run(() => dispatch("platform.tenants.status", { tenant_id, status }));
+    const err = await run(() => mutate("tenants.status", { tenant_id, status }));
     setError(err);
     if (!err) invalidate("platform", "tenants");
   };
@@ -368,7 +398,7 @@ function TenantMembersPanel({
 
   const add = async () => {
     const err = await run(() =>
-      dispatch("platform.tenants.members.add", { tenant_id: tenantId, email: account, role_id: roleId || undefined }),
+      mutate("tenants.members.add", { tenant_id: tenantId, email: account, role_id: roleId || undefined }),
     );
     setError(err);
     if (!err) {
@@ -378,14 +408,14 @@ function TenantMembersPanel({
   };
   const setRole = async (userId: string, nextRole: string) => {
     const err = await run(() =>
-      dispatch("platform.tenants.members.set_role", { tenant_id: tenantId, user_id: userId, role_id: nextRole }),
+      mutate("tenants.members.set_role", { tenant_id: tenantId, user_id: userId, role_id: nextRole }),
     );
     setError(err);
     if (!err) invalidate("platform", "tenant-members");
   };
   const remove = async (userId: string) => {
     const err = await run(() =>
-      dispatch("platform.tenants.members.remove", { tenant_id: tenantId, user_id: userId }),
+      mutate("tenants.members.remove", { tenant_id: tenantId, user_id: userId }),
     );
     setError(err);
     if (!err) invalidate("platform", "tenant-members");
@@ -476,7 +506,7 @@ export function ProjectsPage() {
   const projectRoles = useRoles("PROJECT");
 
   const create = async () => {
-    const err = await run(() => dispatch("platform.projects.create", form));
+    const err = await run(() => mutate("projects.create", form));
     setError(err);
     if (!err) {
       setForm({ tenant_id: "", key: "", name: "", description: "" });
@@ -484,7 +514,7 @@ export function ProjectsPage() {
     }
   };
   const setStatus = async (project_id: string, status: string) => {
-    const err = await run(() => dispatch("platform.projects.status", { project_id, status }));
+    const err = await run(() => mutate("projects.status", { project_id, status }));
     setError(err);
     if (!err) invalidate("platform", "projects");
   };
@@ -604,7 +634,7 @@ function ProjectMembersPanel({
 
   const add = async () => {
     const err = await run(() =>
-      dispatch("platform.projects.members.add", { project_id: projectId, email: account, role_id: roleId || undefined }),
+      mutate("projects.members.add", { project_id: projectId, email: account, role_id: roleId || undefined }),
     );
     setError(err);
     if (!err) {
@@ -614,14 +644,14 @@ function ProjectMembersPanel({
   };
   const setRole = async (userId: string, nextRole: string) => {
     const err = await run(() =>
-      dispatch("platform.projects.members.set_role", { project_id: projectId, user_id: userId, role_id: nextRole }),
+      mutate("projects.members.set_role", { project_id: projectId, user_id: userId, role_id: nextRole }),
     );
     setError(err);
     if (!err) invalidate("platform", "project-members");
   };
   const remove = async (userId: string) => {
     const err = await run(() =>
-      dispatch("platform.projects.members.remove", { project_id: projectId, user_id: userId }),
+      mutate("projects.members.remove", { project_id: projectId, user_id: userId }),
     );
     setError(err);
     if (!err) invalidate("platform", "project-members");
@@ -711,7 +741,7 @@ export function RolesPage() {
   const create = async () => {
     const tenantId = myScope?.tenants[0]?.tenant_id || "";
     const err = await run(() =>
-      dispatch("platform.roles.create", { ...form, tenant_id: tenantId, permissions: checked }),
+      mutate("roles.create", { ...form, tenant_id: tenantId, permissions: checked }),
     );
     setError(err);
     if (!err) {
@@ -722,7 +752,7 @@ export function RolesPage() {
   };
   const savePermissions = async (roleId: string) => {
     const err = await run(() =>
-      dispatch("platform.roles.update", { role_id: roleId, permissions: editChecked }),
+      mutate("roles.update", { role_id: roleId, permissions: editChecked }),
     );
     setError(err);
     if (!err) {
@@ -731,7 +761,7 @@ export function RolesPage() {
     }
   };
   const remove = async (roleId: string) => {
-    const err = await run(() => dispatch("platform.roles.delete", { role_id: roleId }));
+    const err = await run(() => mutate("roles.delete", { role_id: roleId }));
     setError(err);
     if (!err) invalidate("platform", "roles");
   };

@@ -18607,6 +18607,64 @@
    "outputs": {}
   },
   {
+   "id": "OPC_PLATFORM_GOVERNANCE_PIPELINE",
+   "input_schema": "opchub.flow_input",
+   "output_schema": "opchub.flow_output",
+   "options": {
+    "scene": "platform",
+    "version": "v1.0.0"
+   },
+   "nodes": {
+    "step_guard": {
+     "operator": "platform.governance.guard@1",
+     "inputs": {
+      "args.action": {
+       "from": "flow.input.payload.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "flow.input.payload.payload",
+       "required": false,
+       "default": null
+      }
+     }
+    },
+    "step_persist": {
+     "operator": "platform.governance.persist@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "nodes.step_guard.output.data.payload",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_guard"
+     ]
+    },
+    "step_telemetry": {
+     "operator": "platform.governance.telemetry.incr@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_persist"
+     ]
+    }
+   },
+   "outputs": {}
+  },
+  {
    "id": "OPC_POLICY_PUBLISH_PIPELINE",
    "input_schema": "opchub.flow_input",
    "output_schema": "opchub.flow_output",
