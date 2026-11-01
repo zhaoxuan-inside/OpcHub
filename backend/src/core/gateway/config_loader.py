@@ -195,6 +195,7 @@ class GatewayConfigLoader:
             upgrade_adapter_str = entry.get("upgrade_adapter")
             required_permission = entry.get("required_permission", "")
             owner_check = entry.get("owner_check")
+            scope = entry.get("scope", "")
             pipeline = entry.get("pipeline") or entry.get("scenario_code")
 
             if pipeline:
@@ -208,6 +209,7 @@ class GatewayConfigLoader:
                     required_permission=required_permission,
                     owner_check=owner_check,
                     pipeline=pipeline,
+                    scope=scope,
                 )
                 count += 1
                 continue
@@ -237,6 +239,7 @@ class GatewayConfigLoader:
                 is_default=is_default,
                 required_permission=required_permission,
                 owner_check=owner_check,
+                scope=scope,
             )
             count += 1
 

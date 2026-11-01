@@ -33,11 +33,40 @@ P_CONTENT_PUBLISH = "content:publish"
 # Message box: every registered user can read and manage their own receipts.
 P_NOTIFICATION_READ = "notification:read"
 
+# ---------------------------------------------------------------------------
+# Platform governance (support-platform console: 运维 / 运营 / 编排).
+# 分租户 · 分用户 · 分权限 · 分项目 —— 权限点目录。除 legacy 三角色矩阵外，
+# 这些权限点通过可配置角色（platform 域 Role 实体）按 scope 授予：
+# PLATFORM 全局生效 / TENANT 租户内生效 / PROJECT 项目内生效。
+# ---------------------------------------------------------------------------
+# 平台级治理（由平台超管或自定义 PLATFORM 角色持有）
+P_PLATFORM_TENANT_MANAGE = "platform:tenant_manage"
+P_PLATFORM_USER_MANAGE = "platform:user_manage"
+P_PLATFORM_ROLE_MANAGE = "platform:role_manage"
+P_PLATFORM_AUDIT_READ = "platform:audit_read"
+# 租户域治理（由 TENANT scope 角色在该租户内持有）
+P_TENANT_MEMBER_MANAGE = "tenant:member_manage"
+P_TENANT_PROJECT_CREATE = "tenant:project_create"
+P_TENANT_ROLE_MANAGE = "tenant:role_manage"
+# 项目域治理（由 PROJECT scope 角色在该项目内持有）
+P_PROJECT_MANAGE = "project:manage"
+P_PROJECT_MEMBER_MANAGE = "project:member_manage"
+# 编排目录：项目隔离读写（完全隔离 —— 项目成员可见本项目，内置平台资产全局只读）
+P_ORCH_READ = "orchestration:read"
+P_ORCH_WRITE = "orchestration:write"
+# 支撑平台入口：运维平台 / 运营平台
+P_PAGE_OPS_CONSOLE = "page:ops_console"
+P_PAGE_BIZOPS_CONSOLE = "page:bizops_console"
+
 ALL_PERMISSIONS = {
     P_READ_PUBLIC, P_CALC_EPHEMERAL, P_READ_DETAIL, P_SOP_SAVE, P_PERK_CLAIM,
     P_GALLERY_SUBMIT, P_GALLERY_UPVOTE, P_MARKET_DEMAND, P_MARKET_VENDOR,
     P_FORUM_POST, P_PAGE_ORCHESTRATE, P_SCHEMA_MANAGE, P_SCRIPT_UPLOAD, P_REVIEW_AUDIT,
     P_CONTENT_INTERACT, P_CONTENT_COMMENT, P_CONTENT_PUBLISH, P_NOTIFICATION_READ,
+    P_PLATFORM_TENANT_MANAGE, P_PLATFORM_USER_MANAGE, P_PLATFORM_ROLE_MANAGE,
+    P_PLATFORM_AUDIT_READ, P_TENANT_MEMBER_MANAGE, P_TENANT_PROJECT_CREATE,
+    P_TENANT_ROLE_MANAGE, P_PROJECT_MANAGE, P_PROJECT_MEMBER_MANAGE,
+    P_ORCH_READ, P_ORCH_WRITE, P_PAGE_OPS_CONSOLE, P_PAGE_BIZOPS_CONSOLE,
 }
 
 GUEST_PERMISSIONS = {P_READ_PUBLIC, P_CALC_EPHEMERAL}
@@ -48,7 +77,11 @@ USER_PERMISSIONS = GUEST_PERMISSIONS | {
 }
 
 # Permissions blocked while a credential rotation is pending (first-login enforcement).
-HIGH_RISK_PERMISSIONS = {P_PAGE_ORCHESTRATE, P_SCHEMA_MANAGE, P_SCRIPT_UPLOAD, P_REVIEW_AUDIT}
+HIGH_RISK_PERMISSIONS = {
+    P_PAGE_ORCHESTRATE, P_SCHEMA_MANAGE, P_SCRIPT_UPLOAD, P_REVIEW_AUDIT,
+    P_PLATFORM_TENANT_MANAGE, P_PLATFORM_USER_MANAGE, P_PLATFORM_ROLE_MANAGE,
+    P_PLATFORM_AUDIT_READ, P_ORCH_WRITE, P_PAGE_OPS_CONSOLE, P_PAGE_BIZOPS_CONSOLE,
+}
 
 # "MAKER" is the persisted role of an authenticated maker in this codebase (== design "USER").
 ROLE_PERMISSIONS: Dict[str, Any] = {

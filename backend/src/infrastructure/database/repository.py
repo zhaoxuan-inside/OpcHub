@@ -239,6 +239,7 @@ class DatabaseRepository:
         company_name: Optional[str] = None,
         password_hash: Optional[str] = None,
         metadata_patch: Optional[Dict[str, Any]] = None,
+        role: Optional[str] = None,
     ) -> bool:
         """Commit profile / credential / metadata field changes for a user.
 
@@ -259,6 +260,8 @@ class DatabaseRepository:
                 user.company_name = company_name
             if password_hash is not None:
                 user.password_hash = password_hash
+            if role is not None:
+                user.role = role
             if metadata_patch:
                 meta = dict(user.metadata_payload or {})
                 meta.update(metadata_patch)

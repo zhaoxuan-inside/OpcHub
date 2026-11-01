@@ -1205,4 +1205,216 @@ gateway:
       is_default: true
       pipeline: "OPC_GATEWAY_RULES_PIPELINE"
 
+    # --------------------------------------------------------------------------
+    # 14. Platform Governance 平台治理（支撑平台共用底座：分租户·分用户·分权限·分项目）
+    #     管理类场景由平台级权限把守；成员/角色类操作的双重权威（平台 OR 租户/项目
+    #     scope 角色）由 src.domains.platform.service 自行断言。
+    # --------------------------------------------------------------------------
+    # 我的 scope：前端租户/项目切换器数据源（须登录）
+    - scenario: "platform.scope.my"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "我的租户/项目/角色一览（支撑平台切换器数据源）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_scope_my_adapter"
+
+    # 租户管理（平台级）
+    - scenario: "platform.tenants.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "租户清单：平台管理者见全部，普通用户见在册租户"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_list_adapter"
+
+    - scenario: "platform.tenants.create"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "创建租户（创建人自动成为租户管理员）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_create_adapter"
+      required_permission: "platform:tenant_manage"
+
+    - scenario: "platform.tenants.update"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "更新租户基础信息"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_update_adapter"
+      required_permission: "platform:tenant_manage"
+
+    - scenario: "platform.tenants.status"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "租户启用/停用"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_status_adapter"
+      required_permission: "platform:tenant_manage"
+
+    # 租户成员（双重权威：platform:tenant_manage OR tenant:member_manage）
+    - scenario: "platform.tenants.members.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "租户成员清单"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_members_adapter"
+
+    - scenario: "platform.tenants.members.add"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "添加租户成员（默认租户成员角色）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_member_add_adapter"
+
+    - scenario: "platform.tenants.members.set_role"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "调整租户成员角色（至少保留一名租户管理员）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_member_set_role_adapter"
+
+    - scenario: "platform.tenants.members.remove"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "移出租户成员（同步移出该租户下所有项目）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_tenant_member_remove_adapter"
+
+    # 项目管理（双重权威见 service 断言；创建需 tenant:project_create + 活动租户）
+    - scenario: "platform.projects.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "项目清单：按成员可见性过滤"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_list_adapter"
+
+    - scenario: "platform.projects.create"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "创建项目（创建人自动成为项目所有者）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_create_adapter"
+      required_permission: "tenant:project_create"
+      scope: "tenant"
+
+    - scenario: "platform.projects.update"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "更新项目基础信息"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_update_adapter"
+
+    - scenario: "platform.projects.status"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "项目归档/恢复"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_status_adapter"
+
+    # 项目成员（双重权威：project:member_manage OR tenant:member_manage OR 平台）
+    - scenario: "platform.projects.members.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "项目成员清单"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_members_adapter"
+
+    - scenario: "platform.projects.members.add"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "添加项目成员（须先在册于所属租户）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_member_add_adapter"
+
+    - scenario: "platform.projects.members.set_role"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "调整项目成员角色（至少保留一名项目所有者）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_member_set_role_adapter"
+
+    - scenario: "platform.projects.members.remove"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "移出项目成员"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_project_member_remove_adapter"
+
+    # 角色管理（可配置 RBAC：内置角色不可删改，租户可建自定义角色）
+    - scenario: "platform.roles.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "角色清单（内置 + 自定义，可按 scope/租户过滤）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_role_list_adapter"
+
+    - scenario: "platform.roles.create"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "创建自定义角色（TENANT/PROJECT 域，归属租户）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_role_create_adapter"
+
+    - scenario: "platform.roles.update"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "更新自定义角色（名称/描述/权限点勾选）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_role_update_adapter"
+
+    - scenario: "platform.roles.delete"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "删除自定义角色（有生效绑定时拒绝）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_role_delete_adapter"
+
+    - scenario: "platform.permissions.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "权限点目录（角色编辑勾选数据源）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_permissions_list_adapter"
+
+    # 用户管理（平台级）
+    - scenario: "platform.users.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "平台用户清单与搜索"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_user_list_adapter"
+      required_permission: "platform:user_manage"
+
+    - scenario: "platform.users.set_role"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "设置用户平台角色（ADMIN/MAKER/GUEST）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_user_set_role_adapter"
+      required_permission: "platform:user_manage"
+
+    - scenario: "platform.users.set_active"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "启用/停用用户账号"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_user_set_active_adapter"
+      required_permission: "platform:user_manage"
+
+    - scenario: "platform.users.reset_password"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "重置用户密码（强制首次登录轮换）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_user_reset_password_adapter"
+      required_permission: "platform:user_manage"
+
+    # 审计检索（运维平台数据源）
+    - scenario: "platform.audit.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "审计日志检索（platform:audit_read）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_audit_list_adapter"
+      required_permission: "platform:audit_read"
+
 

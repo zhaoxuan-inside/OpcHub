@@ -252,6 +252,7 @@ class UserAccountAdapter:
                 company_name=str(doc.get("company_name") or ""),
                 password_hash=str(doc.get("password_hash") or "") or None,
                 metadata_patch=self._metadata_of(doc),
+                role=str(doc.get("role") or "MAKER"),
             )
         except Exception as exc:  # pragma: no cover - persistence is best effort
             logger.warning("User account update failed for %s: %s", key, exc)

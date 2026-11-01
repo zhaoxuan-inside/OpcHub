@@ -36,6 +36,7 @@ class RouteRule:
         required_permission: str = "",
         owner_check: Optional[Dict[str, Any]] = None,
         pipeline: Optional[str] = None,
+        scope: str = "",
     ):
         self.scenario = scenario
         self.handler = handler
@@ -45,6 +46,8 @@ class RouteRule:
         self.required_permission = required_permission or ""
         self.owner_check = owner_check or None
         self.pipeline = pipeline or None
+        # 分租户/分项目隔离："" 不隔离；"tenant"/"project" 要求活动 scope 上下文
+        self.scope = (scope or "").strip().lower()
         self.is_async = True
         self.sig = inspect.signature(handler) if handler else None
 
@@ -162,6 +165,7 @@ class ScenarioRouter:
         required_permission: str = "",
         owner_check: Optional[Dict[str, Any]] = None,
         pipeline: Optional[str] = None,
+        scope: str = "",
     ) -> None:
         """Register a new scenario routing rule under a specific code version."""
         rule = RouteRule(
@@ -173,6 +177,7 @@ class ScenarioRouter:
             required_permission=required_permission,
             owner_check=owner_check,
             pipeline=pipeline,
+            scope=scope,
         )
         self._routes[(scenario, version)] = rule
         if is_default or scenario not in self._default_versions:
@@ -244,6 +249,128 @@ class ScenarioRouter:
             for r in self._routes.values()
         ]
 
+    # ------------------------------------------------------------------
+    # 授权解析（legacy 静态矩阵 + 可配置 RBAC 绑定，分租户/分项目 scope）
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _platform_service():
+        try:
+            from src.domains.platform.service import platform_service
+
+            return platform_service
+        except Exception:  # pragma: no cover - platform 域缺失时退化为纯 legacy 矩阵
+            return None
+
+    @staticmethod
+    def _scope_value(req: DispatchRequest, scope: str) -> str:
+        """活动 scope 上下文：context 优先，payload 兜底（context.tenant_id / context.project_id）。"""
+        return str(
+            (req.context or {}).get(f"{scope}_id")
+            or (req.payload or {}).get(f"{scope}_id")
+            or ""
+        ).strip()
+
+    def _effective_permissions(self, req: DispatchRequest, identity: Dict[str, Any]) -> set:
+        """可配置 RBAC：PLATFORM 绑定 ∪ 上下文租户/项目匹配的 TENANT/PROJECT 绑定。"""
+        if not identity.get("authenticated"):
+            return set()
+        service = self._platform_service()
+        if service is None:
+            return set()
+        return service.effective_permissions(
+            identity["uid"],
+            tenant_id=self._scope_value(req, "tenant"),
+            project_id=self._scope_value(req, "project"),
+        )
+
+    def _has_access(self, rule: "RouteRule", req: DispatchRequest, identity: Dict[str, Any]) -> bool:
+        """组合授权：legacy 静态矩阵先行短路；可配置角色绑定按 scope 增量兜底。"""
+        if has_permission(identity["role"], rule.required_permission):
+            return True
+        perms = self._effective_permissions(req, identity)
+        return rule.required_permission in perms or "*" in perms
+
+    def _is_platform_super(self, req: DispatchRequest, identity: Dict[str, Any]) -> bool:
+        if identity["role"] == "ADMIN":
+            return True
+        return "*" in self._effective_permissions(req, identity)
+
+    async def _enforce_scope(
+        self,
+        rule: "RouteRule",
+        req: DispatchRequest,
+        identity: Dict[str, Any],
+    ) -> Optional[DispatchResponse]:
+        """scope 隔离强制：声明 scope 的路由要求活动租户/项目上下文与该 scope 上的授权。"""
+        if rule.scope not in ("tenant", "project"):
+            return None
+        scope_id = self._scope_value(req, rule.scope)
+        start_time = time.perf_counter()
+
+        def _duration_ms() -> float:
+            return round((time.perf_counter() - start_time) * 1000, 2)
+
+        def _denial(code: int, message: str, data: Dict[str, Any]) -> DispatchResponse:
+            return DispatchResponse(
+                code=code,
+                scenario=req.scenario,
+                version=rule.version,
+                message=message,
+                data=data,
+                trace_id=(req.context or {}).get("trace_id") or get_current_trace_id(),
+                timestamp=datetime.now(timezone.utc).isoformat(),
+                duration_ms=_duration_ms(),
+            )
+
+        # 平台超管直通（legacy ADMIN 通配 或 PLATFORM 通配角色绑定）
+        if self._is_platform_super(req, identity):
+            return None
+        if not identity["authenticated"]:
+            return _denial(
+                401,
+                "该操作需要登录，请先登录创客账号",
+                {"login_required": True, "scope_required": rule.scope},
+            )
+        if not scope_id:
+            label = "项目" if rule.scope == "project" else "租户"
+            return _denial(
+                403,
+                f"请先选择活动{label}后再执行该操作",
+                {"scope_required": rule.scope},
+            )
+        service = self._platform_service()
+        if service is None:  # pragma: no cover - platform 域缺失时不放宽
+            return _denial(403, "权限不足：授权服务不可用", {"scope_required": rule.scope})
+        if rule.scope == "project":
+            granted = service.has_scoped_permission(
+                identity["uid"],
+                rule.required_permission,
+                tenant_id=self._scope_value(req, "tenant"),
+                project_id=scope_id,
+            )
+        else:
+            granted = service.has_scoped_permission(
+                identity["uid"],
+                rule.required_permission,
+                tenant_id=scope_id,
+            )
+        if not granted:
+            await audit_service.record(
+                action=f"scope.denied:{req.scenario}",
+                actor_id=identity["uid"],
+                actor_role=identity["role"],
+                permission=rule.required_permission,
+                result="DENIED",
+                ip_address=(req.context or {}).get("client_ip", ""),
+                detail={"scope": rule.scope, "scope_id": scope_id},
+            )
+            return _denial(
+                403,
+                f"权限不足：您在所选{('项目' if rule.scope == 'project' else '租户')}中缺少所需权限 '{rule.required_permission}'",
+                {"scope_denied": True, "scope": rule.scope, "required_permission": rule.required_permission},
+            )
+        return None
+
     async def dispatch(self, req: DispatchRequest) -> DispatchResponse:
         """Process unified request and route to matching domain handler by scenario & version.
         
@@ -308,7 +435,12 @@ class ScenarioRouter:
         identity = parse_identity(resolved_token)
         client_ip = (req.context or {}).get("client_ip", "")
 
-        if not has_permission(identity["role"], rule.required_permission):
+        if not self._has_access(rule, req, identity):
+            if rule.scope in ("tenant", "project"):
+                # scope 路由统一走 scope 语义拒绝（scope_required / scope_denied）
+                scope_denial = await self._enforce_scope(rule, req, identity)
+                if scope_denial is not None:
+                    return scope_denial
             await audit_service.record(
                 action=f"rbac.denied:{req.scenario}",
                 actor_id=identity["uid"],
@@ -398,8 +530,21 @@ class ScenarioRouter:
                     duration_ms=duration_ms,
                 )
 
+        # 2.7 Scope enforcement（分租户/分项目隔离）：声明 scope 的路由要求活动
+        #     scope 上下文与该 scope 上的授权；平台超管直通。
+        if rule.scope:
+            scope_denial = await self._enforce_scope(rule, req, identity)
+            if scope_denial is not None:
+                return scope_denial
+
         # 3. Context Injection & Deprecation Inspection
         ctx = dict(req.context)
+        for scope_key in ("tenant_id", "project_id"):
+            scope_val = (req.context or {}).get(scope_key) or (req.payload or {}).get(scope_key)
+            if scope_val:
+                ctx[scope_key] = str(scope_val)
+        if rule.scope in ("tenant", "project"):
+            ctx[f"{rule.scope}_id"] = self._scope_value(req, rule.scope)
         ctx["user_id"] = identity["uid"]
         ctx["user_role"] = identity["role"]
         ctx["token"] = resolved_token or ""
