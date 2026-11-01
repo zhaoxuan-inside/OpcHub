@@ -83,7 +83,10 @@ BUILTIN_ROLES: List[Role] = [
         code="tenant_admin",
         name="租户管理员",
         description="管理本租户成员与项目，可创建自定义角色；可只读浏览本租户项目资产",
-        permissions=[P_TENANT_MEMBER_MANAGE, P_TENANT_PROJECT_CREATE, P_TENANT_ROLE_MANAGE, "orchestration:read"],
+        permissions=[
+            P_TENANT_MEMBER_MANAGE, P_TENANT_PROJECT_CREATE, P_TENANT_ROLE_MANAGE,
+            "orchestration:read", "experiment:read", "configcenter:read",
+        ],
         builtin=True,
     ),
     Role(
@@ -100,8 +103,11 @@ BUILTIN_ROLES: List[Role] = [
         scope=ScopeKind.PROJECT,
         code="project_owner",
         name="项目所有者",
-        description="项目管理与成员授权 + 编排读写",
-        permissions=["orchestration:read", "orchestration:write", "project:manage", "project:member_manage"],
+        description="项目管理与成员授权 + 编排/实验/配置读写",
+        permissions=[
+            "orchestration:read", "orchestration:write", "project:manage", "project:member_manage",
+            "experiment:manage", "experiment:read", "configcenter:read", "configcenter:write",
+        ],
         builtin=True,
     ),
     Role(
@@ -109,8 +115,11 @@ BUILTIN_ROLES: List[Role] = [
         scope=ScopeKind.PROJECT,
         code="project_editor",
         name="项目编辑者",
-        description="编排目录读写（创建/版本/发布/回滚/审批）",
-        permissions=["orchestration:read", "orchestration:write"],
+        description="编排目录读写（创建/版本/发布/回滚/审批）+ 实验/配置读写",
+        permissions=[
+            "orchestration:read", "orchestration:write",
+            "experiment:manage", "experiment:read", "configcenter:read", "configcenter:write",
+        ],
         builtin=True,
     ),
     Role(
@@ -118,8 +127,8 @@ BUILTIN_ROLES: List[Role] = [
         scope=ScopeKind.PROJECT,
         code="project_viewer",
         name="项目查看者",
-        description="编排目录只读",
-        permissions=["orchestration:read"],
+        description="编排/实验/配置只读",
+        permissions=["orchestration:read", "experiment:read", "configcenter:read"],
         builtin=True,
     ),
 ]

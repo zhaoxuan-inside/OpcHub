@@ -120,6 +120,14 @@
   "source": "compliance.yaml"
  },
  {
+  "scenario": "OPC_CONFIGCENTER_PIPELINE",
+  "version": "v1.0.0",
+  "nodes": 3,
+  "conditions": 0,
+  "unmapped": [],
+  "source": "configcenter.yaml"
+ },
+ {
   "scenario": "OPC_DEMAND_PUBLISH_PIPELINE",
   "version": "v1.0.0",
   "nodes": 9,
@@ -174,6 +182,14 @@
   "conditions": 0,
   "unmapped": [],
   "source": "demands.yaml"
+ },
+ {
+  "scenario": "OPC_EXPERIMENT_PIPELINE",
+  "version": "v1.0.0",
+  "nodes": 3,
+  "conditions": 0,
+  "unmapped": [],
+  "source": "experiment.yaml"
  },
  {
   "scenario": "OPC_EXTERNAL_SILICONFLOW_CHAT_PIPELINE",

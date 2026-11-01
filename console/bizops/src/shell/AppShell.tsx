@@ -95,10 +95,8 @@ export function AppShell() {
           </span>
           <Button
             variant="secondary"
-            onClick={async () => {
-              try {
-                await dispatch("auth.logout", {});
-              } catch { /* session may already be gone */ }
+            onClick={() => {
+              // 登出为客户端行为：会话令牌无服务端存储，清除本地令牌即失效（宿主契约）
               clearToken();
               navigate("/login");
             }}

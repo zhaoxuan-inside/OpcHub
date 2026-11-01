@@ -3224,6 +3224,64 @@
    "outputs": {}
   },
   {
+   "id": "OPC_CONFIGCENTER_PIPELINE",
+   "input_schema": "opchub.flow_input",
+   "output_schema": "opchub.flow_output",
+   "options": {
+    "scene": "configcenter",
+    "version": "v1.0.0"
+   },
+   "nodes": {
+    "step_guard": {
+     "operator": "configcenter.governance.guard@1",
+     "inputs": {
+      "args.action": {
+       "from": "flow.input.payload.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "flow.input.payload.payload",
+       "required": false,
+       "default": null
+      }
+     }
+    },
+    "step_persist": {
+     "operator": "configcenter.governance.persist@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "nodes.step_guard.output.data.payload",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_guard"
+     ]
+    },
+    "step_telemetry": {
+     "operator": "configcenter.governance.telemetry.incr@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_persist"
+     ]
+    }
+   },
+   "outputs": {}
+  },
+  {
    "id": "OPC_DEMAND_PUBLISH_PIPELINE",
    "input_schema": "opchub.flow_input",
    "output_schema": "opchub.flow_output",
@@ -4532,6 +4590,64 @@
      },
      "depends_on": [
       "metric"
+     ]
+    }
+   },
+   "outputs": {}
+  },
+  {
+   "id": "OPC_EXPERIMENT_PIPELINE",
+   "input_schema": "opchub.flow_input",
+   "output_schema": "opchub.flow_output",
+   "options": {
+    "scene": "experiment",
+    "version": "v1.0.0"
+   },
+   "nodes": {
+    "step_guard": {
+     "operator": "experiment.governance.guard@1",
+     "inputs": {
+      "args.action": {
+       "from": "flow.input.payload.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "flow.input.payload.payload",
+       "required": false,
+       "default": null
+      }
+     }
+    },
+    "step_persist": {
+     "operator": "experiment.governance.persist@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      },
+      "args.payload": {
+       "from": "nodes.step_guard.output.data.payload",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_guard"
+     ]
+    },
+    "step_telemetry": {
+     "operator": "experiment.governance.telemetry.incr@1",
+     "inputs": {
+      "args.action": {
+       "from": "nodes.step_guard.output.data.action",
+       "required": false,
+       "default": null
+      }
+     },
+     "depends_on": [
+      "step_persist"
      ]
     }
    },

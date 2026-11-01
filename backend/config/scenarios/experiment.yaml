@@ -1,0 +1,28 @@
+# 实验域场景资产（MicroFlow4Python）。
+# 实验写操作（生命周期/分流/结果上报）统一经 OPC_EXPERIMENT_PIPELINE 元管线
+# 执行（guard → persist → telemetry），与平台治理元管线同构；载荷走
+# {action, payload} 信封。读场景（清单/详情/读出）直连 handler（框架约定）。
+scenarios:
+  - scenario: OPC_EXPERIMENT_PIPELINE
+    version: v1.0.0
+    domain: experiment
+    description: 实验域写操作元流水线（guard -> persist -> telemetry）
+    saga: false
+    nodes:
+      - id: step_guard
+        operator: experiment.governance.guard
+        inputs:
+          action: $inputs.action
+          payload: $inputs.payload
+      - id: step_persist
+        operator: experiment.governance.persist
+        inputs:
+          action: $nodes.step_guard.action
+          payload: $nodes.step_guard.payload
+      - id: step_telemetry
+        operator: experiment.governance.telemetry.incr
+        inputs:
+          action: $nodes.step_guard.action
+    edges:
+      - [step_guard, step_persist]
+      - [step_persist, step_telemetry]

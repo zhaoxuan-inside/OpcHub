@@ -1442,3 +1442,205 @@ gateway:
       required_permission: "platform:audit_read"
 
 
+
+    # --------------------------------------------------------------------------
+    # 15. Experiment A/B 实验域（GrowthBook 模式：变体/流量/读出；项目域隔离）
+    #     管理操作经 OPC_EXPERIMENT_PIPELINE（{action,payload} 信封）；
+    #     assign/outcome.report 为宿主客户端数据面调用（仅要求登录身份）。
+    # --------------------------------------------------------------------------
+    - scenario: "experiment.list"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验清单（按活动项目可见性过滤）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_list_adapter"
+      required_permission: "experiment:read"
+      scope: "project"
+
+    - scenario: "experiment.detail"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验详情（变体/流量/状态机）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_detail_adapter"
+      required_permission: "experiment:read"
+      scope: "project"
+
+    - scenario: "experiment.readout"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验读出（各变体分配数与结果指标聚合）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_readout_adapter"
+      required_permission: "experiment:read"
+      scope: "project"
+
+    - scenario: "experiment.create"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "创建实验（草稿态；键唯一，变体+流量）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_write_adapter"
+      required_permission: "experiment:manage"
+      scope: "project"
+
+    - scenario: "experiment.update"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "更新实验（运行中只可调权重与流量）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_write_adapter"
+      required_permission: "experiment:manage"
+      scope: "project"
+
+    - scenario: "experiment.status"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验状态机（DRAFT→RUNNING⇄STOPPED→ARCHIVED）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_write_adapter"
+      required_permission: "experiment:manage"
+      scope: "project"
+
+    - scenario: "experiment.delete"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "删除实验（运行中不可删）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_write_adapter"
+      required_permission: "experiment:manage"
+      scope: "project"
+
+    - scenario: "experiment.assign"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验分流（sha256 稳定分桶 + 流量门控 + 粘性分配记录）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_assign_adapter"
+
+    - scenario: "experiment.outcome.report"
+      version: "v1.0.0"
+      domain: "experiment"
+      description: "实验结果上报（按分配记录追加指标）"
+      is_default: true
+      handler: "src.domains.experiment.adapters:experiment_outcome_adapter"
+
+    # --------------------------------------------------------------------------
+    # 16. ConfigCenter 配置中心（Nacos 模式：命名空间/配置项/版本/灰度发布；项目域隔离）
+    #     管理操作经 OPC_CONFIGCENTER_PIPELINE（{action,payload} 信封）；
+    #     resolve 为宿主运行时数据面调用（自然载荷，读直连）。
+    # --------------------------------------------------------------------------
+    - scenario: "configcenter.namespaces.list"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "命名空间清单（按活动项目可见性过滤）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:config_namespaces_adapter"
+      required_permission: "configcenter:read"
+      scope: "project"
+
+    - scenario: "configcenter.items.list"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "配置项清单（含版本/稳定版/灰度态）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:config_items_adapter"
+      required_permission: "configcenter:read"
+      scope: "project"
+
+    - scenario: "configcenter.items.history"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "配置项版本历史"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:config_history_adapter"
+      required_permission: "configcenter:read"
+      scope: "project"
+
+    - scenario: "configcenter.resolve"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "宿主运行时生效值解析（灰度/白名单/稳定版确定性解析）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:config_resolve_adapter"
+
+    - scenario: "configcenter.namespaces.create"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "创建命名空间"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.namespaces.update"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "更新命名空间"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.namespaces.delete"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "删除命名空间（有配置项时拒绝）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.create"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "创建配置项（JSON/TEXT，含初始草稿）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.update"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "更新配置项元信息"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.delete"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "删除配置项"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.version.save"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "保存配置草稿版本（DRAFT 不可变，派生新草稿）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.publish"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "发布配置（灰度：百分比分桶 + uid 白名单；全量即提升稳定版）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"
+
+    - scenario: "configcenter.items.rollback"
+      version: "v1.0.0"
+      domain: "configcenter"
+      description: "回滚到历史已发布版本（清除灰度态）"
+      is_default: true
+      handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
+      required_permission: "configcenter:write"
+      scope: "project"

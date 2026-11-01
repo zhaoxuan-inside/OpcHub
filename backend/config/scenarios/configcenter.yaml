@@ -1,0 +1,28 @@
+# 配置中心场景资产（MicroFlow4Python）。
+# 配置写操作（命名空间/配置项/版本/灰度发布）统一经 OPC_CONFIGCENTER_PIPELINE
+# 元管线执行（guard → persist → telemetry），载荷走 {action, payload} 信封；
+# 读场景（清单/详情/历史/resolve）直连 handler（框架约定）。
+scenarios:
+  - scenario: OPC_CONFIGCENTER_PIPELINE
+    version: v1.0.0
+    domain: configcenter
+    description: 配置中心写操作元流水线（guard -> persist -> telemetry）
+    saga: false
+    nodes:
+      - id: step_guard
+        operator: configcenter.governance.guard
+        inputs:
+          action: $inputs.action
+          payload: $inputs.payload
+      - id: step_persist
+        operator: configcenter.governance.persist
+        inputs:
+          action: $nodes.step_guard.action
+          payload: $nodes.step_guard.payload
+      - id: step_telemetry
+        operator: configcenter.governance.telemetry.incr
+        inputs:
+          action: $nodes.step_guard.action
+    edges:
+      - [step_guard, step_persist]
+      - [step_persist, step_telemetry]

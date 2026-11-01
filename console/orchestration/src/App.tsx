@@ -5,6 +5,7 @@ import { AppShell } from "./shell/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { OverviewPage } from "./pages/OverviewPage";
 import { OperatorsPage } from "./pages/OperatorsPage";
+import { SubgraphsPage } from "./pages/SubgraphsPage";
 import { ScenariosPage } from "./pages/ScenariosPage";
 import { ReleasesPage } from "./pages/ReleasesPage";
 import { ExperimentsPage } from "./pages/ExperimentsPage";
@@ -21,6 +22,7 @@ export function App() {
               <Route index element={<Navigate to="/overview" replace />} />
               <Route path="/overview" element={<OverviewPage />} />
               <Route path="/operators" element={<OperatorsPage />} />
+              <Route path="/subgraphs" element={<SubgraphsPage />} />
               <Route path="/scenarios" element={<ScenariosPage />} />
               <Route path="/releases" element={<ReleasesPage />} />
               <Route path="/experiments" element={<ExperimentsPage />} />

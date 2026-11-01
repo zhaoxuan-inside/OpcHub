@@ -1,4 +1,12 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import type {
+  ButtonHTMLAttributes,
+  HTMLAttributes,
+  InputHTMLAttributes,
+  LabelHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from "react";
 import { clsx } from "clsx";
 
 export function cn(...parts: Array<string | false | null | undefined>) {
@@ -135,5 +143,48 @@ export function Spinner({ className }: { className?: string }) {
         className,
       )}
     />
+  );
+}
+
+export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <select
+      className={cn(
+        "h-9 w-full rounded-md border border-input bg-card px-2.5 text-sm text-foreground",
+        "focus-visible:outline-2 focus-visible:outline-ring disabled:opacity-50",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return (
+    <textarea
+      spellCheck={false}
+      className={cn(
+        "w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-foreground",
+        "placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring",
+        className,
+      )}
+      {...props}
+    />
+  );
+}
+
+export function Field({
+  label,
+  hint,
+  className,
+  children,
+  ...props
+}: LabelHTMLAttributes<HTMLLabelElement> & { label: ReactNode; hint?: ReactNode }) {
+  return (
+    <label className={cn("flex flex-col gap-1.5", className)} {...props}>
+      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      {children}
+      {hint && <span className="text-[11px] text-muted-foreground/80">{hint}</span>}
+    </label>
   );
 }
