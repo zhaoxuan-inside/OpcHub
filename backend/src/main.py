@@ -66,6 +66,11 @@ async def lifespan(app: FastAPI):
                 password_hash=admin["password_hash"],
             )
         await audit_service.archive_older_than()
+        from src.domains.ops.service import ops_run_service
+
+        removed = ops_run_service.prune(settings.ops_run_retention_days)
+        if removed:
+            startup_log.info("Ops run records pruned: %d (retention %dd)", removed, settings.ops_run_retention_days)
         await user_service.hydrate_from_db()
     except Exception as e:
         startup_log.error(

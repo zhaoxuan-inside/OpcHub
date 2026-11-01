@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { dispatch } from "@opchub/console-api";
 import { PermissionGate } from "@opchub/console-ui";
-import { Card, EmptyState, Input, PageHeader, Spinner } from "@opchub/console-ui";
+import { Card, EmptyState, Input, PageHeader, Select, Spinner } from "@opchub/console-ui";
 
 interface AuditRow {
   id?: string;
@@ -17,9 +17,13 @@ interface AuditRow {
 
 export function AuditPage() {
   const [q, setQ] = useState("");
+  const [result, setResult] = useState("");
   const list = useQuery({
-    queryKey: ["platform", "audit", q],
-    queryFn: () => dispatch<{ logs: AuditRow[]; total: number }>("platform.audit.list", { limit: 200, action: q || undefined }),
+    queryKey: ["platform", "audit", q, result],
+    queryFn: () =>
+      dispatch<{ logs: AuditRow[]; total: number }>("platform.audit.list", {
+        limit: 200, action: q || undefined, result: result || undefined,
+      }),
   });
 
   return (
@@ -29,13 +33,20 @@ export function AuditPage() {
         anyOf={["platform:audit_read", "page:ops_console"]}
         fallback={<Card className="p-6 text-sm text-muted-foreground">需要审计读取权限（platform:audit_read）。</Card>}
       >
-        <Card className="mb-4 p-3">
+        <Card className="mb-4 flex flex-wrap items-end gap-3 p-3">
           <Input
             placeholder="按动作过滤（如 rbac.denied / scenario: / auth.）"
             value={q}
             onChange={(e) => setQ(e.target.value)}
             className="h-8 max-w-sm text-xs"
           />
+          <div className="w-36">
+            <Select className="h-8 text-xs" value={result} onChange={(e) => setResult(e.target.value)} aria-label="按结果过滤">
+              <option value="">全部结果</option>
+              <option value="SUCCESS">SUCCESS</option>
+              <option value="DENIED">DENIED</option>
+            </Select>
+          </div>
         </Card>
         <Card>
           {list.isPending ? (

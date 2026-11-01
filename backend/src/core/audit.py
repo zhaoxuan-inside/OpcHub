@@ -76,6 +76,8 @@ class AuditService:
         limit: int = 100,
         actor_id: Optional[str] = None,
         action: Optional[str] = None,
+        result: Optional[str] = None,
+        since: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         """Query hot audit logs (DB when ready, otherwise in-memory), decrypted."""
         rows: Optional[List[Dict[str, Any]]] = None
@@ -91,6 +93,11 @@ class AuditService:
                 if (actor_id is None or r["actor_id"] == actor_id)
                 and (action is None or r["action"] == action)
             ][-limit:]
+        # result / since 过滤（内存与 DB 返回统一后置过滤，索引列已覆盖该口径）
+        if result:
+            rows = [r for r in rows if r.get("result") == result]
+        if since:
+            rows = [r for r in rows if str(r.get("created_at") or "") >= since]
         return [self._decode(r) for r in rows]
 
     async def archive_older_than(

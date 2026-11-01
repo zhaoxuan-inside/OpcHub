@@ -1644,3 +1644,30 @@ gateway:
       handler: "src.domains.configcenter.adapters:configcenter_write_adapter"
       required_permission: "configcenter:write"
       scope: "project"
+
+    # --------------------------------------------------------------------------
+    # 17. Ops 运维平台：MicroFlow 运行记录（SigNoz/jaeger 模式承载，读直连）
+    # --------------------------------------------------------------------------
+    - scenario: "ops.runs.list"
+      version: "v1.0.0"
+      domain: "ops"
+      description: "运行记录清单（场景/状态过滤，运维平台数据面）"
+      is_default: true
+      handler: "src.domains.ops.adapters:ops_runs_list_adapter"
+      required_permission: "platform:audit_read"
+
+    - scenario: "ops.runs.detail"
+      version: "v1.0.0"
+      domain: "ops"
+      description: "运行详情（节点迹瀑布数据源）"
+      is_default: true
+      handler: "src.domains.ops.adapters:ops_runs_detail_adapter"
+      required_permission: "platform:audit_read"
+
+    - scenario: "ops.runs.metrics"
+      version: "v1.0.0"
+      domain: "ops"
+      description: "运行指标聚合（窗口内调用量/成功率/P95，读时计算）"
+      is_default: true
+      handler: "src.domains.ops.adapters:ops_runs_metrics_adapter"
+      required_permission: "platform:audit_read"

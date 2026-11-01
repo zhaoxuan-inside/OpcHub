@@ -6,7 +6,10 @@ import { useEffect } from "react";
 
 const NAV = [
   { to: "/overview", label: "总览", icon: "◎" },
+  { to: "/runs", label: "运行记录", icon: "≡" },
+  { to: "/metrics", label: "指标看板", icon: "◫" },
   { to: "/audit", label: "审计与日志", icon: "▤" },
+  { to: "/debug", label: "调试工作台", icon: "⚗" },
 ];
 
 const PLATFORM_NAV = [

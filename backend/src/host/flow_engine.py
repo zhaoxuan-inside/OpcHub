@@ -159,7 +159,7 @@ class FlowEngine:
         )
 
     def _node_traces(self, release, scenario_code: str, result) -> list[dict[str, Any]]:
-        """Legacy-compatible node traces (durations are per-request totals only)."""
+        """Legacy-compatible node traces (duration_ms from framework node meta)."""
         plan = release.flows[scenario_code]
         traces: list[dict[str, Any]] = []
         for node_id, node_result in result.nodes.items():
@@ -177,7 +177,9 @@ class FlowEngine:
                 "action_handler": operator_name,
                 "type": _NODE_TYPE_BY_PREFIX.get(prefix, "BIZ"),
                 "status": legacy_status,
-                "duration_ms": 0.0,
+                "duration_ms": float(
+                    (node_result.get("meta") or {}).get("durationMs") or 0.0
+                ),
                 "trace_id": str(result.output.get("meta", {}).get("traceId") or ""),
                 "output": thaw(node_result["data"]) if isinstance(node_result.get("data"), Mapping) else node_result.get("data"),
                 "error": (node_result.get("error") or {}).get("message"),

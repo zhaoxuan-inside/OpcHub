@@ -229,7 +229,7 @@ class OrchestrationService:
                 req.scenario_code, dict(req.inputs or {}), dict(req.context or {}),
             )
         except KeyError as exc:
-            return ScenarioExecuteResponse(
+            response = ScenarioExecuteResponse(
                 scenario_code=req.scenario_code, status="FAILED",
                 execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
                 trace_id=tid, effective_dispatch_mode="IN_PROCESS",
@@ -239,22 +239,37 @@ class OrchestrationService:
         except (PermissionError, ValueError) as exc:
             # The legacy engine marked permission failures GUARD_REJECTED.
             status = "GUARD_REJECTED" if isinstance(exc, PermissionError) else "FAILED"
-            return ScenarioExecuteResponse(
+            response = ScenarioExecuteResponse(
                 scenario_code=req.scenario_code, status=status,
                 execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
                 trace_id=tid, effective_dispatch_mode="IN_PROCESS",
                 node_traces=[], final_output={},
                 error_message=str(exc), error_type=type(exc).__name__,
             )
-        return ScenarioExecuteResponse(
-            scenario_code=req.scenario_code,
-            status="SUCCESS",
-            execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
-            trace_id=run.trace_id or tid,
-            effective_dispatch_mode="IN_PROCESS",
-            node_traces=run.node_traces,
-            final_output=run.final_output,
+        else:
+            response = ScenarioExecuteResponse(
+                scenario_code=req.scenario_code,
+                status="SUCCESS",
+                execution_time_ms=round((_time.perf_counter() - started) * 1000, 2),
+                trace_id=run.trace_id or tid,
+                effective_dispatch_mode="IN_PROCESS",
+                node_traces=run.node_traces,
+                final_output=run.final_output,
+            )
+        # 运维平台采集收口：每次场景执行落一条运行记录（write-behind，不阻塞）
+        from src.domains.ops.service import ops_run_service
+
+        ops_run_service.record(
+            scenario_code=response.scenario_code,
+            status=response.status,
+            execution_time_ms=response.execution_time_ms,
+            trace_id=response.trace_id,
+            node_traces=response.node_traces,
+            final_output_error=response.error_message or "",
+            error_type=response.error_type or "",
+            context=dict(req.context or {}),
         )
+        return response
 
     def save_frontend_layout(self, req: FrontendLayoutSaveRequest) -> FrontendLayoutRecord:
         record_id = str(uuid.uuid4())

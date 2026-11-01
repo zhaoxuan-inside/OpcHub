@@ -125,6 +125,8 @@ class Settings(BaseSettings):
 
     # Audit & archival (legal_compliance §80: encrypted retention >= 180 days)
     audit_retention_days: int = int(os.getenv("OPCHUB_AUDIT_RETENTION_DAYS", "180"))
+    # 运行记录保留天数（ops.run_records 快照；超出启动时清理）
+    ops_run_retention_days: int = 14
     audit_secret: str = os.getenv("OPCHUB_AUDIT_SECRET", "")
     audit_archive_batch_size: int = int(os.getenv("OPCHUB_AUDIT_ARCHIVE_BATCH_SIZE", "500"))
 
