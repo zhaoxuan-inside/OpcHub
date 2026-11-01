@@ -2,7 +2,7 @@
 
 覆盖：
 * 排他锁生命周期：获取 / 冲突（含锁定人提示）/ 心跳续期 / 过期接管 / 强制释放
-* 读展示完全开放（无凭证可读），写操作需要 page:orchestrate 且持锁
+* 目录读取项目隔离（orchestration:read + 活动项目；平台超管缺省全局），写操作需编排写权限且持锁
 * 算子生命周期：创建（沙箱校验）→ 草稿版本 → 发布进运行时算子池 → 删除（引用保护）
 * 子图生命周期：创建 → 编排算子 → 发布编译（无环 / 唯一入口 / 唯一出口校验）
 * 场景生命周期：创建 → 算子+子图混合编排 → 发布（子图内联展开 + 物化 ACTIVE DAG）
@@ -166,10 +166,10 @@ def test_lock_expiry_takeover():
     assert taken["holder_id"] == ADMIN2_UID
 
 
-def test_locks_dashboard_public():
-    """锁看板展示开放，且能看到锁定人。"""
+def test_locks_dashboard_authenticated():
+    """锁看板认证可读（项目隔离），且能看到锁定人。"""
     acquire_lock("scenario", "OPC_LOCK_BOARD", _admin_token())
-    res = ok("orchestration.catalog.locks", {})
+    res = ok("orchestration.catalog.locks", {}, _admin_token())
     locks = res["locks"]
     match = [lk for lk in locks if lk["entity_key"] == "OPC_LOCK_BOARD"]
     assert match and match[0]["holder_id"] == ADMIN_UID
@@ -178,8 +178,8 @@ def test_locks_dashboard_public():
 # ======================================================================
 # 2. 读开放 / 写权限
 # ======================================================================
-def test_catalog_reads_public():
-    """四类目录读取接口无凭证即可访问（展示无限制）。"""
+def test_catalog_reads_scoped():
+    """目录读取项目隔离：未登录 401；认证后可读（管理员缺省全局视角）。"""
     for scenario in (
         "orchestration.catalog.operators",
         "orchestration.catalog.subgraphs",
@@ -187,6 +187,8 @@ def test_catalog_reads_public():
         "orchestration.catalog.locks",
     ):
         res = gw(scenario, {})
+        assert res["code"] == 401, (scenario, res.get("message"))
+        res = gw(scenario, {}, _admin_token())
         assert res["code"] == 200, (scenario, res.get("message"))
 
 
@@ -271,7 +273,7 @@ def test_operator_create_publish_version_delete():
         {"action": "operators.publish", "payload": {"name": "dynamic.lifecycles", "version": "v1.0.1"}},
         _admin_token(),
     )
-    detail = ok("orchestration.catalog.operator", {"name": "dynamic.lifecycles"})
+    detail = ok("orchestration.catalog.operator", {"name": "dynamic.lifecycles"}, _admin_token())
     statuses = {v["version"]: v["status"] for v in detail["versions"]}
     assert statuses["v1.0.0"] == "SUPERSEDED"
     assert statuses["v1.0.1"] == "PUBLISHED"
@@ -285,7 +287,7 @@ def test_operator_create_publish_version_delete():
     )
     assert deleted["deleted"] is True
     assert _registry_get("dynamic.lifecycles") is None
-    names = [o["name"] for o in ok("orchestration.catalog.operators", {})["operators"]]
+    names = [o["name"] for o in ok("orchestration.catalog.operators", {}, _admin_token())["operators"]]
     assert "dynamic.lifecycles" not in names
 
 
@@ -613,7 +615,7 @@ def test_operator_delete_blocked_by_published_subgraph():
 
 def test_scenario_runtime_rows_visible():
     """场景目录同时展示运行时内置管线（只读）与管理场景。"""
-    rows = ok("orchestration.catalog.scenarios", {})["scenarios"]
+    rows = ok("orchestration.catalog.scenarios", {}, _admin_token())["scenarios"]
     codes = {r["code"] for r in rows}
     assert "OPC_FORUM_THREAD_PUBLISH" in codes  # 运行时管线可见
     assert all(r["source"] in ("managed", "runtime") for r in rows)
@@ -639,7 +641,7 @@ def test_catalog_write_reseeds_missing_pipeline():
 
 def test_operator_builtin_version_and_usage():
     """预置算子统一带平台版本 v1.0.0；使用状态覆盖子图/场景/系统流程三类引用。"""
-    ops = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}
+    ops = {o["name"]: o for o in ok("orchestration.catalog.operators", {}, _admin_token())["operators"]}
     guard = ops["guard.authn"]
     assert guard["source"] == "builtin"
     assert guard["current_version"] == "v1.0.0"
@@ -661,7 +663,7 @@ def test_operator_builtin_version_and_usage():
         {"action": "operators.publish", "payload": {"name": "dynamic.usage.lonely", "version": "v1.0.0"}},
         _admin_token(),
     )
-    lonely = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}["dynamic.usage.lonely"]
+    lonely = {o["name"]: o for o in ok("orchestration.catalog.operators", {}, _admin_token())["operators"]}["dynamic.usage.lonely"]
     assert lonely["in_use"] is False
 
     # 发布引用 guard.authn 的子图后 → 引用方新增子图条目
@@ -695,11 +697,11 @@ def test_operator_builtin_version_and_usage():
         {"action": "subgraphs.publish", "payload": {"code": "SG_USAGE_PROBE", "version": "v1.0.0"}},
         _admin_token(),
     )
-    ops2 = {o["name"]: o for o in ok("orchestration.catalog.operators", {})["operators"]}
+    ops2 = {o["name"]: o for o in ok("orchestration.catalog.operators", {}, _admin_token())["operators"]}
     refs = ops2["guard.authn"]["referenced_by"]
     assert any("SG_USAGE_PROBE" in ref for ref in refs)
     assert any(ref.startswith("流程 ") for ref in refs)
     assert ops2["calc.policy.tax_assessment"]["in_use"] is True
     # 详情接口同样返回使用状态
-    detail = ok("orchestration.catalog.operator", {"name": "guard.authn"})
+    detail = ok("orchestration.catalog.operator", {"name": "guard.authn"}, _admin_token())
     assert detail["in_use"] is True and detail["current_version"] == "v1.0.0"

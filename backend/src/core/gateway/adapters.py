@@ -1351,9 +1351,9 @@ def _actor_display_name(uid: str) -> str:
 
 
 def catalog_operators_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
-    """List the managed operator catalog (builtin + custom) with lock status (公开只读)."""
+    """List the managed operator catalog (builtin + custom) with lock status."""
     from src.domains.orchestration.catalog import catalog_service
-    rows = [o.model_dump() for o in catalog_service.list_operators()]
+    rows = [o.model_dump() for o in catalog_service.list_operators(c)]
     return {"operators": rows, "total": len(rows)}
 
 
@@ -1364,44 +1364,44 @@ def catalog_release_approvals_adapter(p: Dict[str, Any] = None, c: Dict[str, Any
 
 
 def catalog_operator_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Fetch one operator asset with its full version history (公开只读)."""
+    """Fetch one operator asset with its full version history (项目隔离可见)."""
     from src.domains.orchestration.catalog import catalog_service
     name = str((p or {}).get("name") or "")
     if not name:
         raise ValueError("name is required")
-    return catalog_service.get_operator(name).model_dump()
+    return catalog_service.get_operator(name, c).model_dump()
 
 
 def catalog_subgraphs_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
-    """List all subgraph assets with lock status (公开只读)."""
+    """List all subgraph assets with lock status (项目隔离可见)."""
     from src.domains.orchestration.catalog import catalog_service
-    rows = [s.model_dump() for s in catalog_service.list_subgraphs()]
+    rows = [s.model_dump() for s in catalog_service.list_subgraphs(c)]
     return {"subgraphs": rows, "total": len(rows)}
 
 
 def catalog_subgraph_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Fetch one subgraph asset with its version history and compiled graphs (公开只读)."""
+    """Fetch one subgraph asset with its version history and compiled graphs (项目隔离可见)."""
     from src.domains.orchestration.catalog import catalog_service
     code = str((p or {}).get("code") or "")
     if not code:
         raise ValueError("code is required")
-    return catalog_service.get_subgraph(code).model_dump()
+    return catalog_service.get_subgraph(code, c).model_dump()
 
 
 def catalog_scenarios_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:
-    """List managed scenarios plus read-only runtime pipelines with lock status (公开只读)."""
+    """List managed scenarios plus read-only runtime pipelines with lock status (项目隔离可见)."""
     from src.domains.orchestration.catalog import catalog_service
-    rows = catalog_service.list_scenarios()
+    rows = catalog_service.list_scenarios(c)
     return {"scenarios": rows, "total": len(rows)}
 
 
 def catalog_scenario_detail_adapter(p: Dict[str, Any], c: Dict[str, Any] = None) -> Any:
-    """Fetch one scenario (managed or runtime) with versions / runtime topology (公开只读)."""
+    """Fetch one scenario (managed or runtime) with versions / runtime topology (项目隔离可见)."""
     from src.domains.orchestration.catalog import catalog_service
     code = str((p or {}).get("code") or "")
     if not code:
         raise ValueError("code is required")
-    return catalog_service.get_scenario(code)
+    return catalog_service.get_scenario(code, c)
 
 
 def catalog_locks_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) -> Any:

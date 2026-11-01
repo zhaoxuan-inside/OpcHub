@@ -110,6 +110,7 @@ class OperatorAsset(BaseModel):
     created_by: str = ""
     created_at: str = ""
     updated_at: str = ""
+    project_id: str = ""  # 归属项目（空 = 平台内置/未归属，全局只读可见）
     runtime_mode: str = ""  # dispatcher 中的当前调度模式
     in_use: bool = False  # 是否被已发布子图/场景编排引用（读取时计算）
     referenced_by: List[str] = []  # 引用方列表（如「子图 SG_X@v1.0.0」）
@@ -171,6 +172,7 @@ class SubgraphAsset(BaseModel):
     created_by: str = ""
     created_at: str = ""
     updated_at: str = ""
+    project_id: str = ""  # 归属项目（空 = 未归属，仅平台管理者可操作）
     lock_status: Optional[AssetLock] = None
 
 
@@ -214,6 +216,7 @@ class ScenarioAsset(BaseModel):
     created_by: str = ""
     created_at: str = ""
     updated_at: str = ""
+    project_id: str = ""  # 归属项目（空 = 未归属，仅平台管理者可操作）
     lock_status: Optional[AssetLock] = None
 
 
@@ -345,6 +348,65 @@ class CatalogService:
         return {"user_id": uid, "user_name": name}
 
     # ------------------------------------------------------------------
+    # 项目隔离 helpers（分租户·分项目治理底座，见 src/domains/platform）
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _ctx_project(context: Dict[str, Any]) -> str:
+        """活动项目上下文（网关 scope 强制后由 ctx 注入；平台超管可缺省）。"""
+        return str((context or {}).get("project_id") or "").strip()
+
+    @staticmethod
+    def _is_super(context: Dict[str, Any]) -> bool:
+        """平台超管：legacy ADMIN 通配 或 PLATFORM 通配角色绑定。"""
+        if str((context or {}).get("user_role") or "").strip().upper() == "ADMIN":
+            return True
+        uid = str((context or {}).get("user_id") or "").strip()
+        if not uid:
+            return False
+        try:
+            from src.domains.platform.service import platform_service
+
+            return platform_service.is_platform_super(uid)
+        except Exception:
+            return False
+
+    def _visible(self, asset_project: str, ctx_project: str) -> bool:
+        """可见性：未归属/平台内置资产全局可见；项目资产仅本项目（超管缺省上下文见全部）。"""
+        return (not asset_project) or (not ctx_project) or asset_project == ctx_project
+
+    def _ensure_writable(self, asset_project: str, context: Dict[str, Any]) -> None:
+        """写权限：项目资产仅本项目可写；未归属资产仅平台超管可写。"""
+        ctx_project = self._ctx_project(context)
+        if not asset_project:
+            if not self._is_super(context):
+                raise PermissionError("该资产未归属项目，仅平台管理者可操作")
+            return
+        if ctx_project and asset_project != ctx_project:
+            raise KeyError("资产不存在于当前项目")
+        if not ctx_project and not self._is_super(context):
+            raise PermissionError("请先选择活动项目后再操作项目资产")
+
+    def _can_write_project(self, context: Dict[str, Any], project_id: str) -> bool:
+        if not project_id:
+            return False
+        if self._is_super(context):
+            return True
+        uid = str((context or {}).get("user_id") or "").strip()
+        if not uid:
+            return False
+        try:
+            from src.domains.platform.service import platform_service
+
+            return platform_service.has_scoped_permission(uid, "orchestration:write", project_id=project_id)
+        except Exception:
+            return False
+
+    def _require_visible(self, asset_project: str, code: str, kind: str, context: Dict[str, Any]) -> None:
+        """项目资产对非本项目成员不可见（不泄露存在性，按不存在处理）。"""
+        if not self._visible(asset_project, self._ctx_project(context)):
+            raise KeyError(f"{kind} {code} 不存在")
+
+    # ------------------------------------------------------------------
     # Operators — 算子
     # ------------------------------------------------------------------
     def _usage_map(self) -> Dict[str, List[str]]:
@@ -402,10 +464,13 @@ class CatalogService:
             referenced_by=holders,
         )
 
-    def list_operators(self) -> List[OperatorAsset]:
+    def list_operators(self, context: Optional[Dict[str, Any]] = None) -> List[OperatorAsset]:
+        ctx_project = self._ctx_project(context)
         usage = self._usage_map()
         rows: List[OperatorAsset] = []
         for asset in self._operators.values():
+            if not self._visible(asset.project_id, ctx_project):
+                continue
             asset.lock_status = lock_manager.status("operator", asset.name)
             descriptor = self._builtin_descriptor(asset.name)
             # MicroFlow executes in-process; the legacy dispatcher mode is retired.
@@ -423,10 +488,11 @@ class CatalogService:
         rows.sort(key=lambda a: (a.source != "builtin", a.domain, a.name))
         return rows
 
-    def get_operator(self, name: str) -> OperatorAsset:
+    def get_operator(self, name: str, context: Optional[Dict[str, Any]] = None) -> OperatorAsset:
         usage = self._usage_map()
         asset = self._operators.get(name)
         if asset:
+            self._require_visible(asset.project_id, name, "算子", context)
             asset.lock_status = lock_manager.status("operator", name)
             holders = sorted(set(usage.get(name, [])))
             asset.in_use = bool(holders)
@@ -453,10 +519,15 @@ class CatalogService:
                 return desc
         return None
 
-    def _resolve_custom_operator_version(self, name: str, version_ref: str) -> OperatorVersion:
+    def _resolve_custom_operator_version(
+        self,
+        name: str,
+        version_ref: str,
+        ctx_project: str = "",
+    ) -> OperatorVersion:
         """Resolve a managed custom operator reference to a PUBLISHED version."""
         asset = self._operators.get(name)
-        if not asset:
+        if not asset or (ctx_project and not self._visible(asset.project_id, ctx_project)):
             raise KeyError(f"算子 {name} 不存在，请先创建并发布")
         if version_ref:
             for v in asset.versions:
@@ -472,6 +543,9 @@ class CatalogService:
 
     def create_operator(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         actor = self._actor(payload, context)
+        ctx_project = self._ctx_project(context)
+        if not ctx_project and not self._is_super(context):
+            raise PermissionError("请先选择活动项目后再创建目录资产")
         name = str(payload.get("name") or "").strip()
         display_name = str(payload.get("display_name") or name).strip()
         domain = str(payload.get("domain") or "custom").strip() or "custom"
@@ -522,6 +596,7 @@ class CatalogService:
             created_by=actor["user_id"],
             created_at=now,
             updated_at=now,
+            project_id=ctx_project,
         )
         self._operators[name] = asset
         self._persist_operator(asset)
@@ -533,6 +608,7 @@ class CatalogService:
         asset = self._operators.get(name)
         if not asset:
             raise KeyError(f"算子 {name} 不存在或为内置算子（内置算子不支持版本编辑）")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("operator", name, actor["user_id"])
 
         version = str(payload.get("version") or "").strip()
@@ -609,6 +685,7 @@ class CatalogService:
         asset = self._operators.get(name)
         if not asset:
             raise KeyError(f"算子 {name} 不存在或为内置算子（内置算子由平台代码发布）")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("operator", name, actor["user_id"])
 
         row = None
@@ -669,6 +746,7 @@ class CatalogService:
             if self._builtin_descriptor(name):
                 raise ValueError(f"算子 {name} 为平台内置算子（代码注册），不可删除")
             raise KeyError(f"算子 {name} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("operator", name, actor["user_id"])
 
         holders = self.operator_reference_holders(name)
@@ -685,24 +763,28 @@ class CatalogService:
     # ------------------------------------------------------------------
     # Subgraphs — 子图
     # ------------------------------------------------------------------
-    def list_subgraphs(self) -> List[SubgraphAsset]:
+    def list_subgraphs(self, context: Optional[Dict[str, Any]] = None) -> List[SubgraphAsset]:
+        ctx_project = self._ctx_project(context)
         rows = []
         for asset in self._subgraphs.values():
+            if not self._visible(asset.project_id, ctx_project):
+                continue
             asset.lock_status = lock_manager.status("subgraph", asset.code)
             rows.append(asset)
         rows.sort(key=lambda a: a.code)
         return rows
 
-    def get_subgraph(self, code: str) -> SubgraphAsset:
+    def get_subgraph(self, code: str, context: Optional[Dict[str, Any]] = None) -> SubgraphAsset:
         asset = self._subgraphs.get(code)
         if not asset:
             raise KeyError(f"子图 {code} 不存在")
+        self._require_visible(asset.project_id, code, "子图", context)
         asset.lock_status = lock_manager.status("subgraph", code)
         return asset
 
-    def _resolve_subgraph_version(self, code: str, version_ref: str) -> SubgraphVersion:
+    def _resolve_subgraph_version(self, code: str, version_ref: str, ctx_project: str = "") -> SubgraphVersion:
         asset = self._subgraphs.get(code)
-        if not asset:
+        if not asset or (ctx_project and not self._visible(asset.project_id, ctx_project)):
             raise KeyError(f"子图 {code} 不存在")
         target = version_ref or asset.current_version
         for v in asset.versions:
@@ -710,15 +792,16 @@ class CatalogService:
                 return v
         raise ValueError(f"子图 {code}@{target or '最新'} 未发布或不存在，仅可编排已发布子图版本")
 
-    def _validate_subgraph_graph(self, graph: SubgraphGraph, strict: bool) -> None:
+    def _validate_subgraph_graph(self, graph: SubgraphGraph, strict: bool, ctx_project: str = "") -> None:
         if not graph.nodes:
             raise ValueError("子图至少需要一个算子节点")
         _validate_structure(graph.entry_node, graph.exit_node, [n.id for n in graph.nodes], graph.edges)
         for n in graph.nodes:
-            if self._operators.get(n.operator):
+            op = self._operators.get(n.operator)
+            if op and self._visible(op.project_id, ctx_project):
                 if strict and (n.operator_version and not any(
                     v.version == n.operator_version and v.status == VersionStatus.PUBLISHED
-                    for v in self._operators[n.operator].versions
+                    for v in op.versions
                 )):
                     raise ValueError(f"节点 {n.id} 引用的算子 {n.operator}@{n.operator_version} 未发布")
             elif not self._builtin_descriptor(n.operator):
@@ -728,6 +811,9 @@ class CatalogService:
 
     def create_subgraph(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         actor = self._actor(payload, context)
+        ctx_project = self._ctx_project(context)
+        if not ctx_project and not self._is_super(context):
+            raise PermissionError("请先选择活动项目后再创建目录资产")
         code = str(payload.get("code") or "").strip()
         if not ASSET_CODE_PATTERN.match(code):
             raise ValueError("子图编码需以字母开头，仅含字母/数字/下划线/点号/横线，长度 2-64")
@@ -752,6 +838,7 @@ class CatalogService:
             created_by=actor["user_id"],
             created_at=now,
             updated_at=now,
+            project_id=ctx_project,
         )
         self._subgraphs[code] = asset
         self._persist_subgraph(asset)
@@ -763,12 +850,13 @@ class CatalogService:
         asset = self._subgraphs.get(code)
         if not asset:
             raise KeyError(f"子图 {code} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("subgraph", code, actor["user_id"])
         now = utc_now_iso()
         version = str(payload.get("version") or "").strip()
 
         graph = SubgraphGraph(**(payload.get("graph") or {}))
-        self._validate_subgraph_graph(graph, strict=False)
+        self._validate_subgraph_graph(graph, strict=False, ctx_project=self._ctx_project(context))
 
         if not version:
             # 未指定版本：最新版本仍为草稿时就地更新，否则派生新草稿版本
@@ -819,6 +907,7 @@ class CatalogService:
         asset = self._subgraphs.get(code)
         if not asset:
             raise KeyError(f"子图 {code} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("subgraph", code, actor["user_id"])
 
         row = next((v for v in asset.versions if v.version == version), None)
@@ -827,7 +916,7 @@ class CatalogService:
         if row.status != VersionStatus.DRAFT:
             raise ValueError(f"版本 {version} 状态为 {row.status.value}，只有草稿可以发布")
 
-        compiled = self._compile_subgraph(row)
+        compiled = self._compile_subgraph(row, ctx_project=self._ctx_project(context))
         now = utc_now_iso()
         for v in asset.versions:
             if v.status == VersionStatus.PUBLISHED:
@@ -841,14 +930,15 @@ class CatalogService:
         self._persist_subgraph(asset)
         return asset.model_dump()
 
-    def _compile_subgraph(self, row: SubgraphVersion) -> CompiledGraph:
+    def _compile_subgraph(self, row: SubgraphVersion, ctx_project: str = "") -> CompiledGraph:
         """Resolve operator references into an executable flat operator graph."""
         graph = row.graph
-        self._validate_subgraph_graph(graph, strict=True)
+        self._validate_subgraph_graph(graph, strict=True, ctx_project=ctx_project)
         nodes: List[CompiledNode] = []
         for n in graph.nodes:
-            if self._operators.get(n.operator):
-                self._resolve_custom_operator_version(n.operator, n.operator_version)
+            op = self._operators.get(n.operator)
+            if op and self._visible(op.project_id, ctx_project):
+                self._resolve_custom_operator_version(n.operator, n.operator_version, ctx_project)
                 handler = n.operator
             else:
                 desc = self._builtin_descriptor(n.operator)
@@ -862,10 +952,13 @@ class CatalogService:
     # ------------------------------------------------------------------
     # Scenarios — 场景
     # ------------------------------------------------------------------
-    def list_scenarios(self) -> List[Dict[str, Any]]:
+    def list_scenarios(self, context: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+        ctx_project = self._ctx_project(context)
         rows: List[Dict[str, Any]] = []
         managed_codes = set()
         for asset in self._scenarios.values():
+            if not self._visible(asset.project_id, ctx_project):
+                continue
             managed_codes.add(asset.code)
             asset.lock_status = lock_manager.status("scenario", asset.code)
             rows.append({**asset.model_dump(), "source": "managed"})
@@ -891,9 +984,10 @@ class CatalogService:
         rows.sort(key=lambda r: (r.get("source") != "managed", r["code"]))
         return rows
 
-    def get_scenario(self, code: str) -> Dict[str, Any]:
+    def get_scenario(self, code: str, context: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         asset = self._scenarios.get(code)
         if asset:
+            self._require_visible(asset.project_id, code, "场景", context)
             asset.lock_status = lock_manager.status("scenario", code)
             return {**asset.model_dump(), "source": "managed"}
         cfgs = [c for c in orchestration_service.list_dag_configs() if c.scenario_code == code]
@@ -917,6 +1011,9 @@ class CatalogService:
 
     def create_scenario(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         actor = self._actor(payload, context)
+        ctx_project = self._ctx_project(context)
+        if not ctx_project and not self._is_super(context):
+            raise PermissionError("请先选择活动项目后再创建目录资产")
         code = str(payload.get("code") or "").strip()
         if not ASSET_CODE_PATTERN.match(code):
             raise ValueError("场景编码需以字母开头，仅含字母/数字/下划线/点号/横线，长度 2-64")
@@ -941,26 +1038,28 @@ class CatalogService:
             created_by=actor["user_id"],
             created_at=now,
             updated_at=now,
+            project_id=ctx_project,
         )
         self._scenarios[code] = asset
         self._persist_scenario(asset)
         return asset.model_dump()
 
-    def _validate_scenario_graph(self, graph: ScenarioGraph, strict: bool) -> None:
+    def _validate_scenario_graph(self, graph: ScenarioGraph, strict: bool, ctx_project: str = "") -> None:
         if not graph.nodes:
             raise ValueError("场景至少需要一个节点")
         _validate_structure(graph.entry_node, graph.exit_node, [n.id for n in graph.nodes], graph.edges)
         for n in graph.nodes:
             if n.kind == "SUBGRAPH":
                 sub = self._subgraphs.get(n.subgraph)
-                if not sub:
+                if not sub or (ctx_project and not self._visible(sub.project_id, ctx_project)):
                     raise ValueError(f"节点 {n.id} 引用了不存在的子图 {n.subgraph}")
                 if strict:
-                    self._resolve_subgraph_version(n.subgraph, n.subgraph_version)
+                    self._resolve_subgraph_version(n.subgraph, n.subgraph_version, ctx_project)
             elif n.kind == "OPERATOR":
-                if self._operators.get(n.operator):
+                op = self._operators.get(n.operator)
+                if op and self._visible(op.project_id, ctx_project):
                     if strict:
-                        self._resolve_operator_handler(n.operator, n.operator_version)
+                        self._resolve_custom_operator_version(n.operator, n.operator_version, ctx_project)
                 elif not self._builtin_descriptor(n.operator):
                     raise ValueError(f"节点 {n.id} 引用了不存在的算子 {n.operator}")
             else:
@@ -972,12 +1071,13 @@ class CatalogService:
         asset = self._scenarios.get(code)
         if not asset:
             raise KeyError(f"场景 {code} 不存在（运行时内置管线需先创建管理版本）")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("scenario", code, actor["user_id"])
         now = utc_now_iso()
         version = str(payload.get("version") or "").strip()
 
         graph = ScenarioGraph(**(payload.get("graph") or {}))
-        self._validate_scenario_graph(graph, strict=False)
+        self._validate_scenario_graph(graph, strict=False, ctx_project=self._ctx_project(context))
 
         if not version:
             # 未指定版本：最新版本仍为草稿时就地更新，否则派生新草稿版本
@@ -1028,6 +1128,7 @@ class CatalogService:
         asset = self._scenarios.get(code)
         if not asset:
             raise KeyError(f"场景 {code} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("scenario", code, actor["user_id"])
 
         row = next((v for v in asset.versions if v.version == version), None)
@@ -1036,7 +1137,7 @@ class CatalogService:
         if row.status != VersionStatus.DRAFT:
             raise ValueError(f"版本 {version} 状态为 {row.status.value}，只有草稿可以发布")
 
-        deployed = self._deploy_scenario_version(code, row)
+        deployed = self._deploy_scenario_version(code, row, ctx_project=self._ctx_project(context))
         now = utc_now_iso()
         for v in asset.versions:
             if v.status == VersionStatus.PUBLISHED:
@@ -1049,10 +1150,10 @@ class CatalogService:
         self._persist_scenario(asset)
         return {**asset.model_dump(), "deployed_dag": deployed}
 
-    def _compile_scenario(self, row: ScenarioVersion) -> CompiledGraph:
+    def _compile_scenario(self, row: ScenarioVersion, ctx_project: str = "") -> CompiledGraph:
         """Expand subgraph nodes inline and produce the executable flat DAG."""
         graph = row.graph
-        self._validate_scenario_graph(graph, strict=True)
+        self._validate_scenario_graph(graph, strict=True, ctx_project=ctx_project)
 
         nodes: List[CompiledNode] = []
         edges: List[GraphEdge] = []
@@ -1060,8 +1161,8 @@ class CatalogService:
 
         for n in graph.nodes:
             if n.kind == "SUBGRAPH":
-                sub_ver = self._resolve_subgraph_version(n.subgraph, n.subgraph_version)
-                compiled_sub = sub_ver.compiled or self._compile_subgraph(sub_ver)
+                sub_ver = self._resolve_subgraph_version(n.subgraph, n.subgraph_version, ctx_project)
+                compiled_sub = sub_ver.compiled or self._compile_subgraph(sub_ver, ctx_project)
                 prefix = f"{n.id}::"
                 for cn in compiled_sub.nodes:
                     nodes.append(CompiledNode(id=prefix + cn.id, action_handler=cn.action_handler, type=cn.type, timeout_ms=cn.timeout_ms))
@@ -1069,8 +1170,9 @@ class CatalogService:
                     edges.append(GraphEdge(from_node=prefix + e.from_node, to_node=prefix + e.to_node))
                 port_map[n.id] = (prefix + compiled_sub.entry_node, prefix + compiled_sub.exit_node)
             else:
-                if self._operators.get(n.operator):
-                    self._resolve_custom_operator_version(n.operator, n.operator_version)
+                op = self._operators.get(n.operator)
+                if op and self._visible(op.project_id, ctx_project):
+                    self._resolve_custom_operator_version(n.operator, n.operator_version, ctx_project)
                     handler = n.operator
                 else:
                     desc = self._builtin_descriptor(n.operator)
@@ -1097,6 +1199,7 @@ class CatalogService:
         asset = self._scenarios.get(code)
         if not asset:
             raise KeyError(f"场景 {code} 不在管理目录中（运行时内置管线不通过此入口删除）")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("scenario", code, actor["user_id"])
 
         removed_configs = []
@@ -1176,9 +1279,9 @@ class CatalogService:
     # ------------------------------------------------------------------
     # M1-1: deployment helper / rollback / release approvals
     # ------------------------------------------------------------------
-    def _deploy_scenario_version(self, code: str, row: ScenarioVersion) -> Dict[str, Any]:
+    def _deploy_scenario_version(self, code: str, row: ScenarioVersion, ctx_project: str = "") -> Dict[str, Any]:
         """Compile (or reuse) a version graph, materialize and activate its DAG config."""
-        compiled = row.compiled or self._compile_scenario(row)
+        compiled = row.compiled or self._compile_scenario(row, ctx_project)
         topology = {
             "topology": "DAG",
             "entry_node": compiled.entry_node,
@@ -1215,6 +1318,7 @@ class CatalogService:
         asset = self._scenarios.get(code)
         if not asset:
             raise KeyError(f"场景 {code} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("scenario", code, actor["user_id"])
         row = next((v for v in asset.versions if v.version == version), None)
         if not row:
@@ -1232,7 +1336,7 @@ class CatalogService:
         row.changelog = (f"{row.changelog} | " if row.changelog else "") + f"回滚 by {actor['user_id']} @ {now}"
         asset.current_version = row.version
         asset.updated_at = now
-        deployed = self._deploy_scenario_version(code, row)
+        deployed = self._deploy_scenario_version(code, row, ctx_project=self._ctx_project(context))
         self._persist_scenario(asset)
         return {**asset.model_dump(), "deployed_dag": deployed}
 
@@ -1248,6 +1352,7 @@ class CatalogService:
         asset = self._subgraphs.get(code)
         if not asset:
             raise KeyError(f"子图 {code} 不存在")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("subgraph", code, actor["user_id"])
         row = next((v for v in asset.versions if v.version == version), None)
         if not row:
@@ -1255,7 +1360,7 @@ class CatalogService:
         if row.status == VersionStatus.DRAFT:
             raise ValueError(f"版本 {version} 是草稿，只有已发布/被取代版本可以回滚")
         if row.compiled is None:
-            row.compiled = self._compile_subgraph(row)
+            row.compiled = self._compile_subgraph(row, ctx_project=self._ctx_project(context))
 
         now = utc_now_iso()
         for v in asset.versions:
@@ -1277,6 +1382,7 @@ class CatalogService:
         asset = self._operators.get(name)
         if not asset:
             raise KeyError(f"算子 {name} 不存在或为内置算子")
+        self._ensure_writable(asset.project_id, context)
         lock_manager.require("operator", name, actor["user_id"])
         row = next((v for v in asset.versions if v.version == version), None)
         if not row:
@@ -1318,6 +1424,7 @@ class CatalogService:
         asset = {"scenario": self._scenarios, "subgraph": self._subgraphs, "operator": self._operators}[kind].get(code)
         if not asset:
             raise KeyError(f"{kind} {code} 不存在")
+        self._require_visible(asset.project_id, code, kind, context)
         row = next((v for v in asset.versions if v.version == version), None)
         if not row:
             raise KeyError(f"{kind} {code} 不存在版本 {version}")
@@ -1339,6 +1446,7 @@ class CatalogService:
             requested_by=actor["user_id"],
             requested_at=utc_now_iso(),
             note=str(payload.get("note") or ""),
+            project_id=str(asset.project_id or ""),
         )
         self._release_approvals[approval.id] = approval
         domain_persistence.write("orchestration.release_approvals", approval.id, approval.model_dump())
@@ -1351,6 +1459,7 @@ class CatalogService:
         approval = self._release_approvals.get(approval_id)
         if not approval:
             raise KeyError(f"审批单 {approval_id} 不存在")
+        self._require_visible(approval.project_id, approval.code, "审批单", context)
         if approval.status != "PENDING":
             raise ValueError(f"审批单 {approval_id} 状态为 {approval.status}")
         if approval.requested_by == actor["user_id"]:
@@ -1385,6 +1494,7 @@ class CatalogService:
         approval = self._release_approvals.get(approval_id)
         if not approval:
             raise KeyError(f"审批单 {approval_id} 不存在")
+        self._require_visible(approval.project_id, approval.code, "审批单", context)
         if approval.status != "PENDING":
             raise ValueError(f"审批单 {approval_id} 状态为 {approval.status}")
         approval.status = "REJECTED"
@@ -1396,11 +1506,79 @@ class CatalogService:
 
     def list_release_approvals(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         status = str(payload.get("status") or "").strip()
-        rows = [a.model_dump() for a in self._release_approvals.values()]
+        ctx_project = self._ctx_project(context)
+        rows = [
+            a.model_dump() for a in self._release_approvals.values()
+            if self._visible(a.project_id, ctx_project)
+        ]
         if status:
             rows = [r for r in rows if r["status"] == status]
         rows.sort(key=lambda r: r["requested_at"], reverse=True)
         return {"approvals": rows, "total": len(rows)}
+
+    # -- cross-project sharing（显式复制，项目完全隔离下的唯一复用通道） ----
+    def copy_asset(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        """把一个目录资产显式复制到另一个项目（目标项目需编排写权限）。
+
+        版本历史原样保留（含各版本的原作者/发布人溯源）；副本归属目标项目，
+        由执行复制的人在目标项目内继续演进。
+        """
+        actor = self._actor(payload, context)
+        kind = str(payload.get("asset_kind") or "scenario").strip()
+        code = str(payload.get("code") or "").strip()
+        target_project_id = str(payload.get("target_project_id") or "").strip()
+        if kind not in ("scenario", "subgraph", "operator"):
+            raise ValueError(f"不支持的资产类型：{kind}")
+        if not target_project_id:
+            raise ValueError("必须指定目标项目 target_project_id")
+        if not self._can_write_project(context, target_project_id):
+            raise PermissionError("权限不足：缺少目标项目的编排写权限")
+
+        stores = {"scenario": self._scenarios, "subgraph": self._subgraphs, "operator": self._operators}
+        asset = stores[kind].get(code)
+        if not asset:
+            raise KeyError(f"{kind} {code} 不存在")
+        # 源可见性：项目资产需对发起人可读（源项目成员或超管），否则按不存在处理
+        if asset.project_id and not self._is_super(context):
+            uid = actor["user_id"]
+            try:
+                from src.domains.platform.service import platform_service
+
+                readable = platform_service.has_scoped_permission(uid, "orchestration:read", project_id=asset.project_id)
+            except Exception:
+                readable = False
+            if not readable:
+                raise KeyError(f"{kind} {code} 不存在")
+
+        new_code = str(payload.get("new_code") or "").strip()
+        if new_code and new_code != code and not ASSET_CODE_PATTERN.match(new_code):
+            raise ValueError("新编码需以字母开头，仅含字母/数字/下划线/点号/横线，长度 2-64")
+        if not new_code:
+            # 编码全局唯一（运行时算子池按名注册）：目标已占用时自动派生空闲编码
+            new_code = code
+            serial = 1
+            while new_code in stores[kind]:
+                serial += 1
+                new_code = f"{code}_{serial}"
+        elif new_code in stores[kind]:
+            raise ValueError(f"编码 {new_code} 已存在，请换一个编码")
+
+        copied = asset.model_copy(deep=True, update={
+            ("name" if kind == "operator" else "code"): new_code,
+            "project_id": target_project_id,
+            "created_by": actor["user_id"],
+            "created_at": utc_now_iso(),
+            "updated_at": utc_now_iso(),
+            "lock_status": None,
+        })
+        stores[kind][new_code] = copied
+        if kind == "operator":
+            self._persist_operator(copied)
+        elif kind == "subgraph":
+            self._persist_subgraph(copied)
+        else:
+            self._persist_scenario(copied)
+        return copied.model_dump()
 
     def hydrate_release_approvals(self, rows: List[Dict]) -> int:
         for r in rows or []:
@@ -1425,6 +1603,7 @@ class ReleaseApproval(BaseModel):
     approver: str = ""
     approved_at: str = ""
     note: str = ""
+    project_id: str = ""  # 发起时所在项目（空 = 未归属资产）
 
 
 CATALOG_ACTIONS: Dict[str, str] = {
@@ -1445,6 +1624,7 @@ CATALOG_ACTIONS: Dict[str, str] = {
     "approvals.request": "request_release_approval",
     "approvals.approve": "approve_release",
     "approvals.reject": "reject_release",
+    "assets.copy": "copy_asset",
 }
 
 
