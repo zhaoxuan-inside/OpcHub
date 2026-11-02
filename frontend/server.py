@@ -5,6 +5,7 @@ and transparently reverse-proxies /api to the backend unified gateway on port 80
 Zero reference to documentation prototype demo files.
 """
 import os
+import pathlib
 from pathlib import Path
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -98,9 +99,16 @@ async def serve_brand_icon():
 
 
 # ----------------------------- Console SPAs -----------------------------
-# 三个支撑平台子项目（编排管理/运维/运营）——Vite 构建产物按路径挂载。
-CONSOLE_ROOT = FRONTEND_DIR.parent / "console"
-CONSOLE_APPS = ("orchestration", "ops", "bizops")
+# 三大支撑平台已迁入 MicroFlow 仓（MicroFlow4Orchestration/Ops/Bizops 子项目，
+# 与具体业务解耦）。本服务按 URL 契约 /console/{app} 挂载其构建产物：
+# 通过 OPCHUB_CONSOLE_ROOT 指向 MicroFlow 仓根（其下按子项目名映射 dist）。
+CONSOLE_ROOT = pathlib.Path(os.getenv("OPCHUB_CONSOLE_ROOT") or (FRONTEND_DIR.parent / "console"))
+CONSOLE_APP_DIRS = {
+    "orchestration": "MicroFlow4Orchestration",
+    "ops": "MicroFlow4Ops",
+    "bizops": "MicroFlow4Bizops",
+}
+CONSOLE_APPS = tuple(CONSOLE_APP_DIRS)
 
 
 def _console_index(app_name: str):
@@ -118,12 +126,12 @@ def _register_console_app(app_name: str):
     @app.get(f"/console/{app_name}/{{rest:path}}", include_in_schema=False)
     async def serve_console_app(rest: str, _app_name: str = app_name):
         if rest.startswith("assets/"):
-            asset = CONSOLE_ROOT / _app_name / "dist" / rest
+            asset = CONSOLE_ROOT / CONSOLE_APP_DIRS[_app_name] / "dist" / rest
             if asset.is_file():
                 return FileResponse(asset)
             return Response(status_code=404)
         return _console_index(_app_name) or HTMLResponse(
-            f"<h2>console/{_app_name} 未构建</h2>", status_code=404
+            f"<h2>console/{_app_name} 未构建（源码位于 MicroFlow 仓对应子项目）</h2>", status_code=404
         )
 
 
