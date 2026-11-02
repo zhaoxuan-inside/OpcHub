@@ -9,6 +9,7 @@ def ops_runs_list_adapter(p: Dict[str, Any] = None, c: Dict[str, Any] = None) ->
     return ops_run_service.list_runs(
         scenario_code=str(payload.get("scenario_code") or ""),
         status=str(payload.get("status") or ""),
+        env_key=str(payload.get("env_key") or ""),
         limit=int(payload.get("limit") or 100),
     )
 

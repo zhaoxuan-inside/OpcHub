@@ -49,3 +49,19 @@
 1. 场景执行入口（orchestration.scenarios.execute）保持 page:orchestrate 管理员把守 —— 项目成员经发布审批进入运行时（运行时隔离边界维持 M1.5 决策）；
 2. 漏斗为足迹去重口径（非严格时序归因），时序归因待 MicroFlow T14 控制面事件序号；
 3. 编排 SPA 构建体积 500KB+（@xyflow/react），待 manualChunks 分包优化。
+
+---
+
+## 补记（2026-11-03 · 环境维度：开发/测试/预上线/线上）
+
+用户指令：支持平台需要支持环境（开发/测试/预上线/线上）。
+
+| 能力 | 交付 |
+| --- | --- |
+| 环境底座 | `platform.environments`：每项目内置四环境（dev/test/staging/online，builtin 不可删，存量项目懒种子）；`platform.envs.list/update` 路由；scope.my 携带项目环境；网关 ctx 透传 `env_key`；切换器升级为 租户→项目→环境 三选 |
+| 保护级闸门 | staging/online 标记 protected：发布/灰度/回滚类变更要求项目所有者角色或平台超管（编辑者被拒），测试覆盖 编辑者拒/所有者放行/开发环境不受限 |
+| 配置中心 env 化 | 版本为全局工件、发布绑定环境：`stable_env[env]` + `gray_env[env]`（灰度参数按环境独立）；resolve 按环境确定性解析；遗留单稳定版数据 hydrate 自动迁移到默认桶；**两环境同键不同值真实生效**（测试覆盖） |
+| 实验 env 化 | experiment.env_key（空=全环境）；assign 在活动环境与实验环境不匹配时诚实返回 ENV_MISMATCH |
+| 运行记录 env | RunRecord.env_key 采集 + ops.runs.list 环境过滤 + 行内徽标 |
+
+验证：新增 pytest 5 例（四环境种子/按环境解析/保护级闸门/实验门控/运行过滤）；全量回归 686 passed，失败集 = 9 基线（mock 服务器系）+ 1 已知 cwd 浮动 hot_reload（单独跑通过，与本变更无关）；三 SPA 构建全绿。边界：编排目录版本机保持全局（运行时单拓扑），环境部署账本随 T14 控制面落地。

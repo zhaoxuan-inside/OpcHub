@@ -152,6 +152,7 @@ class ExperimentService:
             raise ValueError(f"实验标识已存在：{key}")
         variants = self._validate_variants(payload.get("variants") or [])
         traffic = self._validate_traffic(payload.get("traffic_percent", 100))
+        env_key = str(payload.get("env_key") or "").strip()[:32]
         domain_persistence.require(FAMILY_EXPERIMENTS)
         now = _now_iso()
         experiment = Experiment(
@@ -161,6 +162,7 @@ class ExperimentService:
             description=str(payload.get("description") or ""),
             variants=variants,
             traffic_percent=traffic,
+            env_key=env_key,
             project_id=ctx_project,
             created_by=actor,
             created_at=now,
@@ -180,6 +182,8 @@ class ExperimentService:
             experiment.description = str(payload["description"])
         if "traffic_percent" in payload:
             experiment.traffic_percent = self._validate_traffic(payload["traffic_percent"])
+        if "env_key" in payload:
+            experiment.env_key = str(payload.get("env_key") or "").strip()[:32]
         if "variants" in payload:
             new_variants = self._validate_variants(payload["variants"])
             if experiment.status == "RUNNING" and {v.key for v in new_variants} != {v.key for v in experiment.variants}:
@@ -235,6 +239,9 @@ class ExperimentService:
             return {"experiment_key": key, "variant": "", "in_experiment": False, "reason": "NOT_FOUND"}
         if experiment.status != "RUNNING":
             return {"experiment_key": key, "variant": "", "in_experiment": False, "reason": experiment.status}
+        ctx_env = str((context or {}).get("env_key") or "").strip()
+        if experiment.env_key and ctx_env and experiment.env_key != ctx_env:
+            return {"experiment_key": key, "variant": "", "in_experiment": False, "reason": "ENV_MISMATCH"}
         bucket = bucket_of(key, user_id)
         variant_key = pick_variant(bucket, experiment.variants, experiment.traffic_percent)
         if not variant_key:

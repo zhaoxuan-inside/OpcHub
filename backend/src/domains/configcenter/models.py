@@ -1,5 +1,5 @@
 """配置中心模型：命名空间 / 配置项 / 版本 / 灰度发布。"""
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -43,8 +43,9 @@ class ConfigItem(BaseModel):
     value_type: str = "JSON"  # JSON | TEXT
     description: str = ""
     versions: List[ConfigVersion] = []
-    stable_version: str = ""  # 当前稳定生效版本（resolve 的默认来源）
-    gray: Optional[GrayRelease] = None  # 灰度中的版本（未命中的用户取稳定版）
+    # 按环境的生效态：stable_env[env_key]=版本；"" 为遗留/无环境上下文的默认桶
+    stable_env: Dict[str, str] = {}
+    gray_env: Dict[str, GrayRelease] = {}
     project_id: str = ""
     created_by: str = ""
     created_at: str = ""

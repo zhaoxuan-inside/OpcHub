@@ -11,6 +11,7 @@ class RunRecord(BaseModel):
     execution_time_ms: float = 0.0
     user_id: str = ""
     project_id: str = ""  # 活动项目上下文（scope 路由才有）
+    env_key: str = ""  # 活动环境（dev/test/staging/online）
     started_at: str = ""
     error_type: str = ""
     error_message: str = ""

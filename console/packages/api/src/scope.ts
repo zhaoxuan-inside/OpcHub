@@ -9,9 +9,10 @@ const SCOPE_KEY = "opchub_console_scope";
 export interface ConsoleScope {
   tenantId: string;
   projectId: string;
+  envKey: string; // dev | test | staging | online（项目内置环境）
 }
 
-const EMPTY_SCOPE: ConsoleScope = { tenantId: "", projectId: "" };
+const EMPTY_SCOPE: ConsoleScope = { tenantId: "", projectId: "", envKey: "" };
 
 export function getScope(): ConsoleScope {
   try {
@@ -21,6 +22,7 @@ export function getScope(): ConsoleScope {
     return {
       tenantId: String(parsed.tenantId || ""),
       projectId: String(parsed.projectId || ""),
+      envKey: String(parsed.envKey || ""),
     };
   } catch {
     return { ...EMPTY_SCOPE };

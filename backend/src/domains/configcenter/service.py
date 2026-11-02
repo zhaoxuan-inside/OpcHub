@@ -40,16 +40,18 @@ def gray_bucket_of(namespace: str, item_key: str, user_id: str) -> int:
     return int.from_bytes(digest[:4], "big") % 10000
 
 
-def resolve_content(item: ConfigItem, user_id: str) -> Dict[str, Any]:
-    """确定性解析生效值：白名单/灰度桶 → 灰度内容；否则稳定版内容。"""
-    if item.gray and user_id:
-        in_whitelist = user_id in (item.gray.whitelist or [])
-        hit_bucket = gray_bucket_of(item.namespace, item.key, user_id) % 100 < item.gray.percent
+def resolve_content(item: ConfigItem, user_id: str, env: str = "") -> Dict[str, Any]:
+    """确定性解析生效值（按环境）：白名单/灰度桶 → 灰度内容；否则该环境稳定版。"""
+    gray = item.gray_env.get(env) or item.gray_env.get("")
+    if gray and user_id:
+        in_whitelist = user_id in (gray.whitelist or [])
+        hit_bucket = gray_bucket_of(item.namespace, item.key, user_id) % 100 < gray.percent
         if in_whitelist or hit_bucket:
-            return {"value": item.gray.content, "source": "GRAY", "version": item.gray.version}
-    if item.stable_version:
+            return {"value": gray.content, "source": "GRAY", "version": gray.version}
+    stable_version = item.stable_env.get(env) or item.stable_env.get("") or ""
+    if stable_version:
         for v in item.versions:
-            if v.version == item.stable_version:
+            if v.version == stable_version:
                 return {"value": v.content, "source": "STABLE", "version": v.version}
     return {"value": "", "source": "NOT_FOUND", "version": ""}
 
@@ -251,6 +253,8 @@ class ConfigCenterService:
 
     def publish_item_version(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         item = self._require_item(payload, context, write=True)
+        env = str(payload.get("env") or (context or {}).get("env_key") or "").strip()
+        self._guard_protected_env(context, item.project_id, env)
         version = str(payload.get("version") or "").strip()
         target = next((v for v in item.versions if v.version == version), None)
         if target is None:
@@ -264,8 +268,6 @@ class ConfigCenterService:
         whitelist = [str(u).strip() for u in (gray.get("whitelist") or []) if str(u).strip()]
         actor = self._actor(context)
         now = _now_iso()
-        # 旧 PUBLISHED 全部转 SUPERSEDED（稳定版内容保留在 stable_version 指针语义之外，
-        # 通过 versions 历史可回滚）
         for v in item.versions:
             if v.status == "PUBLISHED" and v.version != version:
                 v.status = "SUPERSEDED"
@@ -273,11 +275,11 @@ class ConfigCenterService:
         target.published_by = actor
         target.published_at = now
         if percent >= 100 and not whitelist:
-            # 全量发布：提升为稳定版并清除灰度
-            item.stable_version = version
-            item.gray = None
+            # 全量发布：提升为该环境稳定版并清除该环境灰度
+            item.stable_env[env] = version
+            item.gray_env.pop(env, None)
         else:
-            item.gray = GrayRelease(
+            item.gray_env[env] = GrayRelease(
                 version=version,
                 content=target.content,
                 percent=percent,
@@ -285,28 +287,34 @@ class ConfigCenterService:
                 published_by=actor,
                 published_at=now,
             )
-            # 首次灰度发布时若没有稳定版，先以旧稳定内容兜底：无旧稳定则同样版本兜底
-            if not item.stable_version:
-                item.stable_version = version
+            if env not in item.stable_env:
+                item.stable_env[env] = version
         item.updated_at = now
         domain_persistence.write(FAMILY_ITEMS, f"{item.namespace}:{item.key}", item)
         return item.model_dump()
 
     def rollback_item(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         item = self._require_item(payload, context, write=True)
+        env = str(payload.get("env") or (context or {}).get("env_key") or "").strip()
+        self._guard_protected_env(context, item.project_id, env)
         version = str(payload.get("version") or "").strip()
         target = next((v for v in item.versions if v.version == version and v.status in ("PUBLISHED", "SUPERSEDED")), None)
         if target is None:
             raise ValueError(f"仅可回滚到已发布过的版本（{version} 不是）")
-        item.stable_version = version
-        item.gray = None
+        item.stable_env[env] = version
+        item.gray_env.pop(env, None)
         item.updated_at = _now_iso()
         domain_persistence.write(FAMILY_ITEMS, f"{item.namespace}:{item.key}", item)
         return item.model_dump()
 
     def item_history(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         item = self._require_item(payload, context, write=False)
-        return {"versions": [v.model_dump() for v in reversed(item.versions)], "stable_version": item.stable_version}
+        env = str((context or {}).get("env_key") or payload.get("env") or "").strip()
+        return {
+            "versions": [v.model_dump() for v in reversed(item.versions)],
+            "stable_version": item.stable_env.get(env) or item.stable_env.get("") or "",
+            "gray": item.gray_env.get(env) or item.gray_env.get(""),
+        }
 
     # ------------------------------------------------------------------
     # 数据面读
@@ -324,6 +332,7 @@ class ConfigCenterService:
         return {"items": rows, "total": len(rows)}
 
     def resolve(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        env = str(payload.get("env") or (context or {}).get("env_key") or "").strip()
         # 主体解析：身份取登录态；代查（payload.user_id）仅限配置管理者或平台超管
         uid = str((context or {}).get("user_id") or "").strip()
         requested = str(payload.get("user_id") or "").strip()
@@ -350,12 +359,25 @@ class ConfigCenterService:
         item = self._items.get(f"{ns_key}:{key}")
         if item is None:
             # 宿主运行时不应因误配键而报错：诚实返回 NOT_FOUND
-            return {"namespace": ns_key, "key": key, "value": "", "source": "NOT_FOUND", "version": ""}
-        return {"namespace": ns_key, "key": key, **resolve_content(item, user_id)}
+            return {"namespace": ns_key, "key": key, "env": env, "value": "", "source": "NOT_FOUND", "version": ""}
+        return {"namespace": ns_key, "key": key, "env": env, **resolve_content(item, user_id, env)}
 
     # ------------------------------------------------------------------
     # internals
     # ------------------------------------------------------------------
+    def _guard_protected_env(self, context: Dict[str, Any], project_id: str, env: str) -> None:
+        """保护级环境闸门：staging/online 的发布/回滚要求项目所有者角色/超管。"""
+        if not env:
+            return
+        try:
+            from src.domains.platform.service import platform_service
+
+            platform_service.environment_context_ok(context, project_id)
+        except PermissionError:
+            raise
+        except Exception:
+            pass
+
     def _require_namespace(self, payload: Dict[str, Any], context: Dict[str, Any], write: bool) -> ConfigNamespace:
         key = str(payload.get("namespace") or payload.get("key") or "").strip()
         ns = self._namespaces.get(key)
@@ -417,6 +439,13 @@ class ConfigCenterService:
 
     def hydrate_items(self, rows: List[Dict[str, Any]]) -> int:
         for row in rows or []:
+            # 遗留数据迁移：单稳定版/灰度 → 默认环境桶（""）
+            if "stable_version" in row and not row.get("stable_env"):
+                row["stable_env"] = {"": row.get("stable_version") or ""}
+            if row.get("gray") and not row.get("gray_env"):
+                row["gray_env"] = {"": row["gray"]}
+            row.pop("stable_version", None)
+            row.pop("gray", None)
             try:
                 item = ConfigItem(**row)
             except Exception:

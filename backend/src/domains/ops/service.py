@@ -65,6 +65,7 @@ class OpsRunService:
             execution_time_ms=float(execution_time_ms or 0.0),
             user_id=str((context or {}).get("user_id") or ""),
             project_id=str((context or {}).get("project_id") or ""),
+            env_key=str((context or {}).get("env_key") or ""),
             started_at=_now_iso(),
             error_type=str(error_type or ""),
             error_message=str(final_output_error or "")[:500],
@@ -87,6 +88,7 @@ class OpsRunService:
         self,
         scenario_code: str = "",
         status: str = "",
+        env_key: str = "",
         limit: int = 100,
     ) -> Dict[str, Any]:
         rows = list(self._records.values())
@@ -94,6 +96,8 @@ class OpsRunService:
             rows = [r for r in rows if r.scenario_code == scenario_code]
         if status:
             rows = [r for r in rows if r.status == status]
+        if env_key:
+            rows = [r for r in rows if r.env_key == env_key]
         rows.sort(key=lambda r: r.started_at, reverse=True)
         rows = rows[: max(1, min(int(limit or 100), 500))]
         return {

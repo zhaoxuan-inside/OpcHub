@@ -395,7 +395,8 @@ function CreateExperimentModal({
   onCreated: (key: string) => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ key: "", name: "", description: "", traffic_percent: 100 });
+  const { activeEnvironments } = useScope();
+  const [form, setForm] = useState({ key: "", name: "", description: "", traffic_percent: 100, env_key: "" });
   const [variants, setVariants] = useState<Variant[]>([
     { key: "control", name: "对照组", weight: 1 },
     { key: "treatment", name: "实验组", weight: 1 },
@@ -483,6 +484,19 @@ function CreateExperimentModal({
         <Field label="流量门控（%）" hint="命中桶 %100 < 流量百分比的用户进入实验">
           <Input type="number" min={0} max={100} value={form.traffic_percent}
             onChange={(e) => setForm({ ...form, traffic_percent: Number(e.target.value) })} />
+        </Field>
+        <Field label="生效环境" hint="留空 = 全环境生效；指定环境后宿主仅在匹配环境分流">
+          <select
+            aria-label="选择生效环境"
+            className="h-9 rounded-md border border-input bg-card px-2.5 text-sm"
+            value={form.env_key}
+            onChange={(e) => setForm({ ...form, env_key: e.target.value })}
+          >
+            <option value="">全环境</option>
+            {activeEnvironments.map((env) => (
+              <option key={env.key} value={env.key}>{env.name}{env.protected ? " 🔒" : ""}</option>
+            ))}
+          </select>
         </Field>
       </div>
     </Modal>

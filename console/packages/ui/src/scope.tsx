@@ -40,8 +40,16 @@ interface MyScope {
     name: string;
     status: string;
     role: RoleSummary;
+    environments?: EnvironmentInfo[];
   }>;
   platform_roles: RoleSummary[];
+}
+
+interface EnvironmentInfo {
+  env_id: string;
+  key: string;
+  name: string;
+  protected: boolean;
 }
 
 interface ScopeContextValue {
@@ -50,8 +58,10 @@ interface ScopeContextValue {
   scope: ConsoleScope;
   activeTenant: MyScope["tenants"][number] | undefined;
   activeProject: MyScope["projects"][number] | undefined;
+  activeEnvironments: EnvironmentInfo[];
   selectTenant: (tenantId: string) => void;
   selectProject: (projectId: string) => void;
+  selectEnvironment: (envKey: string) => void;
   hasPermission: (permission: string) => boolean;
   refresh: () => void;
 }
@@ -86,7 +96,7 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
 
   const selectTenant = useCallback(
     (tenantId: string) => {
-      const next = { tenantId, projectId: "" };
+      const next = { tenantId, projectId: "", envKey: "" };
       persistScope(next);
       setLocalScope(next);
     },
@@ -96,11 +106,20 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
   const selectProject = useCallback(
     (projectId: string) => {
       const project = myScope?.projects.find((p) => p.project_id === projectId);
-      const next = { tenantId: project?.tenant_id || "", projectId };
+      const next = { tenantId: project?.tenant_id || "", projectId, envKey: "" };
       persistScope(next);
       setLocalScope(next);
     },
     [myScope],
+  );
+
+  const selectEnvironment = useCallback(
+    (envKey: string) => {
+      const next = { ...getScope(), envKey };
+      persistScope(next);
+      setLocalScope(next);
+    },
+    [],
   );
 
   const hasPermission = useCallback(
@@ -126,14 +145,17 @@ export function ScopeProvider({ children }: { children: ReactNode }) {
     q.refetch();
   }, [q]);
 
+  const activeEnvironments: EnvironmentInfo[] = activeProject?.environments || [];
   const value: ScopeContextValue = {
     myScope,
     loading: q.isPending,
-    scope: { tenantId: effectiveTenantId || "", projectId: activeProject?.project_id || "" },
+    scope: { tenantId: effectiveTenantId || "", projectId: activeProject?.project_id || "", envKey: scope.envKey },
     activeTenant,
     activeProject,
+    activeEnvironments,
     selectTenant,
     selectProject,
+    selectEnvironment,
     hasPermission,
     refresh,
   };
@@ -168,7 +190,7 @@ export function PermissionGate({
 
 /** 租户 → 项目级联切换器（支撑平台头部）。 */
 export function ScopeSwitcher({ className }: { className?: string }) {
-  const { myScope, activeTenant, activeProject, selectTenant, selectProject } = useScope();
+  const { myScope, activeTenant, activeProject, activeEnvironments, scope, selectTenant, selectProject, selectEnvironment } = useScope();
 
   if (!myScope) return null;
   const projects = myScope.projects.filter(
@@ -205,6 +227,21 @@ export function ScopeSwitcher({ className }: { className?: string }) {
             </option>
           ))}
         </select>
+        {activeProject && (
+          <select
+            aria-label="选择环境"
+            className="h-8 rounded-md border border-border bg-background px-2 text-xs"
+            value={scope.envKey}
+            onChange={(e) => selectEnvironment(e.target.value)}
+          >
+            <option value="">默认环境</option>
+            {activeEnvironments.map((env) => (
+              <option key={env.key} value={env.key}>
+                {env.name}{env.protected ? " 🔒" : ""}
+              </option>
+            ))}
+          </select>
+        )}
         {activeProject?.role?.name ? (
           <Badge tone="primary">{activeProject.role.name}</Badge>
         ) : activeTenant?.role?.name ? (

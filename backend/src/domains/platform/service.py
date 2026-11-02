@@ -32,7 +32,7 @@ from src.core.rbac import (
     has_permission,
     normalize_role,
 )
-from src.domains.platform.models import Project, Role, RoleBinding, ScopeKind, Tenant
+from src.domains.platform.models import Environment, Project, Role, RoleBinding, ScopeKind, Tenant
 from src.infrastructure.database.persistence import domain_persistence
 
 # domain_snapshots 文档族（启动 hydrate 重建内存索引）
@@ -40,6 +40,7 @@ FAMILY_TENANTS = "platform.tenants"
 FAMILY_PROJECTS = "platform.projects"
 FAMILY_ROLES = "platform.roles"
 FAMILY_BINDINGS = "platform.role_bindings"
+FAMILY_ENVIRONMENTS = "platform.environments"
 
 TENANT_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
 PROJECT_KEY_PATTERN = re.compile(r"^[a-z][a-z0-9-]{1,31}$")
@@ -47,6 +48,12 @@ ROLE_CODE_PATTERN = re.compile(r"^[a-z][a-z0-9_]{1,47}$")
 
 BUILTIN_ADMIN_UID = "usr_admin_builtin"
 LEGACY_ROLES = ("ADMIN", "MAKER", "GUEST")
+BUILTIN_ENVIRONMENTS = (
+    ("dev", "开发", False),
+    ("test", "测试", False),
+    ("staging", "预上线", True),
+    ("online", "线上", True),
+)
 MIN_PASSWORD_LENGTH = 8
 
 # 内置角色（id 稳定，供绑定引用；builtin=True 不可删除）
@@ -146,6 +153,7 @@ class PlatformService:
     """租户 / 项目 / 角色 / 绑定注册表 + 授权判定（内存索引为运行时读路径）。"""
 
     def __init__(self) -> None:
+        self._environments: Dict[str, Environment] = {}  # key: f"{project_id}:{env_key}"
         self._tenants: Dict[str, Tenant] = {}
         self._projects: Dict[str, Project] = {}
         self._roles: Dict[str, Role] = {}
@@ -506,9 +514,29 @@ class PlatformService:
         )
         self._projects[project.project_id] = project
         domain_persistence.write(FAMILY_PROJECTS, project.project_id, project)
+        self._ensure_environments(project.project_id)
         # 创建人自动成为项目所有者
         self._grant_binding(actor, ROLE_PROJECT_OWNER, ScopeKind.PROJECT, granted_by=actor, project_id=project.project_id)
         return project.model_dump()
+
+    def _ensure_environments(self, project_id: str) -> None:
+        """项目内置四环境幂等种子（存量项目经 envs.list 懒种子）。"""
+        now = _now_iso()
+        for key, name, protected in BUILTIN_ENVIRONMENTS:
+            composite = f"{project_id}:{key}"
+            if composite in self._environments:
+                continue
+            env = Environment(
+                env_id=_new_id("env"),
+                project_id=project_id,
+                key=key,
+                name=name,
+                protected=protected,
+                created_at=now,
+                updated_at=now,
+            )
+            self._environments[composite] = env
+            domain_persistence.write(FAMILY_ENVIRONMENTS, composite, env)
 
     def update_project(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
         project = self._require_project(payload, context)
@@ -806,6 +834,78 @@ class PlatformService:
         return cleaned
 
     # ------------------------------------------------------------------
+    # 环境（项目内 dev/test/staging/online）
+    # ------------------------------------------------------------------
+    def list_environments(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        project_id = str(payload.get("project_id") or "").strip()
+        project = self._projects.get(project_id)
+        if project is None:
+            raise KeyError("项目不存在")
+        uid = self._actor(context)
+        visible = (
+            has_permission(normalize_role((context or {}).get("user_role", "")), P_PLATFORM_TENANT_MANAGE)
+            or project.project_id in {
+                b.project_id for b in self._bindings.values()
+                if b.user_id == uid and b.scope == ScopeKind.PROJECT and b.status == "ACTIVE"
+            }
+            or any(
+                b.tenant_id == project.tenant_id
+                for b in self._bindings.values()
+                if b.user_id == uid and b.scope == ScopeKind.TENANT and b.status == "ACTIVE"
+            )
+        )
+        if not visible:
+            raise KeyError("项目不存在")
+        self._ensure_environments(project_id)  # 存量项目懒种子
+        rows = [e.model_dump() for e in self._environments.values() if e.project_id == project_id]
+        rows.sort(key=lambda r: r["created_at"])
+        return {"environments": rows, "total": len(rows)}
+
+    def update_environment(self, payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+        project_id = str(payload.get("project_id") or "").strip()
+        composite = f"{project_id}:{payload.get('env_key', '')}"
+        env = self._environments.get(composite)
+        if env is None:
+            raise KeyError("环境不存在")
+        uid = self._actor(context)
+        role = normalize_role((context or {}).get("user_role", ""))
+        if not has_permission(role, "project:manage") and not self.has_scoped_permission(
+            uid, "project:manage", project_id=project_id
+        ):
+            raise PermissionError("权限不足：仅项目所有者可调整环境")
+        if payload.get("name"):
+            env.name = str(payload["name"])
+        if "description" in payload:
+            env.description = str(payload.get("description") or "")
+        env.updated_at = _now_iso()
+        domain_persistence.write(FAMILY_ENVIRONMENTS, composite, env)
+        return env.model_dump()
+
+    def environment_context_ok(self, context: Dict[str, Any], project_id: str) -> Optional[Environment]:
+        """保护级环境闸门：活动环境属保护级时，变更类操作要求所有者角色/超管。"""
+        env_key = str((context or {}).get("env_key") or "").strip()
+        if not env_key:
+            return None
+        env = self._environments.get(f"{project_id}:{env_key}")
+        if env is None or not env.protected:
+            return env
+        if normalize_role((context or {}).get("user_role", "")) == "ADMIN":
+            return env
+        uid = str((context or {}).get("user_id") or "")
+        is_owner = any(
+            b.user_id == uid and b.scope == ScopeKind.PROJECT and b.project_id == project_id
+            and b.role_id == ROLE_PROJECT_OWNER and b.status == "ACTIVE"
+            for b in self._bindings.values()
+        )
+        if is_owner or self.is_platform_super(uid):
+            return env
+        raise PermissionError(f"环境 {env.name} 为保护级：发布/变更需要项目所有者角色")
+
+    def environments_for_project(self, project_id: str) -> List[Dict[str, Any]]:
+        self._ensure_environments(project_id)
+        return [e.model_dump() for e in self._environments.values() if e.project_id == project_id]
+
+    # ------------------------------------------------------------------
     # 我的 scope（驱动前端租户/项目切换器）
     # ------------------------------------------------------------------
     def my_scope(self, context: Dict[str, Any]) -> Dict[str, Any]:
@@ -850,6 +950,7 @@ class PlatformService:
                     "name": p.name,
                     "status": p.status,
                     "role": _role_summary(self._project_role_id(uid, p.project_id)),
+                    "environments": self.environments_for_project(p.project_id),
                 }
             )
         platform_roles = [_role_summary(b.role_id) for b in self._bindings.values() if b.user_id == uid and b.scope == ScopeKind.PLATFORM and b.status == "ACTIVE"]
@@ -994,6 +1095,15 @@ class PlatformService:
             self._roles.setdefault(role.role_id, role)
         return len(rows)
 
+    def hydrate_environments(self, rows: List[Dict[str, Any]]) -> int:
+        for row in rows or []:
+            try:
+                env = Environment(**row)
+            except Exception:
+                continue
+            self._environments[f"{env.project_id}:{env.key}"] = env
+        return len(rows or [])
+
     def hydrate_bindings(self, rows: List[Dict[str, Any]]) -> int:
         for row in rows:
             binding = RoleBinding(**row)
@@ -1007,6 +1117,7 @@ domain_persistence.register(FAMILY_TENANTS, platform_service.hydrate_tenants)
 domain_persistence.register(FAMILY_PROJECTS, platform_service.hydrate_projects)
 domain_persistence.register(FAMILY_ROLES, platform_service.hydrate_roles)
 domain_persistence.register(FAMILY_BINDINGS, platform_service.hydrate_bindings)
+domain_persistence.register(FAMILY_ENVIRONMENTS, platform_service.hydrate_environments)
 
 
 # ----------------------------------------------------------------------

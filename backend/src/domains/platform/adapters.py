@@ -146,6 +146,14 @@ def platform_project_member_remove_adapter(payload: Dict[str, Any], context: Dic
     return platform_service.remove_project_member(payload or {}, context)
 
 
+def platform_env_list_adapter(payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    return platform_service.list_environments(payload or {}, context)
+
+
+def platform_env_update_adapter(payload: Dict[str, Any], context: Dict[str, Any]) -> Dict[str, Any]:
+    return platform_service.update_environment(payload or {}, context)
+
+
 # ---------------------------------------------------------------------------
 # 角色与权限点（可配置 RBAC）
 # ---------------------------------------------------------------------------

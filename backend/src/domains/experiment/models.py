@@ -18,6 +18,7 @@ class Experiment(BaseModel):
     status: str = "DRAFT"  # DRAFT | RUNNING | STOPPED | ARCHIVED
     variants: List[Variant] = []
     traffic_percent: int = 100  # 0-100，命中桶 %100 < traffic_percent 进入实验
+    env_key: str = ""  # 生效环境（空 = 全环境；宿主按活动环境分流）
     project_id: str = ""  # 归属项目（项目域隔离，与编排目录同构）
     created_by: str = ""
     created_at: str = ""

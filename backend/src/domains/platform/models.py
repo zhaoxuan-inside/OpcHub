@@ -66,3 +66,20 @@ class RoleBinding(BaseModel):
     status: str = "ACTIVE"  # ACTIVE | DISABLED
     granted_by: str = ""
     granted_at: str = ""
+
+
+class Environment(BaseModel):
+    """项目内执行环境：每项目内置 dev/test/staging/prod 四环境（builtin 不可删）。
+
+    staging/online 为保护级：发布/灰度/回滚类变更要求项目所有者角色（编辑者
+    不足以变更线上），owner/平台超管直通。
+    """
+    env_id: str  # env_
+    project_id: str
+    key: str  # dev | test | staging | online（内置四键）
+    name: str
+    description: str = ""
+    protected: bool = False
+    builtin: bool = True
+    created_at: str = ""
+    updated_at: str = ""

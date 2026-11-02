@@ -539,7 +539,7 @@ class ScenarioRouter:
 
         # 3. Context Injection & Deprecation Inspection
         ctx = dict(req.context)
-        for scope_key in ("tenant_id", "project_id"):
+        for scope_key in ("tenant_id", "project_id", "env_key"):
             scope_val = (req.context or {}).get(scope_key) or (req.payload or {}).get(scope_key)
             if scope_val:
                 ctx[scope_key] = str(scope_val)

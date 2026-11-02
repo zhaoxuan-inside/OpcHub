@@ -24,6 +24,7 @@ interface RunRow {
   status: string;
   execution_time_ms: number;
   user_id: string;
+  env_key?: string;
   started_at: string;
   error_message: string;
   node_count: number;
@@ -42,14 +43,16 @@ const statusTone: Record<string, "success" | "warning" | "destructive" | "neutra
 export function RunsPage() {
   const [scenario, setScenario] = useState("");
   const [status, setStatus] = useState("");
+  const [envKey, setEnvKey] = useState("");
   const [selected, setSelected] = useState("");
 
   const list = useQuery({
-    queryKey: ["ops", "runs", scenario, status],
+    queryKey: ["ops", "runs", scenario, status, envKey],
     queryFn: () =>
       dispatch<{ runs: RunRow[]; total: number }>("ops.runs.list", {
         scenario_code: scenario || undefined,
         status: status || undefined,
+        env_key: envKey || undefined,
         limit: 200,
       }),
   });
@@ -83,6 +86,15 @@ export function RunsPage() {
                 <option value="GUARD_REJECTED">GUARD_REJECTED</option>
               </Select>
             </Field>
+            <Field label="环境">
+              <Select className="h-8 w-32 text-xs" value={envKey} onChange={(e) => setEnvKey(e.target.value)}>
+                <option value="">全部</option>
+                <option value="dev">开发</option>
+                <option value="test">测试</option>
+                <option value="staging">预上线</option>
+                <option value="online">线上</option>
+              </Select>
+            </Field>
           </CardContent>
         </Card>
 
@@ -108,7 +120,10 @@ export function RunsPage() {
                 {rows.map((r) => (
                   <tr key={r.trace_id} className="border-b border-border/60 last:border-0 hover:bg-accent/40">
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">{r.started_at?.slice(11, 19)}</td>
-                    <td className="px-4 py-2.5 text-xs font-medium">{r.scenario_code}</td>
+                    <td className="px-4 py-2.5 text-xs font-medium">
+                      {r.scenario_code}
+                      {r.env_key ? <Badge className="ml-1">{r.env_key}</Badge> : null}
+                    </td>
                     <td className="px-4 py-2.5"><Badge tone={statusTone[r.status] || "neutral"}>{r.status}</Badge></td>
                     <td className="px-4 py-2.5 text-xs">{r.execution_time_ms}ms</td>
                     <td className="px-4 py-2.5 text-xs text-muted-foreground">

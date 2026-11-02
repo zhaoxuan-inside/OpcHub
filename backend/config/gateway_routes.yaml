@@ -1714,3 +1714,20 @@ gateway:
       is_default: true
       handler: "src.domains.bizops.adapters:bizops_retention_adapter"
       required_permission: "page:bizops_console"
+
+    # --------------------------------------------------------------------------
+    # 19. Environments 项目执行环境（dev/test/staging/online；保护级闸门在服务层）
+    # --------------------------------------------------------------------------
+    - scenario: "platform.envs.list"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "项目环境清单（内置四环境；存量项目懒种子）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_env_list_adapter"
+
+    - scenario: "platform.envs.update"
+      version: "v1.0.0"
+      domain: "platform"
+      description: "调整环境名称/描述（仅项目所有者）"
+      is_default: true
+      handler: "src.domains.platform.adapters:platform_env_update_adapter"

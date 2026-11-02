@@ -41,6 +41,7 @@ export async function dispatch<T = any>(
   // 活动租户/项目上下文：网关 scope 隔离授权与目录过滤都依赖它
   if (scope.tenantId) context.tenant_id = scope.tenantId;
   if (scope.projectId) context.project_id = scope.projectId;
+  if (scope.envKey) context.env_key = scope.envKey;
   const res = await fetch("/api/welcom/opc_world", {
     method: "POST",
     headers: {

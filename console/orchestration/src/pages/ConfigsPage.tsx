@@ -373,8 +373,10 @@ function EditDraftModal({ item, onClose }: { item: ConfigItem; onClose: () => vo
 
 function PublishModal({ item, canWrite, onClose }: { item: ConfigItem; canWrite: boolean; onClose: () => void }) {
   const { toast } = useToast();
+  const { activeEnvironments } = useScope();
   const draft = [...item.versions].reverse().find((v) => v.status === "DRAFT");
-  const [version, setVersion] = useState(draft?.version ?? item.stable_version);
+  const [version, setVersion] = useState(draft?.version ?? "");
+  const [env, setEnv] = useState("");
   const [percent, setPercent] = useState(100);
   const [whitelist, setWhitelist] = useState("");
   const [busy, setBusy] = useState(false);
@@ -393,6 +395,7 @@ function PublishModal({ item, canWrite, onClose }: { item: ConfigItem; canWrite:
                 action: "items.publish",
                 payload: {
                   namespace: item.namespace, key: item.key, version,
+                  env: env || undefined,
                   gray: { percent, whitelist: whitelist.split(/[\s,]+/).filter(Boolean) },
                 },
               });
@@ -406,6 +409,14 @@ function PublishModal({ item, canWrite, onClose }: { item: ConfigItem; canWrite:
       }
     >
       <div className="grid gap-3">
+        <Field label="发布环境" hint="预上线/线上为保护级：仅项目所有者可发布">
+          <Select value={env} onChange={(e) => setEnv(e.target.value)}>
+            <option value="">默认（遗留/无环境上下文）</option>
+            {activeEnvironments.map((env) => (
+              <option key={env.key} value={env.key}>{env.name}{env.protected ? " 🔒" : ""}</option>
+            ))}
+          </Select>
+        </Field>
         <Field label="版本">
           <Select value={version} onChange={(e) => setVersion(e.target.value)}>
             {[...item.versions].reverse().filter((v) => v.status !== "SUPERSEDED").map((v) => (
