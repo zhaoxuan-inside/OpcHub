@@ -1,6 +1,6 @@
 <template>
   <div class="view-panel active home-view">
-    <HomeAnnouncementBar @explore="handleExploreAction" />
+    <HomeAnnouncementBar @explore="$emit('switch-tab', 'perks')" />
 
     <HomeHeroSection
       :user-session="userSession"
@@ -15,12 +15,12 @@
       :hot-policies="hotPolicies"
       :hot-demands="hotDemands"
       :sop-templates="sopTemplates"
-      @card-click="handleCardClick"
+      @card-click="$emit('switch-tab', $event)"
     />
 
     <HomeExhibitionFeed
       :items="exhibitionData"
-      @exhibit-click="handleExhibitClick"
+      @exhibit-click="$emit('switch-tab', $event.targetTab)"
     />
 
     <HomeJourneySection />
@@ -32,7 +32,7 @@
       @switch-tab="(tab) => $emit('switch-tab', tab)"
     />
 
-    <HomeSiteFooter @footer-nav="handleFooterNav" />
+    <HomeSiteFooter @footer-nav="$emit('switch-tab', $event)" />
   </div>
 </template>
 
@@ -58,7 +58,6 @@ const emit = defineEmits([
   'open-login',
   'open-register',
   'switch-tab',
-  'toast',
 ]);
 
 const homeOverview = ref(null);
@@ -206,44 +205,6 @@ const exhibitionData = computed(() => {
 
   return [...dynamicProdList, ...dynamicPolicyList, ...dynamicForumList, ...dynamicPerkList];
 });
-
-function handleExploreAction(tab) {
-  if (!props.userSession) {
-    emit('open-login');
-  } else {
-    emit('switch-tab', tab);
-  }
-}
-
-function handleCardClick(tab) {
-  if (!props.userSession) {
-    emit('toast', {
-      title: '创客工作台权限提示',
-      message: '当前板块需登录后使用。请登录或免费入驻成为平台认证创客。',
-      type: 'INFO',
-    });
-    emit('open-login');
-  } else {
-    emit('switch-tab', tab);
-  }
-}
-
-function handleExhibitClick(item) {
-  if (!props.userSession) {
-    emit('toast', {
-      title: '欢迎体验「晨昏线外」',
-      message: `【${item.title}】的完整详情与交互能力仅对认证创客开放，请先登录或入驻。`,
-      type: 'INFO',
-    });
-    emit('open-login');
-  } else {
-    emit('switch-tab', item.targetTab);
-  }
-}
-
-function handleFooterNav(tab) {
-  handleCardClick(tab);
-}
 
 onMounted(() => {
   loadHomeOverview();

@@ -332,7 +332,7 @@ const currentUserId = computed(() => {
 });
 
 const currentUserRole = computed(() => {
-  return (props.userSession?.role || props.userSession?.user?.role || localStorage.getItem('opchub_current_role') || 'MAKER').toUpperCase();
+  return (props.userSession?.role || props.userSession?.user?.role || 'MAKER').toUpperCase();
 });
 
 const canDelete = computed(() => {

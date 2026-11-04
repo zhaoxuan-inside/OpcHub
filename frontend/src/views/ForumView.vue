@@ -17,7 +17,7 @@
       @back="handleBackToList"
       @vote="handleThreadVote"
       @interaction="handleCardInteraction"
-      @require-login="$emit('open-register')"
+      @require-login="$emit('open-login')"
       @update-post="handlePostUpdated"
       @delete="handleDeletePost"
       @toast="$emit('toast', $event)"
@@ -146,7 +146,7 @@
                 @vote="handleThreadVote"
                 @interaction="handleCardInteraction"
                 @delete="handleDeletePost"
-                @require-login="$emit('open-register')"
+                @require-login="$emit('open-login')"
                 @toast="$emit('toast', $event)"
               />
             </div>
@@ -354,7 +354,7 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(['open-register', 'toast']);
+const emit = defineEmits(['open-login', 'toast']);
 
 const route = useRoute();
 const router = useRouter();
@@ -1153,17 +1153,10 @@ async function confirmExecuteDelete() {
 
 // Open Full-Page Create View (非弹窗全页面)
 function handleOpenCreatePage() {
-  const token = localStorage.getItem('opchub_session_token');
-  if (!token) {
-    emit('toast', {
-      title: '需要登录',
-      message: '请先登录创客账号后再在风暴区发帖交流！',
-      type: 'INFO',
-    });
-    emit('open-register');
+  if (!currentUserSession.value) {
+    emit('open-login');
     return;
   }
-  currentViewMode.value = 'create';
   router.push({ name: 'forum', query: { ...route.query, compose: '1' } });
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }

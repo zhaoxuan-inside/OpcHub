@@ -16,11 +16,11 @@
         <span class="brand-tag">{{ currentRole === 'ADMIN' ? 'ADMIN' : 'Beyond the Line' }}</span>
       </div>
 
-      <!-- 2. Middle Scrollable Nav Tabs Wrapper (Displayed ONLY after login) -->
-      <div v-if="userSession" class="nav-tabs-wrapper">
+      <!-- 2. Public module tabs and administrator workspace tabs -->
+      <div class="nav-tabs-wrapper">
         <nav class="nav-tabs" id="mainNavTabs">
           <!-- Maker / User Tabs -->
-          <template v-if="currentRole !== 'ADMIN'">
+          <template v-if="!userSession || currentRole !== 'ADMIN'">
             <button
               class="nav-tab-btn"
               :class="{ active: activeTab === 'home' }"
@@ -336,6 +336,8 @@ function handleUserClick() {
 }
 
 @media (max-width: 720px) {
+  .brand-tag,
+  .brand-island-divider,
   .nav-command-label,
   .nav-command-kbd {
     display: none;

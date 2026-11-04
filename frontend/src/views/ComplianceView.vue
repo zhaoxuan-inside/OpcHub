@@ -415,6 +415,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
+import { authState } from '@/stores/auth';
 import OfficialBadge from '@/components/OfficialBadge.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import PublishForm from '@/components/PublishForm.vue';
@@ -433,16 +434,6 @@ const emit = defineEmits(['toast', 'open-login']);
 
 const route = useRoute();
 const router = useRouter();
-
-// 当前登录会话（页面未接收 userSession prop，与 SopView 同样从本地存储读取）
-function safeSession() {
-  try {
-    const raw = localStorage.getItem('opchub_user_session');
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
-}
 
 // ---- Knowledge base (from PostgreSQL via gateway) ----
 const laws = ref([]);
@@ -730,6 +721,10 @@ function closeDetail() {
 // ---- Publish (内联视图模式，同论坛"发起新风暴话题") ----
 // currentViewMode: 'list' | 'create'
 function openPublishModal() {
+  if (!authState.user) {
+    emit('open-login');
+    return;
+  }
   publishForm.value = {
     kind: 'law',
     title: '',
@@ -768,7 +763,7 @@ function closePublishModal() {
 }
 
 async function submitPublish() {
-  if (!safeSession()) {
+  if (!authState.user) {
     emit('open-login');
     emit('toast', {
       title: '需要登录',

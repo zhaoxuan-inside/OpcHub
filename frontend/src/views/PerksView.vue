@@ -904,6 +904,10 @@ const publishForm = ref({
 });
 
 function openPublishPage() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   publishForm.value = {
     name: '',
     provider: '',

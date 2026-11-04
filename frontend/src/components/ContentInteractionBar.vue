@@ -382,6 +382,7 @@ function toNum(value) {
 }
 
 function requireLogin() {
+  drawerVisible.value = false;
   emit('require-login');
 }
 

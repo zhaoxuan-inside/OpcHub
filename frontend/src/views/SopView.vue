@@ -756,6 +756,7 @@
 import { ref, computed, reactive, watch, onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
+import { authState } from '@/stores/auth';
 import { enrichInteractions } from '@/utils/contentInteractions';
 import SopDocumentCard from '@/components/sop/SopDocumentCard.vue';
 import SopFlowBuilder from '@/components/sop/SopFlowBuilder.vue';
@@ -773,7 +774,7 @@ const emit = defineEmits(['toast', 'open-login']);
 const route = useRoute();
 const router = useRouter();
 
-const currentUserSession = computed(() => safeSession());
+const currentUserSession = computed(() => authState.user);
 
 const viewModes = [
   { key: 'workbench', label: '标准文书', desc: '官方标准文书库' },
@@ -882,6 +883,10 @@ function syncSopListQuery(patch = {}) {
 }
 
 function selectViewMode(mode) {
+  if (!currentUserSession.value && ['mydocs', 'flows'].includes(mode)) {
+    emit('open-login');
+    return;
+  }
   viewMode.value = mode;
   syncSopListQuery({ view: mode === 'workbench' ? undefined : mode });
 }
@@ -896,7 +901,7 @@ async function applyRouteState() {
       viewMode.value = String(route.query.view);
     }
 
-    if (route.name === 'sop-docs') {
+    if (route.name === 'sop-docs' && route.params.id) {
       const id = String(route.params.id || '');
       if (!nodes.value.length) await loadGraph();
       const node = nodes.value.find((item) => String(item.id) === id);
@@ -909,13 +914,13 @@ async function applyRouteState() {
       return;
     }
 
-    if (route.name === 'sop-flows') {
+    if (route.name === 'sop-flows' && route.params.id) {
       const id = String(route.params.id || '');
       await handleOpenFlow({ id }, { updateUrl: false });
       return;
     }
 
-    if (route.name === 'sop-my-docs') {
+    if (route.name === 'sop-my-doc') {
       const id = String(route.params.id || '');
       viewMode.value = 'mydocs';
       if (!myDocuments.value.length) await loadMyDocuments();
@@ -928,7 +933,7 @@ async function applyRouteState() {
       return;
     }
 
-    if (route.name === 'sop-my-flows') {
+    if (route.name === 'sop-my-flow') {
       const id = String(route.params.id || '');
       viewMode.value = 'flows';
       if (!myFlows.value.length) await loadMyFlows();
@@ -953,9 +958,10 @@ async function applyRouteState() {
       return;
     }
 
+    const defaultView = route.name === 'sop-flows' ? 'guide' : 'workbench';
     const view = ['workbench', 'guide', 'mydocs', 'flows'].includes(route.query.view)
       ? String(route.query.view)
-      : 'workbench';
+      : defaultView;
     viewMode.value = view;
     resetDetailState();
   } finally {
@@ -1209,7 +1215,7 @@ async function loadGraph() {
  * gateway scenario — the workbench never renders hardcoded frontend records.
  */
 async function loadDocumentCatalog() {
-  const session = safeSession();
+  const session = authState.user;
   try {
     const res = await dispatchGateway(
       'sop.documents',
@@ -1239,7 +1245,7 @@ function handleOpenDocument(doc) {
  */
 async function loadFlowCatalog() {
   flowLoading.value = true;
-  const session = safeSession();
+  const session = authState.user;
   try {
     const res = await dispatchGateway(
       'sop.flow.templates',
@@ -1338,8 +1344,9 @@ function handleOpenNode(payload) {
 // My documents (我的文书)
 // ---------------------------------------------------------------------------
 async function loadMyDocuments() {
+  const session = authState.user;
+  if (!session) return;
   myDocumentsLoading.value = true;
-  const session = safeSession();
   try {
     const res = await dispatchGateway(
       'sop.document.list',
@@ -1434,8 +1441,9 @@ function templateNameOf(templateId) {
  * Load the maker's own flows as cards (same idiom as the platform flow catalog).
  */
 async function loadMyFlows() {
+  const session = authState.user;
+  if (!session) return;
   myFlowsLoading.value = true;
-  const session = safeSession();
   try {
     const res = await dispatchGateway(
       'sop.myflow.cards',
@@ -1531,6 +1539,10 @@ async function handleDeleteMyFlowFromPage(flow) {
  * never navigates to another mode tab — it replaces the workspace in place.
  */
 function openFlowBuilder(flow = null, returnMode = null, options = {}) {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   // Guard against a DOM event being passed in as the flow argument.
   const target = flow && typeof flow === 'object' && !flow.type ? flow : null;
   if (target) {
@@ -1784,6 +1796,10 @@ function openDocByCategory(category) {
 
 /** Open the template picker so the maker can start a brand new document. */
 function openDocFromCatalog() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   docReturnMode.value = 'workspace';
   docCreationMode.value = true;
   docDraftDoc.value = null;
@@ -1820,15 +1836,6 @@ function handleEditMyDocument(doc) {
   docPageChildren.value = [];
   currentViewMode.value = 'doc';
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-function safeSession() {
-  try {
-    const raw = localStorage.getItem('opchub_user_session');
-    return raw ? JSON.parse(raw) : null;
-  } catch (e) {
-    return null;
-  }
 }
 
 function handleSearch() {

@@ -526,6 +526,7 @@
 import { ref, computed, reactive, watch, onMounted, onUnmounted, nextTick } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { dispatchGateway } from '@/api/gateway';
+import { authState } from '@/stores/auth';
 import ContentInteractionBar from '@/components/ContentInteractionBar.vue';
 import ContentDisclaimer from '@/components/ContentDisclaimer.vue';
 import HoverRevealText from '@/components/HoverRevealText.vue';
@@ -547,13 +548,7 @@ function handleInteractionChanged(item, payload) {
 }
 
 // Current User Session
-const currentUserSession = computed(() => {
-  try {
-    const raw = localStorage.getItem('opchub_user_session');
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return null;
-});
+const currentUserSession = computed(() => authState.user);
 
 // Paged & Infinite Scrolling States
 const displayDemands = ref([]);

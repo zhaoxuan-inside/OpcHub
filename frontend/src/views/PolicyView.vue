@@ -942,6 +942,10 @@ async function handleManualRefresh() {
 
 // Tax Calculation
 async function calculateTax() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   const inc = Number(quarterlyIncome.value) || 0;
   try {
     // `policies.match` is the registered gateway scenario running the tax + subsidy pipeline.
@@ -968,6 +972,10 @@ async function calculateTax() {
 
 // Eligibility Match → guided 30-second wizard instead of a one-shot toast.
 function matchEligibility(p) {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   eligibilityPolicy.value = p || null;
   showEligibility.value = true;
 }
@@ -982,12 +990,16 @@ function handleWizardPolicy(item) {
 
 // Quick AI Summarize
 async function quickAiSummarize(p) {
-  openPolicyDetail(p);
+  if (currentUserSession.value) openPolicyDetail(p);
   await summarizePolicyWithAI(p);
 }
 
 // AI Summarization
 async function summarizePolicyWithAI(p) {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   if (!p) return;
   isAiSummarizing.value = true;
   aiSummaryResult.value = null;
@@ -1043,6 +1055,10 @@ function closePolicyDetail() {
 
 // Publish surface: /policies?compose=1
 function openPublishPage() {
+  if (!currentUserSession.value) {
+    emit('open-login');
+    return;
+  }
   publishForm.value = {
     title: '',
     code: '',

@@ -159,7 +159,7 @@ const route = useRoute();
 const router = useRouter();
 
 const userSession = computed(() => authState.user);
-const currentRole = computed(() => authState.role);
+const currentRole = computed(() => userSession.value ? authState.role : 'MAKER');
 const activeTab = computed(() => tabForRoute(route));
 
 const isDark = ref(false);
@@ -259,15 +259,6 @@ watch(
 );
 
 function handleSwitchTab(tab) {
-  if (!isAuthenticated.value && tab !== 'home') {
-    showToast({
-      title: '需登录创客账号',
-      message: '未登录用户仅限浏览平台宣传首页。请登录或入驻后进入创客工作台。',
-      type: 'INFO',
-    });
-    showLoginModal.value = true;
-    return;
-  }
   const path = pathForTab(tab);
   rememberTab(tab);
   if (route.path === path) {

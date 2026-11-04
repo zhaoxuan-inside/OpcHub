@@ -211,7 +211,7 @@
             <section class="sop-doc-form-pane">
               <div class="sop-doc-pane-label">
                 待填要素
-                <span v-if="fieldSteps.length > 1" class="sop-wizard-progress-label">
+                <span v-if="authenticated && fieldSteps.length > 1" class="sop-wizard-progress-label">
                   {{ isReviewStep ? '检查答案' : `第 ${currentStep + 1} / ${fieldSteps.length} 步` }}
                 </span>
               </div>
@@ -229,7 +229,7 @@
               />
 
               <!-- Guided interview: one small group of fields at a time. -->
-              <div v-if="fieldSteps.length > 1" class="sop-wizard">
+              <div v-if="authenticated && fieldSteps.length > 1" class="sop-wizard">
                 <div class="sop-wizard-track">
                   <span class="sop-wizard-track-fill" :style="{ width: `${wizardProgress}%` }"></span>
                 </div>
@@ -257,7 +257,11 @@
                 </div>
               </div>
 
-              <div v-if="!isReviewStep" class="sop-doc-fields">
+              <button v-if="!authenticated" type="button" class="btn-liquid-outline" @click="$emit('require-login')">
+                登录后填写文书
+              </button>
+
+              <div v-else-if="!isReviewStep" class="sop-doc-fields">
                 <SopFieldForm
                   v-for="field in currentFields"
                   :key="field.key"
@@ -285,7 +289,7 @@
                 </div>
               </div>
 
-              <div v-if="fieldSteps.length > 1" class="sop-wizard-actions">
+              <div v-if="authenticated && fieldSteps.length > 1" class="sop-wizard-actions">
                 <button
                   type="button"
                   class="btn-liquid-outline sop-wizard-btn"
@@ -667,7 +671,7 @@ function prevStep() {
 }
 
 function persistLocalDraft() {
-  if (draftRestoring.value || isEditorMode.value || !props.node?.id) return;
+  if (!props.authenticated || draftRestoring.value || isEditorMode.value || !props.node?.id) return;
   try {
     const payload = { data: { ...formData }, step: currentStep.value, at: Date.now() };
     localStorage.setItem(draftKey(), JSON.stringify(payload));
@@ -679,7 +683,7 @@ function persistLocalDraft() {
 
 function restoreLocalDraft() {
   wizardSavedHint.value = '';
-  if (!props.node?.id) return;
+  if (!props.authenticated || !props.node?.id) return;
   try {
     const raw = localStorage.getItem(draftKey());
     if (!raw) return;
@@ -700,7 +704,7 @@ function restoreLocalDraft() {
 
 // Reset the form whenever a different document is opened.
 watch(
-  () => props.node?.id,
+  () => [props.node?.id, props.authenticated],
   () => {
     for (const key of Object.keys(formData)) {
       delete formData[key];
@@ -929,6 +933,10 @@ async function saveDocument() {
  * PDF export / clipboard
  * ------------------------------------------------------------------------ */
 async function exportPdf() {
+  if (!props.authenticated) {
+    emit('require-login');
+    return;
+  }
   if (isEditorMode.value) {
     if (!draftContent.value.trim()) {
       emit('toast', { title: '正文为空', message: '请先撰写正文后再生成 PDF。', type: 'WARN' });
@@ -989,6 +997,10 @@ function revokeFallbackUrl() {
 }
 
 async function copyRendered() {
+  if (!props.authenticated) {
+    emit('require-login');
+    return;
+  }
   const text = isEditorMode.value ? draftContent.value : renderedContent.value;
   if (!text || !text.trim()) {
     emit('toast', { title: '暂无可复制内容', message: '请先撰写或生成文书正文。', type: 'INFO' });

@@ -31,37 +31,37 @@ export const routes = [
     path: '/forum/:id?',
     name: 'forum',
     component: ForumView,
-    meta: { ...makerMeta, tab: 'forum', title: '头脑风暴', passSession: true },
+    meta: { public: true, tab: 'forum', title: '头脑风暴', passSession: true },
   },
   {
     path: '/products/:id?',
     name: 'products',
     component: ShowcaseView,
-    meta: { ...makerMeta, tab: 'product', title: '产品橱窗', passSession: true },
+    meta: { public: true, tab: 'product', title: '产品橱窗', passSession: true },
   },
   {
     path: '/policies/:id?',
     name: 'policies',
     component: PolicyView,
-    meta: { ...makerMeta, tab: 'policy', title: '政策中心', passSession: true },
+    meta: { public: true, tab: 'policy', title: '政策中心', passSession: true },
   },
   {
     path: '/demands/:id?',
     name: 'demands',
     component: DemandsView,
-    meta: { ...makerMeta, tab: 'demand', title: '需求集市' },
+    meta: { public: true, tab: 'demand', title: '需求集市' },
   },
   {
     path: '/sop/docs/:id?',
     name: 'sop-docs',
     component: SopView,
-    meta: { ...makerMeta, tab: 'sop', title: '流程文书' },
+    meta: { public: true, tab: 'sop', title: '流程文书' },
   },
   {
     path: '/sop/flows/:id?',
     name: 'sop-flows',
     component: SopView,
-    meta: { ...makerMeta, tab: 'sop', title: '流程文书' },
+    meta: { public: true, tab: 'sop', title: '流程文书' },
   },
   {
     path: '/sop/my-docs/:id',
@@ -85,19 +85,19 @@ export const routes = [
     path: '/sop/:view?',
     name: 'sop',
     component: SopView,
-    meta: { ...makerMeta, tab: 'sop', title: '流程文书' },
+    meta: { public: true, tab: 'sop', title: '流程文书' },
   },
   {
     path: '/perks/:id?',
     name: 'perks',
     component: PerksView,
-    meta: { ...makerMeta, tab: 'perks', title: '生态特权', passSession: true },
+    meta: { public: true, tab: 'perks', title: '生态特权', passSession: true },
   },
   {
     path: '/compliance/:id?',
     name: 'compliance',
     component: ComplianceView,
-    meta: { ...makerMeta, tab: 'compliance', title: '合规指南', passSession: true },
+    meta: { public: true, tab: 'compliance', title: '合规指南', passSession: true },
   },
   {
     path: '/membership',
@@ -244,7 +244,10 @@ router.beforeEach(async (to) => {
   // Verify the token once per boot. Deep links must not flash an empty shell.
   await ensureSession();
 
-  const requiresAuth = Boolean(to.meta.requiresAuth);
+  // A public module can also host protected publishing and personal workspace views.
+  const isCompose = to.meta.public && to.name !== 'home' && to.query.compose === '1';
+  const isPrivateSopView = to.meta.tab === 'sop' && ['mydocs', 'flows'].includes(to.query.view);
+  const requiresAuth = to.meta.requiresAuth || isCompose || isPrivateSopView;
   if (requiresAuth && !isAuthenticated.value) {
     return {
       name: 'home',
@@ -261,7 +264,7 @@ router.beforeEach(async (to) => {
     return { name: 'home' };
   }
 
-  if (to.meta.roles?.includes('ADMIN') && !isPlatformAdmin.value) {
+  if (to.meta.roles?.length === 1 && to.meta.roles[0] === 'ADMIN' && !isPlatformAdmin.value) {
     notify({
       title: '权限不足',
       message: '该页面仅对平台管理员开放。',

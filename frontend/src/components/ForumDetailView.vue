@@ -343,7 +343,7 @@
           <div class="empty-icon-ring">💡</div>
           <h4>暂无创客发布深度观点</h4>
           <p>成为第一个针对该议题发表实战经验与避坑复盘的创客！</p>
-          <button type="button" class="btn-liquid" @click="isWritingAnswer = true">
+          <button type="button" class="btn-liquid" @click="toggleComposer">
             <span>立即撰写第一个回答</span>
           </button>
         </div>
@@ -461,7 +461,7 @@
 
             <!-- Expandable Nested Discussion under this specific answer -->
             <div v-if="activeAnswerCommentId === ans.id" class="answer-sub-comments-box">
-              <div class="sub-comment-input-row">
+              <div v-if="currentUserId" class="sub-comment-input-row">
                 <input
                   v-model="subCommentDraft[ans.id]"
                   type="text"
@@ -478,6 +478,10 @@
                   发送
                 </button>
               </div>
+
+              <button v-else type="button" class="btn-liquid-outline" @click="$emit('require-login')">
+                登录后参与探讨
+              </button>
 
               <!-- List of comments for this answer -->
               <div v-if="getAnswerComments(ans.id).length > 0" class="sub-comments-list">
@@ -511,7 +515,7 @@
         </div>
 
         <!-- Reply Input Box -->
-        <div class="reply-input-box">
+        <div v-if="currentUserId" class="reply-input-box">
           <div v-if="replyTarget" class="replying-to-bar">
             <span>正在回复 @{{ replyTarget.authorName }}</span>
             <button type="button" class="btn-cancel-reply-target" @click="replyTarget = null">取消针对回复</button>
@@ -539,6 +543,10 @@
               <span>{{ isSubmitting ? '发送中...' : '发表见解' }}</span>
             </button>
           </div>
+        </div>
+
+        <div v-else class="reply-input-box">
+          <button type="button" class="btn-liquid-outline" @click="$emit('require-login')">登录后发表评论</button>
         </div>
 
         <!-- Comments Tree Render -->
@@ -688,7 +696,7 @@ const currentUserNick = computed(() => {
 });
 
 const currentUserRole = computed(() => {
-  return (props.userSession?.role || props.userSession?.user?.role || localStorage.getItem('opchub_current_role') || 'MAKER').toUpperCase();
+  return (props.userSession?.role || props.userSession?.user?.role || 'MAKER').toUpperCase();
 });
 
 function ownsResource(authorId) {
@@ -916,6 +924,10 @@ function scrollToDiscussions() {
 }
 
 function toggleComposer() {
+  if (!currentUserId.value) {
+    emit('require-login');
+    return;
+  }
   isEditing.value = false;
   isWritingAnswer.value = !isWritingAnswer.value;
 }
@@ -1193,6 +1205,10 @@ async function toggleCommentUpvote(item) {
 }
 
 function setReplyTarget(parentComment, subAuthorName = null) {
+  if (!currentUserId.value) {
+    emit('require-login');
+    return;
+  }
   replyTarget.value = {
     parentId: parentComment.id,
     authorName: subAuthorName || parentComment.author_name,
